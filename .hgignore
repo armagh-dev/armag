@@ -1,0 +1,10 @@
+syntax: glob
+.DS_Store
+*.swp
+*.orig
+.idea
+Gemfile.lock
+coverage
+doc
+.yardoc
+*.gem

@@ -1,0 +1,295 @@
+#!/usr/bin/env ruby
+#
+# Copyright 2016 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
+#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
+#            as part of the requirement as well as in the gemspec.
+
+require 'rubygems'
+require 'bundler/setup'
+
+require_relative '../lib/agent/agent'
+require_relative '../lib/agent/agent_status'
+require_relative '../lib/action/action_manager'
+require_relative '../lib/configuration/launcher_config'
+require_relative '../lib/connection'
+require_relative '../lib/ipc'
+require_relative '../lib/logging/global_logger'
+require_relative '../lib/version'
+
+require 'drb/unix'
+require 'fileutils'
+require 'socket'
+
+include Armagh
+
+TERM_SIGNALS = [:INT, :QUIT, :TERM]
+
+LOG_DIR = '/var/log/armagh'
+LOG_LOCATION = File.join(LOG_DIR, 'armagh.log')
+
+unless File.directory?(LOG_DIR)
+  begin
+    FileUtils.mkdir_p LOG_DIR
+  rescue Errno::EACCES
+    $stderr.puts "Log directory '#{LOG_DIR}' does not exist and could not be created.  Please create the directory and grant the user running armagh full permissions."
+    exit 1
+  end
+end
+
+raise "#{LOG_DIR}" unless File.directory? LOG_DIR
+
+unless Connection.can_connect?
+  $stderr.puts 'Unable to establish connection to the database. Ensure the database is running.' # TODO Output details about the configuration
+  exit 1
+end
+
+@logger = Logging::GlobalLogger.new('Armagh', LOG_LOCATION, 'daily')
+
+@hostname = Socket.gethostname
+@agents = {}
+@restart_agents = true
+
+def reconcile_agents
+  reported_agents = AgentStatus.get_statuses(@agent_status).keys
+  running_agents = @agents.values.collect{|a| a.uuid}
+
+  reported_not_running = reported_agents - running_agents
+  running_not_reported = running_agents - reported_agents
+
+  reported_not_running.each {|id| @agent_status.remove_agent(id) }
+
+  @logger.error "The following agents are reported but not running: #{reported_not_running}" unless reported_not_running.empty?
+  @logger.error "The following agents are running but not reporting: #{running_not_reported}" unless running_not_reported.empty?
+end
+
+def checkin(status)
+  @logger.debug "Checking In: #{status}"
+
+  checkin = {
+      'version' => VERSION,
+      'last_update' => Time.now,
+      'status' => status,
+
+      'agents' => AgentStatus.get_statuses(@agent_status),
+
+      'actions' => {'client' => {}, 'noragh' => {}},
+  }
+
+  checkin['actions']['client'] = {'name' => ClientActions::NAME, 'version' => ClientActions::VERSION} if defined? ClientActions
+  checkin['actions']['noragh'] = {'version' => NoraghActions::VERSION} if defined? NoraghActions
+
+  Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
+
+  @last_checkin = Time.now
+end
+
+def get_initial_log_level
+  config = Configuration::LauncherConfig.get_config
+  change_log_level(config['log_level'])
+end
+
+def apply_config(config)
+  if @last_config_timestamp.nil? || @last_config_timestamp < config['timestamp']
+    change_log_level(config['log_level'])
+    change_agent_configs(config)
+    change_num_agents(config['num_agents'])
+    @last_config_timestamp = config['timestamp']
+  elsif @last_config_timestamp > config['timestamp']
+    @logger.warn 'Attempted to apply a configuration that is older than the one currently applied to the system.  Ignoring.'
+  else
+    @logger.debug 'Ignoring configuration because the timestamp is the same as the last applied'
+  end
+end
+
+def change_log_level(level)
+  level_str = Logging::GlobalLogger::LEVEL_LOOKUP[level]
+  return if level == @logger.level
+
+  @logger.unknown "Changing log level to #{level_str}"
+
+  if level
+    @logger.level = level
+    @logger.unknown "Log level successfully changed to #{Logging::GlobalLogger::LEVEL_LOOKUP[@logger.level]}"
+  else
+    @logger.error "Unable to change log level.  Unknown log level from configuration: #{level_str}."
+  end
+end
+
+def change_agent_configs(config)
+  @agent_status.update_config('log_level', config['log_level'])
+  @agent_status.update_config('available_actions', config['available_actions'])
+  @agent_status.update_config('timestamp', config['timestamp'])
+  @agent_status.update_config(Time.now.to_s, Time.now)
+end
+
+def change_num_agents(num_agents)
+  running_agents = @agents.length
+  @logger.debug "Changing number of agents from #{running_agents} to #{num_agents}"
+
+  if running_agents < num_agents
+    @logger.info "Increasing number of agents from #{running_agents} to #{num_agents}"
+    launch_agents(num_agents - running_agents)
+  elsif running_agents > num_agents
+    @logger.info "Decreasing number of agents from #{running_agents} to #{num_agents}"
+    kill_agents(running_agents - num_agents)
+  end
+end
+
+def launch_agents(num_agents)
+  @logger.debug "Launching #{num_agents} agents"
+  num_agents.times do
+    start_agent_in_process
+  end
+end
+
+def kill_all_agents(signal = :SIGINT)
+  kill_agents(@agents.length, signal)
+end
+
+def kill_agents(num_agents, signal = :SIGINT)
+  num_agents.times do
+    killed_pid = stop_agent(signal)
+    agent_id = @agents[killed_pid].uuid
+    @agents.delete killed_pid
+    @agent_status.remove_agent(agent_id)
+  end
+end
+
+def recover_dead_agents
+  dead_agents = []
+  @agents.each do |pid, agent|
+    unless process_running(pid)
+      _pid, status = Process.wait2(pid)
+      @logger.warn "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
+      dead_agents << agent
+      agent_id = @agents[pid].uuid
+      @agents.delete(pid)
+      @agent_status.remove_agent(agent_id)
+    end
+  end
+
+  dead_agents.each do |agent|
+    start_agent_in_process(agent)
+  end
+end
+
+def process_running(pid)
+  Process.getpgid( pid )
+  true
+rescue Errno::ESRCH
+  false
+end
+
+def start_agent_in_process(agent=nil)
+  agent ||= Agent.new(AgentStatus.get_config(@agent_status))
+
+  pid = Process.fork do
+    TERM_SIGNALS.each do |signal|
+      trap(signal) {agent.stop}
+    end
+    agent.start
+  end
+
+  @agents[pid] = agent
+end
+
+def stop_agent(signal)
+  pid = @agents.keys.first
+  Process.kill(signal, pid)
+  pid = Process.wait
+  pid
+end
+
+def shutdown(signal)
+  Thread.new{ @logger.unknown "Received #{signal}.  Shutting down once agents finish" }
+  @running = false
+  Thread.new{ kill_all_agents(signal) }
+end
+
+def load_actions
+  begin
+    require 'armagh/client_actions'
+    @logger.info "Using Client Actions: #{ClientActions::NAME} (#{ClientActions::VERSION})"
+  rescue LoadError
+    @logger.warn "ClientActions gem is not deployed. These actions won't be available."
+  end
+
+  begin
+    require 'armagh/noragh_actions'
+    @logger.info "Using Noragh Actions: #{NoraghActions::VERSION}"
+  rescue LoadError
+    @logger.warn "NoraghActions gem is not deployed. These actions won't be available."
+  end
+
+  @logger.warn 'No available actions.  Please make sure noragh and/or client actions are installed.' if ActionManager.available_actions.empty?
+end
+
+# Stop agents before stopping armagh
+TERM_SIGNALS.each do |signal|
+  trap(signal) { shutdown(signal) }
+end
+
+## Execution ##
+begin
+  @logger.unknown 'Armagh started'
+
+  @agent_status = AgentStatus.new
+  @agent_status.config = {'log_level' => @logger.level, 'timestamp' => Time.new(0)}
+
+  DRb.start_service(IPC::DRB_URI, @agent_status)
+
+  @config = Configuration::LauncherConfig.get_config
+  change_log_level(@config['log_level'])
+
+  load_actions
+
+  @running = true
+
+  apply_config(@config)
+  checkin('running')
+
+  while @running do
+    if @last_checkin < Time.now - @config['checkin_frequency']
+      reconcile_agents
+      @config = Configuration::LauncherConfig.get_config
+      apply_config(@config)
+      checkin('running')
+    end
+
+    recover_dead_agents
+    sleep 1
+  end
+
+rescue => e
+  @logger.error 'An unexpected error occurred'
+  @logger.error e
+  checkin('Stopped')
+  sleep 1
+  Process.kill(:SIGINT, 0)
+end
+
+checkin('Stopping')
+
+Process.waitall
+DRb.stop_service
+
+checkin('Stopped')
+
+@logger.unknown 'Armagh stopped'

@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+#
+# Copyright 2016 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
+#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
+#
+
+gem 'daemons', '~> 1.2'
+require 'daemons'
+
+require_relative '../lib/agent/agent'
+
+file = File.join(File.dirname(__FILE__), 'armagh-agents')
+
+options = {
+    force_kill_waittime: 86_400,  # We need to be careful about force killing.  We'd rather agents finish their processing and stop gracefully.
+    monitor: true,                # Restart armagh if it dies
+    backtrace: true,              # If there was an uncaught exception that caused termination, log it
+    app_name: 'armagh-agentsd',          # Give the daemon a clean name
+    dir_mode: :normal,            # Allows custom PID directory
+    dir: '/tmp/armagh'            # Default PID directory
+}
+
+Daemons.run(file, options)

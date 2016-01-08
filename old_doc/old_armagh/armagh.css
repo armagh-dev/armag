@@ -1,0 +1,49 @@
+body { width: 1200px; 
+       font-family: 'Open Sans', sans-serif;
+		 }
+
+h1 {   
+	     background: url(nai.png) right bottom no-repeat, url(banner_bg.png) left top repeat-y;
+	background-size: contain, contain;
+		  padding-top: 100px;
+		 padding-left: 10px;
+		 padding-bottom: 5px;
+	          color: white;
+			font-family: 'Open Sans', sans-serif;
+					vertical-align: text-bottom;
+				  }
+					
+#corptag {
+	      background: #3A7728;
+	      margin-top: -21px;
+	           width: 100%;
+	      	 padding: 4px;
+	     font-family: 'Open Sans', sans-serif;
+	      text-align: right;
+	           color: white;
+			  box-sizing: border-box;
+   -moz-box-sizing: border-box;
+-webkit-box-sizing: border-box;
+}
+
+div.half-page-column {
+  width: 45%;
+	padding: 5px;
+	float: left;
+}
+
+div#foot { width:100%;}
+div#foot .prev { width:31%; padding:5px; float:left;}
+div#foot .over { width:31%; padding:5px; float:left; text-align: center;}
+div#foot .next { width:31%; padding:5px; float:left; text-align: right;}
+
+.center { text-align: center;}
+p, li { font-size: 12px; margin-top: 5px;}
+td { font-size: 12px; vertical-align: top; padding-top: 5px; padding-right:5px;}
+th { font-size: 12px; vertical-align: top; padding-top: 5px; padding-right:5px; emphasis: bold;}
+a:link { color: #aa0000; text-decoration: none;}
+
+a:visited { color: #aa0000;}
+a:hover { color: #999900;}
+
+table { border:0;}

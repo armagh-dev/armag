@@ -1,0 +1,40 @@
+<html>
+  <head>
+	  <title>Armagh ETL - Document</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Document - Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics, Inc</div>
+			<div class="half-page-column">
+				<div class=center><img src="document.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">	
+					<h3>The Document's Role</h3>
+					<p>A document is a work collected by provisioners or created by scribes.</p>
+					<h3>The Document's Attributes</h3>
+          <table>
+						<tr><td><b>id</b></td><td>Unique ID for the document task (not the document)</td></tr>
+						<tr><td><b>document_id</b></td><td>Unique ID for the document</td></tr>
+						<tr><td><b>agreement_id</b></td><td>Unique ID of the source agreement under which it was collected</td></tr>
+						<tr><td><b>source_guid</b></td><td>The unique ID of the document as assigned by the source, if available</td></tr>
+						<tr><td><b>title</b></td><td>The title of the document</td></tr>
+						<tr><td><b>publication_ts</b></td><td>Publication date of the document</td></tr>
+						<tr><td><b>format</b></td><td>Format (mime-type or other attribute) of the document</td></tr>
+						<tr><td><b>encoding</b></td><td>Character encoding of the document</td></tr>
+						<tr><td><b>language</b></td><td>Human language in which the document is written</td></tr>
+						<tr><td><b>path</b></td><td>Path to persisted image of the document</td></tr>
+						<tr><td><b>errors</b></td><td>Errors related to the document itself (bad HTML for example)</td></tr>
+						<tr><td><b>source_document_id</b></td><td>(Attribute in translated docs only) Document ID of the original</td></tr>
+						<tr><td><b>translations</b></td><td>(Attribute in original documents only)
+							<table>
+								<tr><td><b>target</b></td><td>Target document file form</td></tr>
+								<tr><td><b>document_id</b></td><td>Unique ID of the translated document</td></tr>
+						</table></td></tr>
+					</table>
+							
+						
+		</div>
+	</body>
+</html>
+	

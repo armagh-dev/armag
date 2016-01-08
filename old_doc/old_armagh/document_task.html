@@ -1,0 +1,43 @@
+<html>
+  <head>
+	  <title>Armagh ETL - Document Task</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Document Task - Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics Inc</div>
+			<div class="half-page-column">
+				<div class=center><img src="document_task.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">	
+				<h3>The Document Task's Role</h3>
+				<p>The document task tracks the progress of an individual document through the scriptorium.</p>
+				<h3>The Document Task's Attributes</h3>
+        <table>
+					<tr><td><b>id</b></td><td>Unique ID for the document task (not the document)</td></tr>
+					<tr><td><b>document_id</b></td><td>Unique ID for the original document</td></tr>
+					<tr><td><b>agreement_id</b></td><td>Unique ID of the source agreement under which it was collected</td></tr>
+					<tr><td><b>pile_id</b></td><td>Unique ID of the pile and pile task to which this document belongs</td></tr>
+					<tr><td><b>publication_ts</b></td><td>Publication date of the document</td></tr>
+					<tr><td><b>provisioner_ts</b></td><td>Time the document was collected by the provisioner</td></tr>
+					<tr><td><b>translations</b></td><td>One of the following for each different target translation of this original:
+						<table>
+						<tr><td><b>target</b></td><td>Target document file form</td></tr>
+						<tr><td><b>scribe_id</b></td><td>PID or other unique ID of the scribe claiming the task</td></tr>
+						<tr><td><b>claim_ts</b></td><td>Time the scribe claimed the translation task</td></tr>
+						<tr><td><b>started_ts</b></td><td>Time after pulling the source document that the scribe started the translation</td></tr>
+						<tr><td><b>completed_ts</b></td><td>Time the scribe completed the translation, before persisting</td></tr>
+						<tr><td><b>saved_ts</b></td><td>Time the scribe completed saving the translated work</td></tr>
+						<tr><td><b>document_id</b></td><td>Unique ID of the translated document</td></tr>
+						<tr><td><b>errors</b></td><td>List of errors encountered attempting to complete translation that are not document-related (resource failure, etc)</td></tr>
+					</table></td></tr>
+				</table>
+				<div id="foot">
+					<div class="prev"><p><a href="pile_task.html"> < Pile Task</a></p></div>
+					<div class="over"><p><a href="overview.html">Overview </a></p></div>
+					<div class="next"><p><a href="document.html">Document ></a></p></div>
+				</div>
+		</div>
+	</body>
+</html>
+	

@@ -1,0 +1,94 @@
+<html>
+  <head>
+	  <title>Armagh ETL - Source Agreement</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics, Inc.</div>
+			<div class="half-page-column">
+				<div class=center><img src="source_agreement.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">	
+			<h3>The Source Agreement's Role</h3>
+			<p>The source agreement provides the technical details and current status of the interface
+				between a provisioner and a source.</p>
+			<h3>The Source Agreement's Attributes</h3>
+		  <table>
+				<tr><td><b>id</b></td></td>Unique ID</td></tr>
+				<tr><td><b>name</b></td><td>Unique name for the agreement</td></tr>
+				<tr><td><b>contract</b></td><td>Collection protocol, credentials and arguments.  One of:
+					<table>
+						<tr><th>protocol</th><th colspan='2' align='left'>arguments</th></tr>
+						<tr><td><b>:http</b></td><td>
+							    host: <i>hostname or IP</i><br/> 
+									user: <i>username</i><br/>
+									password: <i>b-auth pw</i></td><td>
+									port: <i>port number (opt)</i><br/>
+									url: <i>full URL</i><br/>
+									query_params: { <i>params (opt)</i> }<br/>
+									post_params: { <i>params (opt)</i> } </td></tr>
+						<tr><td><b>:https</b></td><td>
+							    host: <i>hostname or IP</i><br/> 
+									user: <i>username</i><br/>
+									password: <i>b-auth pw (opt)</i><br/>
+									certpath:</td><td>
+									keypath:<br/>
+									port: <i>port number (opt)</i><br/>
+									url: <i>full URL</i><br/>
+									query_params: { <i>params (opt)</i> }<br/>
+									post_params: { <i>params (opt)</i> } </td></tr>
+						<tr><td><b>:rss</b></td><td>
+							    host: <i>hostname or IP</i><br/> 
+									user: <i>username</i><br/>
+									password: <i>b-auth pw (opt)</i><br/>
+									certpath:</td><td>
+									keypath:<br/>
+									port: <i>port number (opt)</i><br/>
+									url: <i>full URL</i><br/>
+									query_params: { <i>params (opt)</i> }<br/></td></tr>
+						<tr><td><b>:ftp</b></td><td>
+							    host: <i>hostname or IP</i><br/> 
+									user: <i>username</i><br/>
+									password: <i>b-auth pw</i></td><td>
+									port: <i>port number (opt)</i><br/>
+									dir: <i>source directory (opt)</i><br/>
+									pattern: <i>filename pattern (opt)</i></td></tr>
+						<tr><td><b>:sftp</b></td><td>
+							    host: <i>hostname or IP</i><br/> 
+									user: <i>username</i><br/>
+									password: <i>b-auth pw</i><br/>
+									keypath:<br/>
+									port: <i>port number (opt)</i><br/>
+									dir: <i>source directory (opt)</i><br/>
+									pattern: <i>filename pattern (opt)</i></td></tr>
+						<tr><td><b>:local</b></td><td>
+									dir: <i>source directory</i><br/>
+									pattern: <i>filename pattern (opt)</i></td></tr>
+						<tr><td><b>:archive</b></td><td>
+									<i>parameters as appropriate for archive design</i>
+								</td></tr></table>
+						</td></tr>
+						<tr><td><b>schedule</b></td><td>cron-equivalent timing at which collection should be attempted</td></tr>
+						<tr><td><b>tracking</b></td><td>method by which provisioner should prevent duplicate collections:
+							<ul><li><b>:delete</b> - delete successfully collected and archived files from source</li>
+								<li><b>:hash</b> - retain hash of the body for a fixed period of time</li>
+								<li><b>:title</b> - retain title of the document for a fixed period of time</li>
+              </ul>
+						</td></tr>
+					  <tr><td><b>archive</b></td><td>Archive path (opt - delete work after all deliveries complete otherwise)</td></tr>
+						<tr><td><b>status</b></td><td>Current status of interface; :ok | :suspended | :failed</td></tr>
+						<tr><td><b>errors</b></td><td>Error details if currently failed (opt)</td></tr>
+						<tr><td><b>last_pile_id</b></td><td>ID of last successfully collected pile</td></tr>
+						<tr><td><b>last_pile_ts</b></td><td>Completion timestamp of last successfully collected pile</td></tr>
+						<tr><td><b>transcriptions</b></td><td>List of expected transcription targets</td></tr>
+					</table>									
+			<div id="foot">
+				<div class="prev"><p><a href="resource.html"> < Resource</a></p></div>
+				<div class="over"><p><a href="overview.html">Overview </a></p></div>
+				<div class="next"><p><a href="pile_task.html">Pile Task ></a></p></div>
+			</div>
+		</div>
+	</body>
+</html>
+	

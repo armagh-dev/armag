@@ -1,0 +1,52 @@
+<html>
+  <head>
+	  <title>Armagh - the Abbot</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics Inc</div>
+			<div class="half-page-column">
+				<div class=center><img src="abbot.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">
+				<h3>The Abbot's Role</h3>	
+				<p>The abbot oversees the operations of the scriptorium.  He ensures that there are enough
+					provisioners, scribes and librarians in the abbey to get the work done.  Our abbot has
+					a very light touch, though, so he doesn't actually assign tasks to individual workers.  Instead,
+					as workers do their jobs, they will post, claim, update and close tasks.</p>
+        <h3>The Abbot's Behaviors</h3>
+				<ul>
+					<li>The abbot periodically adjusts the number of workers to ensure that:
+						<ul>
+							<li> the number of <a href='provisioner.html'>provisioners</a> is appropriate for the current work load, based
+						on the scriptorium's <a href='source_agreement.html'>source agreements</a> and the available compute and
+						network <a href="resources.html">resources</a>. </li>
+					    <li>the number of <a href='scribe.html'>scribes</a> is appropriate for the current work load, based on
+						the current unclaimed <a href='tasks.html#documents'>document tasks</a> and the available compute and I/O 
+						<a href="resources.html">resources</a>.</li>
+					    <li>the number of <a href="librarian.html">librarians</a> is appropriate for the current work load, based on
+						the current number of unclaimed <a href='pile_task.html'>pile tasks</a>, the scriptorium's 
+						<a href="customer_agreement.html">customer agreements</a>, and the available compute and I/O
+						<a href="resource.html">resources</a>.</li>
+						  <li>the number of <a href='archivist.html'>archivists</a> is appropriate for the current work load, based 
+								on the current number of unarchived <a href='pile_task.html'>pile tasks</a> and the available compute 
+								and I/O <a href="resourcedf.html">resources</a>.</li>
+						</ul></li>
+					<li>The abbot periodically verifies the health of the <a href="prior.html">prior</a> 
+						and all <a href='provisioner.html'>provisioners</a>,
+						<a href='scribe.html'>scribes</a>, and <a href="librarian.html">librarians</a> 
+						and, if they are unresponsive, will remove them
+						from service and put their <a href='tasks.html'>tasks</a> back into the task pool.</li>
+					<li>The abbot notifies the <a href='administrator.html'>administrator</a> if he is unable to carry out these functions.</li>
+					<li>The abbot shuts itself down if it detects another abbot with a higher process ID.</li>
+				</ul>
+				<div id="foot">
+					<div class="prev"><p><a href="administrator.html"> < Administrator</a></p></div>
+					<div class="over"><p><a href="overview.html">Overview</a></p></div>
+					<div class="next"><p><a href="prior.html">Prior ></a></p></div>
+				</div>
+			</div>		
+	</body>
+</html>
+	

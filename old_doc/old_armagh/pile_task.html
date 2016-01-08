@@ -1,0 +1,47 @@
+<html>
+  <head>
+	  <title>Armagh - Pile Task</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics, Inc</div>
+			<div class="half-page-column">
+				<div class=center><img src="pile_task.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">	
+				<h3>The Pile Task's Role</h3>
+				<p>The pile task plays a particularly purposeful part in the process.  It keeps track of the progress
+					of a set of documents as it goes through the scriptorium.</p>
+				<p>Documents are grouped together in piles to help maintain documents in time order.  It is assumed
+					that a pile represents all the documents for the time period covered by the pile.  If piles are 
+					delivered to librarians in time order, and the documents within each pile are delivered in time 
+					order, the customer will get all documents in time order.</p>
+				<h3>The Pile Task's Attributes</h3>
+				<table>
+					<tr><td><b>id</b></td><td>Unique ID for the task and the pile collected by it</td></tr>
+					<tr><td><b>agreement_id</b></td><td>The ID of the agreement under which the pile was collected</td></tr>
+					<tr><td><b>data_start_ts</b></td><td>The earliest data in the pile<sup>1</sup></td></tr>
+					<tr><td><b>data_end_ts</b></td><td>The latest data in the pile<sup>1</sup></td></tr>
+					<tr><td><b>posted_ts</b></td><td>The time the task was posted</td></tr>
+					<tr><td><b>posted_by</b></td><td>The generator of the request: abbot | administrator_user_id</td></tr>
+					<tr><td><b>claimed_by</b></td><td>The server and process ID of the provisioner that claimed the task</td></tr>
+					<tr><td><b>claimed_ts</b></td><td>The time the provisioner claimed the task</td></tr>
+					<tr><td><b>completed_ts</b></td><td>The time the provisioner completed the ask</td></tr>
+					<tr><td><b>n_docs_attempted</b></td><td>Number of documents the provisioner attempted to collect</td></tr>
+					<tr><td><b>n_docs_collected</b></td><td>Number of documents the provisioner successfully collected</td></tr>
+					<tr><td><b>collection_errors</b></td><td>List of the errors encountered during a collection</td></tr>
+					<tr><td><b>customers</b></td><td>List of the customers expected to want transcriptions of these documents,
+						and the status of the librarian's packaging of those transcriptions</td></tr>
+				</table>
+				<div id="foot">
+					<div class="prev"><p><a href="source_agreement.html"> < Source Agreement</a></p></div>
+					<div class="over"><p><a href="overview.html">Overview </a></p></div>
+					<div class="next"><p><a href="document_task.html">Document Task ></a></p></div>
+				</div>
+				
+			</div>	
+		</div>
+	</body>
+</html>
+	

@@ -1,0 +1,37 @@
+<html>
+  <head>
+	  <title>Armagh ETL - Customer Agreement</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics, Inc</div>
+			<div class="half-page-column">
+				<div class=center><img src="agreement.png" height=360 width=480></div>
+			</div>
+			<div class="half-page-column">	
+				<h2>Source Agreement</h2>
+					<h3>The Source Agreement's Role</h3>
+					<h3>The Source Agreement's Attributes and Interface</h3>
+					
+					<pre>
+	Agreement
+	 - id
+	 - name (unique)
+	 - configuration
+	     sftp:  host user password certpath keypath port dir pattern 
+			 ftp:   host user password port dir pattern 
+			 rsync: host user password certpath keypath dir pattern
+			 rss:   host user password certpath keypath url
+			 local: dir pattern
+	 - schedule (cron-style)
+	 - last_pile { id, gathered }
+	 - accounting-strategy: delete, hash, title, guid
+	 - retention-policy: archive-original: path, archive-translations:path, delete-after-distributed
+	 - status: ok suspended failed
+	 - targets
+ </pre>
+		</div>
+	</body>
+</html>
+	

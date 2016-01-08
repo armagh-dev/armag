@@ -1,0 +1,39 @@
+<html>
+  <head>
+	  <title>Milkshake Diversified</title>
+		<link rel="stylesheet" type="text/css" href="./armagh.css">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,800' rel='stylesheet' type='text/css'>	</head>
+	<body>
+		<h1>Armagh ETL</h1>
+		<div id="corptag">(c) 2014 Noragh Analytics, Inc.</div>
+		<div class="half-page-column">
+			<div class=center><img src="provisioner.png" height=360 width=480></div>
+		</div>
+		<div class="half-page-column">	
+			<h3>The Provisioner's Role</h3>
+				<p>The provisioner collects piles of documents from sources and tees them up for transcription.</p>
+      <h3>The Provisioner's Behaviors</h3>
+			<ul>
+			  <li>The provisioner monitors the task pool to find the next unclaimed <a href="pile_task.html">pile task</a> 
+					and claims it.</li>
+        <li>After the provisioner successfully claims a <a href="pile_task.html">pile task</a>, it collects a 
+					pile of <a href="document.html">documents</a> from a source according to its 
+					<a href="source_agreement.html">agreement</a>, and stores them with <a href="works.html">works</a>.</li>
+				<li>After the provisioner successfully collects and stores a pile
+					of <a href="document.html">documents</a>, it creates and posts <a href="document_task.html">document tasks</a> for
+					<a href="scribe.html">scribes</a> to transcribe the documents, and updates the <a href='pile_task.html'>pile task</a> 
+					to alert <a href="librarian.html">librarians</a> that a new pile is being worked.</li>
+				<li>If the provisioner encounters errors while attempting to contact a source to collect a pile, it updates the
+					pile <a href="pile_task.html">task</a> with the errors.</li>
+				<li>If the provisioner encounters errors while attempting to pull specific documents in a pile, it includes the
+					errors in the <a href="document_task.html">document task</a>.</li>
+			</ul>
+			<div id="foot">
+				<div class="prev"><p><a href="prior.html"> < Prior</a></p></div>
+				<div class="over"><p><a href="overview.html">Overview </a></p></div>
+				<div class="next"><p><a href="scribe.html">Scribe ></a></p></div>
+			</div>
+	  </div>
+	</body>
+</html>
+	
