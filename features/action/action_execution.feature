@@ -51,3 +51,21 @@ Feature: Actions Execution
     Then I should see an agent with a status of "idle" within 5 seconds
     And I should see a "TestDocumentInput" with 0 pending actions
     And I should see a "TestDocumentOutput" with 0 pending action
+
+  Scenario: Have a document to work on with defaults
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's launcher config is
+      | num_agents        | 1 |
+      | checkin_frequency | 1 |
+      | available_actions | sleep_action_default |
+    And I run armagh
+    And I wait 2 second
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 document for "sleep_action_default" processing
+    Then I should see an agent with a status of "running" within 5 seconds
+    Then I should see an agent with a status of "idle" within 5 seconds
+    And I should see a "SleepInputDocument" with 0 pending actions
+    And I should see a "SleepOutputDocument" with 0 pending action

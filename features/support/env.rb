@@ -19,13 +19,15 @@ require_relative '../../test/test_helpers/coverage_helper'
 require_relative 'launcher_support'
 require_relative 'log_support'
 require_relative 'mongo_support'
-require_relative 'test_action_support'
+require 'armagh/client_actions'
 
 require 'fileutils'
 
 FileUtils::mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
 
-TestActionSupport.install_test_actions
+if Armagh::ClientActions::NAME != 'armagh_test'
+  raise "The client actions gem that needs to be installed for testing is 'armagh_test-client_actions'.  '#{Armagh::ClientActions::NAME}-client_actions' was loaded instead."
+end
 
 Before do
   LogSupport.delete_logs

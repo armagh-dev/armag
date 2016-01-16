@@ -53,6 +53,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'mocha', '~> 1.1'
   spec.add_development_dependency 'sys-proctable', '~> 0.9'
   spec.add_development_dependency 'yard', '~> 0.8'
+  spec.add_development_dependency 'armagh_test-client_actions'
 
   # Treat the actions as optional.  This only matters if the script is run w/in the context of a bundle
   names = Gem::Specification.each.collect { |spec| spec.name if spec.name.end_with? '-client_actions' }.compact.uniq

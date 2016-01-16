@@ -18,7 +18,13 @@
 require_relative '../../lib/document/document'
 
 When(/^I insert (\d+) documents* for "([^"]*)" processing$/) do |num_docs, action_type|
+  if action_type == 'sleep_action_default'
+    doc_type = 'SleepInputDocument'
+  else
+    doc_type = 'TestDocumentInput'
+  end
+
   num_docs.to_i.times do
-    Armagh::Document.create('TestDocumentInput', nil, nil, [action_type])
+    Armagh::Document.create(doc_type, nil, nil, [action_type])
   end
 end

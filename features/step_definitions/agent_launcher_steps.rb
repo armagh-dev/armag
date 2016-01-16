@@ -58,7 +58,16 @@ When(/^armagh's launcher config is$/) do |table|
         'input_doctype' => 'TestDocumentInput',
         'output_doctype' => 'TestDocumentOutput',
         'action_class_name' => 'ClientActions::SleepAction',
-        'config' => {}
+        'config' => {'seconds' => 2}
+    }
+  end
+
+  if specified_actions&.include? 'sleep_action_default'
+    available_actions['sleep_action_default'] = {
+        'input_doctype' => Armagh::ClientActions::SleepAction.default_input_doctype,
+        'output_doctype' => Armagh::ClientActions::SleepAction.default_output_doctype,
+        'action_class_name' => 'ClientActions::SleepAction',
+        'config' => {'seconds' => Armagh::ClientActions::SleepAction.defined_parameters['seconds']['default']}
     }
   end
 
