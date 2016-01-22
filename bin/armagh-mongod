@@ -1,0 +1,90 @@
+
+
+DBPATH=${ARMAGH_DATA}
+
+function start_mongo
+{
+  [[ -d ${ARMAGH_CONFIG}/mongo ]] || return
+  pushd ${ARMAGH_CONFIG}/mongo 1>/dev/null 2>&1
+  for x in `ls mongod-* 2>/dev/null`
+  do
+    mongod -f $x
+  done
+  for x in `ls mongos-* 2>/dev/null`
+  do
+    mongos -f $x
+  done
+  popd 1>/dev/null 2>&1
+}
+
+function stop_mongo
+{
+  [[ -d ${ARMAGH_PID} ]] || return
+  pushd ${ARMAGH_PID} 1>/dev/null 2>&1
+  for x in `ls mongos-* 2>/dev/null`
+  do
+    kill `cat $x`
+    rm $x
+  done
+  for x in `ls mongod-* 2>/dev/null`
+  do
+    kill `cat $x`
+    rm $x
+  done
+  popd 1>/dev/null 2>&1
+}
+
+function mongo_status
+{
+  if [[ -d ${ARMAGH_CONFIG}/mongo && -d ${ARMAGH_PID} ]]; then 
+  
+    local num_mongo_configs
+    local num_mongo_not_running
+  
+    for mongo_type in mongod mongos
+    do
+      num_mongo_configs=`ls ${ARMAGH_CONFIG}/mongo/${mongo_type}-* 2>/dev/null| wc -l`
+  
+      if [[ ${num_mongo_configs} -eq 0 ]]; then
+        echo "No ${mongo_type} configs defined"
+      else 
+        num_mongo_not_running=$num_mongo_configs
+        for x in `ls ${ARMAGH_PID}/${mongo_type}-* 2>/dev/null`
+        do
+          pid=`cat $x`
+          if [[ `ps -p $pid` ]]; then
+            num_mongo_not_running=$(( $num_mongo_not_running - 1 ))
+          fi
+        done
+        if [[ $num_mongo_not_running -eq 0 ]]; then
+          echo "All ${num_mongo_configs} ${mongo_type} running"
+        else
+          echo "Of ${num_mongo_configs} ${mongo_type} expected, ${num_mongo_not_running} are not running."
+        fi
+      fi
+    done
+  else
+    echo "Can't find config and/or PID directories"
+  fi
+}
+
+op=$1
+case $op in
+  start) 
+    start_mongo
+    ;;
+  stop)
+    stop_mongo
+    ;;
+  restart)
+    $0 stop
+    $0 start
+    ;;
+  status)
+    mongo_status
+    ;;
+  *)
+    >&2 echo "usage: $0 [start|stop|restart|status]"
+    ;;
+esac
+      

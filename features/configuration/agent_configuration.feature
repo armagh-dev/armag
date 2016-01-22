@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-@agent
+@agent @config
 Feature: Agent Configuration
   Instead of configuring each agent at runtime
   I want to be able to change their configuration dynamically
@@ -25,9 +25,12 @@ Feature: Agent Configuration
     And mongo is running
     And mongo is clean
     And the logs are emptied
-    When armagh's launcher config is
+    When armagh's "launcher" config is
       | log_level         | info |
       | checkin_frequency | 1 |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | log_level         | info |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
@@ -39,18 +42,24 @@ Feature: Agent Configuration
     And mongo is running
     And mongo is clean
     And the logs are emptied
-    When armagh's launcher config is
+    When armagh's "launcher" config is
       | log_level         | warn |
       | checkin_frequency | 1 |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | log_level         | warn |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
     Then the logs should contain 'WARN'
     But the logs should not contain 'INFO'
     And the logs should not contain 'DEBUG'
-    When armagh's launcher config is
+    When armagh's "launcher" config is
       | log_level         | info |
       | checkin_frequency | 1 |
+      | timestamp         | 2015-01-01 11:01:00 |
+    And armagh's "agent" config is
+      | log_level         | info |
       | timestamp         | 2015-01-01 11:01:00 |
     And I wait 1 seconds
     And the logs are emptied
@@ -58,27 +67,26 @@ Feature: Agent Configuration
     Then the logs should not contain 'DEBUG'
     But the logs should contain 'INFO'
 
-  Scenario: Decrease log level
+  Scenario: Create an older configuration
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
     And the logs are emptied
-    When armagh's launcher config is
-      | log_level         | debug |
+    When armagh's "launcher" config is
+      | log_level         | warn |
       | checkin_frequency | 1 |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | log_level         | warn |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
-    Then the logs should contain 'DEBUG'
-    And the logs should contain 'INFO'
-    And the logs should contain 'WARN'
-    When armagh's launcher config is
-      | log_level         | warn |
-      | checkin_frequency | 1 |
-      | timestamp         | 2015-01-01 11:01:00 |
-    And I wait 1 seconds
-    And the logs are emptied
+    Then the logs should contain 'WARN'
+    But the logs should not contain 'INFO'
+    And the logs should not contain 'DEBUG'
+    And armagh's "agent" config is
+      | log_level         | debug |
+      | timestamp         | 2015-01-01 10:00:00 |
     And I wait 5 seconds
     Then the logs should not contain 'DEBUG'
     And the logs should not contain 'INFO'
-    But the logs should contain 'WARN'

@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+#
+# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
+#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
+#
+
+gem 'daemons', '~> 1.2'
+require 'daemons'
+
+file =  File.join(File.dirname(__FILE__), 'armagh-application-admin')
+
+options = {
+    force_kill_waittime: 86_400,   
+    monitor: true,                # Restart mongod if it dies
+    backtrace: true,              # If there was an uncaught exception that caused termination, log it
+    app_name: 'armagh-app-admind',    # Give the daemon a clean name
+    dir_mode: :normal,            # Allows custom PID directory
+    dir: '/var/log/armagh'        # Default PID directory.  Can't sep PID and log dir for daemons.
+}
+
+Daemons.run(file, options)

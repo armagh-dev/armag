@@ -20,8 +20,6 @@ require_relative 'action_instance'
 module Armagh
   class ActionManager
 
-    attr_reader :actions
-
     def initialize(caller, logger)
       @caller = caller
       @logger = logger
@@ -51,7 +49,7 @@ module Armagh
               action = ActionInstance.new(name, input_doctype, output_doctype, @caller, @logger, config, action_class_name)
             rescue NameError => e
               @logger.error "Action '#{name}' could not be created.  #{action_class_name} is an unknown class."
-              @logger.debug "Available classes are #{Object.constants}"
+              @logger.debug "Available classes are #{self.class.available_actions}"
               action = nil
             end
           end

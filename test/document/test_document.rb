@@ -120,13 +120,31 @@ class TestDocument < Test::Unit::TestCase
     assert_false(@doc.pending_work)
   end
 
-  def test_lock
-    mock_document_update_one
-    assert_false(@doc.locked?)
-    @doc.lock
-    assert_true(@doc.locked?)
-    @doc.unlock
-    assert_false(@doc.locked?)
+  def test_failed_actions
+    assert_empty(@doc.failed_actions)
+
+    failures = [
+        {name: 'failed_action', details: RuntimeError.new('runtime error')},
+        {name: 'failed_action2', details: 'string error'},
+    ]
+    failures.each {|f| @doc.add_failed_action(f[:name], f[:details])}
+
+    assert_equal(2, @doc.failed_actions.length)
+
+    failures.each do |failure|
+      name = failure[:name]
+      details = failure[:details]
+      assert_true(@doc.failed_actions.has_key? name)
+      db_details = @doc.failed_actions[name]
+      if details.is_a? Exception
+        assert_equal(details.message, db_details['message'])
+        assert_equal(details.backtrace, db_details['trace'])
+      else
+        assert_equal(details, db_details['message'])
+      end
+
+    end
+
   end
 
   def test_timestamps
@@ -143,4 +161,5 @@ class TestDocument < Test::Unit::TestCase
     assert_not_equal(doc.created_timestamp, doc.updated_timestamp)
     assert_true(doc.created_timestamp < doc.updated_timestamp)
   end
+
 end

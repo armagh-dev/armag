@@ -41,14 +41,13 @@ module Armagh
       db_doc ? Document.new(db_doc) : nil
     end
 
-    def self.get_for_processing
+    def self.get_for_processing(num = 1)
       # TODO find a document in the following order
       #  Oldest -> Newest: No local agent picked up for too long
       #  Oldest -> Newest: local
       # TODO Doc must be in a valid state
-      # TODO Doc must not be locked
-      # TODO lock the doc
-      db_doc = Connection.documents.find_one_and_update({'pending_work' => true}, {'$set' => {'locked': true }}, :return_document => :after)
+      # TODO Ability to pull multiple documents
+      db_doc = Connection.documents.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, :return_document => :after)
       db_doc ? Document.new(db_doc) : nil
     end
 
@@ -57,7 +56,7 @@ module Armagh
     end
 
     protected def initialize(image = {})
-      @db_doc = {'meta' => {}, 'content' => nil, 'md5' => nil, 'type' => nil, 'pending_actions' => [], 'locked' => false, 'pending_work' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
+      @db_doc = {'meta' => {}, 'content' => nil, 'md5' => nil, 'type' => nil, 'pending_actions' => [], 'failed_actions' => {}, 'locked' => false, 'pending_work' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
     end
 
@@ -98,6 +97,7 @@ module Armagh
       @db_doc['type']
     end
 
+
     def updated_timestamp
       @db_doc['updated_timestamp']
     end
@@ -116,6 +116,22 @@ module Armagh
       update_pending_work
     end
 
+    def add_failed_action(action, details)
+      if details.is_a? Exception
+        @db_doc['failed_actions'][action] = {'message' => details.message, 'trace' => details.backtrace}
+      else
+        @db_doc['failed_actions'][action] = {'message' => details.to_s}
+      end
+    end
+
+    def remove_failed_action(action)
+      @db_doc['failed_actions'].delete(action)
+    end
+
+    def failed_actions
+      @db_doc['failed_actions']
+    end
+
     def pending_actions
       @db_doc['pending_actions']
     end
@@ -124,18 +140,9 @@ module Armagh
       @db_doc['pending_work']
     end
 
-    def unlock
-      Connection.documents.update_one({ '_id': id}, '$set' => { 'locked' => false})
+    def finish_processing
       @db_doc['locked'] = false
-    end
-
-    def lock
-      Connection.documents.update_one({ '_id': id}, '$set' => { 'locked' => true})
-      @db_doc['locked'] = true
-    end
-
-    def locked?
-      @db_doc['locked']
+      save
     end
 
     def save

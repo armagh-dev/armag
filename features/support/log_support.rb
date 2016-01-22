@@ -19,7 +19,7 @@ require 'fileutils'
 
 module LogSupport
 
-  LOG_DIR = '/var/log/armagh' unless defined? LOG_DIR
+  LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh' unless defined? LOG_DIR
 
   def self.each_log
     Dir.glob(File.join(LOG_DIR, '*.log')).each do |log_file|

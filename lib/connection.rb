@@ -16,6 +16,7 @@
 #
 
 require_relative 'connection/mongo_connection'
+require_relative 'connection/mongo_admin_connection'
 
 module Armagh
   module Connection
@@ -38,7 +39,15 @@ module Armagh
     def self.log
       MongoConnection.instance.connection['log']
     end
-
+    
+    def self.resource_config
+      MongoAdminConnection.instance.connection['resource']
+    end
+    
+    def self.resource_log
+      MongoAdminConnection.instance.connection['log']
+    end
+    
     def self.master?
       # Is this a primary server?
     end

@@ -17,16 +17,25 @@
 
 require_relative '../test_helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
-require_relative '../../lib/configuration/launcher_config'
+require_relative '../../lib/configuration/config_manager'
 require 'test/unit'
 require 'mocha/test_unit'
 
-class TestLauncherConfig < Test::Unit::TestCase
+class TestConfigManager < Test::Unit::TestCase
 
   include Armagh::Configuration
 
   def setup
-    ArmaghTest.mock_global_logger
+    @logger = mock
+    @logger.stubs(:debug)
+    @logger.stubs(:info)
+    @logger.stubs(:warn)
+    @logger.stubs(:error)
+    @logger.stubs(:level=)
+    @config_manager = ConfigManager.new('generic', @logger)
+
+    @default_config = ConfigManager::DEFAULT_CONFIG.dup
+    @default_config['log_level'] = Logger::DEBUG
   end
 
   def mock_config_find(result)
@@ -41,49 +50,49 @@ class TestLauncherConfig < Test::Unit::TestCase
     Armagh::Connection.stubs(:config).returns(config)
   end
 
-  def test_singleton
-    assert_same(LauncherConfig.instance, Armagh::Configuration::LauncherConfig.instance)
-  end
-
-  def test_singleton_no_new
-    assert_raise NoMethodError do
-      LauncherConfig.new
-    end
-  end
-
   def test_get_config_none
     mock_config_find(nil)
-    assert_equal(LauncherConfig::DEFAULT_CONFIG, LauncherConfig.get_config)
+    assert_equal(@default_config, @config_manager.get_config)
   end
 
   def test_get_config_error
     error_text = 'Error Text'
     mock_config_find(StandardError.new(error_text))
-    assert_equal(LauncherConfig::DEFAULT_CONFIG, LauncherConfig.get_config)
+    assert_equal(@default_config, @config_manager.get_config)
   end
 
   def test_get_config_full
-    config = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => Logger::INFO, 'num_agents' => 10, 'timestamp' => Time.new(0)}
+    config = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
     expected_config = config.dup
+    expected_config['log_level'] = Logger::INFO
     mock_config_find(config)
-    assert_equal(expected_config, LauncherConfig.get_config)
+    assert_equal(expected_config, @config_manager.get_config)
   end
 
   def test_get_config_partial
     config = {'checkin_frequency' => 123, 'unused_field' => 'howdy'}
     mock_config_find(config)
-    assert_equal(LauncherConfig::DEFAULT_CONFIG.merge(config), LauncherConfig.get_config)
+    assert_equal(@default_config.merge(config), @config_manager.get_config)
   end
 
   def test_invalid_log_level
     config = {'log_level' => 'Invalid', 'checkin_frequency' => 111}
     expected_config = config.dup
-    expected_config['log_level'] = LauncherConfig::DEFAULT_CONFIG['log_level']
+    expected_config['log_level'] = Logger::DEBUG
     mock_config_find(config)
 
-    actual_config = LauncherConfig.get_config
+    actual_config = @config_manager.get_config
 
-    assert_equal(LauncherConfig::DEFAULT_CONFIG['log_level'], actual_config['log_level'])
+    assert_equal(@default_config['log_level'], actual_config['log_level'])
     assert_equal(expected_config['checkin_frequency'], actual_config['checkin_frequency'])
+  end
+
+  def test_get_log_level
+    assert_equal(Logger::FATAL, @config_manager.get_log_level('FATAL'))
+    assert_equal(Logger::ERROR, @config_manager.get_log_level('ERROR'))
+    assert_equal(Logger::WARN, @config_manager.get_log_level('WaRn'))
+    assert_equal(Logger::INFO, @config_manager.get_log_level('info'))
+    assert_equal(Logger::DEBUG, @config_manager.get_log_level('debug'))
+    assert_equal(Logger::DEBUG, @config_manager.get_log_level('Invalid'))
   end
 end

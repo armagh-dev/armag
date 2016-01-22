@@ -18,40 +18,36 @@
 require 'drb/unix'
 require 'securerandom'
 
+require_relative '../action/action_manager'
+require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../logging/global_logger'
-require_relative '../action/action_manager'
 require_relative 'processing_backoff'
-require_relative '../document/document'
 
 module Armagh
   class Agent
     attr_reader :uuid
 
-    MAX_BACKOFF_TIME = 500
+    LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
+    LOG_LOCATION = File.join(LOG_DIR, '%s.log')
 
-    LOG_LOCATION = '/var/log/armagh/%s.log'
-
-    def initialize(initial_config = {})
+    def initialize
       @uuid = "Agent-#{SecureRandom.uuid}"
       log_location = LOG_LOCATION % @uuid
       @logger = Logging::GlobalLogger.new(@uuid, log_location, 'daily')
+
       @running = false
 
       @action_manager = ActionManager.new(self, @logger)
-      update_config(initial_config, true)
 
-      client_uri = IPC::DRB_CLIENT_URI % @uuid
-      DRb.start_service(client_uri)
-      @agent_status = DRbObject.new_with_uri(IPC::DRB_URI)
-
-      @backoff = ProcessingBackoff.new(MAX_BACKOFF_TIME)
+      @backoff = ProcessingBackoff.new
       @backoff.logger = @logger
-
-      @logger.debug 'Initialized'
     end
 
     def start
+      connect_agent_status
+      update_config
+
       @logger.info 'Starting'
       @running = true
       run
@@ -60,6 +56,7 @@ module Armagh
     def stop
       if @running
         Thread.new { @logger.info 'Stopping' }
+        @client.stop_service if @client
         @running = false
       end
     end
@@ -69,6 +66,7 @@ module Armagh
     end
 
     def insert_document(id, content, meta)
+      # TODO batching
       if @current_action
         type = @current_action.output_doctype
         pending_actions = @action_manager.get_action_instance_names(type)
@@ -79,6 +77,7 @@ module Armagh
     end
 
     def update_document(id, content, meta)
+      # TODO batching
       if @current_action
         type = @current_action.output_doctype
 
@@ -94,6 +93,7 @@ module Armagh
     end
 
     def insert_or_update_document(id, content, meta)
+      # TODO batching
       if @current_action
         doc = Document.find(id)
         if doc
@@ -112,10 +112,9 @@ module Armagh
       end
     end
 
-    private
-    def run
+    private def run
       while @running
-        update_config(AgentStatus.get_config(@agent_status))
+        update_config
         execute
       end
 
@@ -125,49 +124,71 @@ module Armagh
       @logger.error e
     end
 
-    private def update_config(config, force = false)
-      @last_config_timestamp ||= Time.new(0)
+    private; def connect_agent_status # ; is a workaround for yard and sub/gsub (https://github.com/lsegal/yard/issues/888)
+      client_uri = IPC::DRB_CLIENT_URI % @uuid
+      socket_file = client_uri.sub("drbunix://",'')
 
-      if config['timestamp'].nil?
-        @logger.warn 'Configuration received without a timestamp. A configuration must contain a timestamp.'
-      elsif force || (@last_config_timestamp < config['timestamp'])
-        change_log_level(config['log_level'])
-        @action_manager.set_available_action_instances(config['available_actions'])
-        @logger.debug "Updated configuration to #{config}"
-        @last_config_timestamp = config['timestamp']
+      if File.exists? socket_file
+        @logger.debug "Deleting #{socket_file}.  This may have existed already due to a previous crash of the agent."
+        File.delete socket_file
       end
+
+      @client = DRb.start_service(client_uri)
+      @agent_status = DRbObject.new_with_uri(IPC::DRB_URI)
+    end
+
+    private def update_config
+      new_config = AgentStatus.get_config(@agent_status)
+
+      if @last_config_timestamp.nil? || new_config['timestamp'] > @last_config_timestamp
+        @config = new_config
+        apply_config(@config)
+        @last_config_timestamp = @config['timestamp']
+      end
+    end
+
+    private def apply_config(config)
+      change_log_level(config['log_level'])
+      @action_manager.set_available_action_instances(config['available_actions'])
+      @logger.debug "Updated configuration to #{config}"
     end
 
     private def execute
       doc = Document.get_for_processing
 
       if doc
+        @backoff.reset
+
         action_names = doc.pending_actions
 
         action_names.each do |name|
           @current_action = @action_manager.get_action_from_name(name)
+
           @logger.error "Document: #{doc.id} had an invalid action.  Please make sure all pending actions of this document are defined." unless @current_action
           report_status(doc, @current_action)
+
           if @current_action
-            @backoff.reset
             begin
+              @logger.debug "Executing #{name} on document #{doc.id}"
               @current_action.execute(doc)
             rescue => e
               @logger.error "Error while executing action '#{name}'"
               @logger.error e
+              doc.add_failed_action(name, e)
+            ensure
+              doc.remove_pending_action(name)
             end
-
-            doc.remove_pending_action(name)
           else
             # This could happen while actions are propagating through the system
+            doc.add_failed_action(name, 'Undefined action')
+            doc.remove_pending_action(name)
+
             report_status(doc, @current_action)
             @backoff.interruptible_backoff { !@running }
-            report_status(doc, nil)
           end
         end
-
-        doc.save
-        doc.unlock
+        doc.finish_processing
+        @current_action = nil
       else
         report_status(doc, nil)
         @backoff.interruptible_backoff { !@running }

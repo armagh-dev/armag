@@ -37,11 +37,11 @@ Rake::TestTask.new do |t|
 end
 
 task :clean do
-  rm_rf %w(doc coverage .yardoc)
+  rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage))
 end
 
 Cucumber::Rake::Task.new do |t|
-  t.cucumber_opts = '-e "test-client_actions"'
+  t.cucumber_opts = '-e "test-client_actions"' # TODO This isnt needed anymore
 end
 
 YARD::Rake::YardocTask.new

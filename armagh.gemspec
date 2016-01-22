@@ -27,14 +27,14 @@ Gem::Specification.new do |spec|
   spec.summary       = ''
   spec.description   = ''
   spec.homepage      = ''
-  spec.license       = 'APL 2.0'
+  spec.license       = 'Apache-2.0'
 
   spec.files         = Dir.glob('{bin,lib}/**/*') + %w(LICENSE README)
-  spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
+  spec.executables   = [ 'armaghd' ]
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 
-  spec.required_ruby_version = '~> 2.2'
+  spec.required_ruby_version = '~> 2.3'
 
   # Caution: Since this is actually packaged as a gem, these just verify the required versions are installed.  The versions
   #            used at runtime may differ unless a version is explicitly set before the require.
@@ -43,6 +43,9 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'mongo', '~> 2.1'
   spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
   spec.add_runtime_dependency 'daemons', '~> 1.2'
+  spec.add_runtime_dependency 'sinatra', '~> 1.4'
+  spec.add_runtime_dependency 'thin', '~> 1.6'
+  spec.add_runtime_dependency 'oj', '~> 2.14'
 
   spec.add_development_dependency 'rake', '~> 10.0'
   spec.add_development_dependency 'noragh-gem-tasks'

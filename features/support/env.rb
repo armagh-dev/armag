@@ -21,12 +21,26 @@ require_relative 'log_support'
 require_relative 'mongo_support'
 require 'armagh/client_actions'
 
+require_relative '../../lib/connection'
+
 require 'fileutils'
 
 FileUtils::mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
 
+def quiet_raise(msg)
+  raise RuntimeError, msg, []
+end
+
+unless ENV['ARMAGH_DEV_ROOT']
+  quiet_raise "ARMAGH_DEV_ROOT isn't defined.  Run 'source dev/armagh_env.sh [optional_dev_root]'"
+end
+
 if Armagh::ClientActions::NAME != 'armagh_test'
-  raise "The client actions gem that needs to be installed for testing is 'armagh_test-client_actions'.  '#{Armagh::ClientActions::NAME}-client_actions' was loaded instead."
+  quiet_raise "The client actions gem that needs to be installed for testing is 'armagh_test-client_actions'.  '#{Armagh::ClientActions::NAME}-client_actions' was loaded instead."
+end
+
+if Armagh::Connection.can_connect?
+  quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.'
 end
 
 Before do
@@ -40,5 +54,4 @@ end
 at_exit do
   MongoSupport.instance.clean_database
   MongoSupport.instance.stop_mongo
-  TestActionSupport.uninstall_test_actions
 end

@@ -25,6 +25,28 @@ require 'mongo'
 class TestMongoConnection < Test::Unit::TestCase
 
   def test_mongo_connection
-    assert_kind_of(Mongo::Client, Armagh::Connection::MongoConnection.instance.connection)
+    Mongo::Client.any_instance.stubs(:create_from_uri)
+    orig_strl = ENV['ARMAGH_STRL']
+    ENV['ARMAGH_STRL'] = 'strl'
+    assert_kind_of(Mongo::Client, Class.new(Armagh::Connection::MongoConnection).instance.connection)
+
+    if orig_strl
+      ENV['ARMAGH_STRL'] = orig_strl
+    else
+      ENV.delete 'ARMAGH_STRL'
+    end
+  end
+
+  def test_mongo_connection_no_env
+    orig_strl = ENV['ARMAGH_STRL']
+    ENV.delete 'ARMAGH_STRL' if orig_strl
+
+    e = assert_raise do
+      Class.new(Armagh::Connection::MongoConnection).instance.connection
+    end
+
+    assert_equal('No connection string defined.  Define a base-64 encoded mongo connection URI in env variable ARMAGH_STRL.', e.message)
+
+    ENV['ARMAGH_STRL'] = orig_strl if orig_strl
   end
 end

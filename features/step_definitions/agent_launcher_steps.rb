@@ -27,58 +27,8 @@ Given(/^armagh isn't already running$/) do
   assert_true LauncherSupport.get_launcher_processes.empty?
 end
 
-When(/^armagh's launcher config is$/) do |table|
-  config = table.rows_hash
-
-  if config['log_level']
-    config['log_level'] = case config['log_level'].downcase
-                            when 'debug'
-                              Logger::DEBUG
-                            when 'info'
-                              Logger::INFO
-                            when 'warn'
-                              Logger::WARN
-                            when 'error'
-                              Logger::ERROR
-                            else
-                              Logger::UNKNOWN
-                          end
-  end
-
-
-  config['num_agents'] = config['num_agents'].to_i if config['num_agents']
-  config['checkin_frequency'] = config['checkin_frequency'].to_i if config['checkin_frequency']
-  config['timestamp'] = Time.parse(config['timestamp']) if config['timestamp']
-
-  specified_actions = config['available_actions']&.split(/\s*,\s*/)
-  available_actions = {}
-
-  if specified_actions&.include? 'sleep_action'
-    available_actions['sleep_action'] = {
-        'input_doctype' => 'TestDocumentInput',
-        'output_doctype' => 'TestDocumentOutput',
-        'action_class_name' => 'ClientActions::SleepAction',
-        'config' => {'seconds' => 2}
-    }
-  end
-
-  if specified_actions&.include? 'sleep_action_default'
-    available_actions['sleep_action_default'] = {
-        'input_doctype' => Armagh::ClientActions::SleepAction.default_input_doctype,
-        'output_doctype' => Armagh::ClientActions::SleepAction.default_output_doctype,
-        'action_class_name' => 'ClientActions::SleepAction',
-        'config' => {'seconds' => Armagh::ClientActions::SleepAction.defined_parameters['seconds']['default']}
-    }
-  end
-
-  config['available_actions'] = available_actions
-
-  MongoSupport.instance.set_launcher_config(config)
-end
-
-
-When(/^armagh doesn't have a launcher config$/) do
-  MongoSupport.instance.delete_launcher_config
+When(/^armagh doesn't have a "([^"]*)" config$/) do |config_type|
+  MongoSupport.instance.delete_config(config_type)
 end
 
 When(/^I run armagh$/) do

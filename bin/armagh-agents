@@ -27,7 +27,8 @@ require 'bundler/setup'
 require_relative '../lib/agent/agent'
 require_relative '../lib/agent/agent_status'
 require_relative '../lib/action/action_manager'
-require_relative '../lib/configuration/launcher_config'
+require_relative '../lib/configuration/agent_config_manager'
+require_relative '../lib/configuration/launcher_config_manager'
 require_relative '../lib/connection'
 require_relative '../lib/ipc'
 require_relative '../lib/logging/global_logger'
@@ -41,8 +42,9 @@ include Armagh
 
 TERM_SIGNALS = [:INT, :QUIT, :TERM]
 
-LOG_DIR = '/var/log/armagh'
-LOG_LOCATION = File.join(LOG_DIR, 'armagh.log')
+LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
+
+LOG_LOCATION = File.join(LOG_DIR, 'armagh-agents.log')
 
 unless File.directory?(LOG_DIR)
   begin
@@ -61,10 +63,13 @@ unless Connection.can_connect?
 end
 
 @logger = Logging::GlobalLogger.new('Armagh', LOG_LOCATION, 'daily')
+@launcher_config_manager = Configuration::LauncherConfigManager.new(@logger)
+@agent_config_manager = Configuration::AgentConfigManager.new(@logger)
 
 @hostname = Socket.gethostname
 @agents = {}
 @restart_agents = true
+@running = false
 
 def reconcile_agents
   reported_agents = AgentStatus.get_statuses(@agent_status).keys
@@ -80,7 +85,7 @@ def reconcile_agents
 end
 
 def checkin(status)
-  @logger.debug "Checking In: #{status}"
+  @logger.info "Checking In: #{status}"
 
   checkin = {
       'version' => VERSION,
@@ -95,48 +100,25 @@ def checkin(status)
   checkin['actions']['client'] = {'name' => ClientActions::NAME, 'version' => ClientActions::VERSION} if defined? ClientActions
   checkin['actions']['noragh'] = {'version' => NoraghActions::VERSION} if defined? NoraghActions
 
+  @logger.debug "Details: #{checkin}"
   Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
 
   @last_checkin = Time.now
 end
 
-def get_initial_log_level
-  config = Configuration::LauncherConfig.get_config
+def apply_config(config)
   change_log_level(config['log_level'])
+  change_num_agents(config['num_agents'])
+  @logger.debug "Updated configuration to #{config}"
 end
 
-def apply_config(config)
-  if @last_config_timestamp.nil? || @last_config_timestamp < config['timestamp']
-    change_log_level(config['log_level'])
-    change_agent_configs(config)
-    change_num_agents(config['num_agents'])
-    @last_config_timestamp = config['timestamp']
-  elsif @last_config_timestamp > config['timestamp']
-    @logger.warn 'Attempted to apply a configuration that is older than the one currently applied to the system.  Ignoring.'
-  else
-    @logger.debug 'Ignoring configuration because the timestamp is the same as the last applied'
-  end
+def apply_agent_config(config)
+  @agent_status.config = config
 end
 
 def change_log_level(level)
-  level_str = Logging::GlobalLogger::LEVEL_LOOKUP[level]
-  return if level == @logger.level
-
-  @logger.unknown "Changing log level to #{level_str}"
-
-  if level
-    @logger.level = level
-    @logger.unknown "Log level successfully changed to #{Logging::GlobalLogger::LEVEL_LOOKUP[@logger.level]}"
-  else
-    @logger.error "Unable to change log level.  Unknown log level from configuration: #{level_str}."
-  end
-end
-
-def change_agent_configs(config)
-  @agent_status.update_config('log_level', config['log_level'])
-  @agent_status.update_config('available_actions', config['available_actions'])
-  @agent_status.update_config('timestamp', config['timestamp'])
-  @agent_status.update_config(Time.now.to_s, Time.now)
+  @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
+  @logger.level = level
 end
 
 def change_num_agents(num_agents)
@@ -157,6 +139,7 @@ def launch_agents(num_agents)
   num_agents.times do
     start_agent_in_process
   end
+  sleep 1
 end
 
 def kill_all_agents(signal = :SIGINT)
@@ -177,7 +160,7 @@ def recover_dead_agents
   @agents.each do |pid, agent|
     unless process_running(pid)
       _pid, status = Process.wait2(pid)
-      @logger.warn "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
+      @logger.error "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
       dead_agents << agent
       agent_id = @agents[pid].uuid
       @agents.delete(pid)
@@ -198,13 +181,18 @@ rescue Errno::ESRCH
 end
 
 def start_agent_in_process(agent=nil)
-  agent ||= Agent.new(AgentStatus.get_config(@agent_status))
+  agent ||= Agent.new
 
   pid = Process.fork do
     TERM_SIGNALS.each do |signal|
       trap(signal) {agent.stop}
     end
-    agent.start
+    begin
+      agent.start
+    rescue => e
+      @logger.error "Could not start agent #{agent.uuid}"
+      @logger.error e
+    end
   end
 
   @agents[pid] = agent
@@ -221,6 +209,19 @@ def shutdown(signal)
   Thread.new{ @logger.unknown "Received #{signal}.  Shutting down once agents finish" }
   @running = false
   Thread.new{ kill_all_agents(signal) }
+end
+
+def update_config
+  new_config = @launcher_config_manager.get_config
+  if new_config
+    @config = new_config
+    apply_config(@config)
+  end
+end
+
+def update_agent_config
+  agent_config = @agent_config_manager.get_config
+  apply_agent_config(agent_config) if agent_config
 end
 
 def load_actions
@@ -251,25 +252,24 @@ begin
   @logger.unknown 'Armagh started'
 
   @agent_status = AgentStatus.new
-  @agent_status.config = {'log_level' => @logger.level, 'timestamp' => Time.new(0)}
+  @server = DRb.start_service(IPC::DRB_URI, @agent_status)
 
-  DRb.start_service(IPC::DRB_URI, @agent_status)
-
-  @config = Configuration::LauncherConfig.get_config
+  @config = @launcher_config_manager.get_config
   change_log_level(@config['log_level'])
 
   load_actions
 
-  @running = true
-
+  update_agent_config
   apply_config(@config)
+
+  @running = true
   checkin('running')
 
   while @running do
-    if @last_checkin < Time.now - @config['checkin_frequency']
+    if @last_checkin.nil? || @last_checkin < Time.now - @config['checkin_frequency']
       reconcile_agents
-      @config = Configuration::LauncherConfig.get_config
-      apply_config(@config)
+      update_config
+      update_agent_config
       checkin('running')
     end
 
@@ -278,18 +278,19 @@ begin
   end
 
 rescue => e
-  @logger.error 'An unexpected error occurred'
+  @logger.error 'An unexpected error occurred.  Exiting.'
   @logger.error e
-  checkin('Stopped')
-  sleep 1
-  Process.kill(:SIGINT, 0)
+  kill_all_agents(:SIGINT)
+  @exit_status = 1
 end
 
-checkin('Stopping')
+checkin('stopping')
 
 Process.waitall
-DRb.stop_service
+@server.stop_service
 
-checkin('Stopped')
+checkin('stopped')
 
 @logger.unknown 'Armagh stopped'
+
+exit @exit_status if @exit_status

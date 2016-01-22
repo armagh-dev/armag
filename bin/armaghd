@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+which_armaghd = case ENV[ 'ARMAGH_ENV' ]
+  when 'FIRST' then 'first'
+  when 'DEVELOPMENT' then 'dev'
+  when 'PRODUCTION' then 'prod'
+  else 'first'
+end
+    
+shell_script_path = File.join( __dir__, "armaghd-#{which_armaghd}.sh" )
+
+puts `#{shell_script_path} #{ARGV[0]} #{__dir__} 2>&1`

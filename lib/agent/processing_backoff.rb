@@ -33,7 +33,7 @@ module Armagh
     # @param min_interval [Numeric]
     # @param multiplier [Numeric]
     # @param randomization_factor [Numeric]
-    def initialize(max_backoff, min_interval = 1, multiplier = 1.75, randomization_factor= 0.3)
+    def initialize(max_backoff = 500, min_interval = 1, multiplier = 1.75, randomization_factor= 0.3)
       max_elapsed = max_backoff/(1 + randomization_factor)
 
       @exponential_backoff = ExponentialBackoff.new(min_interval, max_elapsed)

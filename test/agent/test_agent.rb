@@ -23,15 +23,16 @@ require_relative '../../lib/ipc'
 require_relative '../../lib/document/document'
 require_relative '../../lib/action/action_instance'
 require_relative '../../lib/action/action_manager'
+require_relative '../test_helpers/silence_io'
 
 require 'test/unit'
 require 'logger'
 
-require 'drb/drb'
-
 class TestAgent < Test::Unit::TestCase
 
   THREAD_SLEEP_TIME = 0.01
+
+  STARTED = []
 
   def setup
     ArmaghTest.mock_global_logger
@@ -41,7 +42,6 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def teardown
-    DRb.stop_service
     @agent.stop
   end
 
@@ -54,7 +54,12 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start
     assert_false @agent.running?
-    Thread.new {@agent.start}
+
+    agent_status = Armagh::AgentStatus.new
+    agent_status.config = {}
+    DRbObject.stubs(:new_with_uri).returns(agent_status)
+
+    Thread.new { @agent.start }
     sleep THREAD_SLEEP_TIME
     assert_true @agent.running?
   end
@@ -69,15 +74,12 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:execute).at_least_once
     doc.expects(:remove_pending_action).at_least_once
-    doc.expects(:unlock).at_least_once
-    doc.expects(:save).at_least_once
+    doc.expects(:finish_processing).at_least_once
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    status = Armagh::AgentStatus.new
-    DRb.start_service(Armagh::IPC::DRB_URI, status)
     @agent.instance_variable_set(:@running, true)
 
     Thread.new {@agent.send(:run)}
@@ -89,15 +91,18 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     doc = stub(:id => 'document_id', :pending_actions => [action_name])
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.expects(:add_failed_action).at_least_once
+    doc.expects(:remove_pending_action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
     Armagh::ActionManager.any_instance.expects(:get_action_from_name).with(action_name).returns(nil).at_least_once
 
     Armagh::ActionInstance.any_instance.expects(:execute).never
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, nil).at_least_once
+
     @backoff_mock.expects(:interruptible_backoff).at_least_once
 
-    status = Armagh::AgentStatus.new
-    DRb.start_service(Armagh::IPC::DRB_URI, status)
     @agent.instance_variable_set(:@running, true)
 
     Thread.new {@agent.send(:run)}
@@ -115,9 +120,6 @@ class TestAgent < Test::Unit::TestCase
 
     @backoff_mock.expects(:reset).never
 
-    status = Armagh::AgentStatus.new
-
-    DRb.start_service(Armagh::IPC::DRB_URI, status)
     @agent.instance_variable_set(:@running, true)
 
     Thread.new {@agent.send(:run)}
@@ -125,28 +127,12 @@ class TestAgent < Test::Unit::TestCase
     @agent.stop
   end
 
-  def test_update_config
-    logger = @agent.instance_variable_get(:@logger)
-    assert_not_equal(Logger::ERROR, logger.level)
-    @agent.send(:update_config, {'log_level' => Logger::ERROR, 'timestamp' => Time.now})
-    assert_equal(Logger::ERROR, logger.level)
-  end
-
-  def test_update_config_no_log
-    logger = @agent.instance_variable_get(:@logger)
-    start_level = logger.level
-    @agent.send(:update_config, {})
-    assert_equal(start_level, logger.level)
-  end
-
   def test_report_status_no_work
-    status = Armagh::AgentStatus.new
-    DRb.start_service(Armagh::IPC::DRB_URI, status)
+    agent_status = Armagh::AgentStatus.new
+    @agent.instance_variable_set(:@agent_status, agent_status)
+    @agent.send(:report_status, nil, nil)
 
-    Thread.new { @agent.send(:report_status, nil, nil) }
-    sleep THREAD_SLEEP_TIME
-
-    statuses = status.statuses
+    statuses = Armagh::AgentStatus.get_statuses(agent_status)
 
     assert_includes(statuses, @agent.uuid)
     status = statuses[@agent.uuid]
@@ -157,16 +143,14 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_report_status_with_work
-    status = Armagh::AgentStatus.new
-    DRb.start_service(Armagh::IPC::DRB_URI, status)
-
     doc = stub(:id => 'document_id')
     action = stub(:name => 'action_id')
 
-    Thread.new { @agent.send(:report_status, doc, action) }
-    sleep THREAD_SLEEP_TIME
+    agent_status = Armagh::AgentStatus.new
+    @agent.instance_variable_set(:@agent_status, agent_status)
+    @agent.send(:report_status, doc, action)
 
-    statuses = status.statuses
+    statuses = Armagh::AgentStatus.get_statuses(agent_status)
 
     assert_includes(statuses, @agent.uuid)
 

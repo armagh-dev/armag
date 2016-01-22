@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+require 'sinatra'
+require 'thin'
+require_relative '../lib/admin/application/api.rb'
+require_relative '../lib/admin/application/thin_backend.rb'
+require_relative '../lib/configuration/file_based_configuration.rb'
+require_relative '../lib/logging/global_logger.rb'
+
+#------------------------------------------------------------------------------------------------
+#
+# SET UP ENVIRONMENT
+#
+#------------------------------------------------------------------------------------------------
+
+include Armagh
+
+api = Admin::Application::API.instance
+
+configure do
+  
+  set :environment, (ENV[ 'ARMAGH_ENV' ] || 'development').to_sym
+  set :bind,   api.ip
+  set :port,   api.port
+  set :server, "thin"
+  set :root,   api.root_directory
+  set :run,    true
+
+  class << settings
+  
+    def server_settings
+      
+      api = Admin::Application::API.instance
+    
+      settings = { :backend => Admin::Application::ThinBackend }
+      if api.using_ssl?
+        settings.merge!( {
+          :private_key_file => api.key_filepath,           
+          :cert_chain_file  => api.cert_filepath, 
+          :verify_peer      => api.verify_peer
+        })
+      end
+      settings
+    end
+  end
+end # end configure
+
+enable :sessions, :logging
+
+use Rack::CommonLogger, api.logger
+use Rack::Auth::Basic, "Armagh Admin" do |username, password|
+ api.authenticate_and_authorize username, password
+end # use Rack::Auth::Basic
+
+ 
+helpers do
+  
+  def route_after_success( format, message, html_redirect_to )
+    case format
+    when 'json'
+      return [ 200, { :message => message }.to_json ]
+    when 'html'
+      session[ 'message' ] = error_detail
+      redirect to( html_redirect_to )
+    end
+  end
+  
+  def route_after_error( format, error_detail, html_redirect_to )
+    case format
+    when 'json'
+      return [ 500, { :error_detail => error_detail }.to_json ]
+    when 'html'
+      session[ 'message' ] = error_detail
+      redirect to( html_redirect_to )
+    end
+  end
+  
+end
+
+#------------------------------------------------------------------------------------------------
+#
+# GET /noop
+#
+#------------------------------------------------------------------------------------------------
+get '/noop.?:format?' do
+  
+  @message = session.delete 'message'
+  
+  case params[ 'format' ]
+  when 'json'
+    return [ 200, { result: 'way to go!'}.to_json ]
+  when 'html'
+    erb "/views-subdir/page.html".to_sym #.erb
+  end
+end
+
+post '/noop.?:format?' do
+  
+  obj_params = params[ 'form_object' ]
+  begin
+    do_something( obj_params )
+  rescue => e
+    return route_after_error( params[ 'format' ], e.message, '/some/url' )
+  end
+  return route_after_success( params[ 'format' ], "You did something right!", '/noop')
+end
+
+

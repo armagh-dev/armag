@@ -15,17 +15,45 @@
 # limitations under the License.
 #
 
-Then(/^I should see a "([^"]*)" with (\d+) pending actions*$/) do |doc_type, num_actions|
-  num_actions = num_actions.to_i
-
+And(/^I should see a "([^"]*)" with the following$/) do |doc_type, table|
+  doc_info = table.rows_hash
   found_matching_doc = false
+  doc_problems = {}
 
   MongoSupport.instance.get_documents.each do |doc|
-    if doc['type'] == doc_type && doc['pending_actions'].length == num_actions
+    if doc['type'] == doc_type
+      doc_id = doc['_id']
+      doc_problems[doc_id] = {}
       found_matching_doc = true
-      break
+      doc_info.each do |key, value|
+        # This is a potential match
+        expected = eval(value)
+
+        if expected.is_a?(Hash) && doc[key].is_a?(Hash)
+          expected.collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
+          doc[key].collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
+        end
+
+        if expected != doc[key]
+          doc_problems[doc_id][key] = "#{value} != #{doc[key].to_s}"
+          found_matching_doc = false
+          next
+        end
+      end
     end
+    break if found_matching_doc
   end
 
-  assert_true(found_matching_doc, "No #{doc_type} was found with #{num_actions} pending actions")
+  assert_true(found_matching_doc, "No #{doc_type} was found with the expected values.  Details: #{doc_problems}")
+end
+
+Then(/^I should see (\d+) "([^"]*)" documents*$/) do |count, doc_type|
+  expected_count = count.to_i
+  num_found = 0
+
+  MongoSupport.instance.get_documents.each do |doc|
+    num_found += 1 if doc['type'] == doc_type
+  end
+
+  assert_equal(expected_count, num_found)
 end

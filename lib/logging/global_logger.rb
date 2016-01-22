@@ -23,6 +23,8 @@ module Armagh
     class GlobalLogger < Logger
       require 'socket'
       require_relative '../connection'
+      
+      attr_accessor :is_a_resource_log
 
       LEVEL_LOOKUP = %w(DEBUG INFO WARN ERROR FATAL)
 
@@ -33,6 +35,9 @@ module Armagh
         super(multi_io, shift_age, shift_size)
         @progname = component
         @hostname = Socket.gethostname
+        
+        @is_a_resource_log = false
+        
       end
 
       def add(severity, message = nil, progname = nil, &block)
@@ -68,7 +73,11 @@ module Armagh
           log_msg['message'] = message
         end
 
-        Connection.log.insert_one log_msg
+        if @is_a_resource_log
+          Connection.resource_log.insert_one log_msg
+        else
+          Connection.log.insert_one log_msg
+        end
       end
     end
   end

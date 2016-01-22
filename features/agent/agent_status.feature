@@ -23,7 +23,7 @@ Feature: Agent Status
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
-    When armagh's launcher config is
+    When armagh's "launcher" config is
       | num_agents        | 0 |
       | checkin_frequency | 1 |
     And I run armagh

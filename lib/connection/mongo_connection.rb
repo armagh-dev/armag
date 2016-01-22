@@ -19,6 +19,7 @@ gem 'mongo', '~> 2.1'
 require 'mongo'
 
 require 'singleton'
+require 'base64'
 
 require_relative '../logging/global_logger'
 
@@ -31,7 +32,15 @@ module Armagh
 
       def initialize
         Mongo::Logger.logger.level = Logger::WARN
-        @connection = Mongo::Client.new(['127.0.0.1:27017'], :database => 'armagh')
+        unless ENV[ 'ARMAGH_STRL' ]
+          raise 'No connection string defined.  Define a base-64 encoded mongo connection URI in env variable ARMAGH_STRL.'
+        end
+        begin
+          con_str = Base64.decode64( ENV[ 'ARMAGH_STRL' ]).strip
+          @connection = Mongo::Client.new( con_str )
+        rescue => e
+          raise "Unable to establish database connection. #{e.message}"
+        end
       end
     end
   end

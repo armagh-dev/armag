@@ -79,12 +79,12 @@ class MongoSupport
     end
   end
 
-  def delete_launcher_config
-    @client['config'].find('type' => 'launcher').delete_one
+  def delete_config(type)
+    @client['config'].find('type' => type).delete_one
   end
 
-  def set_launcher_config(config)
-    @client['config'].find('type' => 'launcher').replace_one(config.merge({'type' => 'launcher'}), {upsert: true})
+  def set_config(type, config)
+    @client['config'].find('type' => type).replace_one(config.merge({'type' => type}), {upsert: true})
   end
 
   def get_status
