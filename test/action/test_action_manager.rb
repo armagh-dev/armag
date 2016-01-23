@@ -138,4 +138,19 @@ class TestActionManager < Test::Unit::TestCase
     assert_includes(available, Action2)
   end
 
+  def test_invalid_action_instance
+    @logger.expects(:error).with("Action 'bad_action' could not be created.  BadClass is an unknown class.")
+    @logger.expects(:debug).with('Available classes are []')
+
+    actions = {
+        'bad_action' => {
+            'input_doctype' => 'bad_in',
+            'output_doctype' => 'bad_out',
+            'action_class_name' => 'BadClass'
+        }
+    }
+
+    @action_manager.set_available_action_instances actions
+  end
+
 end

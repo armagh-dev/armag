@@ -39,7 +39,7 @@ module Armagh
           con_str = Base64.decode64( ENV[ 'ARMAGH_STRL' ]).strip
           @connection = Mongo::Client.new( con_str )
         rescue => e
-          raise "Unable to establish database connection. #{e.message}"
+          raise "Unable to establish database connection: #{e.message}"
         end
       end
     end

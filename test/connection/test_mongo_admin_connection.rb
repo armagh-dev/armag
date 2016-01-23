@@ -22,50 +22,50 @@ require 'mocha/test_unit'
 
 require 'mongo'
 
-class TestMongoConnection < Test::Unit::TestCase
+class TestMongoAdminConnection < Test::Unit::TestCase
 
   def test_mongo_connection
     Mongo::Client.any_instance.stubs(:create_from_uri)
-    orig_strl = ENV['ARMAGH_STRL']
-    ENV['ARMAGH_STRL'] = 'strl'
-    assert_kind_of(Mongo::Client, Class.new(Armagh::Connection::MongoConnection).instance.connection)
+    orig_strl = ENV['ARMAGH_STRF']
+    ENV['ARMAGH_STRF'] = 'strl'
+    assert_kind_of(Mongo::Client, Class.new(Armagh::Connection::MongoAdminConnection).instance.connection)
 
     if orig_strl
-      ENV['ARMAGH_STRL'] = orig_strl
+      ENV['ARMAGH_STRF'] = orig_strl
     else
-      ENV.delete 'ARMAGH_STRL'
+      ENV.delete 'ARMAGH_STRF'
     end
   end
 
   def test_mongo_connection_no_env
-    orig_strl = ENV['ARMAGH_STRL']
-    ENV.delete 'ARMAGH_STRL' if orig_strl
+    orig_strl = ENV['ARMAGH_STRF']
+    ENV.delete 'ARMAGH_STRF' if orig_strl
 
     e = assert_raise do
-      Class.new(Armagh::Connection::MongoConnection).instance.connection
+      Class.new(Armagh::Connection::MongoAdminConnection).instance.connection
     end
 
-    assert_equal('No connection string defined.  Define a base-64 encoded mongo connection URI in env variable ARMAGH_STRL.', e.message)
+    assert_equal('No admin connection string defined.  Define a base-64 encoded mongo connection URI in env variable ARMAGH_STRF.', e.message)
 
-    ENV['ARMAGH_STRL'] = orig_strl if orig_strl
+    ENV['ARMAGH_STRF'] = orig_strl if orig_strl
   end
 
   def test_mongo_connection_db_err
     Mongo::Client.stubs(:new).raises(RuntimeError.new('Connection Failure'))
 
-    orig_strl = ENV['ARMAGH_STRL']
-    ENV['ARMAGH_STRL'] = 'strl'
+    orig_strl = ENV['ARMAGH_STRF']
+    ENV['ARMAGH_STRF'] = 'strl'
 
     e = assert_raise do
-      Class.new(Armagh::Connection::MongoConnection).instance.connection
+      Class.new(Armagh::Connection::MongoAdminConnection).instance.connection
     end
 
-    assert_equal('Unable to establish database connection: Connection Failure', e.message)
+    assert_equal('Unable to establish admin database connection: Connection Failure', e.message)
 
     if orig_strl
-      ENV['ARMAGH_STRL'] = orig_strl
+      ENV['ARMAGH_STRF'] = orig_strl
     else
-      ENV.delete 'ARMAGH_STRL'
+      ENV.delete 'ARMAGH_STRF'
     end
   end
 end

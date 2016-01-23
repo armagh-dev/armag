@@ -35,6 +35,11 @@ class TestMongoConnection < Test::Unit::TestCase
     Armagh::Connection.stubs(:log).returns(@mock)
   end
 
+  def mock_mongo_resource
+    @mock_resource = mock('object')
+    Armagh::Connection.stubs(:resource_log).returns(@mock_resource)
+  end
+
   def test_add_block
     @logger.expects(:add_global).returns(nil)
     message = 'log message'
@@ -79,6 +84,24 @@ class TestMongoConnection < Test::Unit::TestCase
                 'pid' => Process.pid,
                 'message' => message
             })
+        )
+    )
+    @logger.add_global(Logger::ERROR, message)
+  end
+
+  def test_add_global_resource_log
+    @logger.is_a_resource_log = true
+    mock_mongo_resource
+    message = 'test message'
+    @mock_resource.expects(:insert_one).with(
+        all_of(
+            has_entries({
+                            'level' => 'ERROR',
+                            'component' => @component_name,
+                            'hostname' => Socket.gethostname,
+                            'pid' => Process.pid,
+                            'message' => message
+                        })
         )
     )
     @logger.add_global(Logger::ERROR, message)

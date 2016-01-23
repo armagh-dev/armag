@@ -23,8 +23,8 @@ require_relative '../../lib/ipc'
 require_relative '../../lib/document/document'
 require_relative '../../lib/action/action_instance'
 require_relative '../../lib/action/action_manager'
-require_relative '../test_helpers/silence_io'
 
+require 'mocha/test_unit'
 require 'test/unit'
 require 'logger'
 
@@ -64,6 +64,52 @@ class TestAgent < Test::Unit::TestCase
     assert_true @agent.running?
   end
 
+  def test_start_with_config
+    config = {
+        'log_level' => Logger::ERROR
+    }
+
+    agent_status = mock
+    agent_status.stubs(:config).returns(config)
+
+    DRbObject.stubs(:new_with_uri).returns(agent_status)
+
+    assert_not_equal(Logger::ERROR, @agent.instance_variable_get(:@logger).level)
+    Thread.new { @agent.start }
+    sleep THREAD_SLEEP_TIME
+    assert_equal(Logger::ERROR, @agent.instance_variable_get(:@logger).level)
+  end
+
+  def test_start_and_stop
+    agent_status = Armagh::AgentStatus.new
+    agent_status.config = {}
+    DRbObject.stubs(:new_with_uri).returns(agent_status)
+
+    assert_false @agent.running?
+    Thread.new { @agent.start }
+    sleep THREAD_SLEEP_TIME
+    assert_true @agent.running?
+    sleep THREAD_SLEEP_TIME
+    @agent.stop
+    sleep 1
+    assert_false @agent.running?
+  end
+
+  def test_start_after_failure
+    agent_status = Armagh::AgentStatus.new
+    agent_status.config = {}
+    DRbObject.stubs(:new_with_uri).returns(agent_status)
+
+    client_uri = Armagh::IPC::DRB_CLIENT_URI % @agent.uuid
+    socket_file = client_uri.sub("drbunix://",'')
+
+    FileUtils.touch socket_file
+    assert_false(File.socket?(socket_file))
+    Thread.new { @agent.start }
+    sleep THREAD_SLEEP_TIME
+    assert_true(File.socket?(socket_file))
+  end
+
   def test_run_with_work
     action_name = 'action_name'
     action = stub(:name => action_name, :execute => nil)
@@ -74,6 +120,32 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:execute).at_least_once
     doc.expects(:remove_pending_action).at_least_once
+    doc.expects(:finish_processing).at_least_once
+
+    @agent.expects(:update_config).at_least_once
+    @agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @agent.instance_variable_set(:@running, true)
+
+    Thread.new {@agent.send(:run)}
+    sleep THREAD_SLEEP_TIME
+    @agent.stop
+  end
+
+  def test_run_failed_action
+    exception = RuntimeError.new
+    action_name = 'fail_action'
+    action = mock
+    action.stubs(:name).returns(action_name)
+    action.stubs(:execute).raises(exception)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta')
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::ActionManager.any_instance.expects(:get_action_from_name).with(action_name).returns(action).at_least_once
+
+    doc.expects(:remove_pending_action).at_least_once
+    doc.expects(:add_failed_action).at_least_once
     doc.expects(:finish_processing).at_least_once
 
     @agent.expects(:update_config).at_least_once

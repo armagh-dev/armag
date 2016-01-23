@@ -27,15 +27,19 @@ class TestConnection < Test::Unit::TestCase
   end
 
   def mock_mongo
-    @connection = mock('object')
-
-    instance = mock('object')
+    @connection = mock
+    instance = mock
     instance.stubs(:connection).returns(@connection)
 
-    @cluster = mock('cluster')
+    @admin_connection = mock
+    admin_instance = mock
+    admin_instance.stubs(:connection).returns(@admin_connection)
+
+    @cluster = mock
     @connection.stubs(:cluster).returns(@cluster)
 
     Armagh::Connection::MongoConnection.stubs(:instance).returns(instance)
+    Armagh::Connection::MongoAdminConnection.stubs(:instance).returns(admin_instance)
   end
 
   def test_documents
@@ -61,6 +65,16 @@ class TestConnection < Test::Unit::TestCase
   def test_log
     @connection.expects(:[]).with('log')
     Armagh::Connection.log
+  end
+
+  def test_resource_config
+    @admin_connection.expects(:[]).with('resource')
+    Armagh::Connection.resource_config
+  end
+
+  def test_resource_log
+    @admin_connection.expects(:[]).with('log')
+    Armagh::Connection.resource_log
   end
 
   def test_can_connect_no_servers

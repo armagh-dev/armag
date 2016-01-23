@@ -41,9 +41,9 @@ class TestConfigManager < Test::Unit::TestCase
   def mock_config_find(result)
     find_result = mock('object')
     if result.is_a? Exception
-      find_result.expects(:limit).with(1).raises(result)
+      find_result.expects(:limit).with(1).raises(result).at_least_once
     else
-      find_result.expects(:limit).with(1).returns([result].flatten)
+      find_result.expects(:limit).with(1).returns([result].flatten).at_least_once
     end
 
     config = stub(:find => find_result)
@@ -73,6 +73,39 @@ class TestConfigManager < Test::Unit::TestCase
     config = {'checkin_frequency' => 123, 'unused_field' => 'howdy'}
     mock_config_find(config)
     assert_equal(@default_config.merge(config), @config_manager.get_config)
+  end
+
+  def test_get_updated_config
+    config1 = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
+    config2 = {'available_actions' => {}, 'checkin_frequency' => 2, 'log_level' => 'info', 'num_agents' => 5, 'timestamp' => Time.new(1)}
+    expected_config = config2.dup
+    expected_config['log_level'] = Logger::INFO
+
+    mock_config_find(config1)
+    @config_manager.get_config
+    mock_config_find(config2)
+    assert_equal(expected_config, @config_manager.get_config)
+  end
+
+  def test_get_older_config
+    config1 = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(1)}
+    config2 = {'available_actions' => {}, 'checkin_frequency' => 2, 'log_level' => 'info', 'num_agents' => 5, 'timestamp' => Time.new(0)}
+    expected_config = config1.dup
+    expected_config['log_level'] = Logger::INFO
+
+    mock_config_find(config1)
+    assert_equal(expected_config, @config_manager.get_config)
+    mock_config_find(config2)
+    assert_nil(@config_manager.get_config)
+  end
+
+  def test_get_config_multiple_times
+    config = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
+    expected_config = config.dup
+    expected_config['log_level'] = Logger::INFO
+    mock_config_find(config)
+    assert_equal(expected_config, @config_manager.get_config)
+    assert_nil(@config_manager.get_config)
   end
 
   def test_invalid_log_level

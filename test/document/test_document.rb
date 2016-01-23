@@ -143,6 +143,8 @@ class TestDocument < Test::Unit::TestCase
         assert_equal(details, db_details['message'])
       end
 
+      @doc.remove_failed_action(name)
+      assert_false(@doc.failed_actions.has_key?(name))
     end
 
   end
@@ -160,6 +162,12 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(created_timestamp, doc.created_timestamp)
     assert_not_equal(doc.created_timestamp, doc.updated_timestamp)
     assert_true(doc.created_timestamp < doc.updated_timestamp)
+  end
+
+  def test_finish_processing
+    mock_document_replace
+    @doc.finish_processing
+    assert_false(@doc.instance_variable_get(:@db_doc)['locked'])
   end
 
 end
