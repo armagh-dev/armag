@@ -16,26 +16,29 @@
 #
 
 module Armagh
-  class InterruptibleSleep
+  module Utils
+    class InterruptibleSleep
 
-    # A sleep that is able to be interrupted.
-    #
-    # @example Sleep for 10 seconds unless the runner is terminated
-    #   sleep(10) { runner.terminated? }
-    #
-    # @param sleep_time [Numeric] the time to sleep
-    # @yield  the condition that is checked for interrupt (if true, interrupt)
-    def self.interruptible_sleep(sleep_time)
-      whole = sleep_time.to_i
-      partial = sleep_time - whole
+      # A sleep that is able to be interrupted.
+      #
+      # @example Sleep for 10 seconds unless the runner is terminated
+      #   sleep(10) { runner.terminated? }
+      #
+      # @param sleep_time [Numeric] the time to sleep
+      # @yield  the condition that is checked for interrupt (if true, interrupt)
+      def self.interruptible_sleep(sleep_time)
+        whole = sleep_time.to_i
+        partial = sleep_time - whole
 
-      whole.times do
-        break if yield
-        sleep 1
+        whole.times do
+          break if yield
+          sleep 1
+        end
+
+        sleep partial unless yield
       end
 
-      sleep partial unless yield
+      nil
     end
-    nil
   end
 end

@@ -22,7 +22,7 @@ require_relative '../action/action_manager'
 require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../logging/global_logger'
-require_relative 'processing_backoff'
+require_relative '../utils/processing_backoff'
 
 module Armagh
   class Agent
@@ -40,7 +40,7 @@ module Armagh
 
       @action_manager = ActionManager.new(self, @logger)
 
-      @backoff = ProcessingBackoff.new
+      @backoff = Utils::ProcessingBackoff.new
       @backoff.logger = @logger
     end
 
@@ -65,18 +65,18 @@ module Armagh
       @running
     end
 
-    def insert_document(id, content, meta)
+    def insert_document(id, content, meta, state)
       # TODO batching
       if @current_action
         type = @current_action.output_doctype
         pending_actions = @action_manager.get_action_instance_names(type)
-        Document.create(type, content, meta, pending_actions, id)
+        Document.create(type, content, meta, pending_actions, state, id)
       else
         @logger.error 'Document insert can only be called by an action'
       end
     end
 
-    def update_document(id, content, meta)
+    def update_document(id, content, meta, state)
       # TODO batching
       if @current_action
         type = @current_action.output_doctype
@@ -86,13 +86,14 @@ module Armagh
         doc.content = content
         doc.meta = meta
         doc.add_pending_actions(@action_manager.get_action_instance_names(type))
+        doc.state = state
         doc.save
       else
         @logger.error 'Document update can only be called by an action'
       end
     end
 
-    def insert_or_update_document(id, content, meta)
+    def insert_or_update_document(id, content, meta, state)
       # TODO batching
       if @current_action
         doc = Document.find(id)
@@ -103,13 +104,48 @@ module Armagh
           doc.content = content
           doc.meta = meta
           doc.add_pending_actions(@action_manager.get_action_instance_names(type))
+          doc.state = state
           doc.save
         else
-          insert_document(id, content, meta)
+          insert_document(id, content, meta, state)
         end
       else
         @logger.error 'Document insertion or update can only be called by an action'
       end
+    end
+
+    # Blocking modify.  If the document is locked, block until unlocked.  If the document doesn't exist, doesn't yield
+    def modify(id)
+      if block_given?
+        result = Document.modify(id) do |doc|
+          if doc
+            action_doc = doc.to_action_document
+            yield action_doc
+            doc.update_from_action_document(action_doc)
+          end
+        end
+      else
+        @logger.warn "Modify called for document #{id} but not block was given.  Ignoring."
+        result = false
+      end
+      result
+    end
+
+    # Non-Blocking fetch.  If the document is locked or doesn't exist, doesn't yield
+    def modify!(id)
+      if block_given?
+        result = Document.modify!(id) do |doc|
+          if doc
+            action_doc = doc.to_action_document
+            yield action_doc
+            doc.update_from_action_document(action_doc)
+          end
+        end
+      else
+        @logger.warn "Modify called for document #{id} but not block was given.  Ignoring."
+        result = false
+      end
+      result
     end
 
     private def run

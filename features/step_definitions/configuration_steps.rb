@@ -75,6 +75,14 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
+    if specified_actions.include? 'external_document_action'
+      available_actions['external_document_action'] = {
+          'input_doctype' => 'TestDocumentInput',
+          'output_doctype' => 'ExternalDocument',
+          'action_class_name' => 'ClientActions::ExternalDocumentAction'
+      }
+    end
+
     config['available_actions'] = available_actions
   end
 

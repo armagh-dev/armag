@@ -29,13 +29,21 @@ require 'test/unit'
 require 'logger'
 
 class TestAgent < Test::Unit::TestCase
+  include ArmaghTest
 
   THREAD_SLEEP_TIME = 0.01
 
   STARTED = []
 
   def setup
-    ArmaghTest.mock_global_logger
+    @logger = mock_global_logger
+    @logger.expects(:debug).at_least(0)
+    @logger.expects(:info).at_least(0)
+    @logger.expects(:warn).at_least(0)
+    @logger.expects(:error).at_least(0)
+    @logger.expects(:unknown).at_least(0)
+    @logger.expects(:level).at_least(0)
+
     @agent = Armagh::Agent.new
     @backoff_mock = mock('object')
     @agent.instance_variable_set(:@backoff, @backoff_mock)
@@ -68,16 +76,15 @@ class TestAgent < Test::Unit::TestCase
     config = {
         'log_level' => Logger::ERROR
     }
+    @logger.expects(:level=).with(Logger::ERROR).at_least_once
 
     agent_status = mock
     agent_status.stubs(:config).returns(config)
 
     DRbObject.stubs(:new_with_uri).returns(agent_status)
 
-    assert_not_equal(Logger::ERROR, @agent.instance_variable_get(:@logger).level)
     Thread.new { @agent.start }
     sleep THREAD_SLEEP_TIME
-    assert_equal(Logger::ERROR, @agent.instance_variable_get(:@logger).level)
   end
 
   def test_start_and_stop
@@ -243,8 +250,8 @@ class TestAgent < Test::Unit::TestCase
     action = mock
     action.expects(:output_doctype).returns('DocType')
     @agent.instance_variable_set(:'@current_action', action)
-    Armagh::Document.expects(:create).with('DocType', 'content', 'meta', [], 'id')
-    @agent.insert_document('id', 'content', 'meta')
+    Armagh::Document.expects(:create).with('DocType', 'content', 'meta', [], Armagh::DocState::PUBLISHED, 'id')
+    @agent.insert_document('id', 'content', 'meta', Armagh::DocState::PUBLISHED)
   end
 
   def test_insert_document_out_of_scope
@@ -252,7 +259,7 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:create).never
     logger.expects(:error).with('Document insert can only be called by an action')
 
-    @agent.insert_document(nil, nil, nil)
+    @agent.insert_document(nil, nil, nil, nil)
   end
 
   def test_update_document
@@ -266,9 +273,10 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:content=).with('content')
     doc.expects(:meta=).with('meta')
     doc.expects(:add_pending_actions).with([])
+    doc.expects(:state=).with(Armagh::DocState::CLOSED)
     doc.expects(:save)
 
-    @agent.update_document('id', 'content', 'meta')
+    @agent.update_document('id', 'content', 'meta', Armagh::DocState::CLOSED)
   end
 
   def test_update_document_out_of_scope
@@ -276,7 +284,7 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:find).never
     logger.expects(:error).with('Document update can only be called by an action')
 
-    @agent.update_document(nil, nil, nil)
+    @agent.update_document(nil, nil, nil, nil)
   end
 
   def test_insert_or_update_document_insert
@@ -285,8 +293,8 @@ class TestAgent < Test::Unit::TestCase
     action = mock
     action.expects(:output_doctype).returns('DocType')
     @agent.instance_variable_set(:'@current_action', action)
-    Armagh::Document.expects(:create).with('DocType', 'content', 'meta', [], 'id')
-    @agent.insert_or_update_document('id', 'content', 'meta')
+    Armagh::Document.expects(:create).with('DocType', 'content', 'meta', [], Armagh::DocState::PENDING, 'id')
+    @agent.insert_or_update_document('id', 'content', 'meta', Armagh::DocState::PENDING)
   end
 
   def test_insert_or_update_document_update
@@ -301,8 +309,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:content=).with('content')
     doc.expects(:meta=).with('meta')
     doc.expects(:add_pending_actions).with([])
+    doc.expects(:state=).with(Armagh::DocState::PENDING)
     doc.expects(:save)
-    @agent.insert_or_update_document('id', 'content', 'meta')
+    @agent.insert_or_update_document('id', 'content', 'meta', Armagh::DocState::PENDING)
   end
 
   def test_insert_or_update_document_out_of_scope
@@ -310,6 +319,59 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:find).never
     logger.expects(:error).with('Document insertion or update can only be called by an action')
 
-    @agent.insert_or_update_document(nil, nil, nil)
+    @agent.insert_or_update_document(nil, nil, nil, nil)
   end
+
+  def test_modify
+    id = 'id'
+    doc = mock
+    new_content = 'new content'
+    new_meta = 'new meta'
+    new_state = 'new state'
+    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new('old content', 'old meta', 'old state'))
+    doc.expects(:update_from_action_document)
+    Armagh::Document.expects(:modify).with(id).yields(doc).returns(true)
+
+    result = @agent.modify(id) do |doc|
+      assert_equal(Armagh::ActionDocument, doc.class)
+      doc.meta = new_meta
+      doc.content = new_content
+      doc.state = new_state
+    end
+    assert_true result
+  end
+
+  def test_modify_no_block
+    logger = @agent.instance_variable_get(:@logger)
+    logger.expects(:warn).with('Modify called for document 123 but not block was given.  Ignoring.')
+    result = @agent.modify(123)
+    assert_false result
+  end
+
+  def test_modify_bang
+    id = 'id'
+    doc = mock
+    new_content = 'new content'
+    new_meta = 'new meta'
+    new_state = 'new state'
+    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new('old content', 'old meta', 'old state'))
+    doc.expects(:update_from_action_document)
+    Armagh::Document.expects(:modify!).with(id).yields(doc).returns(true)
+
+    result = @agent.modify!(id) do |doc|
+      assert_equal(Armagh::ActionDocument, doc.class)
+      doc.meta = new_meta
+      doc.content = new_content
+      doc.state = new_state
+    end
+    assert_true result
+  end
+
+  def test_modify_bang_no_block
+    logger = @agent.instance_variable_get(:@logger)
+    logger.expects(:warn).with('Modify called for document 123 but not block was given.  Ignoring.')
+    result = @agent.modify!(123)
+    assert_false result
+  end
+
 end

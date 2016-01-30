@@ -28,8 +28,8 @@ class TestAction < Armagh::Action
   OUT_CONTENT = 'output content'
   OUT_META = 'output meta'
 
-  def execute(content, meta)
-    [OUT_CONTENT, OUT_META]
+  def execute(doc)
+    true
   end
 end
 
@@ -63,10 +63,8 @@ class TestActionInstance < Test::Unit::TestCase
   end
 
   def test_execute
-    doc = stub({:content => nil, :meta => nil})
-    content, meta = @action_instance.execute(doc)
-    assert_equal(TestAction::OUT_CONTENT, content)
-    assert_equal(TestAction::OUT_META, meta)
+    doc = stub({:content => nil, :meta => nil, :state => nil})
+    assert_true @action_instance.execute(doc)
   end
 
 end

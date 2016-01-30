@@ -17,14 +17,14 @@
 
 require_relative '../test_helpers/coverage_helper'
 require_relative '../../test/test_helpers/mock_global_logger'
-require_relative '../../lib/agent/processing_backoff'
+require_relative '../../lib/utils/processing_backoff'
 require 'test/unit'
 
 class TestProcessingBackoff < Test::Unit::TestCase
 
   def setup
     @max_time = 500
-    @processing_backoff = Armagh::ProcessingBackoff.new(@max_time)
+    @processing_backoff = Armagh::Utils::ProcessingBackoff.new(@max_time)
   end
 
   def test_backoff

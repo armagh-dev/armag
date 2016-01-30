@@ -16,13 +16,14 @@
 #
 
 require 'test/unit'
-require 'mocha/test_unit'
+require 'mocha'
 
 require_relative '../../lib/logging/global_logger'
 
 module ArmaghTest
-  def self.mock_global_logger
-    Armagh::Logging::GlobalLogger.any_instance.stubs(:add).returns(nil)
-    Armagh::Logging::GlobalLogger.any_instance.stubs(:add_global).returns(nil)
+  def mock_global_logger
+    logger = mock
+    Armagh::Logging::GlobalLogger.stubs(:new).returns(logger)
+    logger
   end
 end

@@ -17,7 +17,7 @@
 
 require_relative '../test_helpers/coverage_helper'
 require_relative '../../test/test_helpers/mock_global_logger'
-require_relative '../../lib/agent/interruptible_sleep'
+require_relative '../../lib/utils/interruptible_sleep'
 require 'test/unit'
 
 class TestInterruptibleSleep < Test::Unit::TestCase
@@ -28,7 +28,7 @@ class TestInterruptibleSleep < Test::Unit::TestCase
   def test_interruptible_sleep_complete
     sleep_time = 2
     start = Time.now
-    Armagh::InterruptibleSleep.interruptible_sleep(sleep_time) { false }
+    Armagh::Utils::InterruptibleSleep.interruptible_sleep(sleep_time) { false }
     elapsed = Time.now - start
     assert_equal(sleep_time, elapsed.round)
   end
@@ -37,7 +37,7 @@ class TestInterruptibleSleep < Test::Unit::TestCase
     sleep_time = 10
     interrupt_time = 1
     start = Time.now
-    Armagh::InterruptibleSleep.interruptible_sleep(sleep_time) { Time.now > start + interrupt_time }
+    Armagh::Utils::InterruptibleSleep.interruptible_sleep(sleep_time) { Time.now > start + interrupt_time }
     elapsed = Time.now - start
     assert_equal(interrupt_time, elapsed.round)
   end

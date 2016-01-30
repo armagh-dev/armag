@@ -47,7 +47,7 @@ Feature: Actions Execution
     And I wait 2 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 document for "sleep_action" processing
+    When I insert 1 document for "sleep_action" processing with a "published" state
     Then I should see an agent with a status of "running" within 5 seconds
     Then I should see an agent with a status of "idle" within 5 seconds
     And I should see a "TestDocumentInput" with the following
@@ -70,15 +70,15 @@ Feature: Actions Execution
     And I wait 2 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 document for "sleep_action_default" processing
+    When I insert 1 document for "sleep_action_default" processing with a "published" state
     Then I should see an agent with a status of "running" within 5 seconds
     Then I should see an agent with a status of "idle" within 5 seconds
     And I should see a "SleepInputDocument" with the following
       | pending_actions | [] |
-      | failed_actions  | {}                      |
+      | failed_actions  | {} |
     And I should see a "SleepOutputDocument" with the following
       | pending_actions | [] |
-      | failed_actions  | {}                      |
+      | failed_actions  | {} |
 
   Scenario: I have a document to work on with an action that is unavailable
     Given armagh isn't already running
@@ -93,7 +93,7 @@ Feature: Actions Execution
     And I wait 2 second
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 document for "non_existent_action" processing
+    When I insert 1 document for "non_existent_action" processing with a "published" state
     And I wait 5 seconds
     Then I should see a "TestDocumentInput" with the following
       | pending_actions | [] |
@@ -112,7 +112,7 @@ Feature: Actions Execution
     And I wait 2 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 document for "no_execution_action" processing
+    When I insert 1 document for "no_execution_action" processing with a "published" state
     And I wait 5 seconds
     Then I should see a "TestDocumentInput" with the following
       | pending_actions | [] |
@@ -131,9 +131,82 @@ Feature: Actions Execution
     And I wait 2 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 document for "middle_fail_action" processing
+    When I insert 1 document for "middle_fail_action" processing with a "published" state
     And I wait 5 seconds
     Then I should see a "TestDocumentInput" with the following
       | pending_actions | [] |
       | failed_actions  | {"middle_fail_action"=>{"message"=>"Ran into a problem.  Bailing", "trace"=>"anything"}} |
     And I should see 5 "TestDocumentOutput" documents
+
+  Scenario: Don't process any documents that are closed
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1 |
+      | checkin_frequency | 1 |
+    And armagh's "agent" config is
+      | available_actions | sleep_action_default |
+    And I run armagh
+    And I wait 2 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 document for "sleep_action_default" processing with a "closed" state
+    And I wait 2 seconds
+    Then I should see a "SleepInputDocument" with the following
+      | pending_work | true |
+    And I should see 0 "SleepOutputDocument" documents
+
+  Scenario: Don't process any documents that are pending
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1 |
+      | checkin_frequency | 1 |
+    And armagh's "agent" config is
+      | available_actions | sleep_action_default |
+    And I run armagh
+    And I wait 2 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 document for "sleep_action_default" processing with a "pending" state
+    And I wait 2 seconds
+    Then I should see a "SleepInputDocument" with the following
+      | pending_work | true |
+    And I should see 0 "SleepOutputDocument" documents
+
+  Scenario: Execute an action that works on external documents
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1 |
+      | checkin_frequency | 1 |
+    And armagh's "agent" config is
+      | available_actions | external_document_action |
+    And I run armagh
+    And I wait 2 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 document for "external_document_action" processing with a "published" state
+    Then I should see an agent with a status of "running" within 5 seconds
+    Then I should see an agent with a status of "idle" within 30 seconds
+    And I should see a "ExternalDocument" with the following
+      | _id     | 'external_1'                                |
+      | locked  | false                                        |
+      | state   | Armagh::DocState::PENDING                   |
+      | content | 'Document created by modify in iteration 0' |
+      | meta    | {"doc_created_iteration" => 0, "1" => "Iteration 1", "2" => "Iteration 2", "3" => "Iteration 3", "4" => "Iteration 4"} |
+    And I should see a "ExternalDocument" with the following
+      | _id     | 'external_2'                                 |
+      | locked  | false                                        |
+      | state   | Armagh::DocState::PENDING                    |
+      | content | 'Document created by modify! in iteration 0' |
+      | meta    | {"doc_created_iteration" => 0, "1" => "Iteration 1", "2" => "Iteration 2", "3" => "Iteration 3", "4" => "Iteration 4"} |
+    And I should see a "ExternalDocument" with the following
+      | _id     | 'external_3'                   |
+      | locked  | false                          |
+      | state   | Armagh::DocState::PENDING      |
+      | content | 'Document created for locking' |
+      | meta    | {"lock_thread_1" => 1, "lock_thread_2" => 2, "bang_lock_thread_1" => true, "mixed_a_lock_thread_1" => true, "mixed_b_lock_thread_1" => 1, "mixed_b_lock_thread_2" => 2} |

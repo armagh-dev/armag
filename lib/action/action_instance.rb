@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+require 'armagh/action_document'
+
 module Armagh
 
   # An action to perform on a document
@@ -30,7 +32,8 @@ module Armagh
     end
 
     def execute(document)
-      @action_class_instance.execute(document.content, document.meta)
+      action_doc = ActionDocument.new(document.content, document.meta, document.state)
+      @action_class_instance.execute(action_doc)
     end
 
     def ==(other)

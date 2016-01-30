@@ -16,8 +16,9 @@
 #
 
 require_relative '../../lib/document/document'
+require 'armagh/doc_state'
 
-When(/^I insert (\d+) documents* for "([^"]*)" processing$/) do |num_docs, action_type|
+When(/^I insert (\d+) documents* for "([^"]*)" processing with a "([^"]*)" state$/) do |num_docs, action_type, state|
   if action_type == 'sleep_action_default'
     doc_type = 'SleepInputDocument'
   else
@@ -25,6 +26,6 @@ When(/^I insert (\d+) documents* for "([^"]*)" processing$/) do |num_docs, actio
   end
 
   num_docs.to_i.times do
-    Armagh::Document.create(doc_type, nil, nil, [action_type])
+    Armagh::Document.create(doc_type, nil, nil, [action_type], state)
   end
 end

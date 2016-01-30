@@ -18,6 +18,8 @@
 require_relative '../test_helpers/coverage_helper'
 require_relative '../../lib/document/document'
 
+require 'armagh/doc_state'
+
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -26,41 +28,38 @@ class TestDocument < Test::Unit::TestCase
   include Armagh
 
   def setup
+    @documents = mock
     mock_document_insert('id')
-    @doc = Document.create('testdoc', 'content', 'meta', [])
+    Armagh::Connection.stubs(:documents).returns(@documents)
+    @doc = Document.create('testdoc', 'content', 'meta', [], Armagh::DocState::PENDING)
   end
 
   def mock_document_insert(id)
-    documents = stub(insert_one: id)
-    Armagh::Connection.stubs(:documents).returns(documents)
+    insertions = stub(inserted_ids: [id])
+    @documents.stubs(insert_one: insertions)
   end
 
   def mock_document_replace
-    documents = stub(replace_one: nil)
-    Armagh::Connection.stubs(:documents).returns(documents)
+    @documents.stubs(replace_one: nil)
   end
 
   def mock_document_find(result)
     find_result = mock('object')
     find_result.expects(:limit).with(1).returns([result].flatten)
-
-    documents = stub(:find => find_result)
-    Armagh::Connection.stubs(:documents).returns(documents)
+    @documents.stubs(:find => find_result)
   end
 
   def mock_document_find_one_and_update(result)
-    documents = stub(:find_one_and_update => result)
-    Armagh::Connection.stubs(:documents).returns(documents)
+    @documents.stubs(:find_one_and_update => result)
   end
 
   def mock_document_update_one
-    documents = stub(:update_one => nil)
-    Armagh::Connection.stubs(:documents).returns(documents)
+    @documents.stubs(:update_one => nil)
   end
 
   def test_create_no_id
     mock_document_insert('new_id')
-    doc = Document.create('type', 'content', 'meta', [])
+    doc = Document.create('type', 'content', 'meta', [], Armagh::DocState::PENDING)
     assert_equal('type', doc.type)
     assert_equal('content', doc.content)
     assert_equal('meta', doc.meta)
@@ -69,7 +68,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_create_with_id
     mock_document_replace
-    doc = Document.create('type', 'content', 'meta', [], 'id')
+    doc = Document.create('type', 'content', 'meta', [], Armagh::DocState::PENDING, 'id')
 
     assert_equal('type', doc.type)
     assert_equal('content', doc.content)
@@ -84,7 +83,7 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_find_none
-    mock_document_find(nil)
+    mock_document_find([])
     doc = Document.find('id')
     assert_nil(doc)
   end
@@ -151,7 +150,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_timestamps
     mock_document_replace
-    doc = Document.create('type', 'content', 'meta', [], 'id')
+    doc = Document.create('type', 'content', 'meta', [], Armagh::DocState::PENDING, 'id')
     assert_in_delta(Time.now, doc.created_timestamp, 1)
     assert_equal(doc.created_timestamp, doc.updated_timestamp)
 
@@ -168,6 +167,173 @@ class TestDocument < Test::Unit::TestCase
     mock_document_replace
     @doc.finish_processing
     assert_false(@doc.instance_variable_get(:@db_doc)['locked'])
+  end
+
+  def test_state
+    assert_not_equal(DocState::CLOSED, @doc.state)
+    @doc.state = DocState::CLOSED
+    assert_equal(DocState::CLOSED, @doc.state)
+  end
+
+  def test_invalid_state
+    e = assert_raise(RuntimeError) do
+      @doc.state = 'this is an invalid state'
+    end
+
+    assert_equal(e.message, "Tried to set state to an unknown state: 'this is an invalid state'.")
+
+  end
+
+  def test_pending?
+    @doc.state = DocState::CLOSED
+    assert_false @doc.pending?
+    @doc.state = DocState::PENDING
+    assert_true @doc.pending?
+  end
+
+  def test_published?
+    @doc.state = DocState::CLOSED
+    assert_false @doc.published?
+    @doc.state = DocState::PUBLISHED
+    assert_true @doc.published?
+  end
+
+  def test_closed?
+    @doc.state = DocState::PUBLISHED
+    assert_false @doc.closed?
+    @doc.state = DocState::CLOSED
+    assert_true @doc.closed?
+  end
+
+  def test_modify
+    id = 'docid'
+    mock_document_find_one_and_update({'_id' => id, 'content' => 'doc content', 'meta' => 'doc meta'})
+    mock_document_replace
+    block_executed = false
+
+    result = Document.modify(id) do |doc|
+      assert_equal(id, doc.id)
+      block_executed = true
+    end
+
+    assert_true block_executed
+    assert_true result
+  end
+  
+  def test_modify_none
+    id = 'docid'
+    mock_document_find_one_and_update(nil)
+    mock_document_find([])
+    mock_document_replace
+
+    result = Document.modify(id) do |doc|
+      # Should never execute this
+      fail
+    end
+
+    assert_false result
+  end
+  
+  def test_modify_locked
+    id = 'docid'
+    mock_document_find_one_and_update(nil)
+    mock_document_find({'_id' => id, 'content' => 'doc content', 'meta' => 'doc meta'})
+    mock_document_replace
+
+    e = RuntimeError.new
+
+    # Have to bail out of the infinite loop somehow
+    Utils::ProcessingBackoff.any_instance.expects(:backoff).raises(e)
+
+    block_executed = false
+
+    assert_raise(e) do
+      Document.modify(id) do |doc|
+        block_executed = true
+      end
+    end
+
+    assert_false block_executed
+  end
+
+  def test_modify_no_block
+    assert_raise(LocalJumpError) do
+      Document.modify('id')
+    end
+  end
+
+  def test_modify_bang
+    id = 'docid'
+    mock_document_find_one_and_update({'_id' => id, 'content' => 'doc content', 'meta' => 'doc meta'})
+    mock_document_replace
+    block_executed = false
+
+    result = Document.modify!(id) do |doc|
+      assert_equal(id, doc.id)
+      block_executed = true
+    end
+
+    assert_true block_executed
+    assert_true result
+  end
+  
+  def test_modify_bang_none
+    id = 'docid'
+    mock_document_find_one_and_update(nil)
+    mock_document_replace
+
+    result = Document.modify!(id) do |doc|
+      # Should never execute this
+      fail
+    end
+
+    assert_false result
+  end
+  
+  def test_modify_bang_not_blocked_by_lock
+    id = 'docid'
+    mock_document_find_one_and_update(nil)
+    mock_document_replace
+
+    block_executed = false
+
+    result = Document.modify!(id) do |doc|
+      block_executed = true
+    end
+
+    assert_false block_executed
+    assert_false result
+  end
+
+  def test_modify_bang_no_block
+    assert_raise(LocalJumpError) do
+      Document.modify!('id')
+    end
+  end
+
+  def test_to_action_document
+    action_doc = @doc.to_action_document
+    assert_equal(@doc.content, action_doc.content)
+    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.state, action_doc.state)
+  end
+
+  def test_update_from_action_document
+    content = 'new content'
+    meta = 'new meta'
+    state = Armagh::DocState::PUBLISHED
+    
+    action_document = Armagh::ActionDocument.new(content, meta, state)
+    
+    assert_not_equal(content, @doc.content)
+    assert_not_equal(meta, @doc.meta)
+    assert_not_equal(state, @doc.state)
+    
+    @doc.update_from_action_document(action_document)
+
+    assert_equal(content, @doc.content)
+    assert_equal(meta, @doc.meta)
+    assert_equal(state, @doc.state)
   end
 
 end
