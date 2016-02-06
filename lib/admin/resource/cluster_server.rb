@@ -11,20 +11,31 @@ module Armagh
         end
       
         def profile
+          
+          os = `uname -a`
+          case
+          when /Linux/i.match( os ) then linux_profile
+          when /Darwin/i.match( os ) then mac_profile
+          else {}
+          end
+        end
+        
+        def linux_profile
         
           profile = {
-            cpus:    `cat /proc/cpuinfo | grep processor | wc -l `.strip.to_i,
-            ram:     `cat /proc/meminfo | awk '/MemTotal/{ print $2}'`.strip.to_i * 1024,
-            swap:    `swapon -s | awk 'NR==2 { print $3 }'`.strip.to_i,
-            os:      `uname -a`,
-            ruby_v:  `ruby -v 2>/dev/null`,
-            armagh_v: `gem list 2>/dev/null | grep armagh`,
-            disks:    {}
+            'cpus'     => `cat /proc/cpuinfo | grep processor | wc -l `.strip.to_i,
+            'ram'      => `cat /proc/meminfo | awk '/MemTotal/{ print $2}'`.strip.to_i * 1024,
+            'swap'     => `swapon -s | awk 'NR==2 { print $3 }'`.strip.to_i,
+            'os'       => `uname -a`,
+            'ruby_v'   =>  `ruby -v 2>/dev/null`,
+            'armagh_v' =>  `gem list 2>/dev/null | grep armagh`,
+            'disks'    =>  {}
           }
         
-          [ 'ARMAGH_DATA', 'ARMAGH_DB_INDEX', 'ARMAGH_DB_LOG', 'ARMAGH_DB_JOURNAL' ].each do |env_var|
-            df_info = `df -TPB 1 $#{env_var} 2>/dev/null | awk 'NR==2 { print }'` || ''
-            dir=ENV[ env_var ]
+          base_data_dir = ENV[ 'ARMAGH_DATA' ]
+          [ nil, 'index', 'log', 'journal' ].each do |subdir|
+            dir = File.join( base_data_dir, subdir || '')
+            df_info = `df -TPB 1 $#{dir} 2>/dev/null | awk 'NR==2 { print }'` || ''
             filesystem_name,
             filesystem_type,
             blocks,
@@ -32,22 +43,62 @@ module Armagh
             available,
             use_perc,
             mounted_on = df_info.split( /\s+/ )
-            profile[ :disks ][ env_var ] = {
+            profile[ 'disks' ][ subdir || 'base' ] = {
               
-              dir: dir,
-              filesystem_name: filesystem_name,
-              filesystem_type: filesystem_type,
-              blocks: blocks.to_i,
-              user: used.to_i,
-              available: available.to_i,
-              use_perc: use_perc.to_i,
-              mounted_on: mounted_on
+              'dir'             => dir,
+              'filesystem_name' => filesystem_name,
+              'filesystem_type' => filesystem_type,
+              'blocks'          => blocks.to_i,
+              'used'            => used.to_i,
+              'available'       => available.to_i,
+              'use_perc'        => use_perc.to_i,
+              'mounted_on'      => mounted_on
             }
           end
         
           profile
         
         end
+        
+        def mac_profile
+          profile = {
+            'cpus'     => `sysctl -n hw.activecpu`.strip.to_i,
+            'ram'      => `sysctl -n hw.memsize`.strip.to_i,
+            'swap'     => 0,
+            'os'       => `uname -a`,
+            'ruby_v'   => `ruby -v 2>/dev/null`,
+            'armagh_v' => `gem list 2>/dev/null | grep armagh`,
+            'disks'    => {}
+          }
+        
+          base_data_dir = ENV[ 'ARMAGH_DATA' ]
+          [ nil, 'index', 'log', 'journal' ].each do |subdir|
+            dir = File.join( base_data_dir, subdir || '' )
+            df_info = `df $#{dir} 2>/dev/null | awk 'NR==2 { print }'` || ''
+            filesystem_name,
+            blocks,
+            used,
+            available,
+            use_perc,
+            iused,
+            ifree, 
+            iperc,
+            mounted_on = df_info.split( /\s+/ )
+            profile[ 'disks' ][ subdir || 'base' ] = {
+              
+              'dir'             => dir,
+              'filesystem_name' => filesystem_name,
+              'filesystem_type' => 'mac',
+              'blocks'          => blocks.to_i * 512,
+              'used'            => used.to_i,
+              'available'       => available.to_i,
+              'use_perc'        => use_perc.to_i,
+              'mounted_on'      => mounted_on
+            }
+          end
+        
+          profile
+        end          
       
         def evaluate_profile( profile )
           profile

@@ -22,6 +22,7 @@ require 'singleton'
 require 'base64'
 
 require_relative '../logging/global_logger'
+require_relative '../configuration/file_based_configuration.rb'
 
 module Armagh
   module Connection
@@ -32,12 +33,14 @@ module Armagh
 
       def initialize
         Mongo::Logger.logger.level = Logger::WARN
-        unless ENV[ 'ARMAGH_STRF' ]
-          raise 'No admin connection string defined.  Define a base-64 encoded mongo connection URI in env variable ARMAGH_STRF.'
+        config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
+        required = [ 'ip', 'port', 'str', 'db' ]
+        unless ( config.keys & required ).length == required.length
+          raise "Insufficient connection info for admin connection. Ensure armagh_env.json contains Armagh::Connection::MongoAdminConnection[ #{ (required - config).join(', ')}]."
         end
         begin
-          con_str = Base64.decode64( ENV[ 'ARMAGH_STRF' ]).strip
-          @connection = Mongo::Client.new( con_str )
+          conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config_db}"
+          @connection = Mongo::Client.new( conn_uri )
         rescue => e
           raise "Unable to establish admin database connection: #{e.message}"
         end

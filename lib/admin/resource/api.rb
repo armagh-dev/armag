@@ -1,6 +1,7 @@
 require 'singleton'
 require_relative '../../logging/global_logger.rb'
 require_relative '../../configuration/file_based_configuration.rb'
+require_relative './cluster_server.rb'
 
 module Armagh
   module Admin
@@ -52,7 +53,10 @@ module Armagh
         def root_directory
           File.join( __dir__, 'www_root' )
         end
-            
+          
+        def report_profile
+          ClusterServer.new( '127.0.0.1' ).report_profile
+        end
       end
     end
   end
