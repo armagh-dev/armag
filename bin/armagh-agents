@@ -55,8 +55,6 @@ unless File.directory?(LOG_DIR)
   end
 end
 
-raise "#{LOG_DIR}" unless File.directory? LOG_DIR
-
 unless Connection.can_connect?
   $stderr.puts 'Unable to establish connection to the database. Ensure the database is running.' # TODO Output details about the configuration
   exit 1
@@ -94,19 +92,19 @@ def checkin(status)
 
       'agents' => AgentStatus.get_statuses(@agent_status),
 
-      'actions' => {'client' => {}, 'noragh' => {}},
+      'actions' => {'custom' => {}, 'standard' => {}},
   }
 
-  checkin['actions']['client'] = {'name' => ClientActions::NAME, 'version' => ClientActions::VERSION} if defined? ClientActions
-  checkin['actions']['noragh'] = {'version' => NoraghActions::VERSION} if defined? NoraghActions
+  checkin['actions']['custom'] = {'name' => CustomActions::NAME, 'version' => CustomActions::VERSION} if defined? CustomActions
+  checkin['actions']['standard'] = {'version' => StandardActions::VERSION} if defined? StandardActions
 
-  @logger.debug "Details: #{checkin}"
+  @logger.debug "Checkin Details: #{checkin}"
   Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
 
   @last_checkin = Time.now
 end
 
-def apply_config(config)
+def apply_launcher_config(config)
   change_log_level(config['log_level'])
   change_num_agents(config['num_agents'])
   @logger.debug "Updated configuration to #{config}"
@@ -117,8 +115,10 @@ def apply_agent_config(config)
 end
 
 def change_log_level(level)
-  @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
-  @logger.level = level
+  unless @logger.level == level
+    @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
+    @logger.level = level
+  end
 end
 
 def change_num_agents(num_agents)
@@ -191,6 +191,7 @@ def start_agent_in_process(agent=nil)
       agent.start
     rescue => e
       @logger.error "Could not start agent #{agent.uuid}"
+      # TODO Reduce logging
       @logger.error e
     end
   end
@@ -215,7 +216,7 @@ def update_config
   new_config = @launcher_config_manager.get_config
   if new_config
     @config = new_config
-    apply_config(@config)
+    apply_launcher_config(@config)
   end
 end
 
@@ -226,20 +227,38 @@ end
 
 def load_actions
   begin
-    require 'armagh/client_actions'
-    @logger.info "Using Client Actions: #{ClientActions::NAME} (#{ClientActions::VERSION})"
+    require 'armagh/custom_actions'
+    @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
   rescue LoadError
-    @logger.warn "ClientActions gem is not deployed. These actions won't be available."
+    @logger.warn "CustomActions gem is not deployed. These actions won't be available."
+  rescue => e
+    # An unexpected exception - things like syntax errors.
+    @logger.error 'Could not load CustomActions gem'
+    # TODO Split logging
+    @logger.error e
+    Armagh.send(:remove_const, :CustomActions)
   end
 
   begin
-    require 'armagh/noragh_actions'
-    @logger.info "Using Noragh Actions: #{NoraghActions::VERSION}"
+    require 'armagh/standard_actions'
+    @logger.info "Using StandardActions: #{Standard::VERSION}"
   rescue LoadError
-    @logger.warn "NoraghActions gem is not deployed. These actions won't be available."
+    @logger.warn "StandardActions gem is not deployed. These actions won't be available."
+  rescue => e
+    # An unexpected exception - things like syntax errors.
+    @logger.error 'Could not load StandardActions gem'
+    # TODO Split logging
+    @logger.error e
+    Armagh.send(:remove_const, :StandardActions)
   end
 
-  @logger.warn 'No available actions.  Please make sure noragh and/or client actions are installed.' if ActionManager.available_actions.empty?
+  defined_actions = ActionManager.defined_actions
+
+  if defined_actions.any?
+    @logger.debug "Available actions are: #{defined_actions}"
+  else
+    @logger.warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
+  end
 end
 
 # Stop agents before stopping armagh
@@ -260,7 +279,7 @@ begin
   load_actions
 
   update_agent_config
-  apply_config(@config)
+  apply_launcher_config(@config)
 
   @running = true
   checkin('running')

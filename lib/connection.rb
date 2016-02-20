@@ -20,6 +20,8 @@ require_relative 'connection/mongo_admin_connection'
 
 module Armagh
   module Connection
+    # TODO Set up indexes HERE! not elsewhere in the code
+
     def self.documents
       MongoConnection.instance.connection['documents']
     end

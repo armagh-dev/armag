@@ -20,7 +20,8 @@
 
 
 require_relative '../lib/document/document'
+require 'armagh/documents/doc_state'
 
 include Armagh
 
-Document.create('CollectDoc', nil, nil, ['collect'])
+Document.create('CollectDoc', {}, {}, {}, ['read'], DocState::READY)

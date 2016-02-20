@@ -55,7 +55,7 @@ module Armagh
         sleep_time
       end
 
-      # Backoff for the next backoff intervaling allow for interruptions
+      # Backoff for the next backoff interval, allow for interruptions
       #
       # @example backoff unless the runner terminates
       #   interruptible_backoff { runner.terminated? }

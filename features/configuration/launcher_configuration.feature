@@ -106,3 +106,5 @@ Feature: Launcher Configuration
     And I run armagh
     And an agent is killed
     Then a new agent shall launch to take its place
+
+  Scenario: Invalid launcher configuration

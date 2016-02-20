@@ -17,6 +17,11 @@
 
 require 'drb/unix'
 require 'securerandom'
+require 'tmpdir'
+
+require 'armagh/actions'
+require 'armagh/documents'
+require 'armagh/errors'
 
 require_relative '../action/action_manager'
 require_relative '../document/document'
@@ -65,87 +70,69 @@ module Armagh
       @running
     end
 
-    def insert_document(id, content, meta, state)
-      # TODO batching
-      if @current_action
-        type = @current_action.output_doctype
-        pending_actions = @action_manager.get_action_instance_names(type)
-        Document.create(type, content, meta, pending_actions, state, id)
-      else
-        @logger.error 'Document insert can only be called by an action'
-      end
+    def get_splitter(action_name, doctype_name)
+      @action_manager.get_splitter(action_name, doctype_name)
     end
 
-    def update_document(id, content, meta, state)
-      # TODO batching
-      if @current_action
-        type = @current_action.output_doctype
-
-        doc = Document.find(id)
-        doc.type = type
-        doc.content = content
-        doc.meta = meta
-        doc.add_pending_actions(@action_manager.get_action_instance_names(type))
-        doc.state = state
-        doc.save
-      else
-        @logger.error 'Document update can only be called by an action'
-      end
+    def create_document(action_doc)
+      # TODO Throw an error if insert fails (not unique, too large, etc)
+      doctype = action_doc.doctype
+      pending_actions = @action_manager.get_action_names_for_doctype(doctype)
+      Document.create(doctype.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
+                      pending_actions, doctype.state, action_doc.id, true)
     end
 
-    def insert_or_update_document(id, content, meta, state)
-      # TODO batching
-      if @current_action
-        doc = Document.find(id)
-        if doc
-          type = @current_action.output_doctype
-
-          doc.type = type
-          doc.content = content
-          doc.meta = meta
-          doc.add_pending_actions(@action_manager.get_action_instance_names(type))
-          doc.state = state
-          doc.save
-        else
-          insert_document(id, content, meta, state)
-        end
-      else
-        @logger.error 'Document insertion or update can only be called by an action'
-      end
-    end
-
-    # Blocking modify.  If the document is locked, block until unlocked.  If the document doesn't exist, doesn't yield
-    def modify(id)
+    def edit_document(id, doctype)
+      # TODO Throw an error if insert fails (too large, etc)
       if block_given?
-        result = Document.modify(id) do |doc|
-          if doc
-            action_doc = doc.to_action_document
-            yield action_doc
-            doc.update_from_action_document(action_doc)
-          end
+        Document.modify_or_create(id, doctype.type, doctype.state) do |doc|
+          edit_or_create(doc)
         end
       else
-        @logger.warn "Modify called for document #{id} but not block was given.  Ignoring."
+        @logger.warn "edit_document called for document #{id} but not block was given.  Ignoring."
+      end
+    end
+
+    # returns true if the document was modified or created, false if the document was skipped because it was locked.
+    def edit_document!(id, doctype)
+      # TODO Throw an error if insert fails (too large, etc)
+      if block_given?
+        result = Document.modify_or_create!(id, doctype.type, doctype.state) do |doc|
+          edit_or_create(doc)
+        end
+      else
+        @logger.warn "edit_document! called for document #{id} but not block was given.  Ignoring."
         result = false
       end
       result
     end
 
-    # Non-Blocking fetch.  If the document is locked or doesn't exist, doesn't yield
-    def modify!(id)
-      if block_given?
-        result = Document.modify!(id) do |doc|
-          if doc
-            action_doc = doc.to_action_document
-            yield action_doc
-            doc.update_from_action_document(action_doc)
-          end
+    private def edit_or_create(doc)
+      if doc
+        action_doc = doc.to_action_document
+        initial_doctype = action_doc.doctype
+
+        yield action_doc
+
+        new_doctype = action_doc.doctype
+
+        raise ActionErrors::DoctypeError.new "Document's type is not changeable while editing.  Only state is." unless initial_doctype.type == new_doctype.type
+        raise ActionErrors::DoctypeError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_doctype.state == DocState::READY || new_doctype.state == DocState::WORKING
+
+        doc.update_from_action_document(action_doc)
+
+        unless initial_doctype == new_doctype
+          pending_actions = @action_manager.get_action_names_for_doctype(new_doctype)
+          doc.pending_actions.clear
+          doc.add_pending_actions pending_actions
         end
       else
-        @logger.warn "Modify called for document #{id} but not block was given.  Ignoring."
-        result = false
+        action_doc = ActionDocument.new(id, {}, {}, {}, doctype, true)
+        yield action_doc
+        pending_actions = @action_manager.get_action_names_for_doctype(doctype)
+        new_doc = Document.from_action_document(action_doc, pending_actions)
+        new_doc.finish_processing
       end
-      result
     end
 
     private def run
@@ -157,6 +144,7 @@ module Armagh
       @logger.info 'Terminated'
     rescue => e
       @logger.error 'An unexpected error occurred.'
+      # TODO Split error
       @logger.error e
     end
 
@@ -177,15 +165,14 @@ module Armagh
       new_config = AgentStatus.get_config(@agent_status)
 
       if @last_config_timestamp.nil? || new_config['timestamp'] > @last_config_timestamp
-        @config = new_config
-        apply_config(@config)
-        @last_config_timestamp = @config['timestamp']
+        apply_config(new_config)
+        @last_config_timestamp = new_config['timestamp']
       end
     end
 
     private def apply_config(config)
       change_log_level(config['log_level'])
-      @action_manager.set_available_action_instances(config['available_actions'])
+      @action_manager.set_available_actions(config['available_actions'])
       @logger.debug "Updated configuration to #{config}"
     end
 
@@ -195,49 +182,80 @@ module Armagh
       if doc
         @backoff.reset
 
-        action_names = doc.pending_actions
+        doc.pending_actions.delete_if do |name|
+          @current_action = @action_manager.get_action(name)
 
-        action_names.each do |name|
-          @current_action = @action_manager.get_action_from_name(name)
-
-          @logger.error "Document: #{doc.id} had an invalid action.  Please make sure all pending actions of this document are defined." unless @current_action
+          @logger.error "Document: #{doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless @current_action
           report_status(doc, @current_action)
 
           if @current_action
             begin
               @logger.debug "Executing #{name} on document #{doc.id}"
-              @current_action.execute(doc)
+              execute_action(@current_action, doc)
             rescue => e
               @logger.error "Error while executing action '#{name}'"
+              # TODO Split logging
               @logger.error e
               doc.add_failed_action(name, e)
             ensure
-              doc.remove_pending_action(name)
+              @current_action = nil
             end
           else
             # This could happen while actions are propagating through the system
             doc.add_failed_action(name, 'Undefined action')
-            doc.remove_pending_action(name)
-
-            report_status(doc, @current_action)
             @backoff.interruptible_backoff { !@running }
           end
+          true # Always remove this action from pending
         end
-        doc.finish_processing
-        @current_action = nil
+        doc.finish_processing if doc
       else
         report_status(doc, nil)
         @backoff.interruptible_backoff { !@running }
       end
     end
 
-    private def change_log_level(level)
-      return if level == @logger.level
+    # returns new actions that should be added to the iterator
+    private def execute_action(action, doc)
+      action_doc = doc.to_action_document
+      new_actions = nil
+      case
+        when action.is_a?(CollectAction)
+          Dir.mktmpdir do |tmp_dir|
+            Dir.chdir(tmp_dir) do
+              action.collect
+            end
+          end
+          # TODO Don't delete here.  Instead, we should store the number of files colellected (either through this or a splitter called by this)
+          #   Essentially, number of writes to the database.
+          doc.delete
+        when action.is_a?(ParseAction)
+          action.parse action_doc
+          doc.delete
+        when action.is_a?(PublishAction)
+          # TODO Publish should actually publish to an external collection
+          #  So we are working in the local documents collection, but publish applies this to the remote collection
+          action.publish action_doc
+          doc.meta = action_doc.meta
+          doc.published_content = action_doc.draft_content
+          doc.draft_content = {}
+          doc.state = DocState::PUBLISHED
+          doc.add_pending_actions(@action_manager.get_action_names_for_doctype(DocTypeState.new(doc.type, doc.state)))
+        when action.is_a?(SubscribeAction)
+          action.subscribe action_doc
+          doc.draft_content = action_doc.draft_content
+          doc.meta = action_doc.meta
+        when action.is_a?(CollectionSplitterAction)
+          @logger.error "CollectionSplitterAction #{action.name} should have run from the collector.  This is an internal error."
+        else
+          @logger.error "#{action.name} is an unknown action type."
+      end
+      new_actions
+    end
 
-      if level
+    private def change_log_level(level)
+      unless @logger.level == level
         @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
         @logger.level = level
-        @logger.debug 'Log level successfully changed'
       end
     end
 

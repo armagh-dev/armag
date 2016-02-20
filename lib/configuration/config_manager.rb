@@ -22,12 +22,14 @@ module Armagh
   module Configuration
     class ConfigManager
 
-      attr_reader :last_config_timestamp
+      attr_reader :last_config_timestamp, :default_config
 
       DEFAULT_CONFIG = {
           'log_level' => 'debug',
           'timestamp' => Time.utc(0)
       }
+
+      VALID_FIELDS = %w(log_level timestamp)
 
       def initialize(type, logger)
         @type = type
@@ -35,13 +37,16 @@ module Armagh
         @default_config = DEFAULT_CONFIG.merge self.class::DEFAULT_CONFIG
       end
 
-      # Gets the latest configuration.  If the last retrieved configuration is the newest, this returns nil.
+      # Gets the latest configuration.  If the last retrieved configuration is the newest or the retrieved config is invalid, this returns nil.
       def get_config
         #TODO Setup an Index - Connection.config.indexes.create_one('type')
         begin
           db_config = Connection.config.find('type' => @type).limit(1).first || {}
+          db_config.delete '_id'
+          db_config.delete 'type'
         rescue => e
           @logger.error "Problem getting #{@type} configuration."
+          # TODO Don't call error twice
           @logger.error e
           db_config = {}
         end
@@ -54,6 +59,14 @@ module Armagh
         end
 
         config = @default_config.merge db_config
+
+        validation_result = self.class.validate config
+
+        unless validation_result['valid']
+          @logger.error "Validation failed: #{format_validation_results(validation_result)}\n.  Reverting to default configuration."
+          config = @default_config.dup
+        end
+
         config['log_level'] = get_log_level(config['log_level'])
 
         if @last_config_timestamp.nil?
@@ -87,9 +100,59 @@ module Armagh
           when 'debug'
             Logger::DEBUG
           else
-            @logger.error "Unknown log level #{level_str}. Reverting to default"
-            Logger::DEBUG
+            default = @default_config['log_level']
+            @logger.error "Unknown log level #{level_str}. Reverting to #{default}."
+            get_log_level(default)
         end
+      end
+
+      def self.valid_fields
+        VALID_FIELDS.concat self::VALID_FIELDS
+      end
+
+      def self.validate(config)
+        errors = []
+        warnings = []
+        timestamp = config['timestamp']
+        if timestamp
+          errors << "'timestamp' must be a time object." unless timestamp.is_a?(Time)
+        else
+          warnings << "timestamp' does not exist in the configuration.  Using default value of #{@default_config['timestamp']}."
+        end
+
+        log_level = config['log_level']
+        valid_levels = %w(fatal error warn info debug)
+        if log_level
+          warnings << "'log_level' must be #{valid_levels}.  Usind default value of #{@default_config['log_level']}" unless valid_levels.include?(log_level)
+        else
+          warnings << "log_level' does not exist in the configuration.  Using default value of #{@default_config['log_level']}."
+        end
+
+        {'valid' => errors.empty?, 'errors' => errors, 'warnings' => warnings}
+      end
+
+      def self.format_validation_results(result)
+        state = result['valid'] ? 'valid' : 'invalid'
+        warnings = result['warnings']
+        errors = result['errors']
+
+        msg = "The configuration is #{state}"
+
+        if warnings.any?
+          msg << "\n\nWarnings: "
+          warnings.each do |warning|
+            msg << "\n  #{warning}"
+          end
+        end
+
+        if errors.any?
+          msg << "\n\nErrors:"
+          errors.each do |error|
+            msg << "\n  #{error}"
+          end
+        end
+
+        msg
       end
     end
   end

@@ -90,3 +90,5 @@ Feature: Agent Configuration
     And I wait 5 seconds
     Then the logs should not contain 'DEBUG'
     And the logs should not contain 'INFO'
+
+  Scenario: Invalid agent configuration
