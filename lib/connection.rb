@@ -51,11 +51,11 @@ module Armagh
     end
     
     def self.master?
-      # Is this a primary server?
+      # TODO Is this a primary server?
     end
 
     def self.primaries
-      # Get the Primary Servers
+      # TODO Get the Primary Servers
     end
 
     def self.can_connect?

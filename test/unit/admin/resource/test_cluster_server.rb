@@ -16,7 +16,7 @@
 #
 
 require_relative '../../test_helpers/coverage_helper'
-require_relative '../../../lib/admin/resource/cluster_server'
+require_relative '../../../../lib/admin/resource/cluster_server'
 
 require 'test/unit'
 require 'mocha/test_unit'

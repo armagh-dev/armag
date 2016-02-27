@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../unit/test_helpers/coverage_helper'
 require_relative '../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'

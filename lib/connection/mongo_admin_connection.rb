@@ -21,6 +21,7 @@ require 'mongo'
 require 'singleton'
 require 'base64'
 
+require_relative '../errors'
 require_relative '../logging/global_logger'
 require_relative '../configuration/file_based_configuration.rb'
 
@@ -34,15 +35,16 @@ module Armagh
       def initialize
         Mongo::Logger.logger.level = Logger::WARN
         config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
+        config_keys = config.keys
         required = [ 'ip', 'port', 'str', 'db' ]
-        unless ( config.keys & required ).length == required.length
-          raise "Insufficient connection info for admin connection. Ensure armagh_env.json contains Armagh::Connection::MongoAdminConnection[ #{ (required - config).join(', ')}]."
+        unless ( config_keys & required ).length == required.length
+          raise Errors::ConnectionError, "Insufficient connection info for admin connection. Ensure armagh_env.json contains Armagh::Connection::MongoAdminConnection[ #{ (required - config_keys).join(', ')}]."
         end
         begin
-          conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config_db}"
+          conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config['db']}"
           @connection = Mongo::Client.new( conn_uri )
         rescue => e
-          raise "Unable to establish admin database connection: #{e.message}"
+          raise Errors::ConnectionError, "Unable to establish admin database connection: #{e.message}"
         end
       end
     end

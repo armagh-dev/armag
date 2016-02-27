@@ -16,8 +16,8 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../test/test_helpers/mock_global_logger'
-require_relative '../../lib/utils/processing_backoff'
+require_relative '../test_helpers/mock_global_logger'
+require_relative '../../../lib/utils/processing_backoff'
 require 'test/unit'
 
 class TestProcessingBackoff < Test::Unit::TestCase

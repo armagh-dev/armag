@@ -15,15 +15,29 @@
 # limitations under the License.
 #
 
+require_relative '../test_helpers/coverage_helper'
+require_relative '../../../lib/logging/multi_io'
+
 require 'test/unit'
-require 'mocha'
+require 'mocha/test_unit'
 
-require_relative '../../lib/logging/global_logger'
+class TestMultiIO < Test::Unit::TestCase
+  def setup
+    @io1 = mock
+    @io2 = mock
+    @multi_io = Armagh::Logging::MultiIO.new(@io1, @io2)
+  end
 
-module ArmaghTest
-  def mock_global_logger
-    logger = mock
-    Armagh::Logging::GlobalLogger.stubs(:new).returns(logger)
-    logger
+  def test_write
+    str = 'test write'
+    @io1.expects(:write).with(str)
+    @io2.expects(:write).with(str)
+    @multi_io.write(str)
+  end
+
+  def test_close
+    @io1.expects(:close)
+    @io2.expects(:close)
+    @multi_io.close
   end
 end

@@ -242,7 +242,6 @@ module Armagh
     private; def generate_action_validation_msg(action_validation)
       msg = ''
 
-      puts action_validation
       action_validation.each do |name, validation|
         msg << "Errors for action '#{name}':\n"
 
@@ -325,8 +324,6 @@ module Armagh
     end
 
     private def instantiate_action(action_details)
-      # TODO Handle publish w/ only one doctype
-      # TODO There's a chance subscribers won't produce a document, either [it appears as though this behaves correctly as is]
       action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['input_doctypes'], action_details['output_doctypes'])
     end
 

@@ -19,13 +19,18 @@ require_relative '../utils/processing_backoff'
 require_relative '../connection'
 
 require 'armagh/documents'
+require 'armagh/action_errors'
 
 module Armagh
   class Document
 
+    class << self
+      protected :new
+    end
+
     # TODO Add version information (armagh, custom gem, standard gem)
 
-    def self.create(type, draft_content, published_content, meta, pending_actions, doc_state, id = nil, unique = false)
+    def self.create(type, draft_content, published_content, meta, pending_actions, state, id = nil, new = false)
       doc = Document.new
       doc.type = type
       doc.draft_content = draft_content
@@ -33,8 +38,8 @@ module Armagh
       doc.meta = meta
       doc.id = id if id
       doc.add_pending_actions pending_actions
-      doc.state = doc_state
-      doc.save(id.nil? || unique)
+      doc.state = state
+      doc.save(id.nil? || new)
       doc
     end
 
@@ -45,11 +50,30 @@ module Armagh
       doc
     end
 
-    def self.find_and_lock(id, type = nil, state = nil)
+    # Returns document if found, nil if it didn't exist, throws :already_locked when doc exists but locked already
+    def self.find_or_create_and_lock(id, type = nil, state = nil)
       # TODO Index on ID/locked
       # TODO Handle type and state
-      db_doc = Connection.documents.find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, :return_document => :after)
-      db_doc ? Document.new(db_doc) : nil
+      begin
+        db_doc = Connection.documents.find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
+      rescue Mongo::Error::OperationFailure => e
+        if e.message =~ /^E11000/
+          # The document already exists.  It's already locked
+          throw :already_locked, true
+        else
+          raise e
+        end
+      end
+
+      if db_doc
+        db_doc['locked'] = true
+        doc = Document.new(db_doc)
+      else
+        # The document doesn't exist
+        doc = nil
+      end
+
+      doc
     end
 
     def self.find(id, type = nil, state = nil)
@@ -67,7 +91,7 @@ module Armagh
       # TODO Ability to pull multiple documents
       # TODO Index on pending_work/locked
       # TODO Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)
-      db_doc = Connection.documents.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, :return_document => :after)
+      db_doc = Connection.documents.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after})
       db_doc ? Document.new(db_doc) : nil
     end
 
@@ -85,10 +109,12 @@ module Armagh
       doc = nil
 
       until doc
-        doc = find_and_lock(id, type, state)
+        already_locked = catch(:already_locked) do
+          doc = find_or_create_and_lock(id, type, state)
+        end
 
         if doc.nil?
-          if exists?(id)
+          if already_locked
             backoff.backoff
           else
             # The document doesn't even exist - dont keep trying
@@ -102,15 +128,20 @@ module Armagh
       ensure
         doc.finish_processing if doc
       end
+      nil
     end
 
     # Nonblocking Modify/Create.  If a doc with the id exists but is locked, return false, otherwise execute the block and return true
     def self.modify_or_create!(id, type, state)
       raise LocalJumpError.new 'No block given' unless block_given?
 
-      doc = find_and_lock(id, type, state)
+      doc = nil
 
-      if doc.nil? && exists?(id)
+      already_locked = catch(:already_locked) do
+        doc = find_or_create_and_lock(id, type, state)
+      end
+
+      if doc.nil? && already_locked
         # Doc is locked somewhere else
         block_executed = false
       else
@@ -121,11 +152,7 @@ module Armagh
       block_executed
     end
 
-    protected def new(*args)
-      super(args)
-    end
-
-    protected def initialize(image = {})
+    def initialize(image = {})
       @deleted = false
       # TODO Failure should be a sparse index? If we want to index it at all.  It's not used by agents directly but would be useful to an admin
       @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'pending_actions' => [], 'failed_actions' => {}, 'locked' => false, 'pending_work' => false, 'failure' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
@@ -138,6 +165,10 @@ module Armagh
 
     def id=(id)
       @db_doc['_id'] = id
+    end
+
+    def locked?
+      @db_doc['locked']
     end
 
     def published_content=(published_content)
@@ -222,7 +253,7 @@ module Armagh
       @db_doc['failed_actions']
     end
 
-    def failure
+    def failed?
       @db_doc['failure']
     end
 
@@ -237,12 +268,12 @@ module Armagh
     end
 
     # TODO Handle doctype
-    def save(unique = false)
+    def save(new = false)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
       @db_doc['updated_timestamp'] = now
 
-      if unique
+      if new
         @db_doc['_id'] = Connection.documents.insert_one(@db_doc).inserted_ids.first
       else
         Connection.documents.replace_one({ '_id': id}, @db_doc, {upsert: true})
@@ -261,24 +292,25 @@ module Armagh
       end
     end
 
-    def pending?
-      state == DocState::PENDING
+    def ready?
+      state == DocState::READY
+    end
+
+    def working?
+      state == DocState::WORKING
     end
 
     def published?
       state == DocState::PUBLISHED
     end
 
-    def closed?
-      state == DocState::CLOSED
-    end
-
     def to_action_document
       doctype = DocTypeState.new(type, state)
-      ActionDocument.new(id, draft_content, published_content, meta, state, doctype)
+      ActionDocument.new(id, draft_content, published_content, meta, doctype)
     end
 
     def update_from_action_document(action_doc)
+      self.id = action_doc.id
       self.draft_content = action_doc.draft_content
       self.published_content = action_doc.published_content
       self.meta = action_doc.meta
@@ -288,8 +320,8 @@ module Armagh
       self
     end
 
-    # TODO Handle doctype
     def delete
+      # TODO type and state
       Connection.documents.delete_one({ '_id': id})
       @deleted = true
     end

@@ -24,24 +24,31 @@ require 'fileutils'
 desc 'Run tests'
 
 task :ci => [:clean, :yard, :test]
-task :nightly => [:ci, :cucumber]
+task :nightly => [:ci, :integration, :cucumber]
 task :default => [:nightly]
 
-Rake::TestTask.new do |t|
+Rake::TestTask.new(:test) do |t|
   log_dir = '/var/log/armagh'
   FileUtils.mkdir_p log_dir
   raise "Invalid permissions on #{log_dir}" unless File.readable?(log_dir) && File.writable?(log_dir)
 
   t.libs << 'test'
-  t.pattern = 'test/**/test_*.rb'
+  t.pattern = 'test/unit/**/test_*.rb'
+end
+
+Rake::TestTask.new(:integration) do |t|
+  log_dir = '/var/log/armagh'
+  FileUtils.mkdir_p log_dir
+  raise "Invalid permissions on #{log_dir}" unless File.readable?(log_dir) && File.writable?(log_dir)
+
+  t.libs << 'integration'
+  t.pattern = 'test/integration/**/test_*.rb'
 end
 
 task :clean do
   rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage))
 end
 
-Cucumber::Rake::Task.new do |t|
-  t.cucumber_opts = '-e "test-client_actions"' # TODO This isnt needed anymore
-end
+Cucumber::Rake::Task.new
 
 YARD::Rake::YardocTask.new

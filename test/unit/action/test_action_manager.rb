@@ -16,13 +16,13 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../lib/action/action_manager'
+require_relative '../../../lib/action/action_manager'
 
 require 'test/unit'
 require 'mocha/test_unit'
 
 require 'logger'
-require 'armagh/action'
+require 'armagh/actions'
 
 class Action1 < Armagh::Action; end
 class Action2 < Armagh::Action; end

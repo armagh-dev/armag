@@ -16,7 +16,7 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../lib/agent/agent_status'
+require_relative '../../../lib/agent/agent_status'
 require 'test/unit'
 
 class TestAgentStatus < Test::Unit::TestCase

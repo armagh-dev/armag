@@ -16,15 +16,15 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../lib/connection'
+require_relative '../../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'
-
-require 'mongo'
 
 class TestMongoConnection < Test::Unit::TestCase
 
   def setup
+    @config = {'ip' => '127.0.0.1', 'port' => 27017, 'str' => '', 'db' => 'armagh'}
+    Armagh::Configuration::FileBasedConfiguration.stubs(:load).returns(@config)
     @mongo_connection = Armagh::Connection::MongoConnection.instance
   end
   
@@ -32,28 +32,19 @@ class TestMongoConnection < Test::Unit::TestCase
     assert_kind_of(Mongo::Client, @mongo_connection.connection)
     Mongo::Client.any_instance.stubs(:create_from_uri)
     assert_kind_of(Mongo::Client, Class.new(Armagh::Connection::MongoConnection).instance.connection)
-
   end
 
-  def test_mongo_connection_no_env
-
-    e = assert_raise do
-      Class.new(Armagh::Connection::MongoConnection).instance.connection
-    end
-
-    assert_equal('No connection string defined.', e.message)
-
+  def test_mongo_connection_no_config
+    @config.clear
+    Armagh::Configuration::FileBasedConfiguration.stubs(:load).returns(@config)
+    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
+    assert_equal('Insufficient connection info for db connection. Ensure armagh_env.json contains Armagh::Connection::MongoConnection[ ip, port, str, db].', e.message)
   end
 
   def test_mongo_connection_db_err
     Mongo::Client.stubs(:new).raises(RuntimeError.new('Connection Failure'))
-
-    e = assert_raise do
-      Class.new(Armagh::Connection::MongoConnection).instance.connection
-    end
-
+    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
     assert_equal('Unable to establish database connection: Connection Failure', e.message)
-
   end
   
 end

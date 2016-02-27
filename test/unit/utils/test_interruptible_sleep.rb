@@ -16,8 +16,8 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../test/test_helpers/mock_global_logger'
-require_relative '../../lib/utils/interruptible_sleep'
+require_relative '../test_helpers/mock_global_logger'
+require_relative '../../../lib/utils/interruptible_sleep'
 require 'test/unit'
 
 class TestInterruptibleSleep < Test::Unit::TestCase

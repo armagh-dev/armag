@@ -16,13 +16,12 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../lib/agent/agent'
+require_relative '../../../lib/agent/agent'
 require_relative '../test_helpers/mock_global_logger'
-require_relative '../../lib/agent/agent_status'
-require_relative '../../lib/ipc'
-require_relative '../../lib/document/document'
-require_relative '../../lib/action/action_instance'
-require_relative '../../lib/action/action_manager'
+require_relative '../../../lib/agent/agent_status'
+require_relative '../../../lib/ipc'
+require_relative '../../../lib/document/document'
+require_relative '../../../lib/action/action_manager'
 
 require 'mocha/test_unit'
 require 'test/unit'

@@ -16,11 +16,11 @@
 #
 
 require_relative '../test_helpers/coverage_helper'
-require_relative '../../lib/logging/global_logger'
+require_relative '../../../lib/logging/global_logger'
 require 'test/unit'
 require 'mocha/test_unit'
 
-class TestMongoConnection < Test::Unit::TestCase
+class TestGlobalLogger < Test::Unit::TestCase
 
   def setup
     @test_io = StringIO.new

@@ -17,7 +17,7 @@
 
 require_relative '../test_helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
-require_relative '../../lib/configuration/launcher_config_manager'
+require_relative '../../../lib/configuration/launcher_config_manager'
 require 'test/unit'
 require 'mocha/test_unit'
 

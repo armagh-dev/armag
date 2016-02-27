@@ -17,43 +17,28 @@
 
 require_relative '../test_helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
-require_relative '../../lib/configuration/agent_config_manager'
+require_relative '../../../lib/configuration/file_based_configuration.rb'
 require 'test/unit'
 require 'mocha/test_unit'
 
-class TestAgentConfigManager < Test::Unit::TestCase
+class TestFileBasedConfiguration < Test::Unit::TestCase
 
   include Armagh::Configuration
 
   def setup
     @logger = mock
-    @logger.stubs(:debug)
-    @logger.stubs(:info)
-    @logger.stubs(:warn)
     @logger.stubs(:error)
-    @logger.stubs(:level=)
-
-    @manager = AgentConfigManager.new(@logger)
   end
 
-  def mock_config_find(result)
-    find_result = mock('object')
-    if result.is_a? Exception
-      find_result.expects(:limit).with(1).raises(result)
-    else
-      find_result.expects(:limit).with(1).returns([result].flatten)
+  def test_filepath
+    pend
+    assert_nothing_raised do
+     FileBasedConfiguration.filepath
     end
-
-    config = stub(:find => find_result)
-    Armagh::Connection.stubs(:config).returns(config)
   end
-
-  def test_merged_configs
-    mock_config_find(nil)
-
-    default_config = AgentConfigManager::DEFAULT_CONFIG.merge ConfigManager::DEFAULT_CONFIG
-    default_config['log_level'] = Logger::DEBUG
-
-    assert_equal(default_config, @manager.get_config)
+  
+  def test_load
+    pend
+    #puts FileBasedConfiguration.load('Armagh::Connection::MongoConnection').inspect
   end
 end

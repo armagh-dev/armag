@@ -21,7 +21,7 @@ require 'tmpdir'
 
 require 'armagh/actions'
 require 'armagh/documents'
-require 'armagh/errors'
+require 'armagh/action_errors'
 
 require_relative '../action/action_manager'
 require_relative '../document/document'
@@ -86,7 +86,9 @@ module Armagh
       # TODO Throw an error if insert fails (too large, etc)
       if block_given?
         Document.modify_or_create(id, doctype.type, doctype.state) do |doc|
-          edit_or_create(doc)
+          edit_or_create(id, doctype, doc) do |doc|
+            yield doc
+          end
         end
       else
         @logger.warn "edit_document called for document #{id} but not block was given.  Ignoring."
@@ -98,7 +100,9 @@ module Armagh
       # TODO Throw an error if insert fails (too large, etc)
       if block_given?
         result = Document.modify_or_create!(id, doctype.type, doctype.state) do |doc|
-          edit_or_create(doc)
+          edit_or_create(id, doctype, doc) do |doc|
+            yield doc
+          end
         end
       else
         @logger.warn "edit_document! called for document #{id} but not block was given.  Ignoring."
@@ -107,7 +111,7 @@ module Armagh
       result
     end
 
-    private def edit_or_create(doc)
+    private def edit_or_create(id, doctype, doc)
       if doc
         action_doc = doc.to_action_document
         initial_doctype = action_doc.doctype
@@ -217,7 +221,6 @@ module Armagh
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
       action_doc = doc.to_action_document
-      new_actions = nil
       case
         when action.is_a?(CollectAction)
           Dir.mktmpdir do |tmp_dir|
@@ -249,7 +252,6 @@ module Armagh
         else
           @logger.error "#{action.name} is an unknown action type."
       end
-      new_actions
     end
 
     private def change_log_level(level)
