@@ -15,7 +15,9 @@
 # limitations under the License.
 #
 
-require_relative '../unit/test_helpers/coverage_helper'
+require_relative '../helpers/coverage_helper'
+require_relative '../helpers/mongo_support'
+
 require_relative '../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'
@@ -23,11 +25,23 @@ require 'mocha/test_unit'
 require 'mongo'
 
 class TestIntegrationMongo < Test::Unit::TestCase
-  
-  def setup
-    Armagh::Connection.documents.drop
+
+  def self.startup
+    unless MongoSupport.instance.running?
+      puts 'Starting Mongo'
+      MongoSupport.instance.start_mongo
+    end
   end
-  
+
+  def self.shutdown
+    puts 'Stopping Mongo'
+    MongoSupport.instance.stop_mongo
+  end
+
+  def setup
+    MongoSupport.instance.clean_database
+  end
+
   def test_mongo_connection
     r = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
     assert_equal r.documents, [{ "n" => 1, "ok" => 1}]

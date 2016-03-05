@@ -15,17 +15,19 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/document/document'
-require 'armagh/documents/doc_state'
+require_relative '../../helpers/coverage_helper'
+require_relative '../../../lib/configuration/action_config_validator'
+require 'test/unit'
 
-When(/^I insert (\d+) documents* for "([^"]*)" processing with a "([^"]*)" state$/) do |num_docs, action_type, state|
-  if action_type == 'sleep_action_default'
-    doc_type = 'SleepInputDocument'
-  else
-    doc_type = 'TestDocumentInput'
+class TestActionConfigValidator < Test::Unit::TestCase
+
+  def setup
   end
 
-  num_docs.to_i.times do
-    Armagh::Document.create(doc_type, nil, nil, [action_type], state)
+  def teardown
+  end
+
+  def test_todo
+    pend
   end
 end

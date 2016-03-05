@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'
@@ -102,5 +102,4 @@ class TestConnection < Test::Unit::TestCase
     @cluster.expects(:servers).returns([server])
     assert_false Armagh::Connection.can_connect?
   end
-
 end

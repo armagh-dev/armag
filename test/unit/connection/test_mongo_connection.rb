@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'
@@ -46,5 +46,4 @@ class TestMongoConnection < Test::Unit::TestCase
     e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
     assert_equal('Unable to establish database connection: Connection Failure', e.message)
   end
-  
 end

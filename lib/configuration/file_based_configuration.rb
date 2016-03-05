@@ -17,42 +17,39 @@
 
 require 'oj'
 require 'fileutils'
+require_relative '../errors'
 
 module Armagh
   module Configuration
     module FileBasedConfiguration
-       
+
+      CONFIG_DIRS = [ '/etc/armagh', File.join( __dir__, '..') ].collect{|p| File.absolute_path(p)}
+
       def self.filepath
-        
-        config_dirs = [ '/etc', File.join( __dir__, '..') ]
-        config_dirs.each do |dir|
-          
+        CONFIG_DIRS.each do |dir|
           fp = File.join( dir, 'armagh_env.json' )
-          return fp if File.exists?( fp )
+          return fp if File.file?( fp )
         end
-        raise "Can't find the armagh_env.json file in #{config_dirs.join(', ')}"
+        raise Errors::ConfigurationError, "Can't find the armagh_env.json file in #{CONFIG_DIRS.join(', ')}"
       end
-       
-      def self.load( key )
-        
+
+      def self.load(key)
         config = {}
         begin
           config_fp  = self.filepath
           app_config = Oj.load( File.read config_fp ) || {}
-          config     = app_config[ key ]
-        rescue => e
-          @logger.error "Configuration file #{ config_fp }could not be parsed.  Using defaults. Error: #{ e.message }"
+          if app_config.has_key? key
+            config = app_config[key]
+          else
+            raise Errors::ConfigurationError, "Configuration file #{config_fp} does not contain '#{key}'."
+          end
+        rescue Errors::ConfigurationError
+          raise
+        rescue
+          raise Errors::ConfigurationError, "Configuration file #{ config_fp } could not be parsed."
         end
         config
       end
-    
-      def self.assign( config_hash, to_object )
-      
-        config_hash.each do |key, value|
-          to_object.instance_variable_set "@#{ key }", value
-        end
-      end
-    
     end
   end
 end

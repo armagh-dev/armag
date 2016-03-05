@@ -70,23 +70,23 @@ module Armagh
       @running
     end
 
-    def get_splitter(action_name, doctype_name)
-      @action_manager.get_splitter(action_name, doctype_name)
+    def get_splitter(action_name, docspec_name)
+      @action_manager.get_splitter(action_name, docspec_name)
     end
 
     def create_document(action_doc)
       # TODO Throw an error if insert fails (not unique, too large, etc)
-      doctype = action_doc.doctype
-      pending_actions = @action_manager.get_action_names_for_doctype(doctype)
-      Document.create(doctype.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
-                      pending_actions, doctype.state, action_doc.id, true)
+      docspec = action_doc.docspec
+      pending_actions = @action_manager.get_action_names_for_docspec(docspec)
+      Document.create(docspec.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
+                      pending_actions, docspec.state, action_doc.id, true)
     end
 
-    def edit_document(id, doctype)
+    def edit_document(id, docspec)
       # TODO Throw an error if insert fails (too large, etc)
       if block_given?
-        Document.modify_or_create(id, doctype.type, doctype.state) do |doc|
-          edit_or_create(id, doctype, doc) do |doc|
+        Document.modify_or_create(id, docspec.type, docspec.state) do |doc|
+          edit_or_create(id, docspec, doc) do |doc|
             yield doc
           end
         end
@@ -96,11 +96,11 @@ module Armagh
     end
 
     # returns true if the document was modified or created, false if the document was skipped because it was locked.
-    def edit_document!(id, doctype)
+    def edit_document!(id, docspec)
       # TODO Throw an error if insert fails (too large, etc)
       if block_given?
-        result = Document.modify_or_create!(id, doctype.type, doctype.state) do |doc|
-          edit_or_create(id, doctype, doc) do |doc|
+        result = Document.modify_or_create!(id, docspec.type, docspec.state) do |doc|
+          edit_or_create(id, docspec, doc) do |doc|
             yield doc
           end
         end
@@ -111,29 +111,29 @@ module Armagh
       result
     end
 
-    private def edit_or_create(id, doctype, doc)
+    private def edit_or_create(id, docspec, doc)
       if doc
         action_doc = doc.to_action_document
-        initial_doctype = action_doc.doctype
+        initial_docspec = action_doc.docspec
 
         yield action_doc
 
-        new_doctype = action_doc.doctype
+        new_docspec = action_doc.docspec
 
-        raise ActionErrors::DoctypeError.new "Document's type is not changeable while editing.  Only state is." unless initial_doctype.type == new_doctype.type
-        raise ActionErrors::DoctypeError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_doctype.state == DocState::READY || new_doctype.state == DocState::WORKING
+        raise ActionErrors::DocspecError.new "Document's type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
+        raise ActionErrors::DocspecError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_docspec.state == DocState::READY || new_docspec.state == DocState::WORKING
 
         doc.update_from_action_document(action_doc)
 
-        unless initial_doctype == new_doctype
-          pending_actions = @action_manager.get_action_names_for_doctype(new_doctype)
-          doc.pending_actions.clear
+        unless initial_docspec == new_docspec
+          pending_actions = @action_manager.get_action_names_for_docspec(new_docspec)
+          doc.clear_pending_actions
           doc.add_pending_actions pending_actions
         end
       else
-        action_doc = ActionDocument.new(id, {}, {}, {}, doctype, true)
+        action_doc = ActionDocument.new(id, {}, {}, {}, docspec, true)
         yield action_doc
-        pending_actions = @action_manager.get_action_names_for_doctype(doctype)
+        pending_actions = @action_manager.get_action_names_for_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.finish_processing
       end
@@ -166,17 +166,14 @@ module Armagh
     end
 
     private def update_config
-      new_config = AgentStatus.get_config(@agent_status)
-
-      if @last_config_timestamp.nil? || new_config['timestamp'] > @last_config_timestamp
-        apply_config(new_config)
-        @last_config_timestamp = new_config['timestamp']
-      end
+      new_config = AgentStatus.get_config(@agent_status, @last_config_timestamp)
+      apply_config(new_config) if new_config
     end
 
     private def apply_config(config)
       change_log_level(config['log_level'])
       @action_manager.set_available_actions(config['available_actions'])
+      @last_config_timestamp = config['timestamp']
       @logger.debug "Updated configuration to #{config}"
     end
 
@@ -187,22 +184,20 @@ module Armagh
         @backoff.reset
 
         doc.pending_actions.delete_if do |name|
-          @current_action = @action_manager.get_action(name)
+          current_action = @action_manager.get_action(name)
 
-          @logger.error "Document: #{doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless @current_action
-          report_status(doc, @current_action)
+          @logger.error "Document: #{doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
+          report_status(doc, current_action)
 
-          if @current_action
+          if current_action
             begin
               @logger.debug "Executing #{name} on document #{doc.id}"
-              execute_action(@current_action, doc)
+              execute_action(current_action, doc)
             rescue => e
               @logger.error "Error while executing action '#{name}'"
               # TODO Split logging
               @logger.error e
               doc.add_failed_action(name, e)
-            ensure
-              @current_action = nil
             end
           else
             # This could happen while actions are propagating through the system
@@ -211,7 +206,7 @@ module Armagh
           end
           true # Always remove this action from pending
         end
-        doc.finish_processing if doc
+        doc.finish_processing unless doc.deleted?
       else
         report_status(doc, nil)
         @backoff.interruptible_backoff { !@running }
@@ -221,20 +216,20 @@ module Armagh
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
       action_doc = doc.to_action_document
-      case
-        when action.is_a?(CollectAction)
+      case action
+        when CollectAction
           Dir.mktmpdir do |tmp_dir|
             Dir.chdir(tmp_dir) do
               action.collect
             end
           end
-          # TODO Don't delete here.  Instead, we should store the number of files colellected (either through this or a splitter called by this)
+          # TODO Don't delete here.  Instead, we should store the number of files collected (either through this or a splitter called by this)
           #   Essentially, number of writes to the database.
           doc.delete
-        when action.is_a?(ParseAction)
+        when ParseAction
           action.parse action_doc
           doc.delete
-        when action.is_a?(PublishAction)
+        when PublishAction
           # TODO Publish should actually publish to an external collection
           #  So we are working in the local documents collection, but publish applies this to the remote collection
           action.publish action_doc
@@ -242,15 +237,15 @@ module Armagh
           doc.published_content = action_doc.draft_content
           doc.draft_content = {}
           doc.state = DocState::PUBLISHED
-          doc.add_pending_actions(@action_manager.get_action_names_for_doctype(DocTypeState.new(doc.type, doc.state)))
-        when action.is_a?(SubscribeAction)
+          doc.add_pending_actions(@action_manager.get_action_names_for_docspec(DocSpec.new(doc.type, doc.state)))
+        when SubscribeAction
           action.subscribe action_doc
           doc.draft_content = action_doc.draft_content
           doc.meta = action_doc.meta
-        when action.is_a?(CollectionSplitterAction)
-          @logger.error "CollectionSplitterAction #{action.name} should have run from the collector.  This is an internal error."
-        else
+        when Action
           @logger.error "#{action.name} is an unknown action type."
+        else
+          @logger.error "#{action} is an not an action."
       end
     end
 

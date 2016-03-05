@@ -22,7 +22,7 @@ module Armagh
     class LauncherConfigManager < ConfigManager
       DEFAULT_CONFIG = {
           'num_agents' => 1,
-          'checkin_frequency' => 5
+          'checkin_frequency' => 60
       }
 
       VALID_FIELDS = %w(num_agents checkin_frequency)
@@ -38,26 +38,20 @@ module Armagh
         base_valid = super
 
         warnings.concat base_valid['warnings']
-        errors.concat base_valid['warnings']
+        errors.concat base_valid['errors']
 
         num_agents = config['num_agents']
-        if num_agents
-          errors << "'num_agents' must be a positive integer." unless num_agents.is_a?(Integer) && num_agents > 0
-        else
-          warnings << "num_agents' does not exist in the configuration.  Using default value of #{@default_config['num_agents']}."
+        if num_agents.nil?
+          warnings << "'num_agents' does not exist in the configuration.  Using default value of #{default_config['num_agents']}."
+        elsif !num_agents.is_a?(Integer) || num_agents < 0
+          errors << "'num_agents' must be a positive integer."
         end
 
         checkin_frequency = config['checkin_frequency']
         if checkin_frequency
           errors << "'checkin_frequency' must be a positive integer." unless checkin_frequency.is_a?(Integer) && checkin_frequency > 0
         else
-          warnings << "checkin_frequency' does not exist in the configuration.  Using default value of #{@default_config['checkin_frequency']}."
-        end
-
-        unknown_fields = config.keys - valid_fields
-
-        if unknown_fields.any?
-          warnings << "The following settings were configured but are unknown to the launcher: #{unknown_fields}"
+          warnings << "'checkin_frequency' does not exist in the configuration.  Using default value of #{default_config['checkin_frequency']}."
         end
 
         {'valid' => errors.empty?, 'errors' => errors, 'warnings' => warnings}

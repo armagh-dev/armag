@@ -30,17 +30,24 @@ module Armagh
         super('agent', logger)
       end
 
-      def self.validate(configuration)
+      def self.validate(config)
         warnings = []
         errors = []
 
         base_valid = super
 
         warnings.concat base_valid['warnings']
-        errors.concat base_valid['warnings']
+        errors.concat base_valid['errors']
 
-        # TODO Validate an agent configuration.  Most of the logic is currently in action_manager but it shouldn't be.  It may not be correct as some functionality has changed
-        # Make a call to action_config_validator for actions
+        action_validation_result = Configuration::ActionConfigValidator.validate(config['available_actions'])
+        warnings.concat action_validation_result['warnings']
+        errors.concat action_validation_result['errors']
+
+        unknown_fields = config.keys - valid_fields
+
+        if unknown_fields.any?
+          warnings << "The following settings were configured but are unknown to the launcher: #{unknown_fields}"
+        end
 
         {
             'valid'     => errors.empty?,

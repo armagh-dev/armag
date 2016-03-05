@@ -16,7 +16,7 @@
 #
 
 require_relative '../support/launcher_support'
-require_relative '../support/mongo_support'
+require_relative '../../test/helpers/mongo_support'
 
 require 'test/unit/assertions'
 require 'logger'

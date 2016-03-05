@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../support/mongo_support'
+require_relative '../../test/helpers/mongo_support'
 require_relative '../../lib/version'
 
 require 'test/unit/assertions'

@@ -5,9 +5,25 @@ module Armagh
     module Resource
     
       class ClusterServer
-      
-        def initialize( ip )
+
+        DEFAULTS = {
+            'ARMAGH_DATA' => '/tmp/home/armagh'
+        }
+
+        def initialize( ip, logger )
           @ip = ip
+          @logger = logger
+
+          begin
+            config  = Configuration::FileBasedConfiguration.load('ENV')
+          rescue => e
+            @logger.error 'Invalid file based configuration for ENV.  Reverting to default.'
+            # TODO Split Logging
+            @logger.error e
+            config = {}
+          end
+
+          @config = DEFAULTS.merge config
         end
       
         def profile
@@ -32,7 +48,7 @@ module Armagh
             'disks'    =>  {}
           }
         
-          base_data_dir = ENV[ 'ARMAGH_DATA' ]
+          base_data_dir = @config[ 'ARMAGH_DATA' ]
           [ nil, 'index', 'log', 'journal' ].each do |subdir|
             dir = File.join( base_data_dir, subdir || '')
             df_info = `df -TPB 1 $#{dir} 2>/dev/null | awk 'NR==2 { print }'` || ''
@@ -70,8 +86,10 @@ module Armagh
             'armagh_v' => `gem list 2>/dev/null | grep armagh`,
             'disks'    => {}
           }
-        
-          base_data_dir = ENV[ 'ARMAGH_DATA' ]
+
+
+           base_data_dir = @config['ARMAGH_DATA']
+
           [ nil, 'index', 'log', 'journal' ].each do |subdir|
             dir = File.join( base_data_dir, subdir || '' )
             df_info = `df $#{dir} 2>/dev/null | awk 'NR==2 { print }'` || ''

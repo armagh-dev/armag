@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/agent/agent_status'
 require 'test/unit'
 

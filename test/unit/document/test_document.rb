@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/document/document'
 
 require 'armagh/documents/doc_state'
@@ -89,18 +89,18 @@ class TestDocument < Test::Unit::TestCase
     draft_content = 'blah'
     published_content = 'published_content'
     meta = 'meta'
-    doctype = DocTypeState.new('document type', Armagh::DocState::READY)
+    docspec = DocSpec.new('document type', Armagh::DocState::READY)
     new_doc = true
     pending_actions = %w(pend1 pend2)
-    action_doc = Armagh::ActionDocument.new(id, draft_content, published_content, meta, doctype, new_doc)
+    action_doc = Armagh::ActionDocument.new(id, draft_content, published_content, meta, docspec, new_doc)
     doc = Document.from_action_document(action_doc, pending_actions)
 
     assert_equal(id, doc.id)
     assert_equal(draft_content, doc.draft_content)
     assert_equal(published_content, doc.published_content)
     assert_equal(meta, doc.meta)
-    assert_equal(doctype.type, doc.type)
-    assert_equal(doctype.state, doc.state)
+    assert_equal(docspec.type, doc.type)
+    assert_equal(docspec.state, doc.state)
     assert_equal(pending_actions, doc.pending_actions)
   end
 
@@ -430,8 +430,8 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.draft_content, action_doc.draft_content)
     assert_equal(@doc.published_content, action_doc.published_content)
     assert_equal(@doc.meta, action_doc.meta)
-    assert_equal(@doc.state, action_doc.doctype.state)
-    assert_equal(@doc.type, action_doc.doctype.type)
+    assert_equal(@doc.state, action_doc.docspec.state)
+    assert_equal(@doc.type, action_doc.docspec.type)
   end
 
   def test_update_from_action_document
@@ -440,23 +440,23 @@ class TestDocument < Test::Unit::TestCase
     published_content = 'old content'
     meta = 'new meta'
 
-    doctype = DocTypeState.new('type', Armagh::DocState::PUBLISHED)
+    docspec = DocSpec.new('type', Armagh::DocState::PUBLISHED)
     
-    action_document = Armagh::ActionDocument.new(id, draft_content, published_content, meta, doctype)
+    action_document = Armagh::ActionDocument.new(id, draft_content, published_content, meta, docspec)
     
     assert_not_equal(draft_content, @doc.draft_content)
     assert_not_equal(published_content, @doc.published_content)
     assert_not_equal(meta, @doc.meta)
-    assert_not_equal(doctype.type, @doc.type)
-    assert_not_equal(doctype.state, @doc.state)
+    assert_not_equal(docspec.type, @doc.type)
+    assert_not_equal(docspec.state, @doc.state)
     
     @doc.update_from_action_document(action_document)
 
     assert_equal(draft_content, @doc.draft_content)
     assert_equal(published_content, @doc.published_content)
     assert_equal(meta, @doc.meta)
-    assert_equal(doctype.type, @doc.type)
-    assert_equal(doctype.state, @doc.state)
+    assert_equal(docspec.type, @doc.type)
+    assert_equal(docspec.state, @doc.state)
   end
 
   def test_locked?

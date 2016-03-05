@@ -267,7 +267,9 @@ module Armagh
       save
     end
 
-    # TODO Handle doctype
+    # TODO Handle docspec
+    # TODO Buffered writing
+    # TODO Buffered writing
     def save(new = false)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
@@ -305,8 +307,8 @@ module Armagh
     end
 
     def to_action_document
-      doctype = DocTypeState.new(type, state)
-      ActionDocument.new(id, draft_content, published_content, meta, doctype)
+      docspec = DocSpec.new(type, state)
+      ActionDocument.new(id, draft_content, published_content, meta, docspec)
     end
 
     def update_from_action_document(action_doc)
@@ -314,9 +316,9 @@ module Armagh
       self.draft_content = action_doc.draft_content
       self.published_content = action_doc.published_content
       self.meta = action_doc.meta
-      doctype = action_doc.doctype
-      self.type = doctype.type
-      self.state = doctype.state
+      docspec = action_doc.docspec
+      self.type = docspec.type
+      self.state = docspec.state
       self
     end
 

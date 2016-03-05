@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/connection'
 require 'test/unit'
 require 'mocha/test_unit'
@@ -39,19 +39,13 @@ class TestMongoAdminConnection < Test::Unit::TestCase
   def test_mongo_connection_no_config
     @config = {}
     Armagh::Configuration::FileBasedConfiguration.stubs(:load).returns(@config)
-
     e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
-
     assert_equal('Insufficient connection info for admin connection. Ensure armagh_env.json contains Armagh::Connection::MongoAdminConnection[ ip, port, str, db].', e.message)
   end
 
   def test_mongo_connection_db_err
     Mongo::Client.stubs(:new).raises(RuntimeError.new('Connection Failure'))
-
     e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
-
     assert_equal('Unable to establish admin database connection: Connection Failure', e.message)
-
   end
-
 end

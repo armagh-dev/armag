@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
 require_relative '../../../lib/configuration/launcher_config_manager'
 require 'test/unit'
@@ -36,8 +36,13 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     @manager = LauncherConfigManager.new(@logger)
   end
 
+  def launcher_config
+    {'num_agents' => 5, 'checkin_frequency' => 120, 'log_level' => 'debug', 'timestamp' => Time.utc(100)}
+  end
+
   def mock_config_find(result)
-    find_result = mock('object')
+    find_result = mock
+    find_result.stubs(projection: find_result)
     if result.is_a? Exception
       find_result.expects(:limit).with(1).raises(result)
     else
@@ -55,5 +60,99 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     default_config['log_level'] = Logger::DEBUG
 
     assert_equal(default_config, @manager.get_config)
+  end
+
+  def test_validate
+    result = LauncherConfigManager.validate(launcher_config)
+    assert_true result['valid']
+    assert_empty result['warnings']
+    assert_empty result['errors']
+  end
+
+  def test_negative_agents
+    config = launcher_config
+    config['num_agents'] = -1
+
+    result = LauncherConfigManager.validate(config)
+    assert_false result['valid']
+    assert_include(result['errors'], "'num_agents' must be a positive integer.")
+    assert_empty result['warnings']
+  end
+
+  def test_bad_agents
+    config = launcher_config
+    config['num_agents'] = 'I am invalid'
+
+    result = LauncherConfigManager.validate(config)
+    assert_false result['valid']
+    assert_include(result['errors'], "'num_agents' must be a positive integer.")
+    assert_empty result['warnings']
+  end
+
+  def test_validate_no_agents
+    config = launcher_config
+    config.delete('num_agents')
+
+    result = LauncherConfigManager.validate(config)
+    assert_true result['valid']
+    assert_empty result['errors']
+    assert_include(result['warnings'], "'num_agents' does not exist in the configuration.  Using default value of #{LauncherConfigManager.default_config['num_agents']}.")
+  end
+
+  def test_negative_checkin
+    config = launcher_config
+    config['checkin_frequency'] = -1
+
+    result = LauncherConfigManager.validate(config)
+    assert_false result['valid']
+    assert_include(result['errors'], "'checkin_frequency' must be a positive integer.")
+    assert_empty result['warnings']
+  end
+
+  def test_bad_checkin
+    config = launcher_config
+    config['checkin_frequency'] = 'I am invalid'
+
+    result = LauncherConfigManager.validate(config)
+    assert_false result['valid']
+    assert_include(result['errors'], "'checkin_frequency' must be a positive integer.")
+    assert_empty result['warnings']
+  end
+
+  def test_validate_no_checkin
+    config = launcher_config
+    config.delete('checkin_frequency')
+
+    result = LauncherConfigManager.validate(config)
+    assert_true result['valid']
+    assert_empty result['errors']
+    assert_include(result['warnings'], "'checkin_frequency' does not exist in the configuration.  Using default value of #{LauncherConfigManager.default_config['checkin_frequency']}.")
+  end
+
+  def test_validate_bad_timestamp
+    config = launcher_config
+    config['timestamp'] = 'bad'
+    result = LauncherConfigManager.validate(config)
+    assert_false result['valid']
+    assert_empty result['warnings']
+    assert_include(result['errors'], "'timestamp' must be a time object.")
+  end
+
+  def test_validate_bad_log_level
+    config = launcher_config
+    config['log_level'] = 'bad'
+        result = LauncherConfigManager.validate(config)
+    assert_true result['valid']
+    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Will use the default value of debug.")
+    assert_empty result['errors']
+  end
+
+  def test_validate_added_field
+    config = launcher_config
+    config['new_field'] = 'bad'
+    result = LauncherConfigManager.validate(config)
+    assert_true result['valid']
+    assert_include(result['warnings'], 'The following settings were configured but are unknown: ["new_field"].')
+    assert_empty result['errors']
   end
 end

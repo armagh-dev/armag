@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../../test_helpers/coverage_helper'
+require_relative '../../../helpers/coverage_helper'
 require_relative '../../../../lib/admin/resource/cluster_server'
 
 require 'test/unit'
@@ -24,8 +24,11 @@ require 'mocha/test_unit'
 class TestClusterServer < Test::Unit::TestCase
 
   def setup
-    @cluster_server = Armagh::Admin::Resource::ClusterServer.new( '127.0.0.1' )
+    @logger = mock
+    @cluster_server = Armagh::Admin::Resource::ClusterServer.new( '127.0.0.1', @logger)
   end
+
+  # TODO Enhance testing coverage
   
   def test_profile
     profile = @cluster_server.profile
@@ -35,17 +38,18 @@ class TestClusterServer < Test::Unit::TestCase
     assert_match /(Darwin|Linux)/, profile[ 'os' ], 'is not a recognized OS'
     assert_match /^ruby 2.3/i, profile[ 'ruby_v' ]
     assert_includes profile, 'armagh_v'
-    assert_equal profile['disks'].keys.sort, [ 'ARMAGH_DATA', 'ARMAGH_DB_INDEX',  'ARMAGH_DB_JOURNAL', 'ARMAGH_DB_LOG' ]
+    assert_equal profile['disks'].keys.sort, %w(base index journal log)
+
     profile['disks'].each do | key, disk_data|
-      assert_includes profile, 'dir'
-      assert_includes profile, 'filesystem_name'
-      assert_includes profile, 'filesystem_type'
-      assert_kind_of Numeric, profile[ 'blocks' ]
-      assert_kind_of Numeric, profile[ 'used' ]
-      assert_kind_of Numeric, profile[ 'available' ]
-      assert_kind_of Numeric, profile[ 'use_perc' ]
-      assert_includes profile, 'mounted_on'
-    end    
+      assert_true disk_data.has_key? 'dir'
+      assert_true disk_data.has_key? 'filesystem_name'
+      assert_true disk_data.has_key? 'filesystem_type'
+      assert_kind_of Numeric, disk_data[ 'blocks' ]
+      assert_kind_of Numeric, disk_data[ 'used' ]
+      assert_kind_of Numeric, disk_data[ 'available' ]
+      assert_kind_of Numeric, disk_data[ 'use_perc' ]
+      assert_true disk_data.has_key? 'mounted_on'
+    end
   end
   
 end

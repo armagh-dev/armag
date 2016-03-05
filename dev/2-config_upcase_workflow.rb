@@ -34,10 +34,10 @@ agent_config = {
     'available_actions' => {
         'read' => {
             'action_class_name' => 'Armagh::CustomActions::FileReadAction',
-            'input_doctypes' => {
+            'input_docspecs' => {
                 'ready_to_collect' => {'type' => 'CollectDoc', 'state' => 'ready'},
             },
-            'output_doctypes' => {
+            'output_docspecs' => {
                 'collected' => {'type' => 'TestDocument', 'state' => 'ready',
                                 'splitter' => {
                                     'splitter_class_name' => 'Armagh::CustomActions::FileSplitter',
@@ -63,10 +63,10 @@ agent_config = {
 
         'write' => {
             'action_class_name' => 'Armagh::CustomActions::FileWriteAction',
-            'input_doctypes' => {
+            'input_docspecs' => {
                 'doc_to_write' => {'type' => 'TestDocument', 'state' => 'published'},
             },
-            'output_doctypes' => {},
+            'output_docspecs' => {},
             'parameters' => {
                 'path' => '/tmp/output'
             }

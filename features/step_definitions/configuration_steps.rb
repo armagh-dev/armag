@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../support/mongo_support'
+require_relative '../../test/helpers/mongo_support'
 
 require 'test/unit/assertions'
 require 'logger'
@@ -35,8 +35,8 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
     if specified_actions.include? 'sleep_action'
       available_actions['sleep_action'] = {
-          'input_doctype' => 'TestDocumentInput',
-          'output_doctype' => 'TestDocumentOutput',
+          'input_docspec' => 'TestDocumentInput',
+          'output_docspec' => 'TestDocumentOutput',
           'action_class_name' => 'ClientActions::SleepAction',
           'config' => {'seconds' => 2}
       }
@@ -44,8 +44,8 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
     if specified_actions.include? 'sleep_action_default'
       available_actions['sleep_action_default'] = {
-          'input_doctype' => Armagh::ClientActions::SleepAction.default_input_doctype,
-          'output_doctype' => Armagh::ClientActions::SleepAction.default_output_doctype,
+          'input_docspec' => Armagh::ClientActions::SleepAction.default_input_docspec,
+          'output_docspec' => Armagh::ClientActions::SleepAction.default_output_docspec,
           'action_class_name' => 'ClientActions::SleepAction',
           'config' => {'seconds' => Armagh::ClientActions::SleepAction.defined_parameters['seconds']['default']}
       }
@@ -53,32 +53,32 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
     if specified_actions.include? 'non_existent_action'
       available_actions['non_existent_action'] = {
-          'input_doctype' => 'TestDocumentInput',
-          'output_doctype' => 'TestDocumentOutput',
+          'input_docspec' => 'TestDocumentInput',
+          'output_docspec' => 'TestDocumentOutput',
           'action_class_name' => 'NotARealClass'
       }
     end
 
     if specified_actions.include? 'no_execution_action'
       available_actions['no_execution_action'] = {
-          'input_doctype' => 'TestDocumentInput',
-          'output_doctype' => 'TestDocumentOutput',
+          'input_docspec' => 'TestDocumentInput',
+          'output_docspec' => 'TestDocumentOutput',
           'action_class_name' => 'ClientActions::NoExecutionAction'
       }
     end
 
     if specified_actions.include? 'middle_fail_action'
       available_actions['middle_fail_action'] = {
-          'input_doctype' => 'TestDocumentInput',
-          'output_doctype' => 'TestDocumentOutput',
+          'input_docspec' => 'TestDocumentInput',
+          'output_docspec' => 'TestDocumentOutput',
           'action_class_name' => 'ClientActions::MiddleFailAction'
       }
     end
 
     if specified_actions.include? 'external_document_action'
       available_actions['external_document_action'] = {
-          'input_doctype' => 'TestDocumentInput',
-          'output_doctype' => 'ExternalDocument',
+          'input_docspec' => 'TestDocumentInput',
+          'output_docspec' => 'ExternalDocument',
           'action_class_name' => 'ClientActions::ExternalDocumentAction'
       }
     end

@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../unit/test_helpers/coverage_helper'
+require_relative '../helpers/coverage_helper'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
 
@@ -42,21 +42,34 @@ class TestEditCallback < Test::Unit::TestCase
       end
     end
   end
+
+  def self.startup
+    unless MongoSupport.instance.running?
+      puts 'Starting Mongo'
+      MongoSupport.instance.start_mongo
+    end
+  end
+
+  def self.shutdown
+    puts 'Stopping Mongo'
+    MongoSupport.instance.stop_mongo
+  end
   
   def setup
-    Armagh::Connection.documents.drop
+    MongoSupport.instance.start_mongo unless MongoSupport.instance.running?
+    MongoSupport.instance.clean_database
 
     caller = Armagh::Agent.new
     @output_type = 'OutputDocument'
     @output_state = Armagh::DocState::WORKING
-    output_doctypes = {'test_document' => Armagh::DocTypeState.new(@output_type, @output_state)}
-    @parser = TestParser.new('parser', caller, @logger, {}, {}, output_doctypes)
+    output_docspecs = {'test_document' => Armagh::DocSpec.new(@output_type, @output_state)}
+    @parser = TestParser.new('parser', caller, @logger, {}, {}, output_docspecs)
   end
 
   def test_edit_new
     @parser.doc_id = 'non_existing_doc_id'
     assert_nil Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocTypeState.new('TriggerDocument', Armagh::DocState::READY))
+    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
     @parser.parse(action_doc)
 
     assert_equal(Armagh::ActionDocument, @parser.doc_class)
@@ -81,7 +94,7 @@ class TestEditCallback < Test::Unit::TestCase
     assert_false doc.locked?
 
     @parser.doc_id = doc_id
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocTypeState.new('TriggerDocument', Armagh::DocState::READY))
+    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
     @parser.parse(action_doc)
 
     doc = Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
@@ -92,33 +105,5 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal('DRAFT CONTENT', doc.draft_content)
     assert_equal({'field' => true, 'meta' => 'bananas'}, doc.meta)
     assert_false doc.locked?
-  end
-
-  def test_edit_wrong_state
-    doc_id = 'existing_doc_id'
-    assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Document.create(@output_type, {'draft_content' => 456}, {'published_content' => 123}, {'meta' => 'bananas'}, [], Armagh::DocState::READY, doc_id)
-    doc = Armagh::Document.find(doc_id, @output_type, @output_state)
-    assert_not_nil doc
-    assert_false doc.locked?
-
-    @parser.doc_id = doc_id
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocTypeState.new('TriggerDocument', Armagh::DocState::READY))
-    @parser.parse(action_doc)
-    pend 'this should fail as written.  there is a bug'
-  end
-
-  def test_edit_wrong_type
-    doc_id = 'existing_doc_id'
-    assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Document.create('invalid_type', {'draft_content' => 456}, {'published_content' => 123}, {'meta' => 'bananas'}, [], @output_state, doc_id)
-    doc = Armagh::Document.find(doc_id, @output_type, @output_state)
-    assert_not_nil doc
-    assert_false doc.locked?
-
-    @parser.doc_id = doc_id
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocTypeState.new('TriggerDocument', Armagh::DocState::READY))
-    @parser.parse(action_doc)
-    pend 'this should fail as written.  there is a bug'
   end
 end

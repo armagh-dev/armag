@@ -15,9 +15,11 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
 require_relative '../../../lib/configuration/agent_config_manager'
+require_relative '../../../lib/configuration/action_config_validator'
+
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -36,8 +38,18 @@ class TestAgentConfigManager < Test::Unit::TestCase
     @manager = AgentConfigManager.new(@logger)
   end
 
+  def agent_config
+    {'available_actions' => {}, 'log_level' => 'debug', 'timestamp' => Time.utc(100)}
+  end
+
+  def mock_action_config_validator(result = nil)
+    result ||= {'valid' => true, 'errors' => [], 'warnings' => []}
+    Armagh::Configuration::ActionConfigValidator.stubs(:validate).once.returns(result)
+  end
+
   def mock_config_find(result)
-    find_result = mock('object')
+    find_result = mock
+    find_result.stubs(projection: find_result)
     if result.is_a? Exception
       find_result.expects(:limit).with(1).raises(result)
     else
@@ -55,5 +67,43 @@ class TestAgentConfigManager < Test::Unit::TestCase
     default_config['log_level'] = Logger::DEBUG
 
     assert_equal(default_config, @manager.get_config)
+  end
+
+  def test_validate
+    mock_action_config_validator
+    result = AgentConfigManager.validate(agent_config)
+    assert_true result['valid']
+    assert_empty result['warnings']
+    assert_empty result['errors']
+  end
+
+  def test_validate_bad_timestamp
+    config = agent_config
+    config['timestamp'] = 'bad'
+    mock_action_config_validator
+    result = AgentConfigManager.validate(config)
+    assert_false result['valid']
+    assert_empty result['warnings']
+    assert_include(result['errors'], "'timestamp' must be a time object.")
+  end
+
+  def test_validate_bad_log_level
+    config = agent_config
+    config['log_level'] = 'bad'
+    mock_action_config_validator
+    result = AgentConfigManager.validate(config)
+    assert_true result['valid']
+    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Will use the default value of debug.")
+    assert_empty result['errors']
+  end
+
+  def test_validate_added_field
+    config = agent_config
+    config['new_field'] = 'bad'
+    mock_action_config_validator
+    result = AgentConfigManager.validate(config)
+    assert_true result['valid']
+    assert_include(result['warnings'], 'The following settings were configured but are unknown: ["new_field"].')
+    assert_empty result['errors']
   end
 end

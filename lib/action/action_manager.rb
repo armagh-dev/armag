@@ -15,68 +15,58 @@
 # limitations under the License.
 #
 
-require 'armagh/documents/doc_type_state'
+require 'armagh/documents/doc_spec'
 
+require_relative '../configuration/action_config_validator'
 require_relative '../errors'
 
 module Armagh
   class ActionManager
 
-    # TODO - More comprehensive validation
-
     def initialize(caller, logger)
       @caller = caller
       @logger = logger
       @actions_by_name = {}
-      @actions_by_doctype = {}
-      @splitter_by_action_doctype = {}
+      @actions_by_docspec = {}
+      @splitter_by_action_docspec = {}
     end
 
     def set_available_actions(action_config)
       reset_actions
 
-      defined_actions = ActionManager.defined_actions
-
       action_config.each do |action_name, action_details|
         action_class_name = action_details['action_class_name']
         parameters = action_details['parameters']
-
-        unless defined_actions.include? action_class_name
-          @logger.error "Agent Configuration is invalid - No action class '#{action_class_name}' exists.  Available actions are #{defined_actions}.  Abandoning action configuration."
-          reset_actions
-          break
-        end
 
         klass = Object::const_get(action_class_name)
 
         if klass < PublishAction
           doctype = action_details['doctype']
-          input_doctypes = {'' => DocTypeState.new(doctype, DocState::READY)}
-          output_doctypes = {'' => DocTypeState.new(doctype, DocState::PUBLISHED)}
+          input_docspecs = {'' => DocSpec.new(doctype, DocState::READY)}
+          output_docspecs = {'' => DocSpec.new(doctype, DocState::PUBLISHED)}
         else
-          raw_input_doctypes = action_details['input_doctypes']
-          raw_output_doctypes = action_details['output_doctypes']
+          raw_input_docspecs = action_details['input_docspecs']
+          raw_output_docspecs = action_details['output_docspecs']
 
-          input_doctypes = map_doctype_states(raw_input_doctypes)
-          output_doctypes = map_doctype_states(raw_output_doctypes)
+          input_docspecs = map_docspec_states(raw_input_docspecs)
+          output_docspecs = map_docspec_states(raw_output_docspecs)
 
-          map_splitters(action_name, raw_output_doctypes) if klass < CollectAction
+          map_splitters(action_name, raw_output_docspecs) if klass < CollectAction
         end
 
-        action_settings = {'name' => action_name, 'input_doctypes' => input_doctypes, 'output_doctypes' => output_doctypes,
+        action_settings = {'name' => action_name, 'input_docspecs' => input_docspecs, 'output_docspecs' => output_docspecs,
                            'parameters' => parameters, 'class_name' => action_class_name, 'class' => klass}
 
         @actions_by_name[action_name] = action_settings
 
-        input_doctypes.each do |_name, input_doctype|
-          @actions_by_doctype[input_doctype] ||= []
-          @actions_by_doctype[input_doctype] << action_settings
+        input_docspecs.each do |_name, input_docspec|
+          @actions_by_docspec[input_docspec] ||= []
+          @actions_by_docspec[input_docspec] << action_settings
         end
       end
-
-      validate
     rescue => e
-      @logger.error 'Invalid agent configuration.  Could not parse actions.'
+      @logger.error 'Invalid agent configuration.  Could not configure actions.'
+      # TODO Split Logging
       @logger.error e
       reset_actions
     end
@@ -91,20 +81,20 @@ module Armagh
       end
     end
 
-    def get_action_names_for_doctype(input_doctype)
-      actions = @actions_by_doctype[input_doctype]
+    def get_action_names_for_docspec(input_docspec)
+      actions = @actions_by_docspec[input_docspec]
       if actions
         actions.collect { |a| a['name'] }
       else
-        @logger.warn "No actions defined for doctype '#{input_doctype}'"
+        @logger.warn "No actions defined for docspec '#{input_docspec}'"
         []
       end
     end
 
-    def get_splitter(action_name, output_doctype_name)
-      output_doctype = @actions_by_name[action_name]['output_doctypes'][output_doctype_name]
-      if @splitter_by_action_doctype[action_name] && @splitter_by_action_doctype[action_name][output_doctype_name] && output_doctype
-        instantiate_splitter(@splitter_by_action_doctype[action_name][output_doctype_name], output_doctype)
+    def get_splitter(action_name, output_docspec_name)
+      output_docspec = @actions_by_name[action_name]['output_docspecs'][output_docspec_name] if @actions_by_name[action_name] && @actions_by_name[action_name]['output_docspecs']
+      if @splitter_by_action_docspec[action_name] && @splitter_by_action_docspec[action_name][output_docspec_name] && output_docspec
+        instantiate_splitter(@splitter_by_action_docspec[action_name][output_docspec_name], output_docspec)
       else
         nil
       end
@@ -117,218 +107,40 @@ module Armagh
       actions
     end
 
-    private def map_doctype_states(doctypes)
-      converted_doctypes = {}
+    private def map_docspec_states(docspecs)
+      converted_docspecs = {}
 
-      doctypes.each do |name, details|
-        converted_doctypes[name] = DocTypeState.new(details['type'], details['state'])
+      docspecs.each do |name, details|
+        converted_docspecs[name] = DocSpec.new(details['type'], details['state'])
       end
-      converted_doctypes
+      converted_docspecs
     end
 
-    private def map_splitters(action_name, output_doctypes)
-      output_doctypes.each do |doctype_name, output_doctype|
-        splitter_details = output_doctype['splitter']
+    private def map_splitters(action_name, output_docspecs)
+      output_docspecs.each do |docspec_name, output_docspec|
+        splitter_details = output_docspec['splitter']
         if splitter_details
           splitter_class_name = splitter_details['splitter_class_name']
           splitter_parameters = splitter_details['parameters']
           splitter_settings = {'parameters' => splitter_parameters, 'class_name' => splitter_class_name, 'class' => Object::const_get(splitter_class_name)}
-          @splitter_by_action_doctype[action_name] ||= {}
-          @splitter_by_action_doctype[action_name][doctype_name] = splitter_settings
+          @splitter_by_action_docspec[action_name] ||= {}
+          @splitter_by_action_docspec[action_name][docspec_name] = splitter_settings
         end
       end
-    end
-
-    # TODO Move validation into the config managers.  Validate config as a whole.
-    private def validate
-      errors = {}
-
-      action_validation = validate_actions
-      errors['action_validation'] = action_validation if action_validation
-
-      doctype_mapping = validate_actions_doctype_mapping
-      errors['doctype_mapping'] = doctype_mapping if doctype_mapping
-
-      if errors.any?
-        log_validation_errors(errors)
-        reset_actions
-      end
-    end
-
-    private def validate_actions
-      errors = nil
-      @actions_by_name.each do |action_name, action_details|
-        begin
-          instance = instantiate_action(action_details)
-        rescue => e
-          errors ||= {}
-          errors[action_name] ||= {}
-          errors[action_name]['instantiation'] = e.message
-
-          @logger.error 'Could not instantiate action'
-          # TODO Split Logging
-          @logger.error e
-        end
-
-        return errors unless instance
-
-        unless instance.valid?
-          errors ||= {}
-          errors[action_name] = instance.validation_errors
-        end
-
-        if instance.is_a?(CollectAction)
-          action_details['output_doctypes'].each do |doctype_name, _doctype|
-            begin
-              splitter = get_splitter(action_name, doctype_name)
-            rescue => e
-              errors ||= {}
-              errors[action_name] ||= {}
-              errors[action_name]['output_doctypes'] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name]['_splitter'] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name]['_splitter']['initialize'] = e.message
-
-              @logger.error 'Could not instantiate splitter'
-              # TODO Split Logging
-              @logger.error e
-            end
-
-            break unless splitter
-
-            unless splitter.valid?
-              errors ||= {}
-              errors[action_name] ||= {}
-              errors[action_name]['output_doctypes'] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name]['_splitter'] ||= {}
-              errors[action_name]['output_doctypes'][doctype_name]['_splitter'] = splitter.validation_errors
-            end
-          end
-        end
-      end
-
-      errors
-    end
-
-    private def validate_actions_doctype_mapping
-      publish_parse_actions = {}
-      errors = nil
-      @actions_by_doctype.each do |doctype, actions|
-        doctype_s = doctype.to_s
-
-        actions.each do |action|
-          if action['class'].is_a?(PublishAction) || action['class'].is_a?(ParseAction)
-            publish_parse_actions[doctype_s] ||= []
-            publish_parse_actions[doctype_s] << action['name']
-          end
-        end
-
-        if publish_parse_actions[doctype_s] && publish_parse_actions[doctype_s].length > 1
-          errors ||= []
-          errors << "#{doctype_s}: #{publish_parse_actions[doctype_s]}"
-        end
-      end
-      errors
-    end
-
-    private def log_validation_errors(errors)
-      error_msg = "Configuration validation failed with the following errors:\n"
-      error_msg << generate_action_validation_msg(errors['action_validation']) if errors['action_validation']
-      @logger.error error_msg
-    end
-
-    # TODO This should be cleaned up
-    private; def generate_action_validation_msg(action_validation)
-      msg = ''
-
-      action_validation.each do |name, validation|
-        msg << "Errors for action '#{name}':\n"
-
-        if validation['instantiation']
-          msg << "  Instantiation Error:\n"
-          msg << "    #{validation['instantiation']}\n"
-        end
-
-        if validation['parameters']
-          msg << "  Parameter Errors:\n"
-          validation['parameters'].each do |name, message|
-            msg << "    #{name}: #{message}\n"
-          end
-        end
-
-        if validation['general']
-          msg << "  General Action Errors:\n"
-          validation['general'].each do |message|
-            msg << "    #{message}\n"
-          end
-        end
-
-        if validation['all_doctypes']
-          msg << "  General Doctype Errors:\n"
-          validation['all_doctypes'].each do |message|
-            msg << "    #{message}\n"
-          end
-        end
-
-        if validation['input_doctypes']
-          msg << "  Input Doctype Errors:\n"
-          validation['input_doctypes'].each do |name, message|
-            msg << "    #{name}: #{message}\n"
-          end
-        end
-
-        if validation['output_doctypes']
-          msg << "  Output Doctype Errors:\n"
-          validation['output_doctypes'].each do |name, message|
-
-            if message.is_a?(Hash) && message['_splitter']
-              splitter_validation = message['_splitter']
-
-              msg << "    Splitter Errors:\n"
-
-              if splitter_validation['instantiation']
-                msg << "      Instantiation Error:\n"
-                msg << "        #{splitter_validation['instantiation']}\n"
-              end
-
-              if splitter_validation['parameters']
-                msg << "      Parameter Errors:\n"
-                splitter_validation['parameters'].each do |name, message|
-                  msg << "      #{name}: #{message}\n"
-                end
-              end
-
-              if splitter_validation['general']
-                msg << "      General Splitter Errors:\n"
-                splitter_validation['general'].each do |message|
-                  msg << "      #{message}\n"
-                end
-              end
-            else
-              msg << "    #{name}: #{message}\n"
-            end
-          end
-        end
-      end
-
-      msg << 'Abandoning agent configuration.'
-
-      msg
     end
 
     private def reset_actions
       @actions_by_name.clear
-      @actions_by_doctype.clear
-      @splitter_by_action_doctype.clear
+      @actions_by_docspec.clear
+      @splitter_by_action_docspec.clear
     end
 
     private def instantiate_action(action_details)
-      action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['input_doctypes'], action_details['output_doctypes'])
+      action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['input_docspecs'], action_details['output_docspecs'])
     end
 
-    private def instantiate_splitter(splitter_details, doctype)
-      splitter_details['class'].new(@caller, @logger, splitter_details['parameters'], doctype)
+    private def instantiate_splitter(splitter_details, docspec)
+      splitter_details['class'].new(@caller, @logger, splitter_details['parameters'], docspec)
     end
   end
 end

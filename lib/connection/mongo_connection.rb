@@ -35,8 +35,9 @@ module Armagh
       def initialize
         Mongo::Logger.logger.level = Logger::WARN
         config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
+
         config_keys = config.keys
-        required = [ 'ip', 'port', 'str', 'db' ]
+        required = %w(ip port str db)
         unless ( config_keys & required ).length == required.length
           raise Errors::ConnectionError, "Insufficient connection info for db connection. Ensure armagh_env.json contains Armagh::Connection::MongoConnection[ #{ (required - config_keys).join(', ')}]."
         end

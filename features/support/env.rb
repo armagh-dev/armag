@@ -15,15 +15,16 @@
 # limitations under the License.
 #
 
-require_relative '../../test/test_helpers/coverage_helper'
+require_relative '../../test/helpers/coverage_helper'
 require_relative 'launcher_support'
 require_relative 'log_support'
-require_relative 'mongo_support'
-require 'armagh/client_actions'
+require_relative '../../test/helpers/mongo_support'
+require 'armagh/custom_actions'
 
 require_relative '../../lib/connection'
 
 require 'fileutils'
+require 'test/unit/assertions'
 
 FileUtils::mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
 
@@ -31,17 +32,12 @@ def quiet_raise(msg)
   raise RuntimeError, msg, []
 end
 
-unless ENV['ARMAGH_DEV_ROOT']
-  quiet_raise "ARMAGH_DEV_ROOT isn't defined.  Run 'source dev/armagh_env.sh [optional_dev_root]'"
+if Armagh::CustomActions::NAME != 'armagh_test'
+  quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead."
 end
 
-if Armagh::ClientActions::NAME != 'armagh_test'
-  quiet_raise "The client actions gem that needs to be installed for testing is 'armagh_test-client_actions'.  '#{Armagh::ClientActions::NAME}-client_actions' was loaded instead."
-end
 
-if Armagh::Connection.can_connect?
-  quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.'
-end
+quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
 
 Before do
   LogSupport.delete_logs

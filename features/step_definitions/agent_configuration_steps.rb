@@ -17,8 +17,6 @@
 
 require_relative '../support/log_support'
 
-require 'test/unit/assertions'
-
 Given(/^the logs are emptied/) do
   LogSupport.empty_logs
 end

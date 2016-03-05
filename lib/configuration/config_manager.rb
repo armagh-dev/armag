@@ -30,23 +30,22 @@ module Armagh
       }
 
       VALID_FIELDS = %w(log_level timestamp)
+      VALID_LOG_LEVELS = %w(fatal error warn info debug)
 
       def initialize(type, logger)
         @type = type
         @logger = logger
-        @default_config = DEFAULT_CONFIG.merge self.class::DEFAULT_CONFIG
+        @default_config = self.class.default_config
       end
 
       # Gets the latest configuration.  If the last retrieved configuration is the newest or the retrieved config is invalid, this returns nil.
       def get_config
         #TODO Setup an Index - Connection.config.indexes.create_one('type')
         begin
-          db_config = Connection.config.find('type' => @type).limit(1).first || {}
-          db_config.delete '_id'
-          db_config.delete 'type'
+          db_config = Connection.config.find('type' => @type).projection({'type' => 0, '_id' => 0}).limit(1).first || {}
         rescue => e
           @logger.error "Problem getting #{@type} configuration."
-          # TODO Don't call error twice
+          # TODO Split logging
           @logger.error e
           db_config = {}
         end
@@ -60,31 +59,10 @@ module Armagh
 
         config = @default_config.merge db_config
 
-        validation_result = self.class.validate config
+        return nil unless new_config? config
 
-        unless validation_result['valid']
-          @logger.error "Validation failed: #{format_validation_results(validation_result)}\n.  Reverting to default configuration."
-          config = @default_config.dup
-        end
-
-        config['log_level'] = get_log_level(config['log_level'])
-
-        if @last_config_timestamp.nil?
-          # First time getting a configuration
-          @last_config_timestamp = config['timestamp']
-          config
-        elsif config['timestamp'] > @last_config_timestamp
-          # Updated Config
-          @last_config_timestamp = config['timestamp']
-          config
-        elsif config['timestamp'] < @last_config_timestamp
-          # The config is older than the last one we received
-          @logger.warn "#{@type} configuration received that was older than last applied."
-          nil
-        else
-          # Do Nothing, We are up to date
-          nil
-        end
+        validated_config = validate_config config
+        validated_config
       end
 
       def get_log_level(level_str)
@@ -110,22 +88,35 @@ module Armagh
         VALID_FIELDS.concat self::VALID_FIELDS
       end
 
+      def self.default_config
+        DEFAULT_CONFIG.merge self::DEFAULT_CONFIG
+      end
+
       def self.validate(config)
         errors = []
         warnings = []
+
+        default_config = self.default_config
+
+        unknown_fields = config.keys - valid_fields
+
+        if unknown_fields.any?
+          warnings << "The following settings were configured but are unknown: #{unknown_fields}."
+        end
+
         timestamp = config['timestamp']
+
         if timestamp
           errors << "'timestamp' must be a time object." unless timestamp.is_a?(Time)
         else
-          warnings << "timestamp' does not exist in the configuration.  Using default value of #{@default_config['timestamp']}."
+          warnings << "'timestamp' does not exist in the configuration.  Will use the default value of #{default_config['timestamp']}."
         end
 
         log_level = config['log_level']
-        valid_levels = %w(fatal error warn info debug)
         if log_level
-          warnings << "'log_level' must be #{valid_levels}.  Usind default value of #{@default_config['log_level']}" unless valid_levels.include?(log_level)
+          warnings << "'log_level' must be #{VALID_LOG_LEVELS}.  Will use the default value of #{default_config['log_level']}." unless VALID_LOG_LEVELS.include?(log_level)
         else
-          warnings << "log_level' does not exist in the configuration.  Using default value of #{@default_config['log_level']}."
+          warnings << "'log_level' does not exist in the configuration.  Will use the default value of #{default_config['log_level']}."
         end
 
         {'valid' => errors.empty?, 'errors' => errors, 'warnings' => warnings}
@@ -136,7 +127,7 @@ module Armagh
         warnings = result['warnings']
         errors = result['errors']
 
-        msg = "The configuration is #{state}"
+        msg = "The configuration is #{state}."
 
         if warnings.any?
           msg << "\n\nWarnings: "
@@ -153,6 +144,41 @@ module Armagh
         end
 
         msg
+      end
+
+      private def new_config?(config)
+        new = true
+        if config['timestamp'].is_a?(Time) && @last_config_timestamp
+          if config['timestamp'] < @last_config_timestamp
+            @logger.warn "#{@type} configuration received that was older than last applied."
+            new = false
+          elsif config['timestamp'] == @last_config_timestamp
+            # We are up to date
+            new = false
+          end
+        end
+        new
+      end
+
+      private def validate_config(config)
+        validation_result = self.class.validate(config)
+
+        if validation_result['valid']
+          @logger.warn "#{@type} configuration validation is usable but had warnings:\n #{self.class.format_validation_results(validation_result)}" if validation_result['warnings'].any?
+          @last_config_timestamp = config['timestamp']
+          config['log_level'] = get_log_level(config['log_level'])
+        else
+          if @last_config_timestamp
+            config = nil
+            msg  = 'Keeping current configuration.'
+          else
+            config = @default_config.dup
+            config['log_level'] = get_log_level(config['log_level'])
+            msg = 'Reverting to default configuration.'
+          end
+          @logger.error "#{@type} configuration validation failed:\n #{self.class.format_validation_results(validation_result)}\n\n#{msg}"
+        end
+        config
       end
     end
   end

@@ -56,6 +56,7 @@ module Armagh
       end
 
       def add_global(severity, message)
+        # TODO Buffered writing
         log_msg = {
             'component' => @progname,
             'hostname' => @hostname,
@@ -65,10 +66,7 @@ module Armagh
         }
 
         if message.is_a? Exception
-          log_msg['exception'] = {
-              'message' => message.inspect,
-              'trace' => message.backtrace
-          }
+          log_msg['exception'] = exception_details(message)
         else
           log_msg['message'] = message
         end
@@ -78,6 +76,16 @@ module Armagh
         else
           Connection.log.insert_one log_msg
         end
+      end
+
+      private def exception_details(exception)
+        details = {
+            'class' => exception.class,
+            'message' => exception.message,
+            'trace' => exception.backtrace
+        }
+        details['cause'] = exception_details(exception.cause) if exception.cause
+        details
       end
     end
   end

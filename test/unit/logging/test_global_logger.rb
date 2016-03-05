@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/logging/global_logger'
 require 'test/unit'
 require 'mocha/test_unit'
@@ -43,7 +43,7 @@ class TestGlobalLogger < Test::Unit::TestCase
   def test_add_block
     @logger.expects(:add_global).returns(nil)
     message = 'log message'
-    @logger.add(Logger::DEBUG) {message}
+    @logger.add(Logger::DEBUG) { message }
 
     assert_includes(@test_io.string, 'DEBUG')
     assert_includes(@test_io.string, @component_name)
@@ -78,12 +78,12 @@ class TestGlobalLogger < Test::Unit::TestCase
     @mock.expects(:insert_one).with(
         all_of(
             has_entries({
-                'level' => 'ERROR',
-                'component' => @component_name,
-                'hostname' => Socket.gethostname,
-                'pid' => Process.pid,
-                'message' => message
-            })
+                            'level' => 'ERROR',
+                            'component' => @component_name,
+                            'hostname' => Socket.gethostname,
+                            'pid' => Process.pid,
+                            'message' => message
+                        })
         )
     )
     @logger.add_global(Logger::ERROR, message)
@@ -109,7 +109,7 @@ class TestGlobalLogger < Test::Unit::TestCase
 
   def test_add_global_exception
     exception_message = 'this is the exception'
-    backtrace = ['back', 'trace']
+    backtrace = %w(back trace)
     exception = StandardError.new(exception_message)
     exception.set_backtrace backtrace
     @mock.expects(:insert_one).with(
@@ -120,12 +120,64 @@ class TestGlobalLogger < Test::Unit::TestCase
                             'hostname' => Socket.gethostname,
                             'pid' => Process.pid,
                             'exception' => {
-                                'message' => exception.inspect,
+                                'class' => exception.class,
+                                'message' => exception.message,
                                 'trace' => backtrace
                             }
                         })
         )
     )
     @logger.add_global(Logger::INFO, exception)
+  end
+
+  def test_add_global_exception_nested
+    exception = StandardError.new('Exception')
+    backtrace = %w(one two)
+    exception_middle = NameError.new('Exception middle')
+    backtrace_middle = %w(three four)
+    exception_root = EncodingError.new('Exception root')
+    backtrace_root = %w(five six)
+
+    expected = {
+        'level' => 'INFO',
+        'component' => @component_name,
+        'hostname' => Socket.gethostname,
+        'pid' => Process.pid,
+        'exception' => {
+            'class' => exception.class,
+            'message' => exception.message,
+            'trace' => backtrace,
+            'cause' => {
+                'class' => exception_middle.class,
+                'message' => exception_middle.message,
+                'trace' => backtrace_middle,
+                'cause' => {
+                    'class' => exception_root.class,
+                    'message' => exception_root.message,
+                    'trace' => backtrace_root,
+                }
+            }
+        }
+    }
+
+    @mock.expects(:insert_one).with(all_of(has_entries(expected)))
+
+    begin
+      begin
+        begin
+          raise exception_root
+        rescue => e
+          e.set_backtrace backtrace_root
+          raise exception_middle
+        end
+      rescue => e
+        e.set_backtrace backtrace_middle
+        raise exception
+      end
+    rescue => e
+      e.set_backtrace backtrace
+      @logger.add_global(Logger::INFO, e)
+    end
+
   end
 end

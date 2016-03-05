@@ -27,23 +27,27 @@ module Armagh
         }
       
         def initialize
-        
-          @logger     = Logging::GlobalLogger.new( 'ApplicationAdminAPI', LOG_LOCATION, 'daily' )
-        
-          config_dir  = ENV[ 'ARMAGH_CONFIG' ] || File.join( File::SEPARATOR, 'etc', 'armagh')
-          config_path = File.join( config_dir, 'application_admin_api_config.json' )
-          config      = Configuration::FileBasedConfiguration.load( config_path, DEFAULTS )
-          config.delete 'key_filepath' unless File.exists? config[ 'key_filepath' ]
-          config.delete 'cert_filepath' unless File.exists? config[ 'cert_filepath' ]
-          Configuration::FileBasedConfiguration.assign( config, self )        
-        
+          @logger = Logging::GlobalLogger.new( 'ApplicationAdminAPI', LOG_LOCATION, 'daily' )
+
+          begin
+            config  = Configuration::FileBasedConfiguration.load( self.class.to_s )
+          rescue => e
+            @logger.error "Invalid file based configuration for #{self.class.to_s}.  Reverting to default."
+            # TODO Split Logging
+            @logger.error e
+            config = {}
+          end
+
+          @config = DEFAULTS.merge config
+          @config.delete 'key_filepath' unless File.exists? config[ 'key_filepath' ]
+          @config.delete 'cert_filepath' unless File.exists? config[ 'cert_filepath' ]
         end
       
         def using_ssl?
-          ( @key_filepath and (!@key_filepath.empty?) and @cert_filepath and (!@cert_filepath.empty?) )
+          ( @config['key_filepath'] and (!@config['key_filepath'].empty?) and @config['cert_filepath'] and (!@config['cert_filepath'].empty?) )
         end
       
-        def authenticate_and_authorize user, password
+        def authenticate_and_authorize(user, password)how
           # TODO - replace with LDAP-based authentication, verify admin privileges
           true
         end

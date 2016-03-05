@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../test_helpers/coverage_helper'
+require_relative '../../helpers/coverage_helper'
 require_relative '../test_helpers/mock_global_logger'
 require_relative '../../../lib/configuration/config_manager'
 require 'test/unit'
@@ -40,6 +40,7 @@ class TestConfigManager < Test::Unit::TestCase
 
   def mock_config_find(result)
     find_result = mock('object')
+    find_result.stubs(projection: find_result)
     if result.is_a? Exception
       find_result.expects(:limit).with(1).raises(result).at_least_once
     else
@@ -48,6 +49,10 @@ class TestConfigManager < Test::Unit::TestCase
 
     config = stub(:find => find_result)
     Armagh::Connection.stubs(:config).returns(config)
+  end
+
+  def config_for_validation
+    {'log_level' => 'warn', 'timestamp' => Time.utc(2015, 11, 20)}
   end
 
   def test_get_config_none
@@ -76,8 +81,8 @@ class TestConfigManager < Test::Unit::TestCase
   end
 
   def test_get_updated_config
-    config1 = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
-    config2 = {'available_actions' => {}, 'checkin_frequency' => 2, 'log_level' => 'info', 'num_agents' => 5, 'timestamp' => Time.new(1)}
+    config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
+    config2 = {'log_level' => 'info', 'timestamp' => Time.new(1)}
     expected_config = config2.dup
     expected_config['log_level'] = Logger::INFO
 
@@ -88,8 +93,8 @@ class TestConfigManager < Test::Unit::TestCase
   end
 
   def test_get_older_config
-    config1 = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(1)}
-    config2 = {'available_actions' => {}, 'checkin_frequency' => 2, 'log_level' => 'info', 'num_agents' => 5, 'timestamp' => Time.new(0)}
+    config1 = {'log_level' => 'info', 'timestamp' => Time.new(1)}
+    config2 = {'log_level' => 'info','timestamp' => Time.new(0)}
     expected_config = config1.dup
     expected_config['log_level'] = Logger::INFO
 
@@ -100,12 +105,101 @@ class TestConfigManager < Test::Unit::TestCase
   end
 
   def test_get_config_multiple_times
-    config = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
+    config = {'log_level' => 'info', 'timestamp' => Time.new(0)}
     expected_config = config.dup
     expected_config['log_level'] = Logger::INFO
     mock_config_find(config)
     assert_equal(expected_config, @config_manager.get_config)
     assert_nil(@config_manager.get_config)
+  end
+
+  def test_get_config_good_then_warn
+    config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
+    config2 = {'log_level' => 'BKLAHABJDHF','timestamp' => Time.new(1)}
+    expected_config1 = config1.dup
+    expected_config1['log_level'] = Logger::INFO
+
+    mock_config_find(config1)
+    assert_equal(expected_config1, @config_manager.get_config)
+
+    expected_config2 = config2.dup
+    mock_config_find(config2)
+    expected_config2['log_level'] = Logger::DEBUG
+    assert_equal(expected_config2, @config_manager.get_config)
+  end
+
+  def test_get_config_error_first
+    config = {'log_level' => 'info', 'timestamp' => 'BOO'}
+    mock_config_find(config)
+    expected = ConfigManager.default_config
+    expected['log_level'] = @config_manager.get_log_level expected['log_level']
+    assert_equal(expected, @config_manager.get_config)
+  end
+
+  def test_get_config_error_update
+    config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
+    config2 = {'log_level' => 'warn', 'timestamp' => 'BOO'}
+    expected_config1 = config1.dup
+    expected_config1['log_level'] = Logger::INFO
+
+    mock_config_find(config1)
+    assert_equal(expected_config1, @config_manager.get_config)
+    mock_config_find(config2)
+    assert_nil(@config_manager.get_config)
+  end
+
+  def test_format_validation_no_messages
+    validation_results = {'valid' => true, 'warnings' => [], 'errors' => []}
+    result = ConfigManager.format_validation_results validation_results
+    assert_equal('The configuration is valid.', result)
+  end
+
+  def test_format_validation_warnings
+    validation_results = {'valid' => true, 'warnings' => ['Warning 1', 'Warning 2'], 'errors' => []}
+    result = ConfigManager.format_validation_results validation_results
+    assert_equal("The configuration is valid.\n\nWarnings: \n  Warning 1\n  Warning 2", result)
+  end
+
+  def test_format_validation_errors
+    validation_results = {'valid' => false, 'warnings' => [], 'errors' => ['Error 1', 'Error 2']}
+    result = ConfigManager.format_validation_results validation_results
+    assert_equal("The configuration is invalid.\n\nErrors:\n  Error 1\n  Error 2", result)
+  end
+
+  def test_format_validation_warnings_and_errors
+    validation_results = {'valid' => false, 'warnings' => ['Warning 1', 'Warning 2'], 'errors' => ['Error 1', 'Error 2']}
+    result = ConfigManager.format_validation_results validation_results
+    assert_equal("The configuration is invalid.\n\nWarnings: \n  Warning 1\n  Warning 2\n\nErrors:\n  Error 1\n  Error 2", result)
+  end
+
+  def test_validate
+    result = ConfigManager.validate(config_for_validation)
+    assert_true result['valid']
+    assert_empty result['errors']
+    assert_empty result['warnings']
+  end
+
+  def test_validate_empty_config
+    result = ConfigManager.validate({})
+    assert_true result['valid']
+    assert_empty result['errors']
+    assert_include(result['warnings'], "'timestamp' does not exist in the configuration.  Will use the default value of 0000-01-01 00:00:00 UTC.")
+    assert_include(result['warnings'], "'log_level' does not exist in the configuration.  Will use the default value of debug.")
+  end
+
+  def test_validate_wrong_timestamp
+    result = ConfigManager.validate({'timestamp' => 'Not a timestamp!'})
+    assert_false result['valid']
+    assert_include(result['errors'], "'timestamp' must be a time object.")
+  end
+
+  def test_validate_extra_fields
+    config = config_for_validation
+    config['unknown'] = 'muhahaha'
+    result = ConfigManager.validate config
+    assert_true result['valid']
+    assert_empty result['errors']
+    assert_include(result['warnings'], 'The following settings were configured but are unknown: ["unknown"].')
   end
 
   def test_invalid_log_level

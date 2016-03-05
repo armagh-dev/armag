@@ -36,8 +36,12 @@ module Armagh
 
     # Preferred way to access config so we don't risk operating on the shared object.  Can't use dup in the instance because
     # the dup object will immediately be GC'd by the server.
-    def self.get_config(agent_status)
-      agent_status.config.dup
+    def self.get_config(agent_status, last_config_received = nil)
+      if last_config_received.nil? || last_config_received < agent_status.config['timestamp']
+        agent_status.config.dup
+      else
+        nil
+      end
     end
 
     def report_status(agent_id, status)
