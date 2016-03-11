@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+require 'armagh/actions'
 require 'armagh/documents/doc_spec'
 
 require_relative '../configuration/action_config_validator'
@@ -23,8 +24,8 @@ require_relative '../errors'
 module Armagh
   class ActionManager
 
-    def initialize(caller, logger)
-      @caller = caller
+    def initialize(caller_instance, logger)
+      @caller = caller_instance
       @logger = logger
       @actions_by_name = {}
       @actions_by_docspec = {}
@@ -38,35 +39,32 @@ module Armagh
         action_class_name = action_details['action_class_name']
         parameters = action_details['parameters']
 
-        klass = Object::const_get(action_class_name)
+        clazz = Object::const_get(action_class_name)
 
-        if klass < PublishAction
-          doctype = action_details['doctype']
-          input_docspecs = {'' => DocSpec.new(doctype, DocState::READY)}
-          output_docspecs = {'' => DocSpec.new(doctype, DocState::PUBLISHED)}
+        if clazz < PublishAction
+          input_doc_type = action_details['doc_type']
+          output_docspecs = {'' => DocSpec.new(action_details['doc_type'], DocState::PUBLISHED)}
         else
-          raw_input_docspecs = action_details['input_docspecs']
+          input_doc_type = action_details['input_doc_type']
           raw_output_docspecs = action_details['output_docspecs']
-
-          input_docspecs = map_docspec_states(raw_input_docspecs)
           output_docspecs = map_docspec_states(raw_output_docspecs)
-
-          map_splitters(action_name, raw_output_docspecs) if klass < CollectAction
+          map_splitters(action_name, raw_output_docspecs) if clazz < CollectAction
         end
 
-        action_settings = {'name' => action_name, 'input_docspecs' => input_docspecs, 'output_docspecs' => output_docspecs,
-                           'parameters' => parameters, 'class_name' => action_class_name, 'class' => klass}
+        input_state = clazz.is_a?(SubscribeAction) ? DocState::PUBLISHED : DocState::READY
+        input_docspec = DocSpec.new(input_doc_type, input_state)
+
+        action_settings = {'name' => action_name, 'input_docspec' => input_docspec, 'output_docspecs' => output_docspecs,
+                           'parameters' => parameters, 'class_name' => action_class_name, 'class' => clazz}
 
         @actions_by_name[action_name] = action_settings
 
-        input_docspecs.each do |_name, input_docspec|
-          @actions_by_docspec[input_docspec] ||= []
-          @actions_by_docspec[input_docspec] << action_settings
-        end
+        @actions_by_docspec[input_docspec] ||= []
+        @actions_by_docspec[input_docspec] << action_settings
       end
     rescue => e
       @logger.error 'Invalid agent configuration.  Could not configure actions.'
-      # TODO Split Logging
+      # TODO Fix split logging in action_manager set_available_actions rescue
       @logger.error e
       reset_actions
     end
@@ -136,8 +134,8 @@ module Armagh
     end
 
     private def instantiate_action(action_details)
-      action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['input_docspecs'], action_details['output_docspecs'])
-    end
+      action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['output_docspecs'])
+  end
 
     private def instantiate_splitter(splitter_details, docspec)
       splitter_details['class'].new(@caller, @logger, splitter_details['parameters'], docspec)

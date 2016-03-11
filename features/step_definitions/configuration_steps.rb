@@ -16,6 +16,7 @@
 #
 
 require_relative '../../test/helpers/mongo_support'
+require_relative '../../lib/action/action_manager'
 
 require 'test/unit/assertions'
 require 'logger'
@@ -33,55 +34,118 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     specified_actions = config['available_actions'].split(/\s*,\s*/)
     available_actions = {}
 
-    if specified_actions.include? 'sleep_action'
-      available_actions['sleep_action'] = {
-          'input_docspec' => 'TestDocumentInput',
-          'output_docspec' => 'TestDocumentOutput',
-          'action_class_name' => 'ClientActions::SleepAction',
-          'config' => {'seconds' => 2}
+    if specified_actions.include? 'test_actions'
+      test_actions = {
+          'test_collect' => {
+              'action_class_name' => 'Armagh::CustomActions::TestCollector',
+              'input_doc_type' => 'CollectDocument',
+
+              'output_docspecs' => {
+                  'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
+                  'split_collected_document' => {'type' => 'SplitCollectedDocument', 'state' => 'ready',
+                                                 'splitter' => {
+                                                     'splitter_class_name' => 'Armagh::CustomActions::TestSplitter',
+                                                     'parameters' => {}
+                                                 }
+                  }
+              },
+              'parameters' => {}
+          },
+
+          'test_parse' => {
+              'action_class_name' => 'Armagh::CustomActions::TestParser',
+              'input_doc_type' => 'ParseDocument',
+              'output_docspecs' => {
+                  'parse_output' => {'type' => 'ParseOutputDocument', 'state' => 'working'}
+              },
+              'parameters' => {}
+          },
+
+          'test_publish' => {
+              'action_class_name' => 'Armagh::CustomActions::TestPublisher',
+              'doc_type' => 'PublishDocument',
+              'parameters' => {}
+          },
+
+          'test_subscribe' => {
+              'action_class_name' => 'Armagh::CustomActions::TestSubscriber',
+              'input_doc_type' => 'SubscribeDocument',
+              'output_docspecs' => {
+                  'subscribe_output' => {'type' => 'SubscribeOutputDocument', 'state' => 'working'}
+              }
+          }
+      }
+
+      available_actions.merge! test_actions
+    end
+
+    if specified_actions.include? 'bad_publisher'
+      available_actions['bad_publisher'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestBadPublisher',
+          'doc_type' => 'BadPublisherDocument',
+          'parameters' => {}
       }
     end
 
-    if specified_actions.include? 'sleep_action_default'
-      available_actions['sleep_action_default'] = {
-          'input_docspec' => Armagh::ClientActions::SleepAction.default_input_docspec,
-          'output_docspec' => Armagh::ClientActions::SleepAction.default_output_docspec,
-          'action_class_name' => 'ClientActions::SleepAction',
-          'config' => {'seconds' => Armagh::ClientActions::SleepAction.defined_parameters['seconds']['default']}
+    if specified_actions.include? 'unimplemented_parser'
+      available_actions['unimplemented_parser'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestUnimplementedParser',
+          'input_doc_type' => 'UnimplementedParserInputDocument',
+          'output_docspecs' => {
+              'unimplemented_parser_output' => {'type' => 'UnimplementedParserOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
       }
     end
 
-    if specified_actions.include? 'non_existent_action'
-      available_actions['non_existent_action'] = {
-          'input_docspec' => 'TestDocumentInput',
-          'output_docspec' => 'TestDocumentOutput',
-          'action_class_name' => 'NotARealClass'
+    if specified_actions.include? 'full_workflow'
+      full_workflow = {
+          'test_collect' => {
+              'action_class_name' => 'Armagh::CustomActions::TestCollector',
+              'input_doc_type' => 'CollectDocument',
+
+              'output_docspecs' => {
+                  'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
+                  'split_collected_document' => {'type' => 'SplitCollectedDocument', 'state' => 'ready',
+                                                 'splitter' => {
+                                                     'splitter_class_name' => 'Armagh::CustomActions::TestSplitter',
+                                                     'parameters' => {}
+                                                 }
+                  }
+              },
+              'parameters' => {}
+          },
+
+          'test_parse_document' => {
+              'action_class_name' => 'Armagh::CustomActions::TestParser',
+              'input_doc_type' => 'SplitCollectedDocument',
+              'output_docspecs' => {
+                  'parse_output' => {'type' => 'Document', 'state' => 'ready'}
+              },
+              'parameters' => {}
+          },
+
+          'test_publish' => {
+              'action_class_name' => 'Armagh::CustomActions::TestPublisher',
+              'doc_type' => 'Document',
+              'parameters' => {}
+          },
+
+          'test_subscribe' => {
+              'action_class_name' => 'Armagh::CustomActions::TestSubscriber',
+              'input_doc_type' => 'Document',
+              'output_docspecs' => {
+                  'subscribe_output' => {'type' => 'SubscribeOutputDocument', 'state' => 'ready'}
+              }
+          }
       }
+
+      available_actions.merge! full_workflow
     end
 
-    if specified_actions.include? 'no_execution_action'
-      available_actions['no_execution_action'] = {
-          'input_docspec' => 'TestDocumentInput',
-          'output_docspec' => 'TestDocumentOutput',
-          'action_class_name' => 'ClientActions::NoExecutionAction'
-      }
-    end
 
-    if specified_actions.include? 'middle_fail_action'
-      available_actions['middle_fail_action'] = {
-          'input_docspec' => 'TestDocumentInput',
-          'output_docspec' => 'TestDocumentOutput',
-          'action_class_name' => 'ClientActions::MiddleFailAction'
-      }
-    end
-
-    if specified_actions.include? 'external_document_action'
-      available_actions['external_document_action'] = {
-          'input_docspec' => 'TestDocumentInput',
-          'output_docspec' => 'ExternalDocument',
-          'action_class_name' => 'ClientActions::ExternalDocumentAction'
-      }
-    end
+    @action_manager ||= Armagh::ActionManager.new(nil, Logger.new(nil))
+    @action_manager.set_available_actions(available_actions)
 
     config['available_actions'] = available_actions
   end

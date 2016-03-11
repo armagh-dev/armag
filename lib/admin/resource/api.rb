@@ -35,7 +35,7 @@ module Armagh
             config      = Configuration::FileBasedConfiguration.load( self.class.to_s )
           rescue => e
             @logger.error "Invalid file based configuration for #{self.class.to_s}.  Reverting to default."
-            # TODO Split Logging
+            # TODO Fix split logging in admin resource api.rb initialize
             @logger.error e
             config = {}
           end
@@ -50,7 +50,7 @@ module Armagh
         end
       
         def authenticate_and_authorize user, password
-          # TODO - replace with LDAP-based authentication, verify admin privileges
+          # TODO - replace admin resource api authenticate_and_authorize with LDAP, verify resource admin privileges
           true
         end
       

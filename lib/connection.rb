@@ -20,7 +20,7 @@ require_relative 'connection/mongo_admin_connection'
 
 module Armagh
   module Connection
-    # TODO Set up indexes HERE! not elsewhere in the code
+    # TODO Connection Set up indexes HERE! not elsewhere in the code
 
     def self.documents
       MongoConnection.instance.connection['documents']
@@ -51,11 +51,11 @@ module Armagh
     end
     
     def self.master?
-      # TODO Is this a primary server?
+      # TODO Connection.master?  Is this a primary server?
     end
 
     def self.primaries
-      # TODO Get the Primary Servers
+      # TODO Connection.primaries Get the Primary Servers
     end
 
     def self.can_connect?

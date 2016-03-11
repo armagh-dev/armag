@@ -23,7 +23,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 require 'mongo'
-
+require 'connection'
 require 'armagh/actions'
 
 class TestEditCallback < Test::Unit::TestCase
@@ -44,10 +44,9 @@ class TestEditCallback < Test::Unit::TestCase
   end
 
   def self.startup
-    unless MongoSupport.instance.running?
-      puts 'Starting Mongo'
-      MongoSupport.instance.start_mongo
-    end
+    puts 'Starting Mongo'
+    Singleton.__init__(Armagh::Connection::MongoConnection)
+    MongoSupport.instance.start_mongo
   end
 
   def self.shutdown
@@ -59,11 +58,10 @@ class TestEditCallback < Test::Unit::TestCase
     MongoSupport.instance.start_mongo unless MongoSupport.instance.running?
     MongoSupport.instance.clean_database
 
-    caller = Armagh::Agent.new
     @output_type = 'OutputDocument'
     @output_state = Armagh::DocState::WORKING
     output_docspecs = {'test_document' => Armagh::DocSpec.new(@output_type, @output_state)}
-    @parser = TestParser.new('parser', caller, @logger, {}, {}, output_docspecs)
+    @parser = TestParser.new('parser', Armagh::Agent.new, @logger, {}, output_docspecs)
   end
 
   def test_edit_new

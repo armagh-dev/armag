@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative '../connection'
 
@@ -28,7 +29,7 @@ module Armagh
       protected :new
     end
 
-    # TODO Add version information (armagh, custom gem, standard gem)
+    # TODO Document.create: Add version information to meta (armagh, custom gem, standard gem)
 
     def self.create(type, draft_content, published_content, meta, pending_actions, state, id = nil, new = false)
       doc = Document.new
@@ -52,8 +53,8 @@ module Armagh
 
     # Returns document if found, nil if it didn't exist, throws :already_locked when doc exists but locked already
     def self.find_or_create_and_lock(id, type = nil, state = nil)
-      # TODO Index on ID/locked
-      # TODO Handle type and state
+      # TODO Document.find_or_create_and_lock - Index on ID/locked
+      # TODO Document.find_or_create_and_lock - Handle type and state
       begin
         db_doc = Connection.documents.find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
       rescue Mongo::Error::OperationFailure => e
@@ -77,27 +78,27 @@ module Armagh
     end
 
     def self.find(id, type = nil, state = nil)
-      # TODO Index on ID
-      # TODO Handle type, state
+      # TODO Document.find - Index on ID
+      # TODO Document.find - Handle type, state
       db_doc = Connection.documents.find('_id' => id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
     end
 
     def self.get_for_processing(num = 1)
-      # TODO find a document in the following order
+      # TODO Document.get_for_processing: find a document in the following order (see code)
       #  Oldest -> Newest: No local agent picked up for too long
       #  Oldest -> Newest: local
-      # TODO Doc must be in a valid state
-      # TODO Ability to pull multiple documents
-      # TODO Index on pending_work/locked
-      # TODO Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)
+      # TODO Document.get_for_processing: Doc must be in a valid state
+      # TODO Document.get_for_processing: Ability to pull multiple documents
+      # TODO Document.get_for_processing: Index on pending_work/locked
+      # TODO Document.get_for_processing: Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)
       db_doc = Connection.documents.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after})
       db_doc ? Document.new(db_doc) : nil
     end
 
     def self.exists?(id, type = nil, state = nil)
-      # TODO Index on ID
-      # TODO Handle type, state
+      # TODO Document.exists? - Index on ID
+      # TODO Document.exists? - Handle type, state
       Connection.documents.find({'_id' => id}).limit(1).count != 0
     end
 
@@ -154,7 +155,7 @@ module Armagh
 
     def initialize(image = {})
       @deleted = false
-      # TODO Failure should be a sparse index? If we want to index it at all.  It's not used by agents directly but would be useful to an admin
+      # TODO Document#initialize - Failure should be a sparse index? If we want to index it at all.  It's not used by agents directly but would be useful to an admin
       @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'pending_actions' => [], 'failed_actions' => {}, 'locked' => false, 'pending_work' => false, 'failure' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
     end
@@ -232,7 +233,7 @@ module Armagh
 
     def add_failed_action(action, details)
       if details.is_a? Exception
-        @db_doc['failed_actions'][action] = {'message' => details.message, 'trace' => details.backtrace}
+        @db_doc['failed_actions'][action] = Utils::ExceptionHelper.exception_to_hash details
       else
         @db_doc['failed_actions'][action] = {'message' => details.to_s}
       end
@@ -267,9 +268,8 @@ module Armagh
       save
     end
 
-    # TODO Handle docspec
-    # TODO Buffered writing
-    # TODO Buffered writing
+    # TODO Document#save - Handle docspec
+    # TODO Document#save - Buffered writing
     def save(new = false)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
@@ -323,7 +323,7 @@ module Armagh
     end
 
     def delete
-      # TODO type and state
+      # TODO Document #delete - type and state; if published, in the type collection
       Connection.documents.delete_one({ '_id': id})
       @deleted = true
     end

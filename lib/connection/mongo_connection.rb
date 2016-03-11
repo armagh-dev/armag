@@ -48,6 +48,6 @@ module Armagh
           raise Errors::ConnectionError, "Unable to establish database connection: #{e.message}"
         end
       end
-  end
+    end
   end
 end

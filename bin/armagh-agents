@@ -56,7 +56,8 @@ unless File.directory?(LOG_DIR)
 end
 
 unless Connection.can_connect?
-  $stderr.puts 'Unable to establish connection to the database. Ensure the database is running.' # TODO Output details about the configuration
+  # TODO On Connection failure in armagh_agents load, output details about the configuration
+  $stderr.puts 'Unable to establish connection to the database. Ensure the database is running.' 
   exit 1
 end
 
@@ -191,7 +192,7 @@ def start_agent_in_process(agent=nil)
       agent.start
     rescue => e
       @logger.error "Could not start agent #{agent.uuid}"
-      # TODO Reduce logging
+      # TODO Reduce logging in armagh-agents start_agent_in_process
       @logger.error e
     end
   end
@@ -234,7 +235,7 @@ def load_actions
   rescue => e
     # An unexpected exception - things like syntax errors.
     @logger.error 'Could not load CustomActions gem'
-    # TODO Split logging
+    # TODO Fix split logging in armagh-agents load_actions custom actions load
     @logger.error e
     Armagh.send(:remove_const, :CustomActions)
   end
@@ -247,7 +248,7 @@ def load_actions
   rescue => e
     # An unexpected exception - things like syntax errors.
     @logger.error 'Could not load StandardActions gem'
-    # TODO Split logging
+    # TODO Fix split logging in armagh-agents load_actions standard actions load
     @logger.error e
     Armagh.send(:remove_const, :StandardActions)
   end

@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-#
 # Copyright 2016 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,11 +15,18 @@
 # limitations under the License.
 #
 
-
-
-require_relative '../lib/document/document'
-require 'armagh/documents/doc_state'
-
-include Armagh
-
-Document.create('CollectDoc', {}, {}, {}, ['read'], DocState::READY)
+module Armagh
+  module Utils
+    class ExceptionHelper
+      def self.exception_to_hash(exception)
+        hash = {
+            'class' => exception.class.to_s,
+            'message' => exception.message,
+            'trace' => exception.backtrace
+        }
+        hash['cause'] = exception_to_hash(exception.cause) if exception.cause
+        hash
+      end
+    end
+  end
+end

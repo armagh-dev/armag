@@ -29,3 +29,24 @@ When(/^I insert (\d+) documents* for "([^"]*)" processing with a "([^"]*)" state
     Armagh::Document.create(doc_type, nil, nil, [action_type], state)
   end
 end
+
+
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state and id "([^"]*)"$/) do |count, doc_type, state, id, content|
+  docspec = Armagh::DocSpec.new(doc_type, state)
+  pending_actions = @action_manager.get_action_names_for_docspec docspec
+
+  count.to_i.times do
+    Armagh::Document.create(doc_type, 'content', {}, {}, pending_actions, state, id)
+  end
+end
+
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", and content "([^"]*)"$/) do |count, doc_type, state, id, content|
+  docspec = Armagh::DocSpec.new(doc_type, state)
+  pending_actions = @action_manager.get_action_names_for_docspec docspec
+
+  content = content.nil? ? {} : eval(content)
+
+  count.to_i.times do
+    Armagh::Document.create(doc_type, content, {}, {}, pending_actions, state, id)
+  end
+end

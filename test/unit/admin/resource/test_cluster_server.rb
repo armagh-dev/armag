@@ -28,7 +28,7 @@ class TestClusterServer < Test::Unit::TestCase
     @cluster_server = Armagh::Admin::Resource::ClusterServer.new( '127.0.0.1', @logger)
   end
 
-  # TODO Enhance testing coverage
+  # TODO unit test admin/resource/test_cluster_server: Enhance testing coverage
   
   def test_profile
     profile = @cluster_server.profile

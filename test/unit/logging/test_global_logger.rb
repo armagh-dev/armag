@@ -120,7 +120,7 @@ class TestGlobalLogger < Test::Unit::TestCase
                             'hostname' => Socket.gethostname,
                             'pid' => Process.pid,
                             'exception' => {
-                                'class' => exception.class,
+                                'class' => exception.class.name,
                                 'message' => exception.message,
                                 'trace' => backtrace
                             }
@@ -144,15 +144,15 @@ class TestGlobalLogger < Test::Unit::TestCase
         'hostname' => Socket.gethostname,
         'pid' => Process.pid,
         'exception' => {
-            'class' => exception.class,
+            'class' => exception.class.name,
             'message' => exception.message,
             'trace' => backtrace,
             'cause' => {
-                'class' => exception_middle.class,
+                'class' => exception_middle.class.name,
                 'message' => exception_middle.message,
                 'trace' => backtrace_middle,
                 'cause' => {
-                    'class' => exception_root.class,
+                    'class' => exception_root.class.name,
                     'message' => exception_root.message,
                     'trace' => backtrace_root,
                 }

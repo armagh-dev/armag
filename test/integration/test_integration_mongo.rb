@@ -27,10 +27,9 @@ require 'mongo'
 class TestIntegrationMongo < Test::Unit::TestCase
 
   def self.startup
-    unless MongoSupport.instance.running?
-      puts 'Starting Mongo'
-      MongoSupport.instance.start_mongo
-    end
+    puts 'Starting Mongo'
+    Singleton.__init__(Armagh::Connection::MongoConnection)
+    MongoSupport.instance.start_mongo
   end
 
   def self.shutdown
@@ -43,8 +42,8 @@ class TestIntegrationMongo < Test::Unit::TestCase
   end
 
   def test_mongo_connection
-    r = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
-    assert_equal r.documents, [{ "n" => 1, "ok" => 1}]
+    result = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
+    assert_equal result.documents, [{ "n" => 1, "ok" => 1}]
   end
   
 end

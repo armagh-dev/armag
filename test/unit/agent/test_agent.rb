@@ -60,7 +60,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def setup_action(action_class)
-    action_class.new(action_class.to_s, @agent, @logger, {}, {}, {})
+    action_class.new(action_class.to_s, @agent, @logger, {}, {})
   end
 
   def test_stop

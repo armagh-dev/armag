@@ -26,7 +26,7 @@ require_relative '../../lib/connection'
 require 'fileutils'
 require 'test/unit/assertions'
 
-FileUtils::mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
+FileUtils.mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
 
 def quiet_raise(msg)
   raise RuntimeError, msg, []
@@ -35,7 +35,6 @@ end
 if Armagh::CustomActions::NAME != 'armagh_test'
   quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead."
 end
-
 
 quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
 

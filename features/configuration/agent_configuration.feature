@@ -34,8 +34,8 @@ Feature: Agent Configuration
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
-    Then the logs should contain 'INFO'
-    But the logs should not contain 'DEBUG'
+    Then the logs should contain "INFO"
+    But the logs should not contain "DEBUG"
 
   Scenario: Increase log level
     Given armagh isn't already running
@@ -51,9 +51,9 @@ Feature: Agent Configuration
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
-    Then the logs should contain 'WARN'
-    But the logs should not contain 'INFO'
-    And the logs should not contain 'DEBUG'
+    Then the logs should contain "WARN"
+    But the logs should not contain "INFO"
+    And the logs should not contain "DEBUG"
     When armagh's "launcher" config is
       | log_level         | info |
       | checkin_frequency | 1 |
@@ -64,8 +64,8 @@ Feature: Agent Configuration
     And I wait 1 seconds
     And the logs are emptied
     And I wait 5 seconds
-    Then the logs should not contain 'DEBUG'
-    But the logs should contain 'INFO'
+    Then the logs should not contain "DEBUG"
+    But the logs should contain "INFO"
 
   Scenario: Create an older configuration
     Given armagh isn't already running
@@ -81,14 +81,14 @@ Feature: Agent Configuration
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
-    Then the logs should contain 'WARN'
-    But the logs should not contain 'INFO'
-    And the logs should not contain 'DEBUG'
+    Then the logs should contain "WARN"
+    But the logs should not contain "INFO"
+    And the logs should not contain "DEBUG"
     And armagh's "agent" config is
       | log_level         | debug |
       | timestamp         | 2015-01-01 10:00:00 |
     And I wait 5 seconds
-    Then the logs should not contain 'DEBUG'
-    And the logs should not contain 'INFO'
+    Then the logs should not contain "DEBUG"
+    And the logs should not contain "INFO"
 
   Scenario: Invalid agent configuration

@@ -21,7 +21,7 @@ Given(/^the logs are emptied/) do
   LogSupport.empty_logs
 end
 
-Then(/^the logs should not contain '(\w+)'/) do |string|
+Then(/^the logs should not contain "([^"]*)"$/) do |string|
   bad_files = []
 
   LogSupport.each_log do |file|
@@ -31,7 +31,7 @@ Then(/^the logs should not contain '(\w+)'/) do |string|
   assert_empty(bad_files, "Files containing #{string}: #{bad_files}")
 end
 
-Then(/^the logs should contain '(\w+)'/) do |string|
+Then(/^the logs should contain "([^"]*)"$/) do |string|
   found_string = false
 
   LogSupport.each_log do |file|

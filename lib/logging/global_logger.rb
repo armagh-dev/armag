@@ -17,6 +17,7 @@
 
 require 'logger'
 require_relative 'multi_io'
+require_relative '../utils/exception_helper'
 
 module Armagh
   module Logging
@@ -56,7 +57,7 @@ module Armagh
       end
 
       def add_global(severity, message)
-        # TODO Buffered writing
+        # TODO GlobalLogger#add_global - Buffered writing
         log_msg = {
             'component' => @progname,
             'hostname' => @hostname,
@@ -66,7 +67,8 @@ module Armagh
         }
 
         if message.is_a? Exception
-          log_msg['exception'] = exception_details(message)
+          log_msg['exception'] = Utils::ExceptionHelper.exception_to_hash message
+          File.write('/tmp/error', log_msg.inspect)
         else
           log_msg['message'] = message
         end
@@ -76,16 +78,6 @@ module Armagh
         else
           Connection.log.insert_one log_msg
         end
-      end
-
-      private def exception_details(exception)
-        details = {
-            'class' => exception.class,
-            'message' => exception.message,
-            'trace' => exception.backtrace
-        }
-        details['cause'] = exception_details(exception.cause) if exception.cause
-        details
       end
     end
   end

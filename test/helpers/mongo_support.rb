@@ -29,7 +29,7 @@ class MongoSupport
 
   CONNECTION_STRING = "#{HOST}:#{PORT}" unless defined? CONNECTION_STRING
 
-  OUT_PATH = '/tmp/cuke_mongo.out' unless defined? OUT_PATH
+  OUT_PATH = '/tmp/test_mongo.out' unless defined? OUT_PATH
 
   def initialize
     @mongod_exec = `which mongod`
@@ -100,7 +100,6 @@ class MongoSupport
 
     Process.kill(:SIGTERM, @mongo_pid)
     Process.wait(@mongo_pid)
-
     @client = nil
     @mongo_pid = nil
   end

@@ -30,6 +30,9 @@ class ActionShared < Armagh::Action; end
 class TestPublisher < Armagh::PublishAction; end
 class TestCollector < Armagh::CollectAction; end
 class TestSplitter < Armagh::CollectionSplitter; end
+#TODO JBOWES TEST ALL TYPES
+
+# TODO JBOWES THIS NEEDS TO BE CHANGED
 
 # Strickly for testing
 module Armagh
@@ -64,9 +67,7 @@ class TestActionManager < Test::Unit::TestCase
 
     @action_instances = {
         'action_1' => {
-            'input_docspecs' => {
-                'action_1_input' => {'type' => 'InputDocument1', 'state' => 'ready'}
-            },
+            'input_doc_type' => 'InputDocument1',
             'output_docspecs' => {
                 'action_1_output' => {'type' => 'OutputDocument1', 'state' => 'ready'}
             },
@@ -74,9 +75,7 @@ class TestActionManager < Test::Unit::TestCase
             'parameters' => {}
         },
         'action_2' => {
-            'input_docspecs' => {
-                'action_2_input' => {'type' => 'InputDocument2', 'state' => 'ready'}
-            },
+            'input_doc_type' => 'InputDocument2',
             'output_docspecs' => {
                 'action_2_output' => {'type' => 'OutputDocument2', 'state' => 'ready'}
             },
@@ -84,9 +83,7 @@ class TestActionManager < Test::Unit::TestCase
             'parameters' => {}
         },
         'action_shared' => {
-            'input_docspecs' => {
-                'action_1_input' => {'type' => 'InputDocument1', 'state' => 'ready'}
-            },
+            'input_doc_type' => 'InputDocument1',
             'output_docspecs' => {
                 'action_2_output' => {'type' => 'OutputDocument2', 'state' => 'ready'}
             },
@@ -94,14 +91,12 @@ class TestActionManager < Test::Unit::TestCase
             'parameters' => {}
         },
         'publisher' => {
-            'doctype' => 'PublishDocument',
+            'doc_type' => 'PublishDocument',
             'action_class_name' => 'TestPublisher',
             'parameters' => {}
         },
         'collector' => {
-            'input_docspecs' => {
-                'collect_input' => {'type' => 'CollectDocument', 'state' => 'ready'}
-            },
+            'input_doc_type' => 'CollectDocument',
             'output_docspecs' => {
                 'collect_output_with_split' => {'type' => 'CollectedDocument', 'state' => 'working',
                                      'splitter' => {
@@ -138,7 +133,6 @@ class TestActionManager < Test::Unit::TestCase
   def test_get_action_from_name
     action = @action_manager.get_action('action_shared')
     assert_kind_of(ActionShared, action)
-    assert_equal ['action_1_input'], action.input_docspecs.keys
     assert_equal ['action_2_output'], action.output_docspecs.keys
   end
 
@@ -180,7 +174,7 @@ class TestActionManager < Test::Unit::TestCase
 
     actions = {
         'bad_action' => {
-            'input_docspecs' => {
+            'input_doc_type' => {
                 'action_1_input' => {'type' => 'InputDocument1', 'state' => 'ready'}
             },
             'output_docspecs' => {
@@ -196,7 +190,6 @@ class TestActionManager < Test::Unit::TestCase
 
   def test_publish
     action = @action_manager.get_action 'publisher'
-    assert_equal({'' => Armagh::DocSpec.new('PublishDocument', Armagh::DocState::READY)}, action.input_docspecs)
     assert_equal({'' => Armagh::DocSpec.new('PublishDocument', Armagh::DocState::PUBLISHED)}, action.output_docspecs)
   end
 

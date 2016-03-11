@@ -19,7 +19,7 @@ module Armagh
   module Configuration
     module ActionConfigValidator
       def self.validate(action_config)
-        # TODO Implement action config validation here
+        # TODO ActionConfigValidator.validate Implement action config validation here
         errors = []
         warnings = []
 
@@ -38,7 +38,7 @@ module Armagh
       end
 
 
-=begin # TODO CODE BELOW WAS REMOVED FROM ACTION MANAGER.  NEEDS TO BE CALLED FROM VALIDATE.
+=begin # TODO ActionConfigValidator: integrate validate code pulled from action manager. CODE BELOW WAS REMOVED FROM ACTION MANAGER.  NEEDS TO BE CALLED FROM VALIDATE.
       private def validate
         errors = {}
 
@@ -65,7 +65,7 @@ module Armagh
             errors[action_name]['instantiation'] = e.message
 
             @logger.error 'Could not instantiate action'
-            # TODO Split Logging
+            # TODO Fix split logging in action_config_validator pulled validate_actions
             @logger.error e
           end
 
@@ -89,7 +89,7 @@ module Armagh
                 errors[action_name]['output_docspecs'][docspec_name]['_splitter']['initialize'] = e.message
 
                 @logger.error 'Could not instantiate splitter'
-                # TODO Split Logging
+            # TODO Fix split logging in action_config_validator pulled validate_actions
                 @logger.error e
               end
 
@@ -137,7 +137,7 @@ module Armagh
         @logger.error error_msg
       end
 
-      # TODO This should be cleaned up or may not be needed
+      # TODO action_config_validator pulled generate_action_validation_msg: This should be cleaned up or may not be needed
       private; def generate_action_validation_msg(action_validation)
         msg = ''
 

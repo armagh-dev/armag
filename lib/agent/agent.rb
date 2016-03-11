@@ -75,7 +75,7 @@ module Armagh
     end
 
     def create_document(action_doc)
-      # TODO Throw an error if insert fails (not unique, too large, etc)
+      # TODO agent#create_document: throw an error if insert fails (not unique, too large, etc)
       docspec = action_doc.docspec
       pending_actions = @action_manager.get_action_names_for_docspec(docspec)
       Document.create(docspec.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
@@ -83,7 +83,7 @@ module Armagh
     end
 
     def edit_document(id, docspec)
-      # TODO Throw an error if insert fails (too large, etc)
+      # TODO agent#edit_document, throw an error if insert fails (too large, etc)
       if block_given?
         Document.modify_or_create(id, docspec.type, docspec.state) do |doc|
           edit_or_create(id, docspec, doc) do |doc|
@@ -97,7 +97,7 @@ module Armagh
 
     # returns true if the document was modified or created, false if the document was skipped because it was locked.
     def edit_document!(id, docspec)
-      # TODO Throw an error if insert fails (too large, etc)
+      # TODO agent#edit_document!: hrow an error if insert fails (too large, etc)
       if block_given?
         result = Document.modify_or_create!(id, docspec.type, docspec.state) do |doc|
           edit_or_create(id, docspec, doc) do |doc|
@@ -120,8 +120,8 @@ module Armagh
 
         new_docspec = action_doc.docspec
 
-        raise ActionErrors::DocspecError.new "Document's type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
-        raise ActionErrors::DocspecError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_docspec.state == DocState::READY || new_docspec.state == DocState::WORKING
+        raise ActionErrors::DocSpecError.new "Document's type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
+        raise ActionErrors::DocSpecError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_docspec.state == DocState::READY || new_docspec.state == DocState::WORKING
 
         doc.update_from_action_document(action_doc)
 
@@ -148,7 +148,7 @@ module Armagh
       @logger.info 'Terminated'
     rescue => e
       @logger.error 'An unexpected error occurred.'
-      # TODO Split error
+      # TODO fix split logging of error in agent#run
       @logger.error e
     end
 
@@ -192,10 +192,14 @@ module Armagh
           if current_action
             begin
               @logger.debug "Executing #{name} on document #{doc.id}"
-              execute_action(current_action, doc)
+              Dir.mktmpdir do |tmp_dir|
+                Dir.chdir(tmp_dir) do
+                  execute_action(current_action, doc)
+                end
+              end
             rescue => e
               @logger.error "Error while executing action '#{name}'"
-              # TODO Split logging
+              # TODO fix split logging of error in agent#execute
               @logger.error e
               doc.add_failed_action(name, e)
             end
@@ -218,20 +222,14 @@ module Armagh
       action_doc = doc.to_action_document
       case action
         when CollectAction
-          Dir.mktmpdir do |tmp_dir|
-            Dir.chdir(tmp_dir) do
-              action.collect
-            end
-          end
-          # TODO Don't delete here.  Instead, we should store the number of files collected (either through this or a splitter called by this)
-          #   Essentially, number of writes to the database.
+          action.collect
+          # TODO agent#execute_action Don't delete here.  Instead, we should store the number of files collected (either through this or a splitter called by this) Essentially, number of writes to the database.
           doc.delete
         when ParseAction
           action.parse action_doc
           doc.delete
         when PublishAction
-          # TODO Publish should actually publish to an external collection
-          #  So we are working in the local documents collection, but publish applies this to the remote collection
+          # TODO agent#execute_action: Publish should actually publish to an external collection So we are working in the local documents collection, but publish applies this to the remote collection
           action.publish action_doc
           doc.meta = action_doc.meta
           doc.published_content = action_doc.draft_content
