@@ -24,7 +24,9 @@ module Armagh
           'available_actions' => {},
       }
 
-      VALID_FIELDS = ['available_actions']
+      VALID_FIELDS = {
+          'available_actions' => Hash
+      }
 
       def initialize(logger)
         super('agent', logger)
@@ -39,14 +41,10 @@ module Armagh
         warnings.concat base_valid['warnings']
         errors.concat base_valid['errors']
 
-        action_validation_result = Configuration::ActionConfigValidator.validate(config['available_actions'])
-        warnings.concat action_validation_result['warnings']
-        errors.concat action_validation_result['errors']
-
-        unknown_fields = config.keys - valid_fields
-
-        if unknown_fields.any?
-          warnings << "The following settings were configured but are unknown to the launcher: #{unknown_fields}"
+        if errors.empty?
+          action_validation_result = ActionConfigValidator.new.validate(config['available_actions'])
+          warnings.concat action_validation_result['warnings']
+          errors.concat action_validation_result['errors']
         end
 
         {

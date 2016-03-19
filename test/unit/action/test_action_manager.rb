@@ -29,10 +29,9 @@ class Action2 < Armagh::Action; end
 class ActionShared < Armagh::Action; end
 class TestPublisher < Armagh::PublishAction; end
 class TestCollector < Armagh::CollectAction; end
+class TestParser < Armagh::ParseAction; end
+class TestSubscriber < Armagh::SubscribeAction; end
 class TestSplitter < Armagh::CollectionSplitter; end
-#TODO JBOWES TEST ALL TYPES
-
-# TODO JBOWES THIS NEEDS TO BE CHANGED
 
 # Strickly for testing
 module Armagh
@@ -93,6 +92,22 @@ class TestActionManager < Test::Unit::TestCase
         'publisher' => {
             'doc_type' => 'PublishDocument',
             'action_class_name' => 'TestPublisher',
+            'parameters' => {}
+        },
+        'subscriber' => {
+            'input_doc_type' => 'InputSubscribeDocument',
+            'action_class_name' => 'TestSubscriber',
+            'output_docspecs' => {
+                'subscribe_output' => {'type' => 'SubscribeOutDoc', 'state' => 'ready'}
+            },
+            'parameters' => {}
+        },
+        'parser' => {
+            'input_doc_type' => 'InputParseDocument',
+            'action_class_name' => 'TestParser',
+            'output_docspecs' => {
+                'parse_output' => {'type' => 'ParseOutDoc', 'state' => 'ready'}
+            },
             'parameters' => {}
         },
         'collector' => {
@@ -193,9 +208,27 @@ class TestActionManager < Test::Unit::TestCase
     assert_equal({'' => Armagh::DocSpec.new('PublishDocument', Armagh::DocState::PUBLISHED)}, action.output_docspecs)
   end
 
+  def test_parse
+    action = @action_manager.get_action 'parser'
+    assert_equal({'parse_output' => Armagh::DocSpec.new('ParseOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
+  end
+
+  def test_collect
+    action = @action_manager.get_action 'collector'
+    assert_equal({
+                     'collect_output_no_split' => Armagh::DocSpec.new('CollectedDocumentRaw', Armagh::DocState::WORKING),
+                     'collect_output_with_split' => Armagh::DocSpec.new('CollectedDocument', Armagh::DocState::WORKING)
+                 }, action.output_docspecs)
+  end
+
+  def test_subscribe
+    action = @action_manager.get_action 'subscriber'
+    assert_equal({'subscribe_output' => Armagh::DocSpec.new('SubscribeOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
+  end
+
   def test_get_action_unknown
     action_name = 'invalid'
-    @logger.expects(:error).with("Unknown action '#{action_name}'.  Available actions are [\"action_1\", \"action_2\", \"action_shared\", \"publisher\", \"collector\"].")
+    @logger.expects(:error).with("Unknown action '#{action_name}'.  Available actions are #{@action_instances.keys}.")
     @action_manager.get_action action_name
   end
 

@@ -44,7 +44,7 @@ class TestAgentConfigManager < Test::Unit::TestCase
 
   def mock_action_config_validator(result = nil)
     result ||= {'valid' => true, 'errors' => [], 'warnings' => []}
-    Armagh::Configuration::ActionConfigValidator.stubs(:validate).once.returns(result)
+    Armagh::Configuration::ActionConfigValidator.any_instance.stubs(:validate).once.returns(result)
   end
 
   def mock_config_find(result)
@@ -80,11 +80,11 @@ class TestAgentConfigManager < Test::Unit::TestCase
   def test_validate_bad_timestamp
     config = agent_config
     config['timestamp'] = 'bad'
-    mock_action_config_validator
+    Armagh::Configuration::ActionConfigValidator.any_instance.stubs(:validate).never
     result = AgentConfigManager.validate(config)
     assert_false result['valid']
     assert_empty result['warnings']
-    assert_include(result['errors'], "'timestamp' must be a time object.")
+    assert_include(result['errors'], "'timestamp' must be a Time object.  Was a String.")
   end
 
   def test_validate_bad_log_level
@@ -93,7 +93,7 @@ class TestAgentConfigManager < Test::Unit::TestCase
     mock_action_config_validator
     result = AgentConfigManager.validate(config)
     assert_true result['valid']
-    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Will use the default value of debug.")
+    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Was 'bad'.  Will use the default value of 'debug'.")
     assert_empty result['errors']
   end
 

@@ -190,7 +190,7 @@ class TestConfigManager < Test::Unit::TestCase
   def test_validate_wrong_timestamp
     result = ConfigManager.validate({'timestamp' => 'Not a timestamp!'})
     assert_false result['valid']
-    assert_include(result['errors'], "'timestamp' must be a time object.")
+    assert_include(result['errors'], "'timestamp' must be a Time object.  Was a String.")
   end
 
   def test_validate_extra_fields
@@ -200,6 +200,15 @@ class TestConfigManager < Test::Unit::TestCase
     assert_true result['valid']
     assert_empty result['errors']
     assert_include(result['warnings'], 'The following settings were configured but are unknown: ["unknown"].')
+  end
+
+  def test_validate_missing_no_default
+    ConfigManager::VALID_FIELDS['missing_field'] = String
+    result = ConfigManager.validate(config_for_validation)
+    ConfigManager::VALID_FIELDS.delete 'missing_field'
+    assert_false result['valid']
+    assert_include result['errors'], "'missing_field' does not exist in the configuration."
+    assert_empty result['warnings']
   end
 
   def test_invalid_log_level

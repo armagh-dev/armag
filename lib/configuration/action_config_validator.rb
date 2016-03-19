@@ -15,215 +15,416 @@
 # limitations under the License.
 #
 
+require 'tsort'
+
+require 'armagh/actions'
+
+require_relative '../action/action_manager'
+require_relative '../utils/t_sortable_hash'
+
 module Armagh
   module Configuration
-    module ActionConfigValidator
-      def self.validate(action_config)
-        # TODO ActionConfigValidator.validate Implement action config validation here
-        errors = []
-        warnings = []
+    class ActionConfigValidator
 
-        # Things to validate:
-        # * No action of a given class
-        # * Missing action fields (like docspecs)
-        # * Call Action validation (probably need to clean up that error reporting)
-        # * A given type/state pair can only be used for a single Parser, Publisher, or Collector
-        # * A collector can only take a ready document in, can only produce n document types that are all ready or working.  out types can not be the same as in types  the incoming document gets deleted
-        # * A parser can only take a ready document in, can only produce n document types that are all ready or working.  out types can not be the same as in types  the incoming document gets deleted
-        # * A subscriber can only take a published document in, can only produce n document types that are all ready or working.  out types can not be the same as in types  the incoming document does not get changed
-        # * A publisher only takes a document type (no state -- ready -> published is implied). it's only job is to publish that document.
-        # * Check for loops
+      ACTION_FIELDS = {
+          'action_class_name' => String,
+          'parameters' => Hash
+          #doc types and specs are handled separately since they depend on the action type
+      }
 
-        {'valid' => errors.empty?, 'errors' => errors, 'warnings' => warnings}
+      DOCSPEC_FIELDS = {
+          'type' => String,
+          'state' => String
+          #splitter is handled separately since it depends on the action type
+      }
+
+      SPLITTER_FIELDS = {
+          'splitter_class_name' => String,
+          'parameters' => Hash
+      }
+
+      VALID_OUTPUT_DOC_STATES = [DocState::READY, DocState::WORKING]
+
+      def initialize
+        @errors = []
+        @warnings = []
+
+        @input_docspecs = {}
+        @output_docspecs = {}
+        @action_outputs = {}
+
+        @docspec_flow = Utils::TsortableHash.new
       end
 
+      def error?
+        @errors.any?
+      end
 
-=begin # TODO ActionConfigValidator: integrate validate code pulled from action manager. CODE BELOW WAS REMOVED FROM ACTION MANAGER.  NEEDS TO BE CALLED FROM VALIDATE.
-      private def validate
-        errors = {}
+      def validate(action_config)
+        @errors.clear
+        @warnings.clear
 
-        action_validation = validate_actions
-        errors['action_validation'] = action_validation if action_validation
+        @input_docspecs.clear
+        @output_docspecs.clear
+        @action_outputs.clear
+        @docspec_flow.clear
 
-        docspec_mapping = validate_actions_docspec_mapping
-        errors['docspec_mapping'] = docspec_mapping if docspec_mapping
+        if action_config.empty?
+          @warnings << 'Action Configuration is empty.'
+        else
+          field_validation(action_config)
+          workflow_validation unless error?
+        end
 
-        if errors.any?
-          log_validation_errors(errors)
-          reset_actions
+        # TODO JBOWES DELETE ONCE TESTED
+        # Things remaining to validate:
+        # * [DONE] Extra fields
+        # * [DONE] Missing fields (like docspecs)
+        # * [DONE] in and out types cant be the same
+        # * [DONE] A collector can only produce n document types that are all ready or working.
+        # * [DONE] A parser can only produce n document types that are all ready or working.
+        # * [DONE] A publisher does not specifically define inputs and outputs
+        # * [DONE] A subscriber can only produce n document types that are all ready or working.
+        # * [DONE] Call Action validation (probably need to clean up that error reporting)
+
+        # workflow validation
+        # * [DONE] A given input docspec can only be shared by multiple subscribers
+        # * [DONE] Warn when docspecs arent used (produces ready but nothing ingests that doc type)
+        # * [DONE] Warn when docspecs arent used (produces working but no parser produces ready for a given doctype)
+        # * [DONE] Warn duplicate docspecs
+        # * [DONE] Check for loops (error)
+
+        {'valid' => !error?, 'errors' => @errors.uniq, 'warnings' => @warnings.uniq}
+      end
+
+      private def field_validation(action_config)
+        action_config.each do |action_name, action_settings|
+          if action_settings.is_a?(Hash)
+            validate_action_name(action_name)
+            validate_action_settings(action_name, action_settings)
+          else
+            @errors << "Action '#{action_name}' needs to be a Hash.  Was a #{action_settings.class}."
+          end
         end
       end
 
-      private def validate_actions
-        errors = nil
-        @actions_by_name.each do |action_name, action_details|
+      private def validate_action_name(action_name)
+        @errors << 'An action was found without a name' if blank? action_name
+      end
+
+      private def validate_action_settings(action_name, action_settings)
+        validate_action_fields(action_name, action_settings)
+        return if error?
+
+        output_docspecs = action_settings['output_docspecs']
+
+        begin
+          clazz = Object.const_get(action_settings['action_class_name'])
+
+          case
+            when clazz < CollectAction
+              validate_collect(action_name, action_settings)
+            when clazz < ParseAction
+              validate_parse(action_name, action_settings)
+            when clazz < PublishAction
+              validate_publish(action_name, action_settings)
+              output_docspecs = {'' => {'type' => action_settings['doc_type'], 'state' => DocState::PUBLISHED}}
+            when clazz < SubscribeAction
+              validate_subscribe(action_name, action_settings)
+            else
+              @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, ParseAction, PublishAction, or SubscribeAction."
+              return # We can't do additional checking if we don't know what action type we have
+          end
+
+          unless error?
+            validate_action_instance(action_name, clazz, action_settings['parameters'], output_docspecs)
+          end
+        rescue NameError
+          @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' does not exist."
+        end
+      end
+
+      private def validate_action_fields(action_name, action_settings)
+        ACTION_FIELDS.each do |name, type|
+          setting = action_settings[name]
+
+          if setting.nil?
+            @errors << "Action '#{action_name}' does not have  '#{name}'."
+          elsif !setting.is_a?(type)
+            @errors << "Field '#{name}' from action '#{action_name}' must be a '#{type}'.  It is a '#{setting.class}'."
+          end
+        end
+
+        unless action_settings['doc_type'] || (action_settings['input_doc_type'] && action_settings['output_docspecs'])
+          # TODO JBOWES Check the types as well.  Then can remove the checks at 243
+          @errors << "Action '#{action_name}' needs a 'doc_type' field if it is a PublishAction or an 'input_doc_type' and 'output_docspecs' field if it is any other action type."
+        end
+
+        unknown_fields = action_settings.keys - ACTION_FIELDS.keys - %w(doc_type input_doc_type output_docspecs)
+        @warnings << "Action '#{action_name}' has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
+      end
+
+      private def validate_collect(action_name, action_settings)
+        action_type = 'collect'
+        input_doc_type = action_settings['input_doc_type']
+        validate_input_doc_type(action_name, input_doc_type, action_type)
+        validate_output_docspecs(action_name, input_doc_type, action_settings['output_docspecs'], action_type, true)
+        insert_action_for_loop_check(input_doc_type, action_settings['output_docspecs'], action_type)
+      end
+
+      private def validate_parse(action_name, action_settings)
+        action_type = 'parse'
+        input_doc_type = action_settings['input_doc_type']
+        validate_input_doc_type(action_name, input_doc_type, action_type)
+        validate_output_docspecs(action_name, input_doc_type, action_settings['output_docspecs'], action_type)
+        insert_action_for_loop_check(input_doc_type, action_settings['output_docspecs'], action_type)
+      end
+
+      private def validate_publish(action_name, action_settings)
+        action_type = 'publish'
+        doc_type = action_settings['doc_type']
+        validate_doctype(action_name, doc_type, action_type)
+        insert_action_for_loop_check(doc_type, doc_type, action_type)
+      end
+
+      private def validate_subscribe(action_name, action_settings)
+        action_type = 'subscribe'
+        input_doc_type = action_settings['input_doc_type']
+        validate_input_doc_type(action_name, input_doc_type, action_type)
+        validate_output_docspecs(action_name, input_doc_type, action_settings['output_docspecs'], action_type, false, true)
+        insert_action_for_loop_check(input_doc_type, action_settings['output_docspecs'], action_type)
+      end
+
+      private def validate_action_instance(action_name, clazz, parameters, raw_output_docspecs)
+        parameters ||= {}
+        output_docspecs = ActionManager.map_docspec_states(raw_output_docspecs)
+        instance = clazz.new(action_name, nil, nil, parameters, output_docspecs)
+        class_validation = instance.validate
+        class_validation['errors'].each { |err| @errors << "Action '#{action_name}' error: #{err}" }
+        class_validation['warnings'].each { |warn| @warnings << "Action '#{action_name}' warning: #{warn}" }
+      rescue => e
+        @errors << "Action '#{action_name}' validation failed: #{e}"
+      end
+
+      private def validate_input_doc_type(action_name, input_doc_type, action_type)
+        input_docspec = create_input_docspec(input_doc_type, action_type)
+        return if error?
+
+        @input_docspecs[input_docspec] ||= []
+        @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+      end
+
+      private def validate_output_docspecs(action_name, input_doc_type, output_docspecs, action_type, allow_splitter = false, allow_empty = false)
+        output_docspecs.each do |docspec_name, docspec_settings|
+          validate_output_docspec_name(action_name, docspec_name)
+          validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_splitter)
+
+          if input_doc_type == docspec_settings['type']
+            @errors << "Input doctype and output docspec '#{docspec_name}' from action '#{action_name}' are the same but they must be different."
+          end
+
+          next if error?
+
           begin
-            instance = instantiate_action(action_details)
-          rescue => e
-            errors ||= {}
-            errors[action_name] ||= {}
-            errors[action_name]['instantiation'] = e.message
-
-            @logger.error 'Could not instantiate action'
-            # TODO Fix split logging in action_config_validator pulled validate_actions
-            @logger.error e
+            output_docspec = DocSpec.new(docspec_settings['type'], docspec_settings['state'])
+            @output_docspecs[output_docspec] ||= []
+            @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type, 'docspec_name' => docspec_name}
+            @action_outputs[action_name] ||= []
+            @action_outputs[action_name] << output_docspec
+          rescue ActionErrors::StateError => e
+            @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an invalid state: #{e.message}'"
+          rescue ActionErrors::DocSpecError => e
+            @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an error: #{e.message}'"
           end
+        end
+      end
 
-          return errors unless instance
+      private def validate_doctype(action_name, doc_type, action_type)
+        if blank? doc_type
+          @errors << "Action '#{action_name}' does not have a doc_type."
+        elsif !doc_type.is_a? String
+          @errors << "Doc type '#{doc_type}' from '#{action_name}' must be a 'String'.  It is a '#{doc_type.class}'."
+        end
 
-          unless instance.valid?
-            errors ||= {}
-            errors[action_name] = instance.validation_errors
-          end
+        return if error?
 
-          if instance.is_a?(CollectAction)
-            action_details['output_docspecs'].each do |docspec_name, _docspec|
-              begin
-                splitter = get_splitter(action_name, docspec_name)
-              rescue => e
-                errors ||= {}
-                errors[action_name] ||= {}
-                errors[action_name]['output_docspecs'] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name]['_splitter'] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name]['_splitter']['initialize'] = e.message
+        begin
+          input_docspec = DocSpec.new(doc_type, DocState::READY)
+          @input_docspecs[input_docspec] ||= []
+          @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
 
-                @logger.error 'Could not instantiate splitter'
-            # TODO Fix split logging in action_config_validator pulled validate_actions
-                @logger.error e
-              end
+          output_docspec = DocSpec.new(doc_type, DocState::PUBLISHED)
+          @output_docspecs[output_docspec] ||= []
+          @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+          @action_outputs[action_name] ||= []
+          @action_outputs[action_name] << output_docspec
+        rescue ActionErrors::DocSpecError => e
+          @errors << "Action '#{action_name}' doc_type has an error: #{e.message}'"
+        end
 
-              break unless splitter
+      end
 
-              unless splitter.valid?
-                errors ||= {}
-                errors[action_name] ||= {}
-                errors[action_name]['output_docspecs'] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name]['_splitter'] ||= {}
-                errors[action_name]['output_docspecs'][docspec_name]['_splitter'] = splitter.validation_errors
-              end
-            end
+      private def validate_output_docspec_name(action_name, docspec_name)
+        @errors << "Action '#{action_name}' had an output docspec without a name." if blank? docspec_name
+      end
+
+      private def validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_splitter = false)
+        DOCSPEC_FIELDS.each do |name, type|
+          setting = docspec_settings[name]
+
+          if setting.nil?
+            @errors << "Action '#{action_name}', docspec '#{docspec_name}' does not have '#{name}'."
+          elsif !setting.is_a?(type)
+            @errors << "Field '#{name}' from action '#{action_name}', docspec '#{docspec_name}' must be a '#{type}'.  It is a '#{setting.class}'."
           end
         end
 
-        errors
-      end
+        unknown_fields = docspec_settings.keys - DOCSPEC_FIELDS.keys
 
-      private def validate_actions_docspec_mapping
-        publish_parse_actions = {}
-        errors = nil
-        @actions_by_docspec.each do |docspec, actions|
-          docspec_s = docspec.to_s
-
-          actions.each do |action|
-            if action['class'].is_a?(PublishAction) || action['class'].is_a?(ParseAction)
-              publish_parse_actions[docspec_s] ||= []
-              publish_parse_actions[docspec_s] << action['name']
-            end
-          end
-
-          if publish_parse_actions[docspec_s] && publish_parse_actions[docspec_s].length > 1
-            errors ||= []
-            errors << "#{docspec_s}: #{publish_parse_actions[docspec_s]}"
-          end
+        if allow_splitter && docspec_settings['splitter']
+          unknown_fields -= ['splitter']
+          validate_output_docspec_splitter(action_name, docspec_name, docspec_settings)
         end
-        errors
+
+        @warnings << "Action '#{action_name}', docspec '#{docspec_name}' has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
       end
 
-      private def log_validation_errors(errors)
-        error_msg = "Configuration validation failed with the following errors:\n"
-        error_msg << generate_action_validation_msg(errors['action_validation']) if errors['action_validation']
-        @logger.error error_msg
-      end
+      private def validate_output_docspec_splitter(action_name, docspec_name, docspec_settings)
+        splitter_settings = docspec_settings['splitter']
+        if blank?(splitter_settings)
+          @errors << "Action '#{action_name}', docspec '#{docspec_name}' has a partially defined splitter."
+        elsif !splitter_settings.is_a? Hash
+          @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter must be a 'Hash'.  It is a #{splitter_settings.class}"
+        end
 
-      # TODO action_config_validator pulled generate_action_validation_msg: This should be cleaned up or may not be needed
-      private; def generate_action_validation_msg(action_validation)
-        msg = ''
+        SPLITTER_FIELDS.each do |name, type|
+          setting = splitter_settings[name]
 
-        action_validation.each do |name, validation|
-          msg << "Errors for action '#{name}':\n"
-
-          if validation['instantiation']
-            msg << "  Instantiation Error:\n"
-            msg << "    #{validation['instantiation']}\n"
-          end
-
-          if validation['parameters']
-            msg << "  Parameter Errors:\n"
-            validation['parameters'].each do |name, message|
-              msg << "    #{name}: #{message}\n"
-            end
-          end
-
-          if validation['general']
-            msg << "  General Action Errors:\n"
-            validation['general'].each do |message|
-              msg << "    #{message}\n"
-            end
-          end
-
-          if validation['all_docspecs']
-            msg << "  General DocSpec Errors:\n"
-            validation['all_docspecs'].each do |message|
-              msg << "    #{message}\n"
-            end
-          end
-
-          if validation['input_docspecs']
-            msg << "  Input DocSpec Errors:\n"
-            validation['input_docspecs'].each do |name, message|
-              msg << "    #{name}: #{message}\n"
-            end
-          end
-
-          if validation['output_docspecs']
-            msg << "  Output DocSpec Errors:\n"
-            validation['output_docspecs'].each do |name, message|
-
-              if message.is_a?(Hash) && message['_splitter']
-                splitter_validation = message['_splitter']
-
-                msg << "    Splitter Errors:\n"
-
-                if splitter_validation['instantiation']
-                  msg << "      Instantiation Error:\n"
-                  msg << "        #{splitter_validation['instantiation']}\n"
-                end
-
-                if splitter_validation['parameters']
-                  msg << "      Parameter Errors:\n"
-                  splitter_validation['parameters'].each do |name, message|
-                    msg << "      #{name}: #{message}\n"
-                  end
-                end
-
-                if splitter_validation['general']
-                  msg << "      General Splitter Errors:\n"
-                  splitter_validation['general'].each do |message|
-                    msg << "      #{message}\n"
-                  end
-                end
-              else
-                msg << "    #{name}: #{message}\n"
-              end
-            end
+          if setting.nil?
+            @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter does not have '#{name}'."
+          elsif !setting.is_a?(type)
+            @errors << "Field '#{name}' from action '#{action_name}', docspec '#{docspec_name}' splitter must be a '#{type}'.  It is a '#{setting.class}'."
           end
         end
 
-        msg << 'Abandoning agent configuration.'
+        unknown_fields = splitter_settings.keys - SPLITTER_FIELDS.keys
+        @warnings << "Action '#{action_name}', docspec '#{docspec_name}' splitter has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
 
-        msg
+        unless error?
+          clazz = Object.const_get(splitter_settings['splitter_class_name'])
+          validate_splitter_instance(action_name, clazz, splitter_settings['parameters'], docspec_settings)
+        end
       end
 
-      from main parser:
-        unless ActionManager.defined_actions.include? action_class_name
-          @logger.error "Agent Configuration is invalid - No action class '#{action_class_name}' exists.  Available actions are #{defined_actions}.  Abandoning action configuration."
-          reset_actions
-          break
-        end
-=end
+      private def validate_splitter_instance(action_name, clazz, parameters, docspec_settings)
+        parameters ||= {}
+        output_docspec = DocSpec.new(docspec_settings['type'], docspec_settings['state'])
+        instance = clazz.new(nil, nil, parameters, output_docspec)
+        splitter_validation = instance.validate
 
+        splitter_validation['errors'].each { |err| @errors << "Action '#{action_name}' splitter error: #{err}" }
+        splitter_validation['warnings'].each { |warn| @warnings << "Action '#{action_name}' splitter warning: #{warn}" }
+      rescue => e
+        @errors << "Action '#{action_name}' splitter validation failed: #{e}"
+      end
+
+      private def workflow_validation
+        validate_workflow_inputs
+        validate_workflow_used
+        validate_workflow_loops
+      end
+
+      private def validate_workflow_inputs
+        @input_docspecs.each do |docspec, actions|
+          unless docspec.state == DocState::PUBLISHED
+            action_names = actions.collect { |a| a['action_name'] }
+            @errors << "Input docspec '#{docspec}' cannot be shared between multiple actions.  Shared by: #{action_names}" if action_names.length > 1
+          end
+        end
+      end
+
+      private def validate_workflow_used
+        validate_unused_ready_specs
+        validate_unused_working_specs
+        validate_noncreated_inputs
+      end
+
+      private def validate_unused_ready_specs
+        unused_docspecs = @output_docspecs.keys - @input_docspecs.keys
+
+        unused_docspecs.each do |docspec|
+          if docspec.state == DocState::READY
+            action_names = @output_docspecs[docspec].collect { |a| a['action_name'] }
+            @warnings << "Actions #{action_names} produce docspec '#{docspec}', but no action takes that docspec as input."
+          end
+        end
+      end
+
+      private def validate_unused_working_specs
+        unfinished_working = []
+        finished_working = []
+
+        @action_outputs.each do |_action_name, specs|
+          working_types = specs.collect { |s| s.type if s.state == DocState::WORKING }.compact
+          ready_types = specs.collect { |s| s.type if s.state == DocState::READY }.compact
+
+          unfinished_working.concat working_types - ready_types
+          finished_working.concat working_types & ready_types
+        end
+
+        (unfinished_working-finished_working).each do |doc_type|
+          @warnings << "No actions convert '#{doc_type}' from a working to a ready state."
+        end
+      end
+
+      def validate_noncreated_inputs
+        uncreated_docspecs = @input_docspecs.keys - @output_docspecs.keys
+
+        uncreated_docspecs.each do |docspec|
+          @input_docspecs[docspec].each do |action|
+            @warnings << "Action #{action['action_name']} takes in docspec '#{docspec}', but no action creates that docspec." unless action['action_type'] == 'collect'
+          end
+        end
+      end
+
+      private def validate_workflow_loops
+        begin
+          @docspec_flow.tsort
+        rescue TSort::Cyclic
+          @errors << 'Action configuration has a cycle.'
+        end
+      end
+
+      private def create_input_docspec(input_doc_type, action_type)
+        case action_type
+          when 'subscribe'
+            DocSpec.new(input_doc_type, DocState::PUBLISHED)
+          else
+            DocSpec.new(input_doc_type, DocState::READY)
+        end
+      rescue ActionErrors::DocSpecError => e
+        @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an error: #{e.message}'"
+      end
+
+      private def insert_action_for_loop_check(input_doc_type, output_docspecs, action_type)
+        return if error?
+        input_docspec = create_input_docspec(input_doc_type, action_type)
+        return if error?
+
+        @docspec_flow[input_docspec] ||= []
+
+        if output_docspecs.is_a? String
+          @docspec_flow[input_docspec] << DocSpec.new(output_docspecs, DocState::PUBLISHED)
+        else
+          output_docspecs.each do |_name, spec|
+            @docspec_flow[input_docspec] << DocSpec.new(spec['type'], spec['state'])
+          end
+        end
+      end
+
+      private def blank?(item)
+        item.nil? || (item.respond_to?(:empty) && item.empty?)
+      end
     end
   end
 end

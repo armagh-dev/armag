@@ -37,7 +37,7 @@ module Armagh
 
       action_config.each do |action_name, action_details|
         action_class_name = action_details['action_class_name']
-        parameters = action_details['parameters']
+        parameters = action_details['parameters'] || {}
 
         clazz = Object::const_get(action_class_name)
 
@@ -47,7 +47,7 @@ module Armagh
         else
           input_doc_type = action_details['input_doc_type']
           raw_output_docspecs = action_details['output_docspecs']
-          output_docspecs = map_docspec_states(raw_output_docspecs)
+          output_docspecs = self.class.map_docspec_states(raw_output_docspecs)
           map_splitters(action_name, raw_output_docspecs) if clazz < CollectAction
         end
 
@@ -98,14 +98,7 @@ module Armagh
       end
     end
 
-    def self.defined_actions
-      actions = []
-      actions.concat CustomActions.defined_actions if defined? CustomActions
-      actions.concat StandardActions.defined_actions if defined? StandardActions
-      actions
-    end
-
-    private def map_docspec_states(docspecs)
+    def self.map_docspec_states(docspecs)
       converted_docspecs = {}
 
       docspecs.each do |name, details|
@@ -114,12 +107,19 @@ module Armagh
       converted_docspecs
     end
 
+    def self.defined_actions
+      actions = []
+      actions.concat CustomActions.defined_actions if defined? CustomActions
+      actions.concat StandardActions.defined_actions if defined? StandardActions
+      actions
+    end
+
     private def map_splitters(action_name, output_docspecs)
       output_docspecs.each do |docspec_name, output_docspec|
         splitter_details = output_docspec['splitter']
         if splitter_details
           splitter_class_name = splitter_details['splitter_class_name']
-          splitter_parameters = splitter_details['parameters']
+          splitter_parameters = splitter_details['parameters'] || {}
           splitter_settings = {'parameters' => splitter_parameters, 'class_name' => splitter_class_name, 'class' => Object::const_get(splitter_class_name)}
           @splitter_by_action_docspec[action_name] ||= {}
           @splitter_by_action_docspec[action_name][docspec_name] = splitter_settings
@@ -135,7 +135,7 @@ module Armagh
 
     private def instantiate_action(action_details)
       action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['output_docspecs'])
-  end
+    end
 
     private def instantiate_splitter(splitter_details, docspec)
       splitter_details['class'].new(@caller, @logger, splitter_details['parameters'], docspec)

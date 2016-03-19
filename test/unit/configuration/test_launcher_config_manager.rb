@@ -75,7 +75,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'num_agents' must be a positive integer.")
+    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a Fixnum.")
     assert_empty result['warnings']
   end
 
@@ -85,7 +85,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'num_agents' must be a positive integer.")
+    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a String.")
     assert_empty result['warnings']
   end
 
@@ -96,7 +96,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     result = LauncherConfigManager.validate(config)
     assert_true result['valid']
     assert_empty result['errors']
-    assert_include(result['warnings'], "'num_agents' does not exist in the configuration.  Using default value of #{LauncherConfigManager.default_config['num_agents']}.")
+    assert_include(result['warnings'], "'num_agents' does not exist in the configuration.  Will use the default value of #{LauncherConfigManager.default_config['num_agents']}.")
   end
 
   def test_negative_checkin
@@ -105,7 +105,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'checkin_frequency' must be a positive integer.")
+    assert_include(result['errors'], "'checkin_frequency' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a Fixnum.")
     assert_empty result['warnings']
   end
 
@@ -115,7 +115,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'checkin_frequency' must be a positive integer.")
+    assert_include(result['errors'], "'checkin_frequency' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a String.")
     assert_empty result['warnings']
   end
 
@@ -126,7 +126,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     result = LauncherConfigManager.validate(config)
     assert_true result['valid']
     assert_empty result['errors']
-    assert_include(result['warnings'], "'checkin_frequency' does not exist in the configuration.  Using default value of #{LauncherConfigManager.default_config['checkin_frequency']}.")
+    assert_include(result['warnings'], "'checkin_frequency' does not exist in the configuration.  Will use the default value of #{LauncherConfigManager.default_config['checkin_frequency']}.")
   end
 
   def test_validate_bad_timestamp
@@ -135,7 +135,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
     assert_empty result['warnings']
-    assert_include(result['errors'], "'timestamp' must be a time object.")
+    assert_include(result['errors'], "'timestamp' must be a Time object.  Was a String.")
   end
 
   def test_validate_bad_log_level
@@ -143,7 +143,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     config['log_level'] = 'bad'
         result = LauncherConfigManager.validate(config)
     assert_true result['valid']
-    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Will use the default value of debug.")
+    assert_include(result['warnings'], "'log_level' must be [\"fatal\", \"error\", \"warn\", \"info\", \"debug\"].  Was 'bad'.  Will use the default value of 'debug'.")
     assert_empty result['errors']
   end
 

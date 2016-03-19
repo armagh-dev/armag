@@ -21,6 +21,11 @@ require_relative '../logging/global_logger'
 module Armagh
   module Configuration
     class ConfigManager
+      class PositiveInteger < Integer
+        def self.valid?(value)
+          value.is_a?(Integer) && value.positive?
+        end
+      end
 
       attr_reader :last_config_timestamp, :default_config
 
@@ -29,7 +34,11 @@ module Armagh
           'timestamp' => Time.utc(0)
       }
 
-      VALID_FIELDS = %w(log_level timestamp)
+      VALID_FIELDS = {
+          'log_level' => String,
+          'timestamp' => Time
+      }
+
       VALID_LOG_LEVELS = %w(fatal error warn info debug)
 
       def initialize(type, logger)
@@ -85,7 +94,7 @@ module Armagh
       end
 
       def self.valid_fields
-        VALID_FIELDS.concat self::VALID_FIELDS
+        VALID_FIELDS.merge self::VALID_FIELDS
       end
 
       def self.default_config
@@ -98,26 +107,27 @@ module Armagh
 
         default_config = self.default_config
 
-        unknown_fields = config.keys - valid_fields
+        unknown_fields = config.keys - valid_fields.keys
 
         if unknown_fields.any?
           warnings << "The following settings were configured but are unknown: #{unknown_fields}."
         end
 
-        timestamp = config['timestamp']
-
-        if timestamp
-          errors << "'timestamp' must be a time object." unless timestamp.is_a?(Time)
-        else
-          warnings << "'timestamp' does not exist in the configuration.  Will use the default value of #{default_config['timestamp']}."
+        valid_fields.each do |field, type|
+          config_field = config[field]
+          if config_field.nil?
+            if default_config[field]
+              warnings << "'#{field}' does not exist in the configuration.  Will use the default value of #{default_config[field]}."
+            else
+              errors << "'#{field}' does not exist in the configuration."
+            end
+          elsif !config_field.is_a?(type) && !(type == PositiveInteger && PositiveInteger.valid?(config_field))
+            errors << "'#{field}' must be a #{type} object.  Was a #{config_field.class.name}."
+          end
         end
 
         log_level = config['log_level']
-        if log_level
-          warnings << "'log_level' must be #{VALID_LOG_LEVELS}.  Will use the default value of #{default_config['log_level']}." unless VALID_LOG_LEVELS.include?(log_level)
-        else
-          warnings << "'log_level' does not exist in the configuration.  Will use the default value of #{default_config['log_level']}."
-        end
+        warnings << "'log_level' must be #{VALID_LOG_LEVELS}.  Was '#{log_level}'.  Will use the default value of '#{default_config['log_level']}'." unless VALID_LOG_LEVELS.include?(log_level)
 
         {'valid' => errors.empty?, 'errors' => errors, 'warnings' => warnings}
       end
