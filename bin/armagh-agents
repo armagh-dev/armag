@@ -218,12 +218,14 @@ def update_config
   if new_config
     @config = new_config
     apply_launcher_config(@config)
+  else
+    @logger.debug 'Ignoring launcher configuration update.'
   end
 end
 
 def update_agent_config
   agent_config = @agent_config_manager.get_config
-  apply_agent_config(agent_config) if agent_config
+  apply_agent_config(agent_config)
 end
 
 def load_actions
@@ -275,11 +277,23 @@ begin
   @server = DRb.start_service(IPC::DRB_URI, @agent_status)
 
   @config = @launcher_config_manager.get_config
+
+  if @config.nil?
+    @logger.error 'Invalid initial launcher configuration.  Exiting.'
+    exit 1
+  end
+
   change_log_level(@config['log_level'])
 
   load_actions
 
   update_agent_config
+
+  if @agent_status.config.nil?
+    @logger.error 'Invalid initial agent configuration.  Exiting.'
+    exit 1
+  end
+
   apply_launcher_config(@config)
 
   @running = true

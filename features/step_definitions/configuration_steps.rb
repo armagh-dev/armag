@@ -67,12 +67,13 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
               'parameters' => {}
           },
 
-          'test_subscribe' => {
-              'action_class_name' => 'Armagh::CustomActions::TestSubscriber',
-              'input_doc_type' => 'SubscribeDocument',
+          'test_consume' => {
+              'action_class_name' => 'Armagh::CustomActions::TestConsumer',
+              'input_doc_type' => 'ConsumeDocument',
               'output_docspecs' => {
-                  'subscribe_output' => {'type' => 'SubscribeOutputDocument', 'state' => 'working'}
-              }
+                  'consume_output' => {'type' => 'ConsumeOutputDocument', 'state' => 'working'}
+              },
+              'parameters' => {}
           }
       }
 
@@ -131,16 +132,25 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
               'parameters' => {}
           },
 
-          'test_subscribe' => {
-              'action_class_name' => 'Armagh::CustomActions::TestSubscriber',
+          'test_consume' => {
+              'action_class_name' => 'Armagh::CustomActions::TestConsumer',
               'input_doc_type' => 'Document',
               'output_docspecs' => {
-                  'subscribe_output' => {'type' => 'SubscribeOutputDocument', 'state' => 'ready'}
-              }
+                  'consume_output' => {'type' => 'ConsumeOutputDocument', 'state' => 'ready'}
+              },
+              'parameters' => {}
           }
       }
 
       available_actions.merge! full_workflow
+    end
+
+    if specified_actions.include? 'no_such_action'
+      available_actions['no_such_action'] = {
+          'action_class_name' => 'Armagh::CustomActions::NoSuchAction',
+          'doc_type' => 'NoActionDocument',
+          'parameters' => {}
+      }
     end
 
 

@@ -68,7 +68,6 @@ module Armagh
 
         if message.is_a? Exception
           log_msg['exception'] = Utils::ExceptionHelper.exception_to_hash message
-          File.write('/tmp/error', log_msg.inspect)
         else
           log_msg['message'] = message
         end

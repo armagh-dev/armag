@@ -42,6 +42,10 @@ Then(/^armagh should have exited$/) do
   assert_false LauncherSupport.running?(@spawn_pid)
 end
 
+Then(/^armagh should be running$/) do
+  assert_true LauncherSupport.running?(@spawn_pid)
+end
+
 Then(/^stderr should contain "([^"]*)"$/) do |message|
   @stderr_pipe[:write].close
   stderr = @stderr_pipe[:read].readlines.join("\n")

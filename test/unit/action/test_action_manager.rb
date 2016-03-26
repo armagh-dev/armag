@@ -30,7 +30,7 @@ class ActionShared < Armagh::Action; end
 class TestPublisher < Armagh::PublishAction; end
 class TestCollector < Armagh::CollectAction; end
 class TestParser < Armagh::ParseAction; end
-class TestSubscriber < Armagh::SubscribeAction; end
+class TestConsumer < Armagh::ConsumeAction; end
 class TestSplitter < Armagh::CollectionSplitter; end
 
 # Strickly for testing
@@ -94,11 +94,11 @@ class TestActionManager < Test::Unit::TestCase
             'action_class_name' => 'TestPublisher',
             'parameters' => {}
         },
-        'subscriber' => {
-            'input_doc_type' => 'InputSubscribeDocument',
-            'action_class_name' => 'TestSubscriber',
+        'consumer' => {
+            'input_doc_type' => 'InputConsumeDocument',
+            'action_class_name' => 'TestConsumer',
             'output_docspecs' => {
-                'subscribe_output' => {'type' => 'SubscribeOutDoc', 'state' => 'ready'}
+                'consume_output' => {'type' => 'ConsumeOutDoc', 'state' => 'ready'}
             },
             'parameters' => {}
         },
@@ -221,9 +221,9 @@ class TestActionManager < Test::Unit::TestCase
                  }, action.output_docspecs)
   end
 
-  def test_subscribe
-    action = @action_manager.get_action 'subscriber'
-    assert_equal({'subscribe_output' => Armagh::DocSpec.new('SubscribeOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
+  def test_consume
+    action = @action_manager.get_action 'consumer'
+    assert_equal({'consume_output' => Armagh::DocSpec.new('ConsumeOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
   end
 
   def test_get_action_unknown

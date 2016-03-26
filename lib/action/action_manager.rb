@@ -51,7 +51,7 @@ module Armagh
           map_splitters(action_name, raw_output_docspecs) if clazz < CollectAction
         end
 
-        input_state = clazz.is_a?(SubscribeAction) ? DocState::PUBLISHED : DocState::READY
+        input_state = clazz.is_a?(ConsumeAction) ? DocState::PUBLISHED : DocState::READY
         input_docspec = DocSpec.new(input_doc_type, input_state)
 
         action_settings = {'name' => action_name, 'input_docspec' => input_docspec, 'output_docspecs' => output_docspecs,

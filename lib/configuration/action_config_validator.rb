@@ -76,24 +76,6 @@ module Armagh
           workflow_validation unless error?
         end
 
-        # TODO JBOWES DELETE ONCE TESTED
-        # Things remaining to validate:
-        # * [DONE] Extra fields
-        # * [DONE] Missing fields (like docspecs)
-        # * [DONE] in and out types cant be the same
-        # * [DONE] A collector can only produce n document types that are all ready or working.
-        # * [DONE] A parser can only produce n document types that are all ready or working.
-        # * [DONE] A publisher does not specifically define inputs and outputs
-        # * [DONE] A subscriber can only produce n document types that are all ready or working.
-        # * [DONE] Call Action validation (probably need to clean up that error reporting)
-
-        # workflow validation
-        # * [DONE] A given input docspec can only be shared by multiple subscribers
-        # * [DONE] Warn when docspecs arent used (produces ready but nothing ingests that doc type)
-        # * [DONE] Warn when docspecs arent used (produces working but no parser produces ready for a given doctype)
-        # * [DONE] Warn duplicate docspecs
-        # * [DONE] Check for loops (error)
-
         {'valid' => !error?, 'errors' => @errors.uniq, 'warnings' => @warnings.uniq}
       end
 
@@ -112,7 +94,7 @@ module Armagh
         @errors << 'An action was found without a name' if blank? action_name
       end
 
-      private def validate_action_settings(action_name, action_settings)
+      private; def validate_action_settings(action_name, action_settings)
         validate_action_fields(action_name, action_settings)
         return if error?
 
@@ -120,7 +102,6 @@ module Armagh
 
         begin
           clazz = Object.const_get(action_settings['action_class_name'])
-
           case
             when clazz < CollectAction
               validate_collect(action_name, action_settings)
@@ -129,17 +110,17 @@ module Armagh
             when clazz < PublishAction
               validate_publish(action_name, action_settings)
               output_docspecs = {'' => {'type' => action_settings['doc_type'], 'state' => DocState::PUBLISHED}}
-            when clazz < SubscribeAction
-              validate_subscribe(action_name, action_settings)
+            when clazz < ConsumeAction
+              validate_consume(action_name, action_settings)
             else
-              @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, ParseAction, PublishAction, or SubscribeAction."
+              @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, ParseAction, PublishAction, or ConsumeAction."
               return # We can't do additional checking if we don't know what action type we have
           end
 
           unless error?
             validate_action_instance(action_name, clazz, action_settings['parameters'], output_docspecs)
           end
-        rescue NameError
+        rescue NameError => e
           @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' does not exist."
         end
       end
@@ -149,14 +130,13 @@ module Armagh
           setting = action_settings[name]
 
           if setting.nil?
-            @errors << "Action '#{action_name}' does not have  '#{name}'."
+            @errors << "Action '#{action_name}' does not have '#{name}'."
           elsif !setting.is_a?(type)
             @errors << "Field '#{name}' from action '#{action_name}' must be a '#{type}'.  It is a '#{setting.class}'."
           end
         end
 
         unless action_settings['doc_type'] || (action_settings['input_doc_type'] && action_settings['output_docspecs'])
-          # TODO JBOWES Check the types as well.  Then can remove the checks at 243
           @errors << "Action '#{action_name}' needs a 'doc_type' field if it is a PublishAction or an 'input_doc_type' and 'output_docspecs' field if it is any other action type."
         end
 
@@ -187,8 +167,8 @@ module Armagh
         insert_action_for_loop_check(doc_type, doc_type, action_type)
       end
 
-      private def validate_subscribe(action_name, action_settings)
-        action_type = 'subscribe'
+      private def validate_consume(action_name, action_settings)
+        action_type = 'consume'
         input_doc_type = action_settings['input_doc_type']
         validate_input_doc_type(action_name, input_doc_type, action_type)
         validate_output_docspecs(action_name, input_doc_type, action_settings['output_docspecs'], action_type, false, true)
@@ -207,11 +187,14 @@ module Armagh
       end
 
       private def validate_input_doc_type(action_name, input_doc_type, action_type)
-        input_docspec = create_input_docspec(input_doc_type, action_type)
-        return if error?
+        begin
+          input_docspec = create_input_docspec(input_doc_type, action_type)
 
-        @input_docspecs[input_docspec] ||= []
-        @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+          @input_docspecs[input_docspec] ||= []
+          @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+        rescue ActionErrors::DocSpecError => e
+          @errors << "Action '#{action_name}', 'input_doc_type' has an error: #{e.message}'"
+        end
       end
 
       private def validate_output_docspecs(action_name, input_doc_type, output_docspecs, action_type, allow_splitter = false, allow_empty = false)
@@ -231,37 +214,30 @@ module Armagh
             @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type, 'docspec_name' => docspec_name}
             @action_outputs[action_name] ||= []
             @action_outputs[action_name] << output_docspec
-          rescue ActionErrors::StateError => e
-            @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an invalid state: #{e.message}'"
           rescue ActionErrors::DocSpecError => e
-            @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an error: #{e.message}'"
+            @errors << "Action '#{action_name}', docspec '#{docspec_name}' has an error: #{e.message}'"
           end
         end
       end
 
-      private def validate_doctype(action_name, doc_type, action_type)
-        if blank? doc_type
-          @errors << "Action '#{action_name}' does not have a doc_type."
-        elsif !doc_type.is_a? String
+    private def validate_doctype(action_name, doc_type, action_type)
+        if doc_type.is_a? String
+          begin
+            input_docspec = DocSpec.new(doc_type, DocState::READY)
+            @input_docspecs[input_docspec] ||= []
+            @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+
+            output_docspec = DocSpec.new(doc_type, DocState::PUBLISHED)
+            @output_docspecs[output_docspec] ||= []
+            @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type}
+            @action_outputs[action_name] ||= []
+            @action_outputs[action_name] << output_docspec
+          rescue ActionErrors::DocSpecError => e
+            @errors << "Action '#{action_name}' 'doc_type' has an error: #{e.message}'"
+          end
+        else
           @errors << "Doc type '#{doc_type}' from '#{action_name}' must be a 'String'.  It is a '#{doc_type.class}'."
         end
-
-        return if error?
-
-        begin
-          input_docspec = DocSpec.new(doc_type, DocState::READY)
-          @input_docspecs[input_docspec] ||= []
-          @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
-
-          output_docspec = DocSpec.new(doc_type, DocState::PUBLISHED)
-          @output_docspecs[output_docspec] ||= []
-          @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type}
-          @action_outputs[action_name] ||= []
-          @action_outputs[action_name] << output_docspec
-        rescue ActionErrors::DocSpecError => e
-          @errors << "Action '#{action_name}' doc_type has an error: #{e.message}'"
-        end
-
       end
 
       private def validate_output_docspec_name(action_name, docspec_name)
@@ -272,7 +248,7 @@ module Armagh
         DOCSPEC_FIELDS.each do |name, type|
           setting = docspec_settings[name]
 
-          if setting.nil?
+          if blank? setting
             @errors << "Action '#{action_name}', docspec '#{docspec_name}' does not have '#{name}'."
           elsif !setting.is_a?(type)
             @errors << "Field '#{name}' from action '#{action_name}', docspec '#{docspec_name}' must be a '#{type}'.  It is a '#{setting.class}'."
@@ -291,10 +267,10 @@ module Armagh
 
       private def validate_output_docspec_splitter(action_name, docspec_name, docspec_settings)
         splitter_settings = docspec_settings['splitter']
-        if blank?(splitter_settings)
-          @errors << "Action '#{action_name}', docspec '#{docspec_name}' has a partially defined splitter."
-        elsif !splitter_settings.is_a? Hash
-          @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter must be a 'Hash'.  It is a #{splitter_settings.class}"
+
+        unless splitter_settings.is_a? Hash
+          @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter must be a 'Hash'.  It is a '#{splitter_settings.class}'."
+          return
         end
 
         SPLITTER_FIELDS.each do |name, type|
@@ -397,13 +373,11 @@ module Armagh
 
       private def create_input_docspec(input_doc_type, action_type)
         case action_type
-          when 'subscribe'
+          when 'consume'
             DocSpec.new(input_doc_type, DocState::PUBLISHED)
           else
             DocSpec.new(input_doc_type, DocState::READY)
         end
-      rescue ActionErrors::DocSpecError => e
-        @errors << "Action '#{action_name}', output docspec '#{docspec_name}' has an error: #{e.message}'"
       end
 
       private def insert_action_for_loop_check(input_doc_type, output_docspecs, action_type)

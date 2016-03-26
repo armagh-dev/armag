@@ -26,7 +26,7 @@ module Armagh
       }
 
       VALID_FIELDS = {
-          'num_agents' => PositiveInteger,
+          'num_agents' => NonNegativeInteger,
           'checkin_frequency' => PositiveInteger
       }
 

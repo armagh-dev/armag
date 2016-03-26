@@ -26,12 +26,12 @@ Feature: Agent Configuration
     And mongo is clean
     And the logs are emptied
     When armagh's "launcher" config is
-      | log_level         | info |
-      | checkin_frequency | 1 |
+      | log_level         | info                |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And armagh's "agent" config is
-      | log_level         | info |
-      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level | info                |
+      | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
     Then the logs should contain "INFO"
@@ -43,24 +43,24 @@ Feature: Agent Configuration
     And mongo is clean
     And the logs are emptied
     When armagh's "launcher" config is
-      | log_level         | warn |
-      | checkin_frequency | 1 |
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And armagh's "agent" config is
-      | log_level         | warn |
-      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level | warn                |
+      | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
     When armagh's "launcher" config is
-      | log_level         | info |
-      | checkin_frequency | 1 |
+      | log_level         | info                |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:01:00 |
     And armagh's "agent" config is
-      | log_level         | info |
-      | timestamp         | 2015-01-01 11:01:00 |
+      | log_level | info                |
+      | timestamp | 2015-01-01 11:01:00 |
     And I wait 1 seconds
     And the logs are emptied
     And I wait 5 seconds
@@ -73,22 +73,103 @@ Feature: Agent Configuration
     And mongo is clean
     And the logs are emptied
     When armagh's "launcher" config is
-      | log_level         | warn |
-      | checkin_frequency | 1 |
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And armagh's "agent" config is
-      | log_level         | warn |
-      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level | warn                |
+      | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
     And armagh's "agent" config is
-      | log_level         | debug |
-      | timestamp         | 2015-01-01 10:00:00 |
+      | log_level | debug               |
+      | timestamp | 2015-01-01 10:00:00 |
     And I wait 5 seconds
     Then the logs should not contain "DEBUG"
     And the logs should not contain "INFO"
 
-  Scenario: Invalid agent configuration
+  Scenario: Start with an invalid agent configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "launcher" config is
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | log_level         | warn                |
+      | timestamp         | 2015-01-01 11:00:00 |
+      | available_actions | no_such_action      |
+    And I run armagh
+    And I wait 1 seconds
+    Then the logs should contain "Class 'Armagh::CustomActions::NoSuchAction' from action 'no_such_action' does not exist."
+    And the logs should contain "Invalid initial agent configuration.  Exiting."
+
+  Scenario: Start with a partial agent configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "launcher" config is
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | timestamp | 2015-01-01 11:00:00 |
+    And I run armagh
+    And I wait 1 seconds
+    Then the logs should contain "Partial agent configuration found.  Using default values for log_level, available_actions."
+
+  Scenario: Switch to invalid agent configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "launcher" config is
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level         | debug               |
+      | available_actions |                     |
+    And I run armagh
+    And I wait 1 seconds
+    And armagh's "agent" config is
+      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level         | debug               |
+      | available_actions | no_such_action      |
+    And I wait 2 seconds
+    Then armagh should be running
+    And the logs should contain "Ignoring agent configuration update."
+
+
+
+  Scenario: Start with an agent configuration with warnings
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "launcher" config is
+      | log_level         | warn                |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level         | debug               |
+      | available_actions |                     |
+    And I run armagh
+    And I wait 1 seconds
+    And armagh's "agent" config is
+      | timestamp         | 2015-01-01 11:00:00 |
+      | log_level         | debug               |
+      | available_actions | no_such_action      |
+    And I wait 2 seconds
+    Then the logs should contain "agent configuration validation is usable but had warnings:"
+    And the logs should contain "Action Configuration is empty."
+
+

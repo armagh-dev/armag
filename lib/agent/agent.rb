@@ -91,13 +91,13 @@ module Armagh
           end
         end
       else
-        @logger.warn "edit_document called for document #{id} but not block was given.  Ignoring."
+        @logger.warn "edit_document called for document '#{id}' but no block was given.  Ignoring."
       end
     end
 
     # returns true if the document was modified or created, false if the document was skipped because it was locked.
     def edit_document!(id, docspec)
-      # TODO agent#edit_document!: hrow an error if insert fails (too large, etc)
+      # TODO agent#edit_document!: throw an error if insert fails (too large, etc)
       if block_given?
         result = Document.modify_or_create!(id, docspec.type, docspec.state) do |doc|
           edit_or_create(id, docspec, doc) do |doc|
@@ -105,7 +105,7 @@ module Armagh
           end
         end
       else
-        @logger.warn "edit_document! called for document #{id} but not block was given.  Ignoring."
+        @logger.warn "edit_document! called for document '#{id}' but no block was given.  Ignoring."
         result = false
       end
       result
@@ -120,9 +120,10 @@ module Armagh
 
         new_docspec = action_doc.docspec
 
-        raise ActionErrors::DocSpecError.new "Document's type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
-        raise ActionErrors::DocSpecError.new "Document's states can only be changed to #{DocState::READY} or #{DocState::WORKING} while editing." unless new_docspec.state == DocState::READY || new_docspec.state == DocState::WORKING
+        raise ActionErrors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
+        raise ActionErrors::DocSpecError, "Document '#{id}' state can only be changed from #{DocState::WORKING} to #{DocState::READY}." unless ((initial_docspec.state == new_docspec.state) || (initial_docspec.state == DocState::WORKING && new_docspec.state == DocState::READY))
 
+        # Output can only equal to input state unless input was working and output is ready.
         doc.update_from_action_document(action_doc)
 
         unless initial_docspec == new_docspec
@@ -133,6 +134,11 @@ module Armagh
       else
         action_doc = ActionDocument.new(id, {}, {}, {}, docspec, true)
         yield action_doc
+        new_docspec = action_doc.docspec
+
+        raise ActionErrors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
+        raise ActionErrors::DocSpecError, "Document '#{id}' state can only be changed from #{DocState::WORKING} to #{DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == DocState::WORKING && new_docspec.state == DocState::READY))
+
         pending_actions = @action_manager.get_action_names_for_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.finish_processing
@@ -167,7 +173,12 @@ module Armagh
 
     private def update_config
       new_config = AgentStatus.get_config(@agent_status, @last_config_timestamp)
-      apply_config(new_config) if new_config
+      if new_config
+        apply_config(new_config)
+      else
+        @logger.debug 'Ignoring agent configuration update.'
+      end
+
     end
 
     private def apply_config(config)
@@ -236,8 +247,8 @@ module Armagh
           doc.draft_content = {}
           doc.state = DocState::PUBLISHED
           doc.add_pending_actions(@action_manager.get_action_names_for_docspec(DocSpec.new(doc.type, doc.state)))
-        when SubscribeAction
-          action.subscribe action_doc
+        when ConsumeAction
+          action.consume action_doc
           doc.draft_content = action_doc.draft_content
           doc.meta = action_doc.meta
         when Action

@@ -131,9 +131,7 @@ class TestConfigManager < Test::Unit::TestCase
   def test_get_config_error_first
     config = {'log_level' => 'info', 'timestamp' => 'BOO'}
     mock_config_find(config)
-    expected = ConfigManager.default_config
-    expected['log_level'] = @config_manager.get_log_level expected['log_level']
-    assert_equal(expected, @config_manager.get_config)
+    assert_nil(@config_manager.get_config)
   end
 
   def test_get_config_error_update

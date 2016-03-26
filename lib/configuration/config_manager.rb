@@ -27,6 +27,12 @@ module Armagh
         end
       end
 
+      class NonNegativeInteger < Integer
+        def self.valid?(value)
+          value.is_a?(Integer) && value >= 0
+        end
+      end
+
       attr_reader :last_config_timestamp, :default_config
 
       DEFAULT_CONFIG = {
@@ -60,10 +66,10 @@ module Armagh
         end
 
         if db_config.empty?
-          @logger.warn "No #{@type} configuration found.  Using default #{@default_config}"
+          @logger.warn "No #{@type} configuration found.  Using default #{@default_config}."
         else
           missing = @default_config.keys - db_config.keys
-          @logger.warn "Partial #{@type} configuration found.  Using default values for #{missing.join(', ')}" unless missing.empty?
+          @logger.warn "Partial #{@type} configuration found.  Using default values for #{missing.join(', ')}." unless missing.empty?
         end
 
         config = @default_config.merge db_config
@@ -121,7 +127,7 @@ module Armagh
             else
               errors << "'#{field}' does not exist in the configuration."
             end
-          elsif !config_field.is_a?(type) && !(type == PositiveInteger && PositiveInteger.valid?(config_field))
+          elsif !config_field.is_a?(type) && !((type == PositiveInteger && PositiveInteger.valid?(config_field)) || (type == NonNegativeInteger && NonNegativeInteger.valid?(config_field)))
             errors << "'#{field}' must be a #{type} object.  Was a #{config_field.class.name}."
           end
         end
@@ -178,15 +184,8 @@ module Armagh
           @last_config_timestamp = config['timestamp']
           config['log_level'] = get_log_level(config['log_level'])
         else
-          if @last_config_timestamp
-            config = nil
-            msg  = 'Keeping current configuration.'
-          else
-            config = @default_config.dup
-            config['log_level'] = get_log_level(config['log_level'])
-            msg = 'Reverting to default configuration.'
-          end
-          @logger.error "#{@type} configuration validation failed:\n #{self.class.format_validation_results(validation_result)}\n\n#{msg}"
+          config = nil
+          @logger.error "#{@type} configuration validation failed:\n #{self.class.format_validation_results(validation_result)}"
         end
         config
       end

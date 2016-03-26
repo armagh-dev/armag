@@ -25,7 +25,7 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 0 |
+      | num_agents | 0 |
     And I run armagh
     Then the number of running agents equals 0
 
@@ -34,7 +34,7 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 2 |
+      | num_agents | 2 |
     And I run armagh
     Then the number of running agents equals 2
 
@@ -51,14 +51,14 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 2 |
-      | checkin_frequency | 1 |
+      | num_agents        | 2                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And the number of running agents equals 2
     When armagh's "launcher" config is
-      | num_agents        | 4 |
-      | checkin_frequency | 1 |
+      | num_agents        | 4                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:01 |
     And I wait 5 seconds
     Then the number of running agents equals 4
@@ -68,14 +68,14 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 4 |
-      | checkin_frequency | 1 |
+      | num_agents        | 4                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And the number of running agents equals 4
     When armagh's "launcher" config is
-      | num_agents        | 2 |
-      | checkin_frequency | 1 |
+      | num_agents        | 2                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:01 |
     And I wait 5 seconds
     Then the number of running agents equals 2
@@ -85,14 +85,14 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 4 |
-      | checkin_frequency | 1 |
+      | num_agents        | 4                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
     And the number of running agents equals 4
     When armagh's "launcher" config is
-      | num_agents        | 2 |
-      | checkin_frequency | 1 |
+      | num_agents        | 2                   |
+      | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 10:00:00 |
     And I wait 5 seconds
     Then the number of running agents equals 4
@@ -102,9 +102,52 @@ Feature: Launcher Configuration
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 3 |
+      | num_agents | 3 |
     And I run armagh
     And an agent is killed
     Then a new agent shall launch to take its place
 
-  Scenario: Invalid launcher configuration
+  Scenario: Start with an invalid launcher configuration
+    Given armagh isn't already running
+    And the logs are emptied
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | -100                |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And I run armagh
+    And I wait 2 seconds
+    Then armagh should have exited
+    And the logs should contain "Invalid initial launcher configuration.  Exiting."
+
+  Scenario: Start with a partial launcher configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And I run armagh
+    And I wait 2 seconds
+    Then the number of running agents equals 1
+
+  Scenario: Switch to invalid launcher configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | log_level         | debug               |
+      | num_agents        | 4                   |
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And I run armagh
+    And I wait 2 seconds
+    Then the number of running agents equals 4
+    When armagh's "launcher" config is
+      | log_level         | info                |
+      | num_agents        | 1                   |
+      | checkin_frequency | -1                  |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And I wait 2 seconds
+    Then the number of running agents equals 4

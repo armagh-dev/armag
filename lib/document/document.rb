@@ -88,7 +88,6 @@ module Armagh
       # TODO Document.get_for_processing: find a document in the following order (see code)
       #  Oldest -> Newest: No local agent picked up for too long
       #  Oldest -> Newest: local
-      # TODO Document.get_for_processing: Doc must be in a valid state
       # TODO Document.get_for_processing: Ability to pull multiple documents
       # TODO Document.get_for_processing: Index on pending_work/locked
       # TODO Document.get_for_processing: Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)

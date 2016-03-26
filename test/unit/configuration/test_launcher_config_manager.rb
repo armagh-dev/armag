@@ -75,7 +75,17 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a Fixnum.")
+    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::NonNegativeInteger object.  Was a Fixnum.")
+    assert_empty result['warnings']
+  end
+
+  def test_zero_agents
+    config = launcher_config
+    config['num_agents'] = 0
+
+    result = LauncherConfigManager.validate(config)
+    assert_true result['valid']
+    assert_empty result['errors']
     assert_empty result['warnings']
   end
 
@@ -85,7 +95,7 @@ class TestLauncherConfigManager < Test::Unit::TestCase
 
     result = LauncherConfigManager.validate(config)
     assert_false result['valid']
-    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::PositiveInteger object.  Was a String.")
+    assert_include(result['errors'], "'num_agents' must be a Armagh::Configuration::ConfigManager::NonNegativeInteger object.  Was a String.")
     assert_empty result['warnings']
   end
 

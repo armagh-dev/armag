@@ -145,7 +145,7 @@ Feature: Actions Execution
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
 
-  Scenario: Have a document for a subscriber
+  Scenario: Have a document for a consumer
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
@@ -158,11 +158,11 @@ Feature: Actions Execution
     And I wait 2 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 "SubscribeDocument" with a "ready" state, id "123", and content "'incoming content'"
+    When I insert 1 "ConsumeDocument" with a "ready" state, id "123", and content "'incoming content'"
     Then I should see an agent with a status of "running" within 5 seconds
     Then I should see an agent with a status of "idle" within 5 seconds
-    And  I should see a "SubscribeOutputDocument" with the following
-      | _id               | 'subscribe_1'                                                |
+    And  I should see a "ConsumeOutputDocument" with the following
+      | _id               | 'consume_1'                                                |
       | meta              | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
       | pending_actions   | []                                                           |
       | failed_actions    | {}                                                           |
@@ -172,8 +172,8 @@ Feature: Actions Execution
       | locked            | false                                                        |
       | failure           | false                                                        |
       | pending_work      | false                                                        |
-    And  I should see a "SubscribeOutputDocument" with the following
-      | _id               | 'subscribe_2'                                     |
+    And  I should see a "ConsumeOutputDocument" with the following
+      | _id               | 'consume_2'                                     |
       | meta              | {'touched_by' => ['block_2'], 'new' => 'block_2'} |
       | pending_actions   | []                                                |
       | failed_actions    | {}                                                |
@@ -183,11 +183,11 @@ Feature: Actions Execution
       | locked            | false                                             |
       | failure           | false                                             |
       | pending_work      | false                                             |
-    And I should see a "SubscribeDocument" with the following
+    And I should see a "ConsumeDocument" with the following
       | _id           | '123'              |
       | draft_content | 'incoming content' |
       | state         | 'ready'            |
-    And the logs should contain "Test Subscribe Running"
+    And the logs should contain "Test Consume Running"
     And the logs should not contain "ERROR"
 
   Scenario: Have a document with an action that doesn't implement the required action method
@@ -264,17 +264,17 @@ Feature: Actions Execution
     And I wait 30 seconds
     Then the logs should contain "Test Collect Running"
     And the logs should contain "Test Collect Splitter Running"
-    And the logs should contain "Test Subscribe Running"
+    And the logs should contain "Test Consume Running"
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
-    And  I should see a "SubscribeOutputDocument" with the following
-      | _id          | 'subscribe_1' |
+    And  I should see a "ConsumeOutputDocument" with the following
+      | _id          | 'consume_1' |
       | state        | 'ready'       |
       | locked       | false         |
       | failure      | false         |
       | pending_work | false         |
-    And  I should see a "SubscribeOutputDocument" with the following
-      | _id          | 'subscribe_2' |
+    And  I should see a "ConsumeOutputDocument" with the following
+      | _id          | 'consume_2' |
       | state        | 'ready'       |
       | locked       | false         |
       | failure      | false         |
