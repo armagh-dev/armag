@@ -18,6 +18,7 @@
 require 'mongo'
 require 'singleton'
 require 'socket'
+require 'log4r'
 
 class MongoSupport
 
@@ -39,7 +40,7 @@ class MongoSupport
 
     @hostname = Socket.gethostname
 
-    Mongo::Logger.logger.level = Logger::WARN
+    Mongo::Logger.logger = Log4r::Logger.root
 
     raise 'No mongod found' if @mongod_exec.empty? || @mongod_exec.nil?
     raise 'No mongo found' if @mongo_exec.empty? || @mongo_exec.nil?

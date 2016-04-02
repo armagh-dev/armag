@@ -19,7 +19,8 @@ require_relative '../../test/helpers/mongo_support'
 require_relative '../../lib/action/action_manager'
 
 require 'test/unit/assertions'
-require 'logger'
+
+require 'log4r'
 require 'time'
 
 
@@ -154,7 +155,7 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     end
 
 
-    @action_manager ||= Armagh::ActionManager.new(nil, Logger.new(nil))
+    @action_manager ||= Armagh::ActionManager.new(nil, Log4r::Logger.root)
     @action_manager.set_available_actions(available_actions)
 
     config['available_actions'] = available_actions

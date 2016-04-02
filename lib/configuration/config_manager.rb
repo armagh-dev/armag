@@ -15,8 +15,10 @@
 # limitations under the License.
 #
 
+require 'log4r'
+
 require_relative '../connection'
-require_relative '../logging/global_logger'
+require_relative '../logging'
 
 module Armagh
   module Configuration
@@ -36,7 +38,6 @@ module Armagh
       attr_reader :last_config_timestamp, :default_config
 
       DEFAULT_CONFIG = {
-          'log_level' => 'debug',
           'timestamp' => Time.utc(0)
       }
 
@@ -59,9 +60,7 @@ module Armagh
         begin
           db_config = Connection.config.find('type' => @type).projection({'type' => 0, '_id' => 0}).limit(1).first || {}
         rescue => e
-          @logger.error "Problem getting #{@type} configuration."
-          # TODO Fix split logging in ConfigManager#get_config
-          @logger.error e
+          Logging.error_exception(@logger, e, "Problem getting #{@type} configuration.")
           db_config = {}
         end
 
@@ -69,7 +68,7 @@ module Armagh
           @logger.warn "No #{@type} configuration found.  Using default #{@default_config}."
         else
           missing = @default_config.keys - db_config.keys
-          @logger.warn "Partial #{@type} configuration found.  Using default values for #{missing.join(', ')}." unless missing.empty?
+          @logger.warn "Partial #{@type} configuration found.  Using default values for #{missing.sort.join(', ')}." unless missing.empty?
         end
 
         config = @default_config.merge db_config
@@ -81,22 +80,14 @@ module Armagh
       end
 
       def get_log_level(level_str)
-        case level_str.strip.downcase
-          when 'fatal'
-            Logger::FATAL
-          when 'error'
-            Logger::ERROR
-          when 'warn'
-            Logger::WARN
-          when 'info'
-            Logger::INFO
-          when 'debug'
-            Logger::DEBUG
-          else
-            default = @default_config['log_level']
-            @logger.error "Unknown log level #{level_str}. Reverting to #{default}."
-            get_log_level(default)
+        level_num = Log4r::Logger.root.levels.find_index(level_str.upcase)
+
+        if level_num.nil?
+          default = @default_config['log_level']
+          @logger.error "Unknown log level #{level_str}. Reverting to #{default}."
+          level_num = get_log_level(default)
         end
+        level_num
       end
 
       def self.valid_fields
@@ -104,7 +95,14 @@ module Armagh
       end
 
       def self.default_config
-        DEFAULT_CONFIG.merge self::DEFAULT_CONFIG
+        config = DEFAULT_CONFIG.merge self::DEFAULT_CONFIG
+        config['log_level'] = default_log_level
+        config
+      end
+
+      def self.default_log_level
+        logger = Log4r::Logger["Armagh::Application"] || Log4r::Logger.new("Armagh::Application")
+        logger.levels[logger.level].downcase
       end
 
       def self.validate(config)

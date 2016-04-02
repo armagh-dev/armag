@@ -20,6 +20,7 @@ require 'armagh/documents/doc_spec'
 
 require_relative '../configuration/action_config_validator'
 require_relative '../errors'
+require_relative '../logging'
 
 module Armagh
   class ActionManager
@@ -63,9 +64,7 @@ module Armagh
         @actions_by_docspec[input_docspec] << action_settings
       end
     rescue => e
-      @logger.error 'Invalid agent configuration.  Could not configure actions.'
-      # TODO Fix split logging in action_manager set_available_actions rescue
-      @logger.error e
+      Logging.error_exception(@logger, e, 'Invalid agent configuration.  Could not configure actions.')
       reset_actions
     end
 

@@ -22,7 +22,6 @@ require 'singleton'
 require 'base64'
 
 require_relative '../errors'
-require_relative '../logging/global_logger'
 require_relative '../configuration/file_based_configuration.rb'
 
 module Armagh
@@ -33,7 +32,7 @@ module Armagh
       attr_reader :connection
 
       def initialize
-        Mongo::Logger.logger.level = Logger::WARN
+        Mongo::Logger.logger = Log4r::Logger['Armagh::MongoAdminConnection'] || Log4r::Logger.new('Armagh::MongoAdminConnection')
         config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
 
         config_keys = config.keys
@@ -44,8 +43,8 @@ module Armagh
         begin
           conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config['db']}"
           @connection = Mongo::Client.new( conn_uri )
-        rescue => e
-          raise Errors::ConnectionError, "Unable to establish admin database connection: #{e.message}"
+        rescue
+          raise Errors::ConnectionError, 'Unable to establish admin database connection.'
         end
       end
     end

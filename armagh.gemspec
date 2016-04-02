@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
   spec.homepage      = ''
   spec.license       = 'Apache-2.0'
 
-  spec.files         = Dir.glob('{bin,lib}/**/*') + %w(LICENSE README)
+  spec.files         = Dir.glob('{bin,config,lib}/**/*') + %w(LICENSE README)
   spec.executables   = [ 'armaghd' ]
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
@@ -46,6 +46,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'sinatra', '~> 1.4'
   spec.add_runtime_dependency 'thin', '~> 1.6'
   spec.add_runtime_dependency 'oj', '~> 2.14'
+  spec.add_runtime_dependency 'log4r', '~> 1.1'
 
   spec.add_development_dependency 'rake', '~> 10.0'
   spec.add_development_dependency 'noragh-gem-tasks'

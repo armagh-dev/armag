@@ -44,8 +44,10 @@ class TestMongoAdminConnection < Test::Unit::TestCase
   end
 
   def test_mongo_connection_db_err
-    Mongo::Client.stubs(:new).raises(RuntimeError.new('Connection Failure'))
+    root_error = RuntimeError.new('Connection Failure')
+    Mongo::Client.stubs(:new).raises(root_error)
     e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
-    assert_equal('Unable to establish admin database connection: Connection Failure', e.message)
+    assert_equal('Unable to establish admin database connection.', e.message)
+    assert_equal(root_error, e.cause)
   end
 end

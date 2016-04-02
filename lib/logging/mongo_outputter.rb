@@ -15,19 +15,25 @@
 # limitations under the License.
 #
 
-module Armagh
-  module Logging
-    class MultiIO
-      def initialize(*targets)
-        @targets = targets.uniq
-      end
+require 'log4r/outputter/outputter'
+require 'socket'
 
-      def write(*args)
-        @targets.each {|t| t.write(*args)}
-      end
+require_relative '../connection'
 
-      def close
-        @targets.each(&:close)
+module Log4r
+  class MongoOutputter < Log4r::Outputter
+    def initialize(_name, hash={})
+      super
+      @resource_log = hash['resource_log']
+    end
+
+    def write(data)
+      raise ArgumentError, 'Data must be a hash.' unless data.is_a? Hash
+
+      if @resource_log
+        Armagh::Connection.resource_log.insert_one data
+      else
+        Armagh::Connection.log.insert_one data
       end
     end
   end

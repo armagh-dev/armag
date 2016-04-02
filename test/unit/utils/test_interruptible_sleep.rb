@@ -16,7 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../test_helpers/mock_global_logger'
+require_relative '../test_helpers/mock_logger'
 require_relative '../../../lib/utils/interruptible_sleep'
 require 'test/unit'
 

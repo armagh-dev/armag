@@ -20,7 +20,6 @@ require_relative 'interruptible_sleep'
 gem 'exponential-backoff', '~> 0.0.2'
 require 'exponential_backoff'
 
-require 'logger'
 
 module Armagh
   module Utils

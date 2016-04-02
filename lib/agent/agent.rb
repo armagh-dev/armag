@@ -16,6 +16,7 @@
 #
 
 require 'drb/unix'
+require 'log4r'
 require 'securerandom'
 require 'tmpdir'
 
@@ -26,20 +27,15 @@ require 'armagh/action_errors'
 require_relative '../action/action_manager'
 require_relative '../document/document'
 require_relative '../ipc'
-require_relative '../logging/global_logger'
 require_relative '../utils/processing_backoff'
 
 module Armagh
   class Agent
     attr_reader :uuid
 
-    LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
-    LOG_LOCATION = File.join(LOG_DIR, '%s.log')
-
     def initialize
       @uuid = "Agent-#{SecureRandom.uuid}"
-      log_location = LOG_LOCATION % @uuid
-      @logger = Logging::GlobalLogger.new(@uuid, log_location, 'daily')
+      @logger = Log4r::Logger["Armagh::Application::Agent::#{@uuid}"] || Log4r::Logger.new("Armagh::Application::Agent::#{@uuid}")
 
       @running = false
 
@@ -153,9 +149,7 @@ module Armagh
 
       @logger.info 'Terminated'
     rescue => e
-      @logger.error 'An unexpected error occurred.'
-      # TODO fix split logging of error in agent#run
-      @logger.error e
+      Logging.error_exception(@logger, e, 'An unexpected error occurred.')
     end
 
     private; def connect_agent_status # ; is a workaround for yard and sub/gsub (https://github.com/lsegal/yard/issues/888)
@@ -202,16 +196,14 @@ module Armagh
 
           if current_action
             begin
-              @logger.debug "Executing #{name} on document #{doc.id}"
+              @logger.debug "Executing #{name} on document '#{doc.id}'."
               Dir.mktmpdir do |tmp_dir|
                 Dir.chdir(tmp_dir) do
                   execute_action(current_action, doc)
                 end
               end
             rescue => e
-              @logger.error "Error while executing action '#{name}'"
-              # TODO fix split logging of error in agent#execute
-              @logger.error e
+              Logging.error_exception(@logger, e, "Error while executing action '#{name}'.")
               doc.add_failed_action(name, e)
             end
           else
@@ -260,7 +252,7 @@ module Armagh
 
     private def change_log_level(level)
       unless @logger.level == level
-        @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
+        @logger.any "Changing log level to #{@logger.levels[level]}"
         @logger.level = level
       end
     end

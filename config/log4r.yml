@@ -1,0 +1,114 @@
+# Copyright 2016 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
+#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
+#            as part of the requirement as well as in the gemspec.
+
+
+line_format:  &line_format
+  date_pattern: '%Y-%m-%d %H:%M:%S'
+  pattern     : '[%d] [%c] %5l: %m '
+  type        : PatternFormatter
+
+log4r_config:
+  pre_config:
+    custom_levels:
+      - DEBUG
+      - INFO
+      - WARN
+      - ERROR
+      - FATAL
+      - ANY
+
+  loggers:
+    - name: 'Armagh::Application'
+      level: DEBUG
+      outputters:
+        - stdout
+        - app_logfile
+        - mongo_app_log
+
+    - name: 'Armagh::ApplicationAdminAPI'
+      outputters:
+        - stdout
+        - app_admin_logfile
+        - mongo_resource_log
+
+    - name: 'Armagh::ResourceAdminAPI'
+      outputters:
+        - stdout
+        - resource_admin_logfile
+        - mongo_resource_log
+
+    - name: 'Armagh::MongoConnection'
+      level: WARN
+      outputters:
+        - stdout
+        - mongo_logfile
+
+    - name: 'Armagh::MongoAdminConnection'
+      level: WARN
+      outputters:
+        - stdout
+        - mongo_admin_logfile
+
+  outputters:
+    - type: StdoutOutputter
+      name: stdout
+      formatter   : *line_format
+
+    - type        : DateFileOutputter
+      name        : app_logfile
+      dirname     : "#{LOG_DIR}"
+      filename    : "armagh-agents.log"
+      formatter   : *line_format
+
+    - type        : DateFileOutputter
+      name        : app_admin_logfile
+      dirname     : "#{LOG_DIR}"
+      filename    : "application_admin_api.log"
+      formatter   : *line_format
+
+    - type        : DateFileOutputter
+      name        : resource_admin_logfile
+      dirname     : "#{LOG_DIR}"
+      filename    : "resource_admin_api.log"
+      formatter   : *line_format
+
+    - type        : DateFileOutputter
+      name        : mongo_logfile
+      dirname     : "#{LOG_DIR}"
+      filename    : "mongo.log"
+      formatter   : *line_format
+
+    - type        : DateFileOutputter
+      name        : mongo_admin_logfile
+      dirname     : "#{LOG_DIR}"
+      filename    : "mongo_admin.log"
+      formatter   : *line_format
+
+    - type: MongoOutputter
+      name: mongo_app_log
+      formatter:
+        type: HashFormatter
+
+    - type: MongoOutputter
+      name: mongo_resource_log
+      resource_log: resource
+      formatter:
+        type: HashFormatter

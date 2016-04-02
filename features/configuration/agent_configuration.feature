@@ -37,6 +37,20 @@ Feature: Agent Configuration
     Then the logs should contain "INFO"
     But the logs should not contain "DEBUG"
 
+  Scenario: Default log level
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "launcher" config is
+      | checkin_frequency | 1                   |
+      | timestamp         | 2015-01-01 11:00:00 |
+    And armagh's "agent" config is
+      | timestamp | 2015-01-01 11:00:00 |
+    And I run armagh
+    And I wait 1 seconds
+    Then the logs should contain "DEBUG"
+
   Scenario: Increase log level
     Given armagh isn't already running
     And mongo is running
@@ -122,7 +136,7 @@ Feature: Agent Configuration
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
     And I wait 1 seconds
-    Then the logs should contain "Partial agent configuration found.  Using default values for log_level, available_actions."
+    Then the logs should contain "Partial agent configuration found.  Using default values for available_actions, log_level."
 
   Scenario: Switch to invalid agent configuration
     Given armagh isn't already running
@@ -146,8 +160,6 @@ Feature: Agent Configuration
     And I wait 2 seconds
     Then armagh should be running
     And the logs should contain "Ignoring agent configuration update."
-
-
 
   Scenario: Start with an agent configuration with warnings
     Given armagh isn't already running

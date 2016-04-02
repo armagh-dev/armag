@@ -16,18 +16,21 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../test_helpers/mock_global_logger'
+
 require_relative '../../../lib/configuration/agent_config_manager'
 require_relative '../../../lib/configuration/action_config_validator'
+require_relative '../../../lib/logging'
 
+require 'log4r'
 require 'test/unit'
 require 'mocha/test_unit'
 
 class TestAgentConfigManager < Test::Unit::TestCase
-
   include Armagh::Configuration
 
   def setup
+    Armagh::Logging.init_log_env
+
     @logger = mock
     @logger.stubs(:debug)
     @logger.stubs(:info)
@@ -64,7 +67,7 @@ class TestAgentConfigManager < Test::Unit::TestCase
     mock_config_find(nil)
 
     default_config = AgentConfigManager::DEFAULT_CONFIG.merge ConfigManager::DEFAULT_CONFIG
-    default_config['log_level'] = Logger::DEBUG
+    default_config['log_level'] = Log4r::DEBUG
 
     assert_equal(default_config, @manager.get_config)
   end

@@ -24,6 +24,12 @@
 require 'rubygems'
 require 'bundler/setup'
 
+require 'drb/unix'
+require 'fileutils'
+require 'socket'
+
+require 'log4r'
+
 require_relative '../lib/agent/agent'
 require_relative '../lib/agent/agent_status'
 require_relative '../lib/action/action_manager'
@@ -31,37 +37,22 @@ require_relative '../lib/configuration/agent_config_manager'
 require_relative '../lib/configuration/launcher_config_manager'
 require_relative '../lib/connection'
 require_relative '../lib/ipc'
-require_relative '../lib/logging/global_logger'
+require_relative '../lib/logging'
 require_relative '../lib/version'
-
-require 'drb/unix'
-require 'fileutils'
-require 'socket'
 
 include Armagh
 
 TERM_SIGNALS = [:INT, :QUIT, :TERM]
 
-LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
-
-LOG_LOCATION = File.join(LOG_DIR, 'armagh-agents.log')
-
-unless File.directory?(LOG_DIR)
-  begin
-    FileUtils.mkdir_p LOG_DIR
-  rescue Errno::EACCES
-    $stderr.puts "Log directory '#{LOG_DIR}' does not exist and could not be created.  Please create the directory and grant the user running armagh full permissions."
-    exit 1
-  end
-end
+Logging.init_log_env
 
 unless Connection.can_connect?
-  # TODO On Connection failure in armagh_agents load, output details about the configuration
-  $stderr.puts 'Unable to establish connection to the database. Ensure the database is running.' 
+  $stderr.puts "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
   exit 1
 end
 
-@logger = Logging::GlobalLogger.new('Armagh', LOG_LOCATION, 'daily')
+@logger = Log4r::Logger['Armagh::Application::Launcher'] || Log4r::Logger.new('Armagh::Application::Launcher')
+
 @launcher_config_manager = Configuration::LauncherConfigManager.new(@logger)
 @agent_config_manager = Configuration::AgentConfigManager.new(@logger)
 
@@ -117,7 +108,7 @@ end
 
 def change_log_level(level)
   unless @logger.level == level
-    @logger.unknown "Changing log level to #{Logging::GlobalLogger::LEVEL_LOOKUP[level]}"
+    @logger.any "Changing log level to #{@logger.levels[level]}"
     @logger.level = level
   end
 end
@@ -191,9 +182,7 @@ def start_agent_in_process(agent=nil)
     begin
       agent.start
     rescue => e
-      @logger.error "Could not start agent #{agent.uuid}"
-      # TODO Reduce logging in armagh-agents start_agent_in_process
-      @logger.error e
+      Logging.error_exception(@logger, e, "Could not start agent #{agent.uuid}")
     end
   end
 
@@ -208,7 +197,7 @@ def stop_agent(signal)
 end
 
 def shutdown(signal)
-  Thread.new{ @logger.unknown "Received #{signal}.  Shutting down once agents finish" }
+  Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }
   @running = false
   Thread.new{ kill_all_agents(signal) }
 end
@@ -236,9 +225,7 @@ def load_actions
     @logger.warn "CustomActions gem is not deployed. These actions won't be available."
   rescue => e
     # An unexpected exception - things like syntax errors.
-    @logger.error 'Could not load CustomActions gem'
-    # TODO Fix split logging in armagh-agents load_actions custom actions load
-    @logger.error e
+    Logging.error_exception(@logger, e, 'Could not load CustomActions gem')
     Armagh.send(:remove_const, :CustomActions)
   end
 
@@ -249,9 +236,7 @@ def load_actions
     @logger.warn "StandardActions gem is not deployed. These actions won't be available."
   rescue => e
     # An unexpected exception - things like syntax errors.
-    @logger.error 'Could not load StandardActions gem'
-    # TODO Fix split logging in armagh-agents load_actions standard actions load
-    @logger.error e
+    Logging.error_exception(@logger, e, 'Could not load StandardActions gem')
     Armagh.send(:remove_const, :StandardActions)
   end
 
@@ -271,7 +256,7 @@ end
 
 ## Execution ##
 begin
-  @logger.unknown 'Armagh started'
+  @logger.any 'Armagh started'
 
   @agent_status = AgentStatus.new
   @server = DRb.start_service(IPC::DRB_URI, @agent_status)
@@ -325,6 +310,6 @@ Process.waitall
 
 checkin('stopped')
 
-@logger.unknown 'Armagh stopped'
+@logger.any 'Armagh stopped'
 
 exit @exit_status if @exit_status

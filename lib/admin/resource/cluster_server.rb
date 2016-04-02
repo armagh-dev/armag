@@ -17,9 +17,7 @@ module Armagh
           begin
             config  = Configuration::FileBasedConfiguration.load('ENV')
           rescue => e
-            @logger.error 'Invalid file based configuration for ENV.  Reverting to default.'
-            # TODO Fix split logging in admin resource cluster_server.rb initialize
-            @logger.error e
+            Logger.error_exception(@logger, e, 'Invalid file based configuration for ENV.  Reverting to default.')
             config = {}
           end
 

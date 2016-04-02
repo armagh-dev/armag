@@ -47,6 +47,8 @@ After('@agent') do
 end
 
 at_exit do
-  MongoSupport.instance.clean_database
-  MongoSupport.instance.stop_mongo
+  begin
+    MongoSupport.instance.clean_database
+    MongoSupport.instance.stop_mongo
+  rescue; end
 end

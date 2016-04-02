@@ -34,6 +34,11 @@ module Armagh
         super('launcher', logger)
       end
 
+      def self.default_log_level
+        logger = Log4r::Logger['Armagh::Application::Launcher'] || Log4r::Logger.new('Armagh::Application::Launcher')
+        logger.levels[logger.level].downcase
+      end
+
       def self.validate(config)
         warnings = []
         errors = []

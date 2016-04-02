@@ -15,8 +15,6 @@
 # limitations under the License.
 #
 
-require_relative '../logging/global_logger'
-
 module Armagh
   class AgentStatus
 

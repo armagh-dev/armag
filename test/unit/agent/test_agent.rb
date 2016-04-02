@@ -17,15 +17,17 @@
 
 require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/agent/agent'
-require_relative '../test_helpers/mock_global_logger'
+require_relative '../test_helpers/mock_logger'
 require_relative '../../../lib/agent/agent_status'
 require_relative '../../../lib/ipc'
 require_relative '../../../lib/document/document'
 require_relative '../../../lib/action/action_manager'
 
+require_relative '../../../lib/logging'
+
 require 'mocha/test_unit'
 require 'test/unit'
-require 'logger'
+require 'log4r'
 
 class CollectTest < Armagh::CollectAction; end
 class ParseTest < Armagh::ParseAction; end
@@ -42,13 +44,9 @@ class TestAgent < Test::Unit::TestCase
   STARTED = []
 
   def setup
-    @logger = mock_global_logger
-    @logger.expects(:debug).at_least(0)
-    @logger.expects(:info).at_least(0)
-    @logger.expects(:warn).at_least(0)
-    @logger.expects(:error).at_least(0)
-    @logger.expects(:unknown).at_least(0)
-    @logger.expects(:level).at_least(0)
+    Armagh::Logging.init_log_env
+
+    @logger = mock_logger
 
     @agent = Armagh::Agent.new
     @backoff_mock = mock('object')
@@ -84,12 +82,24 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_with_config
     config = {
-        'log_level' => Logger::ERROR
+        'log_level' => Log4r::ERROR
     }
-    @logger.expects(:level=).with(Logger::ERROR).at_least_once
+    @logger.expects(:level=).with(Log4r::ERROR).at_least_once
 
     agent_status = mock
     agent_status.stubs(:config).returns(config)
+
+    DRbObject.stubs(:new_with_uri).returns(agent_status)
+
+    Thread.new { @agent.start }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_start_without_config
+    @logger.expects(:debug).with('Ignoring agent configuration update.')
+
+    agent_status = mock
+    agent_status.stubs(:config).returns(nil)
 
     DRbObject.stubs(:new_with_uri).returns(agent_status)
 
@@ -310,7 +320,12 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock.expects(:reset).at_least_once
 
     @agent.instance_variable_set(:@running, true)
-    @logger.expects(:error).with("Error while executing action '#{action_name}'")
+
+    Armagh::Logging.expects(:error_exception).with do |_logger, e, msg|
+      assert_equal exception, e
+      assert_equal "Error while executing action '#{action_name}'.", msg
+      true
+    end
 
     Thread.new {@agent.send(:run)}
     sleep THREAD_SLEEP_TIME
@@ -355,9 +370,14 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_unexpected_error
-    exception = RuntimeError, 'Exception'
+    exception = RuntimeError.new 'Exception'
     @agent.expects(:update_config).raises(exception)
-    @logger.expects(:error).with('An unexpected error occurred.')
+
+    Armagh::Logging.expects(:error_exception).with do |_logger, e, msg|
+      assert_equal exception, e
+      assert_equal 'An unexpected error occurred.', msg
+      true
+    end
 
     @agent.instance_variable_set(:@running, true)
     @agent.send(:run)

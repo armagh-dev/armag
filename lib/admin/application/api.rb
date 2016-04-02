@@ -1,5 +1,6 @@
 require 'singleton'
-require_relative '../../logging/global_logger.rb'
+require 'log4r'
+
 require_relative '../../configuration/file_based_configuration.rb'
 
 module Armagh
@@ -27,14 +28,12 @@ module Armagh
         }
       
         def initialize
-          @logger = Logging::GlobalLogger.new( 'ApplicationAdminAPI', LOG_LOCATION, 'daily' )
+          @logger = Log4r::Logger['Armagh::ApplicationAdminAPI'] || Log4r::Logger.new('Armagh::ApplicationAdminAPI')
 
           begin
             config  = Configuration::FileBasedConfiguration.load( self.class.to_s )
           rescue => e
-            @logger.error "Invalid file based configuration for #{self.class.to_s}.  Reverting to default."
-            # TODO Fix split logging in admin api.rb initialize
-            @logger.error e
+            Logger.error_exception(@logger, e, "Invalid file based configuration for #{self.class.to_s}.  Reverting to default.")
             config = {}
           end
 

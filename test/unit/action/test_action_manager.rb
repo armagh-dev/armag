@@ -21,7 +21,6 @@ require_relative '../../../lib/action/action_manager'
 require 'test/unit'
 require 'mocha/test_unit'
 
-require 'logger'
 require 'armagh/actions'
 
 class Action1 < Armagh::Action; end
@@ -184,8 +183,11 @@ class TestActionManager < Test::Unit::TestCase
   end
 
   def test_invalid_action_instance
-    @logger.expects(:error).with('Invalid agent configuration.  Could not configure actions.')
-    @logger.expects(:error).with{|e| e.class == NameError}
+    @logger.expects(:error).with do |e|
+      assert_equal(NameError, e.class)
+      assert_equal('Invalid agent configuration.  Could not configure actions.  Exception Details: uninitialized constant Object::BadClass', e.message)
+      true
+    end
 
     actions = {
         'bad_action' => {

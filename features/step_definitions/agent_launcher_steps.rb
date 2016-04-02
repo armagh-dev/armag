@@ -19,7 +19,6 @@ require_relative '../support/launcher_support'
 require_relative '../../test/helpers/mongo_support'
 
 require 'test/unit/assertions'
-require 'logger'
 require 'time'
 
 Given(/^armagh isn't already running$/) do
@@ -48,8 +47,8 @@ end
 
 Then(/^stderr should contain "([^"]*)"$/) do |message|
   @stderr_pipe[:write].close
-  stderr = @stderr_pipe[:read].readlines.join("\n")
-  assert_true(stderr.include?(message), "'#{stderr}' does not include '#{message}'")
+  stderr = @stderr_pipe[:read].readlines.join("\n").strip
+  assert_not_nil stderr =~ /#{message}/, "Stderr does not contain '#{message}'."
 end
 
 Then(/^the number of running agents equals (\d+)$/) do |num_agents|

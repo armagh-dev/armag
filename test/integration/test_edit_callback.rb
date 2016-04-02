@@ -16,6 +16,8 @@
 #
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/mongo_support'
+
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
 

@@ -16,26 +16,32 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../test_helpers/mock_global_logger'
+
 require_relative '../../../lib/configuration/config_manager'
+require_relative '../../../lib/logging'
+
+require 'log4r'
 require 'test/unit'
 require 'mocha/test_unit'
 
 class TestConfigManager < Test::Unit::TestCase
-
+  include ArmaghTest
   include Armagh::Configuration
 
   def setup
+    Armagh::Logging.init_log_env
+
     @logger = mock
     @logger.stubs(:debug)
     @logger.stubs(:info)
     @logger.stubs(:warn)
     @logger.stubs(:error)
     @logger.stubs(:level=)
+
     @config_manager = ConfigManager.new('generic', @logger)
 
     @default_config = ConfigManager::DEFAULT_CONFIG.dup
-    @default_config['log_level'] = Logger::DEBUG
+    @default_config['log_level'] = Log4r::DEBUG
   end
 
   def mock_config_find(result)
@@ -69,7 +75,7 @@ class TestConfigManager < Test::Unit::TestCase
   def test_get_config_full
     config = {'available_actions' => {}, 'checkin_frequency' => 5, 'log_level' => 'info', 'num_agents' => 10, 'timestamp' => Time.new(0)}
     expected_config = config.dup
-    expected_config['log_level'] = Logger::INFO
+    expected_config['log_level'] = Log4r::INFO
     mock_config_find(config)
     assert_equal(expected_config, @config_manager.get_config)
   end
@@ -84,7 +90,7 @@ class TestConfigManager < Test::Unit::TestCase
     config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
     config2 = {'log_level' => 'info', 'timestamp' => Time.new(1)}
     expected_config = config2.dup
-    expected_config['log_level'] = Logger::INFO
+    expected_config['log_level'] = Log4r::INFO
 
     mock_config_find(config1)
     @config_manager.get_config
@@ -96,7 +102,7 @@ class TestConfigManager < Test::Unit::TestCase
     config1 = {'log_level' => 'info', 'timestamp' => Time.new(1)}
     config2 = {'log_level' => 'info','timestamp' => Time.new(0)}
     expected_config = config1.dup
-    expected_config['log_level'] = Logger::INFO
+    expected_config['log_level'] = Log4r::INFO
 
     mock_config_find(config1)
     assert_equal(expected_config, @config_manager.get_config)
@@ -107,7 +113,7 @@ class TestConfigManager < Test::Unit::TestCase
   def test_get_config_multiple_times
     config = {'log_level' => 'info', 'timestamp' => Time.new(0)}
     expected_config = config.dup
-    expected_config['log_level'] = Logger::INFO
+    expected_config['log_level'] = Log4r::INFO
     mock_config_find(config)
     assert_equal(expected_config, @config_manager.get_config)
     assert_nil(@config_manager.get_config)
@@ -117,14 +123,14 @@ class TestConfigManager < Test::Unit::TestCase
     config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
     config2 = {'log_level' => 'BKLAHABJDHF','timestamp' => Time.new(1)}
     expected_config1 = config1.dup
-    expected_config1['log_level'] = Logger::INFO
+    expected_config1['log_level'] = Log4r::INFO
 
     mock_config_find(config1)
     assert_equal(expected_config1, @config_manager.get_config)
 
     expected_config2 = config2.dup
     mock_config_find(config2)
-    expected_config2['log_level'] = Logger::DEBUG
+    expected_config2['log_level'] = Log4r::DEBUG
     assert_equal(expected_config2, @config_manager.get_config)
   end
 
@@ -138,7 +144,7 @@ class TestConfigManager < Test::Unit::TestCase
     config1 = {'log_level' => 'info', 'timestamp' => Time.new(0)}
     config2 = {'log_level' => 'warn', 'timestamp' => 'BOO'}
     expected_config1 = config1.dup
-    expected_config1['log_level'] = Logger::INFO
+    expected_config1['log_level'] = Log4r::INFO
 
     mock_config_find(config1)
     assert_equal(expected_config1, @config_manager.get_config)
@@ -212,7 +218,7 @@ class TestConfigManager < Test::Unit::TestCase
   def test_invalid_log_level
     config = {'log_level' => 'Invalid', 'checkin_frequency' => 111}
     expected_config = config.dup
-    expected_config['log_level'] = Logger::DEBUG
+    expected_config['log_level'] = Log4r::DEBUG
     mock_config_find(config)
 
     actual_config = @config_manager.get_config
@@ -222,11 +228,11 @@ class TestConfigManager < Test::Unit::TestCase
   end
 
   def test_get_log_level
-    assert_equal(Logger::FATAL, @config_manager.get_log_level('FATAL'))
-    assert_equal(Logger::ERROR, @config_manager.get_log_level('ERROR'))
-    assert_equal(Logger::WARN, @config_manager.get_log_level('WaRn'))
-    assert_equal(Logger::INFO, @config_manager.get_log_level('info'))
-    assert_equal(Logger::DEBUG, @config_manager.get_log_level('debug'))
-    assert_equal(Logger::DEBUG, @config_manager.get_log_level('Invalid'))
+    assert_equal(Log4r::FATAL, @config_manager.get_log_level('FATAL'))
+    assert_equal(Log4r::ERROR, @config_manager.get_log_level('ERROR'))
+    assert_equal(Log4r::WARN, @config_manager.get_log_level('WaRn'))
+    assert_equal(Log4r::INFO, @config_manager.get_log_level('info'))
+    assert_equal(Log4r::DEBUG, @config_manager.get_log_level('debug'))
+    assert_equal(Log4r::DEBUG, @config_manager.get_log_level('Invalid'))
   end
 end
