@@ -19,5 +19,6 @@ module Armagh
   module Errors
     class ConfigurationError  < StandardError; end
     class ConnectionError < StandardError; end
+    class DocumentMarkError < StandardError; end
   end
 end

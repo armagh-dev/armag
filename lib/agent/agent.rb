@@ -43,6 +43,8 @@ module Armagh
 
       @backoff = Utils::ProcessingBackoff.new
       @backoff.logger = @logger
+
+      @num_creates = 0
     end
 
     def start
@@ -76,6 +78,7 @@ module Armagh
       pending_actions = @action_manager.get_action_names_for_docspec(docspec)
       Document.create(docspec.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
                       pending_actions, docspec.state, action_doc.id, true)
+      @num_creates += 1
     end
 
     def edit_document(id, docspec)
@@ -213,7 +216,7 @@ module Armagh
           end
           true # Always remove this action from pending
         end
-        doc.finish_processing unless doc.deleted?
+        doc.finish_processing
       else
         report_status(doc, nil)
         @backoff.interruptible_backoff { !@running }
@@ -222,24 +225,29 @@ module Armagh
 
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
-      action_doc = doc.to_action_document
       case action
         when CollectAction
+          @num_creates = 0
           action.collect
-          # TODO agent#execute_action Don't delete here.  Instead, we should store the number of files collected (either through this or a splitter called by this) Essentially, number of writes to the database.
-          doc.delete
+          doc.meta.merge!({
+            'docs_collected' => @num_creates
+          })
+          doc.mark_archive
         when ParseAction
+          action_doc = doc.to_action_document
           action.parse action_doc
-          doc.delete
+          doc.mark_delete
         when PublishAction
-          # TODO agent#execute_action: Publish should actually publish to an external collection So we are working in the local documents collection, but publish applies this to the remote collection
+          action_doc = doc.to_publish_action_document
           action.publish action_doc
           doc.meta = action_doc.meta
           doc.published_content = action_doc.draft_content
           doc.draft_content = {}
           doc.state = DocState::PUBLISHED
           doc.add_pending_actions(@action_manager.get_action_names_for_docspec(DocSpec.new(doc.type, doc.state)))
+          doc.mark_publish
         when ConsumeAction
+          action_doc = doc.to_action_document
           action.consume action_doc
           doc.draft_content = action_doc.draft_content
           doc.meta = action_doc.meta

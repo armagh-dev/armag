@@ -89,6 +89,15 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
+    if specified_actions.include? 'bad_consumer'
+      available_actions['bad_consumer'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestBadConsumer',
+          'input_doc_type' => 'BadConsumerDocument',
+          'output_docspecs' => {},
+          'parameters' => {}
+      }
+    end
+
     if specified_actions.include? 'unimplemented_parser'
       available_actions['unimplemented_parser'] = {
           'action_class_name' => 'Armagh::CustomActions::TestUnimplementedParser',

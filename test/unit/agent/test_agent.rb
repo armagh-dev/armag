@@ -141,17 +141,16 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(CollectTest)
 
-    action_doc = Armagh::ActionDocument.new('id', 'old content', 'published content', 'old meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
     action.expects(:collect).with()
 
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING)
-    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
 
-    doc.expects(:finish_processing).never
-    doc.expects(:delete)
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_archive)
+    doc.expects(:meta).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -172,7 +171,8 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :deleted? => true)
     doc.expects(:to_action_document).returns(action_doc)
-    doc.expects(:delete)
+    doc.expects(:mark_delete)
+    doc.expects(:finish_processing).at_least_once
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -196,7 +196,7 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:publish).with(action_doc)
 
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
-    doc.expects(:to_action_document).returns(action_doc)
+    doc.expects(:to_publish_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -208,7 +208,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:state=, Armagh::DocState::PUBLISHED)
     doc.expects(:add_pending_actions).with(pending_actions)
     doc.expects(:delete).never
-
+    doc.expects(:mark_publish).at_least_once
     doc.expects(:finish_processing).at_least_once
 
     @agent.expects(:update_config).at_least_once
@@ -254,10 +254,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     splitter = SplitterTest.new(@agent, @logger, {}, {})
 
-    action_doc = Armagh::ActionDocument.new('id', 'old content', 'published content', 'old meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
-
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING)
-    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(splitter).at_least_once
@@ -277,10 +274,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(UnknownAction)
 
-    action_doc = Armagh::ActionDocument.new('id', 'old content', 'published content', 'old meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
-
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
-    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -304,10 +298,7 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(CollectTest)
     action.stubs(:collect).raises(exception)
 
-    action_doc = Armagh::ActionDocument.new('id', 'old content', 'published content', 'old meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
-
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :meta => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
-    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once

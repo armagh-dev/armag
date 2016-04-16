@@ -26,8 +26,11 @@ Then(/^I should see an agent with a status of "([^"]*)" within (\d+) seconds*$/)
 
   until ((Time.now > end_time) || found_status)
     sleep 0.1
-    agent_status = MongoSupport.instance.get_status['agents']
-    found_status = agent_status.collect{|_a,s| s['status']}.include? status
+    db_status = MongoSupport.instance.get_status
+    if db_status
+      agent_status = db_status['agents']
+      found_status = agent_status.collect{|_a,s| s['status']}.include? status
+    end
   end
 
   assert_true(found_status, "No agents were seen with a status of #{status}")

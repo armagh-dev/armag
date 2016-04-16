@@ -218,26 +218,30 @@ def update_agent_config
 end
 
 def load_actions
-  begin
-    require 'armagh/custom_actions'
-    @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
-  rescue LoadError
-    @logger.warn "CustomActions gem is not deployed. These actions won't be available."
-  rescue => e
-    # An unexpected exception - things like syntax errors.
-    Logging.error_exception(@logger, e, 'Could not load CustomActions gem')
-    Armagh.send(:remove_const, :CustomActions)
-  end
+  version_str = "#{VERSION}"
 
   begin
     require 'armagh/standard_actions'
     @logger.info "Using StandardActions: #{Standard::VERSION}"
+    version_str << "|std:#{StandardActions::VERSION}"
   rescue LoadError
     @logger.warn "StandardActions gem is not deployed. These actions won't be available."
   rescue => e
     # An unexpected exception - things like syntax errors.
     Logging.error_exception(@logger, e, 'Could not load StandardActions gem')
     Armagh.send(:remove_const, :StandardActions)
+  end
+
+  begin
+    require 'armagh/custom_actions'
+    @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
+    version_str << "|#{CustomActions::NAME}:#{CustomActions::VERSION}"
+  rescue LoadError
+    @logger.warn "CustomActions gem is not deployed. These actions won't be available."
+  rescue => e
+    # An unexpected exception - things like syntax errors.
+    Logging.error_exception(@logger, e, 'Could not load CustomActions gem')
+    Armagh.send(:remove_const, :CustomActions)
   end
 
   defined_actions = ActionManager.defined_actions
@@ -247,6 +251,7 @@ def load_actions
   else
     @logger.warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
   end
+  Document.version = version_str
 end
 
 # Stop agents before stopping armagh

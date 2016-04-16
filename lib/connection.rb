@@ -22,8 +22,27 @@ module Armagh
   module Connection
     # TODO Connection Set up indexes HERE! not elsewhere in the code
 
-    def self.documents
-      MongoConnection.instance.connection['documents']
+    def self.all_document_collections
+      doc_collections = []
+
+      MongoConnection.instance.connection.collections.each do |collection|
+        doc_collections << collection if collection.name =~ /^documents\./
+      end
+
+      doc_collections << documents
+    end
+
+    def self.documents(type_collection = nil)
+      collection = type_collection ? "documents.#{type_collection}" : 'documents'
+      MongoConnection.instance.connection[collection]
+    end
+
+    def self.archive
+      MongoConnection.instance.connection['archive']
+    end
+
+    def self.failures
+      MongoConnection.instance.connection['failures']
     end
 
     def self.config
@@ -41,15 +60,15 @@ module Armagh
     def self.log
       MongoConnection.instance.connection['log']
     end
-    
+
     def self.resource_config
       MongoAdminConnection.instance.connection['resource']
     end
-    
+
     def self.resource_log
       MongoAdminConnection.instance.connection['log']
     end
-    
+
     def self.master?
       # TODO Connection.master?  Is this a primary server?
     end

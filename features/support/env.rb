@@ -15,13 +15,14 @@
 # limitations under the License.
 #
 
+require_relative '../../lib/connection'
+require_relative '../../lib/version'
+
 require_relative '../../test/helpers/coverage_helper'
+require_relative '../../test/helpers/mongo_support'
+
 require_relative 'launcher_support'
 require_relative 'log_support'
-require_relative '../../test/helpers/mongo_support'
-require 'armagh/custom_actions'
-
-require_relative '../../lib/connection'
 
 require 'fileutils'
 require 'test/unit/assertions'
@@ -32,11 +33,24 @@ def quiet_raise(msg)
   raise RuntimeError, msg, []
 end
 
-if Armagh::CustomActions::NAME != 'armagh_test'
-  quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead."
+VERSION_STR = "#{Armagh::VERSION}"
+
+begin
+  require 'armagh/standard_actions'
+  VERSION_STR << "|std:#{StandardActions::VERSION}"
+rescue LoadError
+  # Not a problem in test
+rescue => e
+  Armagh.send(:remove_const, :StandardActions)
 end
 
-quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
+require 'armagh/custom_actions'
+VERSION_STR << "|#{Armagh::CustomActions::NAME}:#{Armagh::CustomActions::VERSION}"
+
+quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead." unless Armagh::CustomActions::NAME == 'armagh_test'
+
+#quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
+
 
 Before do
   LogSupport.delete_logs
@@ -48,7 +62,7 @@ end
 
 at_exit do
   begin
-    MongoSupport.instance.clean_database
-    MongoSupport.instance.stop_mongo
+    #MongoSupport.instance.clean_database
+    #MongoSupport.instance.stop_mongo
   rescue; end
 end

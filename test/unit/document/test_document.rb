@@ -20,6 +20,8 @@ require_relative '../../../lib/document/document'
 
 require 'armagh/documents/doc_state'
 
+require 'log4r'
+
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -28,9 +30,10 @@ class TestDocument < Test::Unit::TestCase
   include Armagh
 
   def setup
-    @documents = mock
+    @documents = mock('documents')
     mock_document_insert('id')
     Armagh::Connection.stubs(:documents).returns(@documents)
+    Armagh::Connection.stubs(:all_document_collections).returns([@documents])
     @doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING)
   end
 
@@ -49,6 +52,10 @@ class TestDocument < Test::Unit::TestCase
     @documents.stubs(replace_one: nil)
   end
 
+  def mock_document_delete
+    @documents.stubs(delete_one: nil)
+  end
+
   def mock_document_find(result)
     find_result = mock('object')
     find_result.expects(:limit).with(1).returns([result].flatten)
@@ -65,8 +72,8 @@ class TestDocument < Test::Unit::TestCase
 
   def test_create_no_id
     mock_document_insert('new_id')
-    doc = Document.create('type', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING)
-    assert_equal('type', doc.type)
+    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING)
+    assert_equal('testdoc', doc.type)
     assert_equal('draft_content', doc.draft_content)
     assert_equal('published_content', doc.published_content)
     assert_equal({'meta' => true}, doc.meta)
@@ -75,9 +82,9 @@ class TestDocument < Test::Unit::TestCase
 
   def test_create_with_id
     mock_document_replace
-    doc = Document.create('type', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
+    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
 
-    assert_equal('type', doc.type)
+    assert_equal('testdoc', doc.type)
     assert_equal('draft_content', doc.draft_content)
     assert_equal('published_content', doc.published_content)
     assert_equal({'meta' => true}, doc.meta)
@@ -106,17 +113,18 @@ class TestDocument < Test::Unit::TestCase
 
   def test_find
     mock_document_find({'_id' => 'docid'})
-    doc = Document.find('docid')
+    doc = Document.find('docid', 'testdoc', DocState::READY)
     assert_equal('docid', doc.id)
   end
 
   def test_find_none
     mock_document_find([])
-    doc = Document.find('id')
+    doc = Document.find('id', 'testdoc', DocState::WORKING)
     assert_nil(doc)
   end
 
   def test_get_for_processing
+
     mock_document_find_one_and_update({'_id' => 'docid'})
     doc = Document.get_for_processing
     assert_equal('docid', doc.id)
@@ -225,7 +233,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_timestamps
     mock_document_replace
-    doc = Document.create('type', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
+    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
     assert_in_delta(Time.now, doc.created_timestamp, 1)
     assert_equal(doc.created_timestamp, doc.updated_timestamp)
 
@@ -278,7 +286,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_new
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     mock_document_find_one_and_update(nil)
     block_executed = false
@@ -290,10 +298,10 @@ class TestDocument < Test::Unit::TestCase
 
     assert_true block_executed
   end
-  
+
   def test_modify_or_create_existing
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     mock_document_find_one_and_update({'_id' => id, 'draft_content' => 'doc content', 'published_content' => {}, 'meta' => 'doc meta', 'type' => type, 'state' => state})
     mock_document_replace
@@ -306,10 +314,10 @@ class TestDocument < Test::Unit::TestCase
 
     assert_true block_executed
   end
-  
+
   def test_modify_or_create_locked
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error')
 
@@ -330,7 +338,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_unexpected_error
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'Unknown')
 
@@ -354,7 +362,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_bang_new
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     mock_document_find_one_and_update(nil)
     block_executed = false
@@ -370,7 +378,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_bang_existing
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     mock_document_find_one_and_update({'_id' => id, 'draft_content' => 'doc content', 'published_content' => {}, 'meta' => 'doc meta', 'type' => type, 'state' => state})
     mock_document_replace
@@ -387,7 +395,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_bang_locked
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error')
     block_executed = false
@@ -403,7 +411,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_bang_unexpected_error
     id = 'docid'
-    type = 'type'
+    type = 'testdoc'
     state = DocState::WORKING
     @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'Unknown')
 
@@ -434,6 +442,37 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.type, action_doc.docspec.type)
   end
 
+  def test_to_publish_action_document
+    Armagh::Connection.stubs(:documents).returns(@documents).with do |collection|
+      assert_equal(@doc.type, collection)
+      true
+    end
+
+    mock_document_find({'_id' => 'docid', 'published_content' => 'Externally Published Content'})
+
+    action_doc = @doc.to_publish_action_document
+    assert_equal(@doc.draft_content, action_doc.draft_content)
+    assert_equal('Externally Published Content', action_doc.published_content)
+    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.state, action_doc.docspec.state)
+    assert_equal(@doc.type, action_doc.docspec.type)
+  end
+
+  def test_to_publish_action_document_new
+    Armagh::Connection.stubs(:documents).returns(@documents).with do |collection|
+      assert_equal(@doc.type, collection)
+      true
+    end
+
+    mock_document_find(nil)
+    action_doc = @doc.to_publish_action_document
+    assert_equal(@doc.draft_content, action_doc.draft_content)
+    assert_equal(@doc.published_content, action_doc.published_content)
+    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.state, action_doc.docspec.state)
+    assert_equal(@doc.type, action_doc.docspec.type)
+  end
+
   def test_update_from_action_document
     id = 'id'
     draft_content = 'new content'
@@ -441,15 +480,15 @@ class TestDocument < Test::Unit::TestCase
     meta = 'new meta'
 
     docspec = DocSpec.new('type', Armagh::DocState::PUBLISHED)
-    
+
     action_document = Armagh::ActionDocument.new(id, draft_content, published_content, meta, docspec)
-    
+
     assert_not_equal(draft_content, @doc.draft_content)
     assert_not_equal(published_content, @doc.published_content)
     assert_not_equal(meta, @doc.meta)
     assert_not_equal(docspec.type, @doc.type)
     assert_not_equal(docspec.state, @doc.state)
-    
+
     @doc.update_from_action_document(action_document)
 
     assert_equal(draft_content, @doc.draft_content)
@@ -465,11 +504,70 @@ class TestDocument < Test::Unit::TestCase
     assert_true @doc.locked?
   end
 
-  def test_delete
-    @documents.expects(:delete_one)
+  def test_publish_save
+    testdoc_collection = mock
+    Armagh::Connection.expects(:documents).with('testdoc').returns(testdoc_collection)
+    testdoc_collection.expects(:replace_one)
+    @documents.expects(:delete_one).with({'_id': @doc.id})
 
-    assert_false @doc.deleted?
-    @doc.delete
-    assert_true @doc.deleted?
+    assert_false @doc.instance_variable_get(:@pending_publish)
+    @doc.mark_publish
+    assert_true @doc.instance_variable_get(:@pending_publish)
+    @doc.save
+    assert_false @doc.instance_variable_get(:@pending_publish)
+  end
+
+  def test_archive_save
+    archive_collection = mock
+    Armagh::Connection.expects(:archive).returns(archive_collection)
+    archive_collection.expects(:replace_one)
+    @documents.expects(:delete_one).with({'_id': @doc.id})
+
+    assert_false @doc.instance_variable_get(:@pending_archive)
+    @doc.mark_archive
+    assert_true @doc.instance_variable_get(:@pending_archive)
+    @doc.save
+    assert_false @doc.instance_variable_get(:@pending_archive)
+  end
+
+  def test_delete_save
+    @documents.expects(:delete_one).with({'_id': @doc.id})
+
+    assert_false @doc.instance_variable_get(:@pending_delete)
+    @doc.mark_delete
+    assert_true @doc.instance_variable_get(:@pending_delete)
+    @doc.save
+    assert_false @doc.instance_variable_get(:@pending_delete)
+  end
+
+  def test_published_save
+    @documents.expects(:replace_one)
+
+    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED)
+    doc.save
+  end
+
+  def test_failed_action_save
+    failures = mock('failures')
+    Armagh::Connection.expects(:failures).returns(failures)
+    @documents.expects(:delete_one).with({'_id': @doc.id})
+    failures.expects(:replace_one)
+
+    @doc.add_failed_action('test_action', 'Failure Details')
+    @doc.save
+  end
+
+  def test_class_version
+    version = '12345abcdefh'
+    Armagh::Document.version = version
+    assert_equal(version, Armagh::Document.version)
+  end
+
+  def test_version
+    mock_document_replace
+    version = '12345abcdefh'
+    Armagh::Document.version = version
+    @doc.save
+    assert_equal(version, @doc.version)
   end
 end

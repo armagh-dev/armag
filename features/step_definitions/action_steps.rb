@@ -15,12 +15,12 @@
 # limitations under the License.
 #
 
-And(/^I should see a "([^"]*)" with the following$/) do |doc_type, table|
+And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
   doc_info = table.rows_hash
   found_matching_doc = false
   doc_problems = {}
 
-  MongoSupport.instance.get_documents.each do |doc|
+  MongoSupport.instance.get_mongo_documents(collection).each do |doc|
     if doc['type'] == doc_type
       doc_id = doc['_id']
       doc_problems[doc_id] = {}
@@ -35,7 +35,7 @@ And(/^I should see a "([^"]*)" with the following$/) do |doc_type, table|
         end
 
         if expected != doc[key]
-          doc_problems[doc_id][key] = "#{value} != #{doc[key].to_s}"
+          doc_problems[doc_id][key] = "#{expected.to_s} != #{doc[key].to_s}"
           found_matching_doc = false
           next
         end
@@ -52,14 +52,14 @@ When(/^I insert the following document$/) do |table|
 
   doc_info.each {|k, v| doc_info[k] = eval(v)}
 
-  doc = Armagh::Document.create(doc_info['type'], doc_info['content'], doc_info['meta'], doc_info['pending_actions'], doc_info['state'], doc_info['id'])
+  Armagh::Document.create(doc_info['type'], doc_info['content'], doc_info['meta'], doc_info['pending_actions'], doc_info['state'], doc_info['id'])
 end
 
-Then(/^I should see (\d+) "([^"]*)" documents*$/) do |count, doc_type|
+And(/^I should see (\d+) "([^"]*)" documents in the "([^"]*)" collection$/) do |count, doc_type, doc_collection|
   expected_count = count.to_i
   num_found = 0
 
-  MongoSupport.instance.get_documents.each do |doc|
+  MongoSupport.instance.get_mongo_documents(doc_collection).each do |doc|
     num_found += 1 if doc['type'] == doc_type
   end
 

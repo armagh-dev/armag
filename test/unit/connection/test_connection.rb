@@ -42,9 +42,36 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection::MongoAdminConnection.stubs(:instance).returns(admin_instance)
   end
 
+  def test_all_document_collections
+    documents = mock(name: 'documents')
+    sometype1 = mock(name: 'documents.SomeType1')
+    sometype2 = mock(name: 'documents.SomeType2')
+    unrelated = mock(name: 'unrelated')
+
+    @connection.expects(:collections).returns([documents, sometype1, sometype2, unrelated])
+
+    @connection.expects(:[]).with('documents').returns(documents)
+
+    all_collections = Armagh::Connection.all_document_collections
+    assert_include all_collections, documents
+    assert_include all_collections, sometype1
+    assert_include all_collections, sometype2
+    assert_not_include all_collections, unrelated
+  end
+
   def test_documents
     @connection.expects(:[]).with('documents')
     Armagh::Connection.documents
+  end
+
+  def test_archive
+    @connection.expects(:[]).with('archive')
+    Armagh::Connection.archive
+  end
+
+  def test_failures
+    @connection.expects(:[]).with('failures')
+    Armagh::Connection.failures
   end
 
   def test_config

@@ -29,7 +29,13 @@ module Armagh
       protected :new
     end
 
-    # TODO Document.create: Add version information to meta (armagh, custom gem, standard gem)
+    def self.version=(version)
+      @version = version
+    end
+
+    def self.version
+      @version
+    end
 
     def self.create(type, draft_content, published_content, meta, pending_actions, state, id = nil, new = false)
       doc = Document.new
@@ -52,11 +58,10 @@ module Armagh
     end
 
     # Returns document if found, nil if it didn't exist, throws :already_locked when doc exists but locked already
-    def self.find_or_create_and_lock(id, type = nil, state = nil)
+    def self.find_or_create_and_lock(id, type, state)
       # TODO Document.find_or_create_and_lock - Index on ID/locked
-      # TODO Document.find_or_create_and_lock - Handle type and state
       begin
-        db_doc = Connection.documents.find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
+        db_doc = collection(type, state).find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
       rescue Mongo::Error::OperationFailure => e
         if e.message =~ /^E11000/
           # The document already exists.  It's already locked
@@ -77,28 +82,31 @@ module Armagh
       doc
     end
 
-    def self.find(id, type = nil, state = nil)
+    def self.find(id, type, state)
       # TODO Document.find - Index on ID
-      # TODO Document.find - Handle type, state
-      db_doc = Connection.documents.find('_id' => id).limit(1).first
+      db_doc = collection(type, state).find('_id' => id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
     end
 
-    def self.get_for_processing(num = 1)
+    def self.get_for_processing
       # TODO Document.get_for_processing: find a document in the following order (see code)
       #  Oldest -> Newest: No local agent picked up for too long
       #  Oldest -> Newest: local
       # TODO Document.get_for_processing: Ability to pull multiple documents
+      #
       # TODO Document.get_for_processing: Index on pending_work/locked
       # TODO Document.get_for_processing: Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)
-      db_doc = Connection.documents.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after})
-      db_doc ? Document.new(db_doc) : nil
+      Connection.all_document_collections.each do |collection|
+        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after})
+        return Document.new(db_doc) if db_doc
+      end
+
+      nil
     end
 
-    def self.exists?(id, type = nil, state = nil)
+    def self.exists?(id, type, state)
       # TODO Document.exists? - Index on ID
-      # TODO Document.exists? - Handle type, state
-      Connection.documents.find({'_id' => id}).limit(1).count != 0
+      collection(type, state).find({'_id' => id}).limit(1).count != 0
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
@@ -151,9 +159,17 @@ module Armagh
 
       block_executed
     end
+    
+    def self.collection(type = nil, state = nil)
+      type_collection = (state == DocState::PUBLISHED) ? type : nil
+      Connection.documents(type_collection)
+    end
 
     def initialize(image = {})
-      @deleted = false
+      @pending_delete = false
+      @pending_publish = false
+      @pending_archive = false
+
       # TODO Document#initialize - Failure should be a sparse index? If we want to index it at all.  It's not used by agents directly but would be useful to an admin
       @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'pending_actions' => [], 'failed_actions' => {}, 'locked' => false, 'pending_work' => false, 'failure' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
@@ -209,6 +225,10 @@ module Armagh
 
     def created_timestamp
       @db_doc['created_timestamp']
+    end
+
+    def version
+      @db_doc['version']
     end
 
     def pending_actions
@@ -267,18 +287,45 @@ module Armagh
       save
     end
 
-    # TODO Document#save - Handle docspec
     # TODO Document#save - Buffered writing
     def save(new = false)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
       @db_doc['updated_timestamp'] = now
+      @db_doc['version'] = self.class.version
 
-      if new
-        @db_doc['_id'] = Connection.documents.insert_one(@db_doc).inserted_ids.first
+      delete_orig = false
+
+      if failed? && state != DocState::PUBLISHED
+        save_collection = Connection.failures
+        delete_orig = true
+      elsif @pending_publish
+        save_collection = Connection.documents(type)
+        @pending_publish = false
+        delete_orig = true
+      elsif @pending_archive
+        save_collection = Connection.archive
+        @pending_archive = false
+        delete_orig = true
+      elsif @pending_delete
+        @pending_delete = false
+        delete_orig = true
+        save_collection = nil
+      elsif state == DocState::PUBLISHED
+        save_collection = Connection.documents(type)
       else
-        Connection.documents.replace_one({ '_id': id}, @db_doc, {upsert: true})
+        save_collection = Connection.documents
       end
+
+      if save_collection
+        if new
+          @db_doc['_id'] = save_collection.insert_one(@db_doc).inserted_ids.first
+        else
+          save_collection.replace_one({'_id': id}, @db_doc, {upsert: true})
+        end
+      end
+
+      Connection.documents.delete_one({ '_id': id}) if delete_orig
     end
 
     def state
@@ -310,6 +357,17 @@ module Armagh
       ActionDocument.new(id, draft_content, published_content, meta, docspec)
     end
 
+    def to_publish_action_document
+      docspec = DocSpec.new(type, state)
+      published_doc = self.class.find(id, type, DocState::PUBLISHED)
+      if published_doc
+        pub_content = published_doc.published_content
+      else
+        pub_content = published_content
+      end
+      ActionDocument.new(id, draft_content, pub_content, meta, docspec)
+    end
+
     def update_from_action_document(action_doc)
       self.id = action_doc.id
       self.draft_content = action_doc.draft_content
@@ -321,14 +379,19 @@ module Armagh
       self
     end
 
-    def delete
-      # TODO Document #delete - type and state; if published, in the type collection
-      Connection.documents.delete_one({ '_id': id})
-      @deleted = true
+    def mark_delete
+      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or publish.' if @pending_archive || @pending_publish
+      @pending_delete = true
     end
 
-    def deleted?
-      @deleted
+    def mark_publish
+      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or delete.' if @pending_archive || @pending_delete
+      @pending_publish = true
+    end
+
+    def mark_archive
+      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for delete or publish.' if @pending_delete || @pending_publish
+      @pending_archive = true
     end
 
     private def update_pending_work

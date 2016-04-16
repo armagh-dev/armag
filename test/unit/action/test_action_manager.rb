@@ -57,7 +57,8 @@ end
 class TestActionManager < Test::Unit::TestCase
 
   def setup
-    @caller = mock('agent')
+    @caller = mock('caller')
+    @caller.stubs({uuid: '123abc'})
     @logger = mock('logger')
     @config = {}
 

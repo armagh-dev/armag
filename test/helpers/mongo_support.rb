@@ -92,8 +92,12 @@ class MongoSupport
     @client['status'].find('_id' => @hostname).limit(1).first
   end
 
-  def get_documents
-    @client['documents'].find
+  def get_mongo_documents(collection)
+    @client[collection].find
+  end
+
+  def update_document(collection, id, values)
+    @client[collection].find('_id' => id).find_one_and_update('$set' => values)
   end
 
   def stop_mongo

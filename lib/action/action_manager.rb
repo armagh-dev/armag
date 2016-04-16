@@ -52,7 +52,7 @@ module Armagh
           map_splitters(action_name, raw_output_docspecs) if clazz < CollectAction
         end
 
-        input_state = clazz.is_a?(ConsumeAction) ? DocState::PUBLISHED : DocState::READY
+        input_state = clazz < ConsumeAction ? DocState::PUBLISHED : DocState::READY
         input_docspec = DocSpec.new(input_doc_type, input_state)
 
         action_settings = {'name' => action_name, 'input_docspec' => input_docspec, 'output_docspecs' => output_docspecs,
@@ -91,7 +91,7 @@ module Armagh
     def get_splitter(action_name, output_docspec_name)
       output_docspec = @actions_by_name[action_name]['output_docspecs'][output_docspec_name] if @actions_by_name[action_name] && @actions_by_name[action_name]['output_docspecs']
       if @splitter_by_action_docspec[action_name] && @splitter_by_action_docspec[action_name][output_docspec_name] && output_docspec
-        instantiate_splitter(@splitter_by_action_docspec[action_name][output_docspec_name], output_docspec)
+        instantiate_splitter(action_name, @splitter_by_action_docspec[action_name][output_docspec_name], output_docspec)
       else
         nil
       end
@@ -133,11 +133,15 @@ module Armagh
     end
 
     private def instantiate_action(action_details)
-      action_details['class'].new(action_details['name'], @caller, @logger, action_details['parameters'], action_details['output_docspecs'])
+      logger_name = "Armagh::Application::Action::#{@caller.uuid}/Action-#{action_details['name']}"
+      action_logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      action_details['class'].new(action_details['name'], @caller, action_logger, action_details['parameters'], action_details['output_docspecs'])
     end
 
-    private def instantiate_splitter(splitter_details, docspec)
-      splitter_details['class'].new(@caller, @logger, splitter_details['parameters'], docspec)
+    private def instantiate_splitter(action_name, splitter_details, docspec)
+      logger_name = "Armagh::Application::Splitter::#{@caller.uuid}/Splitter-#{action_name}"
+      splitter_logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      splitter_details['class'].new(@caller, splitter_logger, splitter_details['parameters'], docspec)
     end
   end
 end
