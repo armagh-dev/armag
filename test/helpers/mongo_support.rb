@@ -42,8 +42,8 @@ class MongoSupport
 
     Mongo::Logger.logger = Log4r::Logger.root
 
-    raise 'No mongod found' if @mongod_exec.empty? || @mongod_exec.nil?
-    raise 'No mongo found' if @mongo_exec.empty? || @mongo_exec.nil?
+    raise 'No mongod found' if @mongod_exec.nil? || @mongod_exec.empty?
+    raise 'No mongo found' if @mongo_exec.nil? || @mongo_exec.empty?
   end
 
   def start_mongo
