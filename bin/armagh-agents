@@ -261,6 +261,9 @@ end
 
 ## Execution ##
 begin
+  @logger.any 'Setting up MongoDB indexes.  This may take a while.'
+  Connection.setup_indexes
+
   @logger.any 'Armagh started'
 
   @agent_status = AgentStatus.new

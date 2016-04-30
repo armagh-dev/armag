@@ -49,7 +49,7 @@ VERSION_STR << "|#{Armagh::CustomActions::NAME}:#{Armagh::CustomActions::VERSION
 
 quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead." unless Armagh::CustomActions::NAME == 'armagh_test'
 
-#quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
+quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
 
 
 Before do
@@ -62,7 +62,7 @@ end
 
 at_exit do
   begin
-    #MongoSupport.instance.clean_database
-    #MongoSupport.instance.stop_mongo
+    MongoSupport.instance.clean_database
+    MongoSupport.instance.stop_mongo
   rescue; end
 end

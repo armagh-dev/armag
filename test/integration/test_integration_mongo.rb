@@ -19,6 +19,8 @@ require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/connection'
+require_relative '../../lib/document/document'
+
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -45,5 +47,4 @@ class TestIntegrationMongo < Test::Unit::TestCase
     result = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
     assert_equal result.documents, [{ "n" => 1, "ok" => 1}]
   end
-  
 end

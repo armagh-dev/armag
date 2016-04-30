@@ -58,8 +58,8 @@ Feature: Actions Execution
       | published_content | {}                  |
       | state             | 'ready'             |
       | locked            | false               |
-      | failure           | false               |
-      | pending_work      | false               |
+      | failure           | nil                 |
+      | pending_work      | nil                 |
       | version           | VERSION_STR         |
     And I should see a "SplitCollectedDocument" in "documents" with the following
       | _id               | '123_collected_post_split' |
@@ -69,8 +69,8 @@ Feature: Actions Execution
       | published_content | {}                         |
       | state             | 'ready'                    |
       | locked            | false                      |
-      | failure           | false                      |
-      | pending_work      | false                      |
+      | failure           | nil                        |
+      | pending_work      | nil                        |
       | version           | VERSION_STR                |
     And I should see 0 "CollectDocument" documents in the "documents" collection
     And I should see a "CollectDocument" in "archive" with the following
@@ -82,8 +82,8 @@ Feature: Actions Execution
       | published_content | {}                      |
       | state             | 'ready'                 |
       | locked            | false                   |
-      | failure           | false                   |
-      | pending_work      | false                   |
+      | failure           | nil                     |
+      | pending_work      | nil                     |
       | version           | VERSION_STR             |
     And the logs should contain "Test Collect Running"
     And the logs should contain "Test Collect Splitter Running"
@@ -114,8 +114,8 @@ Feature: Actions Execution
       | published_content | {}                                                           |
       | state             | 'working'                                                    |
       | locked            | false                                                        |
-      | failure           | false                                                        |
-      | pending_work      | false                                                        |
+      | failure           | nil                                                          |
+      | pending_work      | nil                                                          |
       | version           | VERSION_STR                                                  |
     And  I should see a "ParseOutputDocument" in "documents" with the following
       | _id               | 'parse_2'                                         |
@@ -126,8 +126,8 @@ Feature: Actions Execution
       | published_content | {}                                                |
       | state             | 'working'                                         |
       | locked            | false                                             |
-      | failure           | false                                             |
-      | pending_work      | false                                             |
+      | failure           | nil                                               |
+      | pending_work      | nil                                               |
       | version           | VERSION_STR                                       |
     And I should see 0 "ParseDocument" documents in the "documents" collection
     And the logs should contain "Test Parse Running"
@@ -157,8 +157,8 @@ Feature: Actions Execution
       | published_content | {'content' => 'some content'} |
       | state             | 'published'                   |
       | locked            | false                         |
-      | failure           | false                         |
-      | pending_work      | false                         |
+      | failure           | nil                           |
+      | pending_work      | nil                           |
       | version           | VERSION_STR                   |
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
@@ -189,8 +189,8 @@ Feature: Actions Execution
       | published_content | {'orig_content' => 'old published content', 'new_content' => 'new content'} |
       | state             | 'published'                                                                 |
       | locked            | false                                                                       |
-      | failure           | false                                                                       |
-      | pending_work      | false                                                                       |
+      | failure           | nil                                                                         |
+      | pending_work      | nil                                                                         |
       | version           | VERSION_STR                                                                 |
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
@@ -221,8 +221,8 @@ Feature: Actions Execution
       | published_content | {}                                                           |
       | state             | 'working'                                                    |
       | locked            | false                                                        |
-      | failure           | false                                                        |
-      | pending_work      | false                                                        |
+      | failure           | nil                                                          |
+      | pending_work      | nil                                                          |
       | version           | VERSION_STR                                                  |
     And  I should see a "ConsumeOutputDocument" in "documents" with the following
       | _id               | 'consume_2'                                       |
@@ -233,8 +233,8 @@ Feature: Actions Execution
       | published_content | {}                                                |
       | state             | 'working'                                         |
       | locked            | false                                             |
-      | failure           | false                                             |
-      | pending_work      | false                                             |
+      | failure           | nil                                               |
+      | pending_work      | nil                                               |
       | version           | VERSION_STR                                       |
     And I should see a "ConsumeDocument" in "documents.ConsumeDocument" with the following
       | _id           | '123'              |
@@ -270,7 +270,7 @@ Feature: Actions Execution
       | state             | 'ready'                                                                                                                                                                          |
       | locked            | false                                                                                                                                                                            |
       | failure           | true                                                                                                                                                                             |
-      | pending_work      | false                                                                                                                                                                            |
+      | pending_work      | nil                                                                                                                                                                              |
       | version           | VERSION_STR                                                                                                                                                                      |
     And the logs should contain "ERROR"
 
@@ -300,7 +300,7 @@ Feature: Actions Execution
       | state             | 'ready'                                                                                                    |
       | locked            | false                                                                                                      |
       | failure           | true                                                                                                       |
-      | pending_work      | false                                                                                                      |
+      | pending_work      | nil                                                                                                        |
       | version           | VERSION_STR                                                                                                |
     And the logs should contain "ERROR"
 
@@ -330,7 +330,7 @@ Feature: Actions Execution
       | state             | 'published'                                                                                               |
       | locked            | false                                                                                                     |
       | failure           | true                                                                                                      |
-      | pending_work      | false                                                                                                     |
+      | pending_work      | nil                                                                                                       |
       | version           | VERSION_STR                                                                                               |
     And the logs should contain "ERROR"
 
@@ -359,36 +359,36 @@ Feature: Actions Execution
       | _id          | 'consume_1' |
       | state        | 'ready'     |
       | locked       | false       |
-      | failure      | false       |
-      | pending_work | false       |
+      | failure      | nil         |
+      | pending_work | nil         |
       | version      | VERSION_STR |
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | _id          | 'consume_2' |
       | state        | 'ready'     |
       | locked       | false       |
-      | failure      | false       |
-      | pending_work | false       |
+      | failure      | nil         |
+      | pending_work | nil         |
       | version      | VERSION_STR |
     And I should see a "Document" in "documents.Document" with the following
       | _id          | 'parse_1'   |
       | state        | 'published' |
       | locked       | false       |
-      | failure      | false       |
-      | pending_work | false       |
+      | failure      | nil         |
+      | pending_work | nil         |
       | version      | VERSION_STR |
     And I should see a "Document" in "documents.Document" with the following
       | _id          | 'parse_2'   |
       | state        | 'published' |
       | locked       | false       |
-      | failure      | false       |
-      | pending_work | false       |
+      | failure      | nil         |
+      | pending_work | nil         |
       | version      | VERSION_STR |
     And I should see a "CollectedDocument" in "documents" with the following
       | _id          | '123_collected' |
       | state        | 'ready'         |
       | locked       | false           |
-      | failure      | false           |
-      | pending_work | false           |
+      | failure      | nil             |
+      | pending_work | nil             |
       | version      | VERSION_STR     |
     And I should see a "CollectDocument" in "archive" with the following
       | _id               | '123_trigger'           |
@@ -399,8 +399,8 @@ Feature: Actions Execution
       | published_content | {}                      |
       | state             | 'ready'                 |
       | locked            | false                   |
-      | failure           | false                   |
-      | pending_work      | false                   |
+      | failure           | nil                     |
+      | pending_work      | nil                     |
       | version           | VERSION_STR             |
     And I should see 0 "CollectDocument" documents in the "document" collection
 

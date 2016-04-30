@@ -17,12 +17,14 @@
 
 require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/connection'
+
 require 'test/unit'
 require 'mocha/test_unit'
 
 class TestConnection < Test::Unit::TestCase
 
   def setup
+    Armagh::Connection.clear_indexed_doc_collections
     mock_mongo
   end
 
@@ -43,10 +45,11 @@ class TestConnection < Test::Unit::TestCase
   end
 
   def test_all_document_collections
-    documents = mock(name: 'documents')
-    sometype1 = mock(name: 'documents.SomeType1')
-    sometype2 = mock(name: 'documents.SomeType2')
-    unrelated = mock(name: 'unrelated')
+    indexes = mock(:create_one)
+    documents = stub(name: 'documents', indexes: indexes)
+    sometype1 = stub(name: 'documents.SomeType1', indexes: indexes)
+    sometype2 = stub(name: 'documents.SomeType2', indexes: indexes)
+    unrelated = stub(name: 'unrelated', indexes: indexes)
 
     @connection.expects(:collections).returns([documents, sometype1, sometype2, unrelated])
 
@@ -57,11 +60,19 @@ class TestConnection < Test::Unit::TestCase
     assert_include all_collections, sometype1
     assert_include all_collections, sometype2
     assert_not_include all_collections, unrelated
+    assert_equal documents, all_collections.last #documents is expected to be last
   end
 
   def test_documents
     @connection.expects(:[]).with('documents')
+    Armagh::Connection.stubs(:index_doc_collection).once
     Armagh::Connection.documents
+  end
+
+  def test_document_published_collection
+    @connection.expects(:[]).with('documents.test_type')
+    Armagh::Connection.stubs(:index_doc_collection).once
+    Armagh::Connection.documents('test_type')
   end
 
   def test_archive
@@ -128,5 +139,28 @@ class TestConnection < Test::Unit::TestCase
     server.stubs(:connectable?).raises (RuntimeError.new('error'))
     @cluster.expects(:servers).returns([server])
     assert_false Armagh::Connection.can_connect?
+  end
+
+  def test_setup_indexes
+    config_indexes = mock
+    doc_indexes = mock
+    config = stub(indexes: config_indexes)
+    @connection.stubs(:[]).with('config').returns(config)
+    Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
+
+    config_indexes.expects(:create_one).with({'type' => 1}, {unique: true, name: 'types'})
+    doc_indexes.expects(:create_one)
+
+    Armagh::Connection.setup_indexes
+  end
+
+  def test_index_doc_collection
+    indexes = mock
+    indexes.expects(:create_one)
+    collection = mock
+    collection.stubs(:name).returns('test_name').twice
+    collection.stubs(:indexes).returns(indexes).once
+    Armagh::Connection.index_doc_collection(collection)
+    Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
   end
 end

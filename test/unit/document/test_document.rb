@@ -141,22 +141,22 @@ class TestDocument < Test::Unit::TestCase
   def test_pending_actions
     pending_actions = %w(Action1 Action2 Action3)
     assert_empty(@doc.pending_actions)
-    assert_false(@doc.pending_work)
+    assert_false(@doc.pending_work?)
 
     @doc.add_pending_actions(pending_actions)
     assert_equal(3, @doc.pending_actions.length)
-    assert_true(@doc.pending_work)
+    assert_true(@doc.pending_work?)
 
     pending_actions.each_with_index do |action, idx|
       @doc.remove_pending_action(action)
       assert_equal(3-(1+idx), @doc.pending_actions.length)
     end
-    assert_false(@doc.pending_work)
+    assert_false(@doc.pending_work?)
 
     @doc.add_pending_actions(pending_actions)
-    assert_true @doc.pending_work
+    assert_true @doc.pending_work?
     @doc.clear_pending_actions
-    assert_false @doc.pending_work
+    assert_false @doc.pending_work?
     assert_empty @doc.pending_actions
   end
 
@@ -203,13 +203,13 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_pending_and_failed
-    assert_false @doc.pending_work
+    assert_false @doc.pending_work?
     assert_false @doc.failed?
 
     pending_actions = %w(Action1 Action2 Action3)
     @doc.add_pending_actions pending_actions
 
-    assert_true  @doc.pending_work
+    assert_true  @doc.pending_work?
     assert_false @doc.failed?
 
     failures = [
@@ -218,16 +218,16 @@ class TestDocument < Test::Unit::TestCase
     ]
     failures.each {|f| @doc.add_failed_action(f[:name], f[:details])}
 
-    assert_false @doc.pending_work
+    assert_false @doc.pending_work?
     assert_true  @doc.failed?
 
     @doc.clear_failed_actions
 
-    assert_true @doc.pending_work
+    assert_true @doc.pending_work?
     assert_false  @doc.failed?
 
     @doc.clear_pending_actions
-    assert_false @doc.pending_work
+    assert_false @doc.pending_work?
     assert_false @doc.failed?
   end
 

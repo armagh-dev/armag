@@ -15,13 +15,13 @@
 # limitations under the License.
 #
 
+require 'set'
+
 require_relative 'connection/mongo_connection'
 require_relative 'connection/mongo_admin_connection'
 
 module Armagh
   module Connection
-    # TODO Connection Set up indexes HERE! not elsewhere in the code
-
     def self.all_document_collections
       doc_collections = []
 
@@ -33,8 +33,10 @@ module Armagh
     end
 
     def self.documents(type_collection = nil)
-      collection = type_collection ? "documents.#{type_collection}" : 'documents'
-      MongoConnection.instance.connection[collection]
+      collection_name = type_collection ? "documents.#{type_collection}" : 'documents'
+      collection = MongoConnection.instance.connection[collection_name]
+      index_doc_collection collection
+      collection
     end
 
     def self.archive
@@ -90,6 +92,30 @@ module Armagh
       rescue
         false
       end
+    end
+
+    def self.clear_indexed_doc_collections
+      @indexed_doc_collections.clear if @indexed_doc_collections
+    end
+
+    def self.setup_indexes
+      config.indexes.create_one({'type' => 1}, unique: true, name: 'types')
+      all_document_collections.each { |c| index_doc_collection(c) }
+    end
+
+    def self.index_doc_collection(collection)
+      @indexed_doc_collections ||= Set.new
+      return unless @indexed_doc_collections.add?(collection.name)
+
+      # Unlocked Documents by ID (Document#find_or_create_and_lock) not needed to be indexed because ids are unique (mongo reverts to _id_ index)
+
+      # Unlocked documents pending work
+      collection.indexes.create_one({'pending_work' => 1, 'locked' => 1, 'updated_timestamp' => 1},
+                                    name: 'pending_unlocked',
+                                    partial_filter_expression: {
+                                        'pending_work' => {'$exists' => true},
+                                        'locked' => false
+                                    })
     end
   end
 end

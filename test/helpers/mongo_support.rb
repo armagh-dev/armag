@@ -32,6 +32,8 @@ class MongoSupport
 
   OUT_PATH = '/tmp/test_mongo.out' unless defined? OUT_PATH
 
+
+
   def initialize
     @mongod_exec = `which mongod`
     @mongo_exec = `which mongo`

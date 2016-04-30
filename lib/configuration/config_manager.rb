@@ -56,7 +56,6 @@ module Armagh
 
       # Gets the latest configuration.  If the last retrieved configuration is the newest or the retrieved config is invalid, this returns nil.
       def get_config
-        #TODO ConfigManager#get_config: Setup an Index - Connection.config.indexes.create_one('type')
         begin
           db_config = Connection.config.find('type' => @type).projection({'type' => 0, '_id' => 0}).limit(1).first || {}
         rescue => e

@@ -59,7 +59,6 @@ module Armagh
 
     # Returns document if found, nil if it didn't exist, throws :already_locked when doc exists but locked already
     def self.find_or_create_and_lock(id, type, state)
-      # TODO Document.find_or_create_and_lock - Index on ID/locked
       begin
         db_doc = collection(type, state).find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
       rescue Mongo::Error::OperationFailure => e
@@ -83,21 +82,14 @@ module Armagh
     end
 
     def self.find(id, type, state)
-      # TODO Document.find - Index on ID
       db_doc = collection(type, state).find('_id' => id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
     end
 
     def self.get_for_processing
-      # TODO Document.get_for_processing: find a document in the following order (see code)
-      #  Oldest -> Newest: No local agent picked up for too long
-      #  Oldest -> Newest: local
       # TODO Document.get_for_processing: Ability to pull multiple documents
-      #
-      # TODO Document.get_for_processing: Index on pending_work/locked
-      # TODO Document.get_for_processing: Remove pending_work true/false and locked true/false.  have them be non-existent or have a value.  (Sparse index)
       Connection.all_document_collections.each do |collection|
-        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after})
+        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
         return Document.new(db_doc) if db_doc
       end
 
@@ -105,7 +97,6 @@ module Armagh
     end
 
     def self.exists?(id, type, state)
-      # TODO Document.exists? - Index on ID
       collection(type, state).find({'_id' => id}).limit(1).count != 0
     end
 
@@ -170,8 +161,7 @@ module Armagh
       @pending_publish = false
       @pending_archive = false
 
-      # TODO Document#initialize - Failure should be a sparse index? If we want to index it at all.  It's not used by agents directly but would be useful to an admin
-      @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'pending_actions' => [], 'failed_actions' => {}, 'locked' => false, 'pending_work' => false, 'failure' => false, 'created_timestamp' => nil, 'updated_timestamp' => nil}
+      @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'failed_actions' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
     end
 
@@ -274,11 +264,11 @@ module Armagh
     end
 
     def failed?
-      @db_doc['failure']
+      @db_doc['failure'] ? true : false
     end
 
-    def pending_work
-      @db_doc['pending_work']
+    def pending_work?
+      @db_doc['pending_work'] ? true : false
     end
 
     def finish_processing
@@ -395,8 +385,18 @@ module Armagh
     end
 
     private def update_pending_work
-      @db_doc['failure'] = @db_doc['failed_actions'].any?
-      @db_doc['pending_work'] = @db_doc['pending_actions'].any? && !@db_doc['failure']
+      if @db_doc['failed_actions'].any?
+        @db_doc['failure'] =  true
+      else
+        @db_doc.delete 'failure'
+      end
+
+      if @db_doc['pending_actions'].any? && !@db_doc['failure']
+        @db_doc['pending_work'] = true
+      else
+        @db_doc.delete 'pending_work'
+      end
+
     end
   end
 end
