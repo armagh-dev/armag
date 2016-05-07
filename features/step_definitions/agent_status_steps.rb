@@ -38,7 +38,7 @@ end
 
 
 Then(/^the valid reported status should contain agents with statuses$/) do |table|
-  start_time = Time.now
+  start_time = Time.now.utc
 
   expected_agent_statuses = table.raw.flatten.sort
   expected_agent_statuses = expected_agent_statuses.delete_if {|e| e == 'nil'}
@@ -50,14 +50,14 @@ Then(/^the valid reported status should contain agents with statuses$/) do |tabl
   seen_statuses = []
   agents.each do |id, details|
     assert_not_empty(id)
-    assert_in_delta(start_time, details['last_update'], 5, 'Incorrect agent last_update time')
+    assert_in_delta(start_time, details['last_update'], 10, 'Incorrect agent last_update time')
 
     agent_status = details['status']
 
     if agent_status == 'idle'
-      assert_in_delta(start_time, details['idle_since'], 5, 'Incorrect agent idle_since')
+      assert_in_delta(start_time, details['idle_since'], 10, 'Incorrect agent idle_since')
     elsif agent_status == 'running'
-      assert_in_delta(start_time, details['running_since'], 5, 'Incorrect agent idle_since')
+      assert_in_delta(start_time, details['running_since'], 10, 'Incorrect agent idle_since')
       assert_not_empty(details['task'])
     else
       flunk "Status #{agent_status} should be 'running' or 'idle'"

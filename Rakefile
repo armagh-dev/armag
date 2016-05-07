@@ -24,7 +24,8 @@ require 'fileutils'
 desc 'Run tests'
 
 task :ci => [:clean, :yard, :test]
-task :nightly => [:ci, :integration, :cucumber]
+task :ci_vm => [:integration, :cucumber]
+task :nightly => [:clean, :test, :ci_vm]
 task :default => [:nightly]
 
 Rake::TestTask.new(:test) do |t|

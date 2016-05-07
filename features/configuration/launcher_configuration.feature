@@ -60,7 +60,7 @@ Feature: Launcher Configuration
       | num_agents        | 4                   |
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:01 |
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then the number of running agents equals 4
 
   Scenario: Decrease number of agents
@@ -77,7 +77,7 @@ Feature: Launcher Configuration
       | num_agents        | 2                   |
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:01 |
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then the number of running agents equals 2
 
   Scenario: Create an older configuration
@@ -94,7 +94,7 @@ Feature: Launcher Configuration
       | num_agents        | 2                   |
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 10:00:00 |
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then the number of running agents equals 4
 
   Scenario: Handle agents that die
@@ -117,7 +117,7 @@ Feature: Launcher Configuration
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then armagh should have exited
     And the logs should contain "Invalid initial launcher configuration.  Exiting."
 
@@ -129,7 +129,7 @@ Feature: Launcher Configuration
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the number of running agents equals 1
 
   Scenario: Switch to invalid launcher configuration
@@ -142,12 +142,12 @@ Feature: Launcher Configuration
       | checkin_frequency | 1                   |
       | timestamp         | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the number of running agents equals 4
     When armagh's "launcher" config is
       | log_level         | info                |
       | num_agents        | 1                   |
       | checkin_frequency | -1                  |
       | timestamp         | 2015-01-01 11:00:00 |
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the number of running agents equals 4

@@ -27,7 +27,7 @@ Feature: Agent Status
       | num_agents        | 0 |
       | checkin_frequency | 1 |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | nil |
 

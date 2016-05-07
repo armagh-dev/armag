@@ -186,7 +186,7 @@ class TestActionManager < Test::Unit::TestCase
   def test_invalid_action_instance
     @logger.expects(:error).with do |e|
       assert_equal(NameError, e.class)
-      assert_equal('Invalid agent configuration.  Could not configure actions.  Exception Details: uninitialized constant Object::BadClass', e.message)
+      assert_match(/Invalid agent configuration.  Could not configure actions.  Exception Details: uninitialized constant (Object::){0,1}BadClass/, e.message)
       true
     end
 

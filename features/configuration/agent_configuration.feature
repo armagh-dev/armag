@@ -33,7 +33,7 @@ Feature: Agent Configuration
       | log_level | info                |
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "INFO"
     But the logs should not contain "DEBUG"
 
@@ -48,7 +48,7 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "DEBUG"
 
   Scenario: Increase log level
@@ -64,7 +64,7 @@ Feature: Agent Configuration
       | log_level | warn                |
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
@@ -75,9 +75,9 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | log_level | info                |
       | timestamp | 2015-01-01 11:01:00 |
-    And I wait 1 seconds
+    And I wait 3 seconds
     And the logs are emptied
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then the logs should not contain "DEBUG"
     But the logs should contain "INFO"
 
@@ -94,14 +94,14 @@ Feature: Agent Configuration
       | log_level | warn                |
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
     And armagh's "agent" config is
       | log_level | debug               |
       | timestamp | 2015-01-01 10:00:00 |
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then the logs should not contain "DEBUG"
     And the logs should not contain "INFO"
 
@@ -119,7 +119,7 @@ Feature: Agent Configuration
       | timestamp         | 2015-01-01 11:00:00 |
       | available_actions | no_such_action      |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "Class 'Armagh::CustomActions::NoSuchAction' from action 'no_such_action' does not exist."
     And the logs should contain "Invalid initial agent configuration.  Exiting."
 
@@ -135,7 +135,7 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | timestamp | 2015-01-01 11:00:00 |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     Then the logs should contain "Partial agent configuration found.  Using default values for available_actions, log_level."
 
   Scenario: Switch to invalid agent configuration
@@ -152,12 +152,12 @@ Feature: Agent Configuration
       | log_level         | debug               |
       | available_actions |                     |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     And armagh's "agent" config is
       | timestamp         | 2015-01-01 11:00:00 |
       | log_level         | debug               |
       | available_actions | no_such_action      |
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then armagh should be running
     And the logs should contain "Ignoring agent configuration update."
 
@@ -175,12 +175,12 @@ Feature: Agent Configuration
       | log_level         | debug               |
       | available_actions |                     |
     And I run armagh
-    And I wait 1 seconds
+    And I wait 3 seconds
     And armagh's "agent" config is
       | timestamp         | 2015-01-01 11:00:00 |
       | log_level         | debug               |
       | available_actions | no_such_action      |
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the logs should contain "agent configuration validation is usable but had warnings:"
     And the logs should contain "Action Configuration is empty."
 

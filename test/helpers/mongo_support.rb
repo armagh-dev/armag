@@ -52,7 +52,7 @@ class MongoSupport
     unless running?
       File.truncate(OUT_PATH, 0) if File.file? OUT_PATH
       @mongo_pid = Process.spawn(@mongod_exec, :out => OUT_PATH)
-      sleep 0.5
+      sleep 1
     end
 
     @client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => DATABASE_NAME)
@@ -62,15 +62,14 @@ class MongoSupport
 
   def running?
     running = false
-
     if @mongo_pid
-      sock = Socket.new(:INET, :STREAM)
-      raw = Socket.sockaddr_in(PORT, HOST)
       begin
-        running = true if sock.connect(raw)
-      rescue; end
+        Process.kill(0, @mongo_pid) # check if running
+        running = true
+      rescue Errno::ESRCH
+        running = false
+      end
     end
-
     running
   end
 

@@ -1,0 +1,27 @@
+Vagrant.configure('2') do |config|
+  config.vm.hostname = 'armagh-ci'
+
+  config.vm.box = 'armagh-ci'
+  config.vm.box_url = 'file:///var/vagrant_boxes/armagh-ci.box'
+
+  config.vm.provider 'virtualbox' do |v|
+    v.name = 'armagh-ci'
+    v.memory = 1024
+    v.cpus = 2
+  end
+
+  config.vm.provision 'file', source: '~/.bundle/config', destination: '.bundle/config'
+
+  config.vm.provision 'shell', inline: <<-SHELL
+  echo 'export GEM_HOME=$HOME/.gem'    >> /etc/profile.d/rubygems.sh
+  echo 'export GEM_PATH=$HOME/.gem'    >> /etc/profile.d/rubygems.sh
+  echo 'export PATH=$GEM_PATH/bin:$PATH' >> /etc/profile.d/rubygems.sh
+  mkdir -p /var/log/armagh
+  chown vagrant.vagrant /var/log/armagh
+  mkdir -p /data/db
+  chown vagrant.vagrant /data/db
+  SHELL
+
+  config.vm.synced_folder '../../', '/workspace'
+
+end

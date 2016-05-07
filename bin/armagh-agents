@@ -150,8 +150,8 @@ end
 def recover_dead_agents
   dead_agents = []
   @agents.each do |pid, agent|
-    unless process_running(pid)
-      _pid, status = Process.wait2(pid)
+    wait_pid, status = Process.waitpid2(pid, Process::WNOHANG)
+    if wait_pid
       @logger.error "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
       dead_agents << agent
       agent_id = @agents[pid].uuid
@@ -163,13 +163,6 @@ def recover_dead_agents
   dead_agents.each do |agent|
     start_agent_in_process(agent)
   end
-end
-
-def process_running(pid)
-  Process.getpgid( pid )
-  true
-rescue Errno::ESRCH
-  false
 end
 
 def start_agent_in_process(agent=nil)

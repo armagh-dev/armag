@@ -27,7 +27,7 @@ Feature: Actions Execution
       | num_agents        | 4 |
       | checkin_frequency | 1 |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
       | idle |
@@ -44,12 +44,12 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | test_actions |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "CollectDocument" with a "ready" state, id "123_trigger", and content "'doesnt matter'"
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
       | _id               | '123_collected'     |
       | pending_actions   | []                  |
@@ -99,12 +99,12 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | test_actions |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "ParseDocument" with a "ready" state, id "123", and content "'doesnt matter'"
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "ParseOutputDocument" in "documents" with the following
       | _id               | 'parse_1'                                                    |
       | meta              | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
@@ -143,12 +143,12 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | test_actions |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, id "123", and content "{'content' => 'some content'}"
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | _id               | '123'                         |
       | pending_actions   | []                            |
@@ -174,13 +174,13 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | test_actions |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     And I insert 1 "PublishDocument" with a "published" state, id "123", and published content "{'orig_content' => 'old published content'}"
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, id "123", and content "{'new_content' => 'new content'}"
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | _id               | '123'                                                                       |
       | pending_actions   | []                                                                          |
@@ -206,12 +206,12 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | test_actions |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "ConsumeDocument" with a "published" state, id "123", and content "'incoming content'"
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "ConsumeOutputDocument" in "documents" with the following
       | _id               | 'consume_1'                                                  |
       | meta              | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
@@ -254,11 +254,11 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | unimplemented_parser |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "UnimplementedParserInputDocument" with a "ready" state, id "123", and content "'incoming content'"
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then I should see 0 "UnimplementedParserInputDocument" documents in the "documents" collection
     Then I should see a "UnimplementedParserInputDocument" in "failures" with the following
       | _id               | '123'                                                                                                                                                                            |
@@ -284,11 +284,11 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | bad_publisher |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "BadPublisherDocument" with a "ready" state, id "123", and content "'incoming content'"
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
     Then I should see a "BadPublisherDocument" in "failures" with the following
       | _id               | '123'                                                                                                      |
@@ -314,11 +314,11 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | bad_consumer |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "BadConsumerDocument" with a "published" state, id "123", and content "'published content'"
-    And I wait 5 seconds
+    And I wait 7 seconds
     Then I should see 0 "BadConsumerDocument" documents in the "failures" collection
     Then I should see a "BadConsumerDocument" in "documents.BadConsumerDocument" with the following
       | _id               | '123'                                                                                                     |
@@ -344,7 +344,7 @@ Feature: Actions Execution
     And armagh's "agent" config is
       | available_actions | full_workflow |
     And I run armagh
-    And I wait 2 seconds
+    And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
       | idle |
@@ -421,8 +421,7 @@ Feature: Actions Execution
       | version | 'old_version' |
     When I insert 1 "PublishDocument" with a "ready" state, id "123", and content "{'new_content' => 'new content'}"
     And I run armagh
-    Then I should see an agent with a status of "running" within 5 seconds
-    Then I should see an agent with a status of "idle" within 5 seconds
+    And I wait 3 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | _id     | '123'       |
       | version | VERSION_STR |

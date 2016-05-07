@@ -35,6 +35,7 @@ When(/^I run armagh$/) do
   @spawn_pid = launch_details[:pid]
   @stderr_pipe = launch_details[:stderr]
   @stdout_pipe = launch_details[:stdout]
+  sleep 3
 end
 
 Then(/^armagh should have exited$/) do
