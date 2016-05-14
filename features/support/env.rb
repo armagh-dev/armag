@@ -33,11 +33,11 @@ def quiet_raise(msg)
   raise RuntimeError, msg, []
 end
 
-VERSION_STR = "#{Armagh::VERSION}"
+APP_VERSION = {'armagh' => Armagh::VERSION}
 
 begin
   require 'armagh/standard_actions'
-  VERSION_STR << "|std:#{StandardActions::VERSION}"
+  APP_VERSION['standard'] = StandardActions::VERSION
 rescue LoadError
   # Not a problem in test
 rescue => e
@@ -45,7 +45,7 @@ rescue => e
 end
 
 require 'armagh/custom_actions'
-VERSION_STR << "|#{Armagh::CustomActions::NAME}:#{Armagh::CustomActions::VERSION}"
+APP_VERSION[Armagh::CustomActions::NAME] = Armagh::CustomActions::VERSION
 
 quiet_raise "The custom actions gem that needs to be installed for testing is 'armagh_test-custom_actions'.  '#{Armagh::CustomActions::NAME}-custom_actions' was loaded instead." unless Armagh::CustomActions::NAME == 'armagh_test'
 

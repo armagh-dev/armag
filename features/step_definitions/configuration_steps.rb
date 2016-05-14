@@ -109,6 +109,61 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
+    if specified_actions.include? 'duplicate_collector'
+      available_actions['duplicate_collector'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestDuplicateCollector',
+          'input_doc_type' => 'DuplicateInputDocType',
+          'output_docspecs' => {
+              'duplicate_collector_output' => {'type' => 'DuplicateCollectorOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'too_large_collector'
+      available_actions['too_large_collector'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestTooLargeCollector',
+          'input_doc_type' => 'TooLargeInputDocType',
+          'output_docspecs' => {
+              'too_large_collector_output' => {'type' => 'TooLargeCollectorOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'too_large_parser'
+      available_actions['too_large_parser'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestTooLargeParser',
+          'input_doc_type' => 'TooLargeInputDocType',
+          'output_docspecs' => {
+              'too_large_parser_output' => {'type' => 'TooLargeParserOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'edit_current_parser'
+      available_actions['edit_current_parser'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestEditCurrentParser',
+          'input_doc_type' => 'EditCurrentInputDocType',
+          'output_docspecs' => {
+              'edit_current_parser_output' => {'type' => 'EditCurrentParserOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'update_error_parser'
+      available_actions['update_error_parser'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestUpdateErrorParser',
+          'input_doc_type' => 'UpdateErrorInputDocType',
+          'output_docspecs' => {
+              'update_error_parser_output' => {'type' => 'UpdateErrorParserOutputDocument', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
     if specified_actions.include? 'full_workflow'
       full_workflow = {
           'test_collect' => {

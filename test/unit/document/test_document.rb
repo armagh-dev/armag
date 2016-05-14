@@ -291,7 +291,7 @@ class TestDocument < Test::Unit::TestCase
     mock_document_find_one_and_update(nil)
     block_executed = false
 
-    Document.modify_or_create(id, type, state) do |doc|
+    Document.modify_or_create(id, type, state, true) do |doc|
       assert_nil(doc)
       block_executed = true
     end
@@ -307,7 +307,7 @@ class TestDocument < Test::Unit::TestCase
     mock_document_replace
     block_executed = false
 
-    Document.modify_or_create(id, type, state) do |doc|
+    Document.modify_or_create(id, type, state, true) do |doc|
       assert_not_nil doc
       block_executed = true
     end
@@ -319,16 +319,17 @@ class TestDocument < Test::Unit::TestCase
     id = 'docid'
     type = 'testdoc'
     state = DocState::WORKING
-    @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error')
+    @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error').at_least_once
+
 
     # Have to bail out of the infinite loop somehow
     e = RuntimeError.new
-    Utils::ProcessingBackoff.any_instance.expects(:backoff).raises(e)
+    Utils::ProcessingBackoff.any_instance.expects(:interruptible_backoff).raises(e)
 
     block_executed = false
 
     assert_raise(e) do
-      Document.modify_or_create(id, type, state) do |doc|
+      Document.modify_or_create(id, type, state, false) do |doc|
         block_executed = true
       end
     end
@@ -346,7 +347,7 @@ class TestDocument < Test::Unit::TestCase
     block_executed = false
 
     assert_raise(Mongo::Error::OperationFailure) do
-      Document.modify_or_create(id, type, state) do |doc|
+      Document.modify_or_create(id, type, state, true) do |doc|
         block_executed = true
       end
     end
@@ -356,81 +357,28 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_no_block
     assert_raise(LocalJumpError) do
-      Document.modify_or_create('id', 'type', Armagh::DocState::WORKING)
+      Document.modify_or_create('id', 'type', Armagh::DocState::WORKING, true)
     end
   end
 
-  def test_modify_or_create_bang_new
+  def test_modify_or_create_new_error
     id = 'docid'
     type = 'testdoc'
     state = DocState::WORKING
-    mock_document_find_one_and_update(nil)
-    block_executed = false
+    @documents.expects(:find_one_and_update)
+    @documents.expects(:delete_one)
 
-    result = Document.modify_or_create!(id, type, state) do |doc|
-      assert_nil(doc)
-      block_executed = true
-    end
-
-    assert_true block_executed
-    assert_true result
-  end
-
-  def test_modify_or_create_bang_existing
-    id = 'docid'
-    type = 'testdoc'
-    state = DocState::WORKING
-    mock_document_find_one_and_update({'_id' => id, 'draft_content' => 'doc content', 'published_content' => {}, 'meta' => 'doc meta', 'type' => type, 'state' => state})
-    mock_document_replace
-    block_executed = false
-
-    result = Document.modify_or_create!(id, type, state) do |doc|
-      assert_not_nil doc
-      block_executed = true
-    end
-
-    assert_true block_executed
-    assert_true result
-  end
-
-  def test_modify_or_create_bang_locked
-    id = 'docid'
-    type = 'testdoc'
-    state = DocState::WORKING
-    @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error')
-    block_executed = false
-
-    result = Document.modify_or_create!(id, type, state) do |doc|
-      assert_not_nil doc
-      block_executed = true
-    end
-
-    assert_false block_executed
-    assert_false result
-  end
-
-  def test_modify_or_create_bang_unexpected_error
-    id = 'docid'
-    type = 'testdoc'
-    state = DocState::WORKING
-    @documents.expects(:find_one_and_update).raises(Mongo::Error::OperationFailure, 'Unknown')
-
-
-    block_executed = false
-
-    assert_raise(Mongo::Error::OperationFailure) do
-      Document.modify_or_create!(id, type, state) do |doc|
-        block_executed = true
+    e = RuntimeError.new 'Error'
+    assert_raise(e) do
+      Document.modify_or_create(id, type, state, true) do |doc|
+        raise e
       end
     end
-
-    assert_false block_executed
   end
 
-  def test_modify_or_create_bang_no_block
-    assert_raise(LocalJumpError) do
-      Document.modify_or_create!('id', 'type', Armagh::DocState::WORKING)
-    end
+  def test_delete
+    @documents.expects(:delete_one).with({:'_id' => '123'})
+    Document.delete('123', 'type', 'state')
   end
 
   def test_to_action_document
@@ -557,17 +505,48 @@ class TestDocument < Test::Unit::TestCase
     @doc.save
   end
 
+  def test_too_large
+    @documents.expects(:insert_one).raises(Mongo::Error::MaxBSONSize)
+
+    error = assert_raise(ActionErrors::DocumentSizeError) do
+      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+    end
+
+    assert_equal 'Document id is too large.  Consider using a splitter or parser to split the document.', error.message
+  end
+
+  def test_duplicate
+    @documents.expects(:insert_one).raises(Mongo::Error::OperationFailure.new('E11000 Some context'))
+
+    error = assert_raise(ActionErrors::DocumentUniquenessError) do
+      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+    end
+
+    assert_equal 'Unable to create document id.  This document already exists.', error.message
+  end
+
+  def test_unknown_operation_error
+    expected = Mongo::Error::OperationFailure.new('Something')
+    @documents.expects(:insert_one).raises(expected)
+
+    error = assert_raise(Mongo::Error::OperationFailure) do
+      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+    end
+
+    assert_equal expected, error
+  end
+
   def test_class_version
     version = '12345abcdefh'
-    Armagh::Document.version = version
-    assert_equal(version, Armagh::Document.version)
+    Armagh::Document.version['armagh'] = version
+    assert_equal({'armagh' => version}, Armagh::Document.version)
   end
 
   def test_version
     mock_document_replace
     version = '12345abcdefh'
-    Armagh::Document.version = version
+    Armagh::Document.version['armagh'] = version
     @doc.save
-    assert_equal(version, @doc.version)
+    assert_equal({'armagh' => version}, @doc.version)
   end
 end

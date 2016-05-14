@@ -23,13 +23,13 @@ require_relative 'connection/mongo_admin_connection'
 module Armagh
   module Connection
     def self.all_document_collections
-      doc_collections = []
+      doc_collections = [documents]
 
       MongoConnection.instance.connection.collections.each do |collection|
         doc_collections << collection if collection.name =~ /^documents\./
       end
 
-      doc_collections << documents
+      doc_collections
     end
 
     def self.documents(type_collection = nil)

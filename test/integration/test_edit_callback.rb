@@ -45,6 +45,10 @@ class TestEditCallback < Test::Unit::TestCase
     end
   end
 
+  class TestDocument
+    attr_accessor :id
+  end
+
   def self.startup
     puts 'Starting Mongo'
     Singleton.__init__(Armagh::Connection::MongoConnection)
@@ -60,10 +64,16 @@ class TestEditCallback < Test::Unit::TestCase
     MongoSupport.instance.start_mongo unless MongoSupport.instance.running?
     MongoSupport.instance.clean_database
 
+    agent = Armagh::Agent.new
+    doc = TestDocument.new
+    doc.id = 'some other id'
+
+    agent.instance_variable_set(:@current_doc, doc)
+
     @output_type = 'OutputDocument'
     @output_state = Armagh::DocState::WORKING
     output_docspecs = {'test_document' => Armagh::DocSpec.new(@output_type, @output_state)}
-    @parser = TestParser.new('parser', Armagh::Agent.new, @logger, {}, output_docspecs)
+    @parser = TestParser.new('parser', agent, @logger, {}, output_docspecs)
   end
 
   def test_edit_new

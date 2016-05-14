@@ -29,12 +29,8 @@ module Armagh
       protected :new
     end
 
-    def self.version=(version)
-      @version = version
-    end
-
     def self.version
-      @version
+      @version ||= {}
     end
 
     def self.create(type, draft_content, published_content, meta, pending_actions, state, id = nil, new = false)
@@ -101,10 +97,11 @@ module Armagh
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
-    def self.modify_or_create(id, type, state)
+    def self.modify_or_create(id, type, state, running, logger = nil)
       raise LocalJumpError.new 'No block given' unless block_given?
 
       backoff = Utils::ProcessingBackoff.new
+      backoff.logger = logger
       doc = nil
 
       until doc
@@ -114,7 +111,8 @@ module Armagh
 
         if doc.nil?
           if already_locked
-            backoff.backoff
+            logger.info "Document '#{id}' already locked for editing.  Backing off." if logger
+            backoff.interruptible_backoff { !running }
           else
             # The document doesn't even exist - dont keep trying
             break
@@ -124,31 +122,28 @@ module Armagh
 
       begin
         yield doc
-      ensure
-        doc.finish_processing if doc
+      rescue => e
+        # TODO JBOWES DONT APPLY CHANGES FROM YIELD
+        if doc
+          # Unlock only
+          unlock(id, type, state)
+        else
+          delete(id, type, state)
+        end
+
+        raise e
       end
+      doc.finish_processing if doc
+
       nil
     end
 
-    # Nonblocking Modify/Create.  If a doc with the id exists but is locked, return false, otherwise execute the block and return true
-    def self.modify_or_create!(id, type, state)
-      raise LocalJumpError.new 'No block given' unless block_given?
+    def self.delete(id, type, state)
+      collection(type, state).delete_one({ '_id': id})
+    end
 
-      doc = nil
-
-      already_locked = catch(:already_locked) do
-        doc = find_or_create_and_lock(id, type, state)
-      end
-
-      if doc.nil? && already_locked
-        # Doc is locked somewhere else
-        block_executed = false
-      else
-        yield doc
-        block_executed = true
-      end
-
-      block_executed
+    def self.unlock(id, type, state)
+      collection(type, state).find_one_and_update({ '_id': id}, {'$set' => {'locked' => false}})
     end
     
     def self.collection(type = nil, state = nil)
@@ -316,6 +311,15 @@ module Armagh
       end
 
       Connection.documents.delete_one({ '_id': id}) if delete_orig
+
+    rescue Mongo::Error::MaxBSONSize
+      raise ActionErrors::DocumentSizeError.new("Document #{id} is too large.  Consider using a splitter or parser to split the document.")
+    rescue Mongo::Error::OperationFailure => e
+      if e.message =~ /^E11000/
+        raise ActionErrors::DocumentUniquenessError.new("Unable to create document #{id}.  This document already exists.")
+      else
+        raise e
+      end
     end
 
     def state
@@ -396,7 +400,6 @@ module Armagh
       else
         @db_doc.delete 'pending_work'
       end
-
     end
   end
 end

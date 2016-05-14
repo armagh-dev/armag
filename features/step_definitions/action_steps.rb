@@ -32,6 +32,9 @@ And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, 
         if expected.is_a?(Hash) && doc[key].is_a?(Hash)
           expected.collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
           doc[key].collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
+
+          expected.collect{|_k,v| v['cause'] = 'placeholder' if v.is_a?(Hash) && v['cause']}
+          doc[key].collect{|_k,v| v['cause'] = 'placeholder' if v.is_a?(Hash) && v['cause']}
         end
 
         if expected != doc[key]

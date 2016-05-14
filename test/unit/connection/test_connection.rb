@@ -60,7 +60,7 @@ class TestConnection < Test::Unit::TestCase
     assert_include all_collections, sometype1
     assert_include all_collections, sometype2
     assert_not_include all_collections, unrelated
-    assert_equal documents, all_collections.last #documents is expected to be last
+    assert_equal documents, all_collections.first, 'documents is expected to be first'
   end
 
   def test_documents

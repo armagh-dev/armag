@@ -211,12 +211,12 @@ def update_agent_config
 end
 
 def load_actions
-  version_str = "#{VERSION}"
+  Document.version['armagh'] = VERSION
 
   begin
     require 'armagh/standard_actions'
     @logger.info "Using StandardActions: #{Standard::VERSION}"
-    version_str << "|std:#{StandardActions::VERSION}"
+    Document.version['standard'] = StandardActions::VERSION
   rescue LoadError
     @logger.warn "StandardActions gem is not deployed. These actions won't be available."
   rescue => e
@@ -228,7 +228,7 @@ def load_actions
   begin
     require 'armagh/custom_actions'
     @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
-    version_str << "|#{CustomActions::NAME}:#{CustomActions::VERSION}"
+    Document.version[CustomActions::NAME] = CustomActions::VERSION
   rescue LoadError
     @logger.warn "CustomActions gem is not deployed. These actions won't be available."
   rescue => e
@@ -244,7 +244,6 @@ def load_actions
   else
     @logger.warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
   end
-  Document.version = version_str
 end
 
 # Stop agents before stopping armagh

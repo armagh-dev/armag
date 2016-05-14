@@ -49,8 +49,12 @@ class TestAgent < Test::Unit::TestCase
     @logger = mock_logger
 
     @agent = Armagh::Agent.new
-    @backoff_mock = mock('object')
+    @backoff_mock = mock('backoff')
+    @current_doc_mock = mock('current_doc')
+    @running = true
     @agent.instance_variable_set(:@backoff, @backoff_mock)
+    @agent.instance_variable_set(:@current_doc, @current_doc_mock)
+    @agent.instance_variable_set(:@running, @running)
   end
 
   def teardown
@@ -69,6 +73,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start
+    @agent.instance_variable_set(:@running, false)
     assert_false @agent.running?
 
     agent_status = Armagh::AgentStatus.new
@@ -108,6 +113,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start_and_stop
+    @agent.instance_variable_set(:@running, false)
     agent_status = Armagh::AgentStatus.new
     agent_status.config = {}
     DRbObject.stubs(:new_with_uri).returns(agent_status)
@@ -416,16 +422,31 @@ class TestAgent < Test::Unit::TestCase
 
   def test_create_document
     action = mock
+    @current_doc_mock.expects(:id).returns('current_id')
     @agent.instance_variable_set(:'@current_action', action)
     Armagh::Document.expects(:create).with('DocumentType', 'draft_content', 'published_content', 'meta', [], Armagh::DocState::WORKING, 'id', true)
     action_doc = Armagh::ActionDocument.new('id', 'draft_content', 'published_content', 'meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING))
     @agent.create_document action_doc
   end
 
+  def test_create_document_current
+    id = 'id'
+    @current_doc_mock.expects(:id).returns(id)
+
+    action_doc = Armagh::ActionDocument.new(id, 'draft_content', 'published_content', 'meta', Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING))
+
+    e = assert_raise(Armagh::ActionErrors::DocumentError) do
+      @agent.create_document action_doc
+    end
+
+    assert_equal("Cannot create document 'id'.  It is the same document that was passed into the action.", e.message)
+  end
+
   def test_edit_document
     doc = mock('document')
-
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
+
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
 
     new_content = 'new content'
@@ -443,7 +464,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal('published content', action_doc.published_content)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
     executed_block = false
     @agent.edit_document(id, old_docspec) do |doc|
@@ -458,7 +479,19 @@ class TestAgent < Test::Unit::TestCase
     assert_true executed_block
   end
 
+  def test_edit_document_current
+    id = 'id'
+    @current_doc_mock.expects(:id).returns(id)
+
+    e = assert_raise(Armagh::ActionErrors::DocumentError) do
+      @agent.edit_document(id, Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+    end
+
+    assert_equal("Cannot edit document 'id'.  It is the same document that was passed into the action.", e.message)
+  end
+
   def test_edit_document_no_block
+    @current_doc_mock.expects(:id).returns('current_id')
     logger = @agent.instance_variable_get(:@logger)
     logger.expects(:warn).with("edit_document called for document '123' but no block was given.  Ignoring.")
     @agent.edit_document(123, Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
@@ -466,6 +499,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_new
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
 
     id = 'id'
     docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
@@ -474,7 +508,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:finish_processing).returns nil
 
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(nil)
     Armagh::Document.expects(:from_action_document).returns doc
 
     executed_block = false
@@ -492,6 +526,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_type
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
@@ -499,7 +534,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
@@ -512,6 +547,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_same_state
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
     docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
@@ -522,7 +558,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(docspec, action_doc.docspec)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(doc)
 
     @agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -531,6 +567,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_w_p
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
@@ -538,7 +575,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
@@ -551,6 +588,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_r_w
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
@@ -558,7 +596,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
@@ -571,11 +609,12 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_new_change_type
     id = 'id'
+    @current_doc_mock.expects(:id).returns('current_id')
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
     new_docspec = Armagh::DocSpec.new('ChangedType', Armagh::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
@@ -588,13 +627,14 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_new_same_state
     doc = mock('document')
+    @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
     docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
 
     doc.expects(:finish_processing).returns nil
 
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(nil)
     Armagh::Document.expects(:from_action_document).returns doc
 
     @agent.edit_document(id, docspec) do |doc|
@@ -604,11 +644,12 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_new_change_state_w_p
     id = 'id'
+    @current_doc_mock.expects(:id).returns('current_id')
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
     new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::PUBLISHED)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
@@ -621,229 +662,15 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_new_change_state_r_w
     id = 'id'
+    @current_doc_mock.expects(:id).returns('current_id')
 
     old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
     new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
     e = assert_raise(Armagh::ActionErrors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' state can only be changed from working to ready.", e.message)
-  end
-
-  def test_edit_document_bang
-    doc = mock('document')
-
-    id = 'id'
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-
-    new_content = 'new content'
-    new_meta = 'new meta'
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
-
-    doc.expects(:clear_pending_actions)
-    doc.expects(:add_pending_actions).with([])
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
-
-    doc.expects(:update_from_action_document).with do |action_doc|
-      assert_equal(new_content, action_doc.draft_content)
-      assert_equal(new_meta, action_doc.meta)
-      assert_equal(new_docspec, action_doc.docspec)
-      assert_equal('published content', action_doc.published_content)
-      true
-    end
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(doc).returns(true)
-
-    executed_block = false
-    result = @agent.edit_document!(id, old_docspec) do |doc|
-      assert_equal(Armagh::ActionDocument, doc.class)
-      assert_false doc.new_document?
-      doc.meta = new_meta
-      doc.draft_content = new_content
-      doc.docspec = new_docspec
-      executed_block = true
-    end
-
-    assert_true result
-    assert_true executed_block
-  end
-
-  def test_edit_document_bang_no_block
-    logger = @agent.instance_variable_get(:@logger)
-    logger.expects(:warn).with("edit_document! called for document '123' but no block was given.  Ignoring.")
-    @agent.edit_document!(123, Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
-  end
-
-  def test_edit_document_new_bang
-    doc = mock('document')
-
-    id = 'id'
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    content = 'new content'
-    meta = 'new meta'
-
-    doc.expects(:finish_processing).returns nil
-
-    Armagh::Document.expects(:modify_or_create!).with(id, docspec.type, docspec.state).yields(nil)
-    Armagh::Document.expects(:from_action_document).returns doc
-
-    executed_block = false
-    @agent.edit_document!(id, docspec) do |doc|
-      assert_equal(Armagh::ActionDocument, doc.class)
-      assert_true doc.new_document?
-      doc.meta = meta
-      doc.draft_content = content
-      doc.docspec = docspec
-      executed_block = true
-    end
-
-    assert_true executed_block
-  end
-
-  def test_edit_document_bang_change_type
-    doc = mock('document')
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('ChangedType', Armagh::DocState::WORKING)
-
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(doc).returns(true)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' type is not changeable while editing.  Only state is.", e.message)
-  end
-
-  def test_edit_document_bang_same_state
-    doc = mock('document')
-    id = 'id'
-
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-
-    Armagh::Document.expects(:modify_or_create!).with(id, docspec.type, docspec.state).yields(doc).returns(true)
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', docspec))
-
-    doc.expects(:update_from_action_document).with do |action_doc|
-      assert_equal(docspec, action_doc.docspec)
-      true
-    end
-
-    @agent.edit_document!(id, docspec) do |doc|
-      doc.docspec = docspec
-    end
-  end
-
-  def test_edit_document_bang_change_state_r_w
-    doc = mock('document')
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(doc).returns(true)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' state can only be changed from working to ready.", e.message)
-  end
-
-  def test_edit_document_bang_change_state_w_p
-    doc = mock('document')
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::PUBLISHED)
-
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id, 'old content', 'published content', 'old meta', old_docspec))
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(doc).returns(true)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' state can only be changed from working to ready.", e.message)
-  end
-
-  def test_edit_document_new_bang_change_type
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('ChangedType', Armagh::DocState::WORKING)
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(nil)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' type is not changeable while editing.  Only state is.", e.message)
-  end
-
-  def test_edit_document_new_bang_same_state
-    doc = mock('document')
-    id = 'id'
-
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-
-    doc.expects(:finish_processing).returns nil
-
-    Armagh::Document.expects(:modify_or_create!).with(id, docspec.type, docspec.state).yields(nil)
-    Armagh::Document.expects(:from_action_document).returns doc
-
-    @agent.edit_document!(id, docspec) do |doc|
-      doc.docspec = docspec
-    end
-  end
-
-  def test_edit_document_new_bang_change_state_w_p
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::PUBLISHED)
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(nil)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
-        doc.docspec = new_docspec
-      end
-    end
-
-    assert_equal("Document 'id' state can only be changed from working to ready.", e.message)
-  end
-
-  def test_edit_document_new_bang_change_state_r_w
-    id = 'id'
-
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-
-    Armagh::Document.expects(:modify_or_create!).with(id, old_docspec.type, old_docspec.state).yields(nil)
-
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
-      @agent.edit_document!(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
     end

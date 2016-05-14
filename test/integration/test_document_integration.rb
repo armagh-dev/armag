@@ -52,21 +52,35 @@ class TestDocumentIntegration < Test::Unit::TestCase
     Armagh::Document.create('PublishedTestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, 'published_document')
 
     # Make doc_3 more recently updated
-    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::DocState::READY) do |doc|
+    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::DocState::READY, true) do |doc|
       doc.draft_content['modified'] = true
     end
 
     # Make doc_1 most recently updated
-    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::DocState::READY) do |doc|
+    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::DocState::READY, true) do |doc|
       doc.draft_content['modified'] = true
     end
 
     # Expected order (based on last update and published first) - published_document, doc_0, doc_2, doc_3, doc_1
-    assert_equal('published_document', Armagh::Document.get_for_processing.id)
     assert_equal('doc_0', Armagh::Document.get_for_processing.id)
     assert_equal('doc_2', Armagh::Document.get_for_processing.id)
     assert_equal('doc_3', Armagh::Document.get_for_processing.id)
     assert_equal('doc_1', Armagh::Document.get_for_processing.id)
+    assert_equal('published_document', Armagh::Document.get_for_processing.id)
   end
-  
+
+  def test_document_too_large
+    content = {'field' => 'a'*100_000_000}
+    assert_raise(Armagh::ActionErrors::DocumentSizeError) do
+      Armagh::Document.create('TestDocument', content, {}, {}, 'action', Armagh::DocState::READY, 'test_doc')
+    end
+  end
+
+  def test_create_duplicate
+    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'test_doc', true)
+
+    assert_raise(Armagh::ActionErrors::DocumentUniquenessError) do
+      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'test_doc', true)
+    end
+  end
 end

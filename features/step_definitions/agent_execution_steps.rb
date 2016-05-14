@@ -24,6 +24,8 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", and conten
 
   content = content.nil? ? {} : eval(content)
 
+  Armagh::Document.version.merge! APP_VERSION
+
   count.to_i.times do
     Armagh::Document.create(doc_type, content, {}, {}, pending_actions, state, id)
   end

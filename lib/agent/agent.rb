@@ -73,8 +73,8 @@ module Armagh
     end
 
     def create_document(action_doc)
-      # TODO agent#create_document: throw an error if insert fails (not unique, too large, etc)
       docspec = action_doc.docspec
+      raise ActionErrors::DocumentError, "Cannot create document '#{action_doc.id}'.  It is the same document that was passed into the action." if action_doc.id == @current_doc.id
       pending_actions = @action_manager.get_action_names_for_docspec(docspec)
       Document.create(docspec.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
                       pending_actions, docspec.state, action_doc.id, true)
@@ -82,9 +82,9 @@ module Armagh
     end
 
     def edit_document(id, docspec)
-      # TODO agent#edit_document, throw an error if insert fails (too large, etc)
+      raise ActionErrors::DocumentError, "Cannot edit document '#{id}'.  It is the same document that was passed into the action." if id == @current_doc.id
       if block_given?
-        Document.modify_or_create(id, docspec.type, docspec.state) do |doc|
+        Document.modify_or_create(id, docspec.type, docspec.state, @running, @logger) do |doc|
           edit_or_create(id, docspec, doc) do |doc|
             yield doc
           end
@@ -92,22 +92,6 @@ module Armagh
       else
         @logger.warn "edit_document called for document '#{id}' but no block was given.  Ignoring."
       end
-    end
-
-    # returns true if the document was modified or created, false if the document was skipped because it was locked.
-    def edit_document!(id, docspec)
-      # TODO agent#edit_document!: throw an error if insert fails (too large, etc)
-      if block_given?
-        result = Document.modify_or_create!(id, docspec.type, docspec.state) do |doc|
-          edit_or_create(id, docspec, doc) do |doc|
-            yield doc
-          end
-        end
-      else
-        @logger.warn "edit_document! called for document '#{id}' but no block was given.  Ignoring."
-        result = false
-      end
-      result
     end
 
     private def edit_or_create(id, docspec, doc)
@@ -132,7 +116,9 @@ module Armagh
         end
       else
         action_doc = ActionDocument.new(id, {}, {}, {}, docspec, true)
+
         yield action_doc
+
         new_docspec = action_doc.docspec
 
         raise ActionErrors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
@@ -186,41 +172,43 @@ module Armagh
     end
 
     private def execute
-      doc = Document.get_for_processing
+      @current_doc = Document.get_for_processing
 
-      if doc
+      if @current_doc
         @backoff.reset
 
-        doc.pending_actions.delete_if do |name|
+        @current_doc.pending_actions.delete_if do |name|
           current_action = @action_manager.get_action(name)
 
-          @logger.error "Document: #{doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
-          report_status(doc, current_action)
+          @logger.error "Document: #{@current_doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
+          report_status(@current_doc, current_action)
 
           if current_action
             begin
-              @logger.debug "Executing #{name} on document '#{doc.id}'."
+              @logger.debug "Executing #{name} on document '#{@current_doc.id}'."
               Dir.mktmpdir do |tmp_dir|
                 Dir.chdir(tmp_dir) do
-                  execute_action(current_action, doc)
+                  execute_action(current_action, @current_doc)
                 end
               end
-            rescue => e
+            rescue Exception => e
               Logging.error_exception(@logger, e, "Error while executing action '#{name}'.")
-              doc.add_failed_action(name, e)
+              @current_doc.add_failed_action(name, e)
             end
           else
             # This could happen while actions are propagating through the system
-            doc.add_failed_action(name, 'Undefined action')
+            @current_doc.add_failed_action(name, 'Undefined action')
             @backoff.interruptible_backoff { !@running }
           end
           true # Always remove this action from pending
         end
-        doc.finish_processing
+        @current_doc.finish_processing
       else
-        report_status(doc, nil)
+        @logger.debug 'No document found for processing.'
+        report_status(@current_doc, nil)
         @backoff.interruptible_backoff { !@running }
       end
+      @current_doc = nil
     end
 
     # returns new actions that should be added to the iterator
