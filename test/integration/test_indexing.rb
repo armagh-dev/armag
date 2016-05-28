@@ -54,6 +54,14 @@ class TestIndexing < Test::Unit::TestCase
     end
   end
 
+  def create_documents(state)
+    4_000.times do |i|
+      Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
+                              draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
+                              state: state, id: "id_#{i}")
+    end
+  end
+
   def test_config_idx
     MongoSupport.instance.set_config('launcher', {'launcher_details' => 'launcher config details'})
     MongoSupport.instance.set_config('agent', {'agent_details' => 'agent config details'})
@@ -79,11 +87,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_get_for_processing_idx
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'id')
-
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, "id_#{i}")
-    end
+    create_documents Armagh::DocState::READY
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
@@ -97,11 +101,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_get_for_processing_idx_published
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, 'id')
-
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, "id_#{i}")
-    end
+    create_documents Armagh::DocState::PUBLISHED
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
@@ -115,11 +115,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_find_idx
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'id')
+    create_documents Armagh::DocState::READY
 
     index_stats = get_index_stats(Armagh::Connection.documents, '_id_')
     initial_ops = index_stats['accesses']['ops']
@@ -133,11 +129,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_find_idx_published
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, 'id')
+    create_documents Armagh::DocState::PUBLISHED
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), '_id_')
     initial_ops = index_stats['accesses']['ops']
@@ -151,11 +143,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_exists
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'id')
+    create_documents Armagh::DocState::READY
 
     index_stats = get_index_stats(Armagh::Connection.documents, '_id_')
     initial_ops = index_stats['accesses']['ops']
@@ -169,11 +157,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_exists_published
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, 'id')
+    create_documents Armagh::DocState::PUBLISHED
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), '_id_')
     initial_ops = index_stats['accesses']['ops']
@@ -187,11 +171,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_find_or_create_and_lock_idx
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::READY, 'id')
+    create_documents Armagh::DocState::READY
 
     index_stats = get_index_stats(Armagh::Connection.documents, '_id_')
     initial_ops = index_stats['accesses']['ops']
@@ -205,11 +185,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_find_or_create_and_lock_idx_published
-    4_000.times do |i|
-      Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, "id_#{i}")
-    end
-
-    Armagh::Document.create('TestDocument', {}, {}, {}, 'action', Armagh::DocState::PUBLISHED, 'id')
+    create_documents Armagh::DocState::PUBLISHED
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), '_id_')
     initial_ops = index_stats['accesses']['ops']

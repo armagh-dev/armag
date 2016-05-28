@@ -38,7 +38,7 @@ class TestEditCallback < Test::Unit::TestCase
     def parse(_trigger)
       edit(@doc_id, 'test_document') do |doc|
         @doc_class = doc.class
-        doc.meta['field'] = true
+        doc.draft_metadata['field'] = true
         doc.draft_content = 'DRAFT CONTENT'
         @doc_was_new = doc.new_document?
       end
@@ -79,7 +79,9 @@ class TestEditCallback < Test::Unit::TestCase
   def test_edit_new
     @parser.doc_id = 'non_existing_doc_id'
     assert_nil Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
+    action_doc = Armagh::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
+                                            draft_metadata: {}, published_metadata: {},
+                                            docspec: Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
     @parser.parse(action_doc)
 
     assert_equal(Armagh::ActionDocument, @parser.doc_class)
@@ -91,20 +93,25 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal(@output_state, doc.state)
     assert_equal(@parser.doc_id, doc.id)
     assert_equal('DRAFT CONTENT', doc.draft_content)
-    assert_equal({'field' => true}, doc.meta)
+    assert_equal({'field' => true}, doc.draft_metadata)
     assert_false doc.locked?
   end
 
   def test_edit_existing
     doc_id = 'existing_doc_id'
     assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Document.create(@output_type, {'draft_content' => 456}, {'published_content' => 123}, {'meta' => 'bananas'}, [], @output_state, doc_id)
+    Armagh::Document.create(type: @output_type, draft_content:{'draft_content' => 456},
+                            published_content: {'published_content' => 123}, draft_metadata: {'draft_meta' => 'bananas'},
+                            published_metadata: {'published_meta' => 'apples'},
+                            pending_actions: [], state: @output_state, id: doc_id)
     doc = Armagh::Document.find(doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_false doc.locked?
 
     @parser.doc_id = doc_id
-    action_doc = Armagh::ActionDocument.new('triggering_id', {}, {}, {}, Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
+    action_doc = Armagh::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
+                                            draft_metadata: {}, published_metadata: {},
+                                            docspec: Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
     @parser.parse(action_doc)
 
     doc = Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
@@ -113,7 +120,7 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal(@output_state, doc.state)
     assert_equal(@parser.doc_id, doc.id)
     assert_equal('DRAFT CONTENT', doc.draft_content)
-    assert_equal({'field' => true, 'meta' => 'bananas'}, doc.meta)
+    assert_equal({'field' => true, 'draft_meta' => 'bananas'}, doc.draft_metadata)
     assert_false doc.locked?
   end
 end

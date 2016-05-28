@@ -18,27 +18,31 @@
 require_relative '../../lib/document/document'
 require 'armagh/documents/doc_state'
 
-When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", and content "([^"]*)"$/) do |count, doc_type, state, id, content|
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", content "([^"]*)", metadata "([^"]*)"$/) do |count, doc_type, state, id, content, meta|
   docspec = Armagh::DocSpec.new(doc_type, state)
   pending_actions = @action_manager.get_action_names_for_docspec docspec
 
   content = content.nil? ? {} : eval(content)
+  meta = meta.nil? ? {} : eval(meta)
 
   Armagh::Document.version.merge! APP_VERSION
 
   count.to_i.times do
-    Armagh::Document.create(doc_type, content, {}, {}, pending_actions, state, id)
+    Armagh::Document.create(type: doc_type, draft_content: content, published_content: {}, draft_metadata: meta,
+                            published_metadata: {}, pending_actions: pending_actions, state: state, id: id)
   end
 end
 
-When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", and published content "([^"]*)"$/) do |count, doc_type, state, id, content|
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", published content "([^"]*)", published metadata "([^"]*)"$/) do |count, doc_type, state, id, content, meta|
   docspec = Armagh::DocSpec.new(doc_type, state)
   pending_actions = @action_manager.get_action_names_for_docspec docspec
 
   content = content.nil? ? {} : eval(content)
+  meta = meta.nil? ? {} : eval(meta)
 
   count.to_i.times do
-    Armagh::Document.create(doc_type, {}, content, {}, pending_actions, state, id)
+    Armagh::Document.create(type: doc_type, draft_content: {}, published_content: content, draft_metadata: {},
+                            published_metadata: meta, pending_actions: pending_actions, state: state, id: id)
   end
 end
 

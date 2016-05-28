@@ -33,12 +33,13 @@ module Armagh
       @version ||= {}
     end
 
-    def self.create(type, draft_content, published_content, meta, pending_actions, state, id = nil, new = false)
+    def self.create(type:, draft_content:, published_content:, draft_metadata:, published_metadata:, pending_actions:, state:, id: nil, new: false)
       doc = Document.new
       doc.type = type
       doc.draft_content = draft_content
       doc.published_content = published_content
-      doc.meta = meta
+      doc.draft_metadata = draft_metadata
+      doc.published_metadata = published_metadata
       doc.id = id if id
       doc.add_pending_actions pending_actions
       doc.state = state
@@ -123,12 +124,10 @@ module Armagh
       begin
         yield doc
       rescue => e
-        # TODO JBOWES DONT APPLY CHANGES FROM YIELD
         if doc
-          # Unlock only
-          unlock(id, type, state)
+          unlock(id, type, state) # Unlock - don't apply changes
         else
-          delete(id, type, state)
+          delete(id, type, state) # This was a new document.  Delete the locked placeholder.
         end
 
         raise e
@@ -156,7 +155,7 @@ module Armagh
       @pending_publish = false
       @pending_archive = false
 
-      @db_doc = {'meta' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'failed_actions' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
+      @db_doc = {'draft_metadata' => {}, 'published_metadata' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'failed_actions' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
     end
 
@@ -172,8 +171,8 @@ module Armagh
       @db_doc['locked']
     end
 
-    def published_content=(published_content)
-      @db_doc['published_content'] = published_content
+    def published_content=(content)
+      @db_doc['published_content'] = content
     end
 
     def published_content
@@ -188,12 +187,20 @@ module Armagh
       @db_doc['draft_content']
     end
 
-    def meta
-      @db_doc['meta']
+    def draft_metadata
+      @db_doc['draft_metadata']
     end
 
-    def meta=(meta)
-      @db_doc['meta'] = meta
+    def draft_metadata=(meta)
+      @db_doc['draft_metadata'] = meta
+    end
+
+    def published_metadata
+      @db_doc['published_metadata']
+    end
+
+    def published_metadata=(meta)
+      @db_doc['published_metadata'] = meta
     end
 
     def type=(type)
@@ -348,7 +355,8 @@ module Armagh
 
     def to_action_document
       docspec = DocSpec.new(type, state)
-      ActionDocument.new(id, draft_content, published_content, meta, docspec)
+      ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
+                         draft_metadata: draft_metadata, published_metadata: published_metadata, docspec: docspec)
     end
 
     def to_publish_action_document
@@ -356,17 +364,21 @@ module Armagh
       published_doc = self.class.find(id, type, DocState::PUBLISHED)
       if published_doc
         pub_content = published_doc.published_content
+        pub_metadata = published_doc.published_metadata
       else
         pub_content = published_content
+        pub_metadata = published_metadata
       end
-      ActionDocument.new(id, draft_content, pub_content, meta, docspec)
+      ActionDocument.new(id: id, draft_content: draft_content, published_content: pub_content,
+                         draft_metadata: draft_metadata, published_metadata: pub_metadata, docspec: docspec)
     end
 
     def update_from_action_document(action_doc)
       self.id = action_doc.id
       self.draft_content = action_doc.draft_content
       self.published_content = action_doc.published_content
-      self.meta = action_doc.meta
+      self.draft_metadata = action_doc.draft_metadata
+      self.published_metadata = action_doc.published_metadata
       docspec = action_doc.docspec
       self.type = docspec.type
       self.state = docspec.state

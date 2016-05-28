@@ -76,8 +76,9 @@ module Armagh
       docspec = action_doc.docspec
       raise ActionErrors::DocumentError, "Cannot create document '#{action_doc.id}'.  It is the same document that was passed into the action." if action_doc.id == @current_doc.id
       pending_actions = @action_manager.get_action_names_for_docspec(docspec)
-      Document.create(docspec.type, action_doc.draft_content, action_doc.published_content, action_doc.meta,
-                      pending_actions, docspec.state, action_doc.id, true)
+      Document.create(type: docspec.type, draft_content: action_doc.draft_content, published_content: action_doc.published_content,
+                      draft_metadata: action_doc.draft_metadata, published_metadata: action_doc.published_metadata,
+                      pending_actions: pending_actions, state: docspec.state, id: action_doc.id, new: true)
       @num_creates += 1
     end
 
@@ -115,7 +116,8 @@ module Armagh
           doc.add_pending_actions pending_actions
         end
       else
-        action_doc = ActionDocument.new(id, {}, {}, {}, docspec, true)
+        action_doc = ActionDocument.new(id: id, draft_content: {}, published_content: {}, draft_metadata: {},
+                                        published_metadata: {}, docspec: docspec, new: true)
 
         yield action_doc
 
@@ -217,7 +219,7 @@ module Armagh
         when CollectAction
           @num_creates = 0
           action.collect
-          doc.meta.merge!({
+          doc.draft_metadata.merge!({
             'docs_collected' => @num_creates
           })
           doc.mark_archive
@@ -228,8 +230,9 @@ module Armagh
         when PublishAction
           action_doc = doc.to_publish_action_document
           action.publish action_doc
-          doc.meta = action_doc.meta
+          doc.published_metadata = action_doc.draft_metadata
           doc.published_content = action_doc.draft_content
+          doc.draft_metadata = {}
           doc.draft_content = {}
           doc.state = DocState::PUBLISHED
           doc.add_pending_actions(@action_manager.get_action_names_for_docspec(DocSpec.new(doc.type, doc.state)))
@@ -238,7 +241,7 @@ module Armagh
           action_doc = doc.to_action_document
           action.consume action_doc
           doc.draft_content = action_doc.draft_content
-          doc.meta = action_doc.meta
+          doc.draft_metadata = action_doc.draft_metadata
         when Action
           @logger.error "#{action.name} is an unknown action type."
         else

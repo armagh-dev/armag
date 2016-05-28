@@ -34,11 +34,13 @@ class TestDocument < Test::Unit::TestCase
     mock_document_insert('id')
     Armagh::Connection.stubs(:documents).returns(@documents)
     Armagh::Connection.stubs(:all_document_collections).returns([@documents])
-    @doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING)
+    @doc = Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                           draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                           pending_actions: [], state: Armagh::DocState::WORKING)
   end
 
   def test_new
-    assert_raise(NoMethodError) {Document.new}
+    assert_raise(NoMethodError) { Document.new }
     doc = Document.send(:new)
     assert_instance_of(Document, doc)
   end
@@ -72,22 +74,28 @@ class TestDocument < Test::Unit::TestCase
 
   def test_create_no_id
     mock_document_insert('new_id')
-    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING)
+    doc = Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                          draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                          pending_actions: [], state: Armagh::DocState::WORKING)
     assert_equal('testdoc', doc.type)
     assert_equal('draft_content', doc.draft_content)
     assert_equal('published_content', doc.published_content)
-    assert_equal({'meta' => true}, doc.meta)
+    assert_equal({'draft_meta' => true}, doc.draft_metadata)
+    assert_equal({'published_meta' => true}, doc.published_metadata)
     assert_equal('new_id', doc.id)
   end
 
   def test_create_with_id
     mock_document_replace
-    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
+    doc = Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                          draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                          pending_actions: [], state: Armagh::DocState::WORKING, id: 'id')
 
     assert_equal('testdoc', doc.type)
     assert_equal('draft_content', doc.draft_content)
     assert_equal('published_content', doc.published_content)
-    assert_equal({'meta' => true}, doc.meta)
+    assert_equal({'draft_meta' => true}, doc.draft_metadata)
+    assert_equal({'published_meta' => true}, doc.published_metadata)
     assert_equal('id', doc.id)
   end
 
@@ -95,17 +103,21 @@ class TestDocument < Test::Unit::TestCase
     id = 'id'
     draft_content = 'blah'
     published_content = 'published_content'
-    meta = 'meta'
+    draft_metadata = 'draft_meta'
+    published_metadata = 'published_meta'
     docspec = DocSpec.new('document type', Armagh::DocState::READY)
     new_doc = true
     pending_actions = %w(pend1 pend2)
-    action_doc = Armagh::ActionDocument.new(id, draft_content, published_content, meta, docspec, new_doc)
+    action_doc = Armagh::ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
+                                            draft_metadata: draft_metadata, published_metadata: published_metadata,
+                                            docspec: docspec, new: new_doc)
     doc = Document.from_action_document(action_doc, pending_actions)
 
     assert_equal(id, doc.id)
     assert_equal(draft_content, doc.draft_content)
     assert_equal(published_content, doc.published_content)
-    assert_equal(meta, doc.meta)
+    assert_equal(draft_metadata, doc.draft_metadata)
+    assert_equal(published_metadata, doc.published_metadata)
     assert_equal(docspec.type, doc.type)
     assert_equal(docspec.state, doc.state)
     assert_equal(pending_actions, doc.pending_actions)
@@ -168,7 +180,7 @@ class TestDocument < Test::Unit::TestCase
         {name: 'failed_action', details: RuntimeError.new('runtime error')},
         {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each {|f| @doc.add_failed_action(f[:name], f[:details])}
+    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
 
     assert_equal(2, @doc.failed_actions.length)
     assert_true @doc.failed?
@@ -192,7 +204,7 @@ class TestDocument < Test::Unit::TestCase
     assert_empty @doc.failed_actions
     assert_false @doc.failed?
 
-    failures.each {|f| @doc.add_failed_action(f[:name], f[:details])}
+    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
 
     assert_true @doc.failed?
 
@@ -209,22 +221,22 @@ class TestDocument < Test::Unit::TestCase
     pending_actions = %w(Action1 Action2 Action3)
     @doc.add_pending_actions pending_actions
 
-    assert_true  @doc.pending_work?
+    assert_true @doc.pending_work?
     assert_false @doc.failed?
 
     failures = [
         {name: 'failed_action', details: RuntimeError.new('runtime error')},
         {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each {|f| @doc.add_failed_action(f[:name], f[:details])}
+    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
 
     assert_false @doc.pending_work?
-    assert_true  @doc.failed?
+    assert_true @doc.failed?
 
     @doc.clear_failed_actions
 
     assert_true @doc.pending_work?
-    assert_false  @doc.failed?
+    assert_false @doc.failed?
 
     @doc.clear_pending_actions
     assert_false @doc.pending_work?
@@ -233,7 +245,9 @@ class TestDocument < Test::Unit::TestCase
 
   def test_timestamps
     mock_document_replace
-    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::WORKING, 'id')
+    doc = Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                           draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                           pending_actions: [], state: Armagh::DocState::WORKING, id: 'id')
     assert_in_delta(Time.now, doc.created_timestamp, 1)
     assert_equal(doc.created_timestamp, doc.updated_timestamp)
 
@@ -259,7 +273,7 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_invalid_state
-    e = assert_raise(Armagh::ActionErrors::StateError){@doc.state = 'this is an invalid state'}
+    e = assert_raise(Armagh::ActionErrors::StateError) { @doc.state = 'this is an invalid state' }
     assert_equal(e.message, "Tried to set state to an unknown state: 'this is an invalid state'.")
   end
 
@@ -385,7 +399,8 @@ class TestDocument < Test::Unit::TestCase
     action_doc = @doc.to_action_document
     assert_equal(@doc.draft_content, action_doc.draft_content)
     assert_equal(@doc.published_content, action_doc.published_content)
-    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.draft_metadata, action_doc.draft_metadata)
+    assert_equal(@doc.published_metadata, action_doc.published_metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
   end
@@ -396,12 +411,13 @@ class TestDocument < Test::Unit::TestCase
       true
     end
 
-    mock_document_find({'_id' => 'docid', 'published_content' => 'Externally Published Content'})
+    mock_document_find({'_id' => 'docid', 'published_content' => 'Externally Published Content', 'published_metadata' => 'Old Published Metadata'})
 
     action_doc = @doc.to_publish_action_document
     assert_equal(@doc.draft_content, action_doc.draft_content)
     assert_equal('Externally Published Content', action_doc.published_content)
-    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.draft_metadata, action_doc.draft_metadata)
+    assert_equal('Old Published Metadata', action_doc.published_metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
   end
@@ -416,7 +432,8 @@ class TestDocument < Test::Unit::TestCase
     action_doc = @doc.to_publish_action_document
     assert_equal(@doc.draft_content, action_doc.draft_content)
     assert_equal(@doc.published_content, action_doc.published_content)
-    assert_equal(@doc.meta, action_doc.meta)
+    assert_equal(@doc.draft_metadata, action_doc.draft_metadata)
+    assert_equal(@doc.published_metadata, action_doc.published_metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
   end
@@ -425,23 +442,25 @@ class TestDocument < Test::Unit::TestCase
     id = 'id'
     draft_content = 'new content'
     published_content = 'old content'
-    meta = 'new meta'
+    draft_meta = 'draft meta'
+    published_meta = 'published meta'
 
     docspec = DocSpec.new('type', Armagh::DocState::PUBLISHED)
 
-    action_document = Armagh::ActionDocument.new(id, draft_content, published_content, meta, docspec)
+    action_document = Armagh::ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
+                                                 draft_metadata: draft_meta, published_metadata: published_meta,
+                                                 docspec: docspec)
 
     assert_not_equal(draft_content, @doc.draft_content)
     assert_not_equal(published_content, @doc.published_content)
-    assert_not_equal(meta, @doc.meta)
+    assert_not_equal(draft_meta, @doc.draft_metadata)
     assert_not_equal(docspec.type, @doc.type)
     assert_not_equal(docspec.state, @doc.state)
 
     @doc.update_from_action_document(action_document)
 
-    assert_equal(draft_content, @doc.draft_content)
     assert_equal(published_content, @doc.published_content)
-    assert_equal(meta, @doc.meta)
+    assert_equal(published_meta, @doc.published_metadata)
     assert_equal(docspec.type, @doc.type)
     assert_equal(docspec.state, @doc.state)
   end
@@ -491,7 +510,9 @@ class TestDocument < Test::Unit::TestCase
   def test_published_save
     @documents.expects(:replace_one)
 
-    doc = Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED)
+    doc = Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                           draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                           pending_actions: [], state: Armagh::DocState::PUBLISHED)
     doc.save
   end
 
@@ -509,7 +530,9 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(Mongo::Error::MaxBSONSize)
 
     error = assert_raise(ActionErrors::DocumentSizeError) do
-      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+      Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                      draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                      pending_actions: [], state: Armagh::DocState::PUBLISHED, id: 'id', new: true)
     end
 
     assert_equal 'Document id is too large.  Consider using a splitter or parser to split the document.', error.message
@@ -519,7 +542,9 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(Mongo::Error::OperationFailure.new('E11000 Some context'))
 
     error = assert_raise(ActionErrors::DocumentUniquenessError) do
-      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+      Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                      draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                      pending_actions: [], state: Armagh::DocState::PUBLISHED, id: 'id', new: true)
     end
 
     assert_equal 'Unable to create document id.  This document already exists.', error.message
@@ -530,7 +555,9 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(expected)
 
     error = assert_raise(Mongo::Error::OperationFailure) do
-      Document.create('testdoc', 'draft_content', 'published_content', {'meta' => true}, [], Armagh::DocState::PUBLISHED, 'id', true)
+      Document.create(type: 'testdoc', draft_content: 'draft_content', published_content: 'published_content',
+                      draft_metadata: {'draft_meta' => true}, published_metadata: {'published_meta' => true},
+                      pending_actions: [], state: Armagh::DocState::PUBLISHED, id: 'id', new: true)
     end
 
     assert_equal expected, error
