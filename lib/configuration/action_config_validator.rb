@@ -43,7 +43,7 @@ module Armagh
           'parameters' => Hash
       }
 
-      VALID_OUTPUT_DOC_STATES = [DocState::READY, DocState::WORKING]
+      VALID_OUTPUT_DOC_STATES = [Documents::DocState::READY, Documents::DocState::WORKING]
 
       def initialize
         @errors = []
@@ -103,14 +103,14 @@ module Armagh
         begin
           clazz = Object.const_get(action_settings['action_class_name'])
           case
-            when clazz < CollectAction
+            when clazz < Actions::Collect
               validate_collect(action_name, action_settings)
-            when clazz < ParseAction
+            when clazz < Actions::Parse
               validate_parse(action_name, action_settings)
-            when clazz < PublishAction
+            when clazz < Actions::Publish
               validate_publish(action_name, action_settings)
-              output_docspecs = {'' => {'type' => action_settings['doc_type'], 'state' => DocState::PUBLISHED}}
-            when clazz < ConsumeAction
+              output_docspecs = {'' => {'type' => action_settings['doc_type'], 'state' => Documents::DocState::PUBLISHED}}
+            when clazz < Actions::Consume
               validate_consume(action_name, action_settings)
             else
               @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, ParseAction, PublishAction, or ConsumeAction."
@@ -192,7 +192,7 @@ module Armagh
 
           @input_docspecs[input_docspec] ||= []
           @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
-        rescue ActionErrors::DocSpecError => e
+        rescue Documents::Errors::DocSpecError => e
           @errors << "Action '#{action_name}', 'input_doc_type' has an error: #{e.message}'"
         end
       end
@@ -209,12 +209,12 @@ module Armagh
           next if error?
 
           begin
-            output_docspec = DocSpec.new(docspec_settings['type'], docspec_settings['state'])
+            output_docspec = Documents::DocSpec.new(docspec_settings['type'], docspec_settings['state'])
             @output_docspecs[output_docspec] ||= []
             @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type, 'docspec_name' => docspec_name}
             @action_outputs[action_name] ||= []
             @action_outputs[action_name] << output_docspec
-          rescue ActionErrors::DocSpecError => e
+          rescue Documents::Errors::DocSpecError => e
             @errors << "Action '#{action_name}', docspec '#{docspec_name}' has an error: #{e.message}'"
           end
         end
@@ -223,16 +223,16 @@ module Armagh
     private def validate_doctype(action_name, doc_type, action_type)
         if doc_type.is_a? String
           begin
-            input_docspec = DocSpec.new(doc_type, DocState::READY)
+            input_docspec = Documents::DocSpec.new(doc_type, Documents::DocState::READY)
             @input_docspecs[input_docspec] ||= []
             @input_docspecs[input_docspec] << {'action_name' => action_name, 'action_type' => action_type}
 
-            output_docspec = DocSpec.new(doc_type, DocState::PUBLISHED)
+            output_docspec = Documents::DocSpec.new(doc_type, Documents::DocState::PUBLISHED)
             @output_docspecs[output_docspec] ||= []
             @output_docspecs[output_docspec] << {'action_name' => action_name, 'action_type' => action_type}
             @action_outputs[action_name] ||= []
             @action_outputs[action_name] << output_docspec
-          rescue ActionErrors::DocSpecError => e
+          rescue Documents::Errors::DocSpecError => e
             @errors << "Action '#{action_name}' 'doc_type' has an error: #{e.message}'"
           end
         else
@@ -294,7 +294,7 @@ module Armagh
 
       private def validate_splitter_instance(action_name, clazz, parameters, docspec_settings)
         parameters ||= {}
-        output_docspec = DocSpec.new(docspec_settings['type'], docspec_settings['state'])
+        output_docspec = Documents::DocSpec.new(docspec_settings['type'], docspec_settings['state'])
         instance = clazz.new(nil, nil, parameters, output_docspec)
         splitter_validation = instance.validate
 
@@ -312,7 +312,7 @@ module Armagh
 
       private def validate_workflow_inputs
         @input_docspecs.each do |docspec, actions|
-          unless docspec.state == DocState::PUBLISHED
+          unless docspec.state == Documents::DocState::PUBLISHED
             action_names = actions.collect { |a| a['action_name'] }
             @errors << "Input docspec '#{docspec}' cannot be shared between multiple actions.  Shared by: #{action_names}" if action_names.length > 1
           end
@@ -329,7 +329,7 @@ module Armagh
         unused_docspecs = @output_docspecs.keys - @input_docspecs.keys
 
         unused_docspecs.each do |docspec|
-          if docspec.state == DocState::READY
+          if docspec.state == Documents::DocState::READY
             action_names = @output_docspecs[docspec].collect { |a| a['action_name'] }
             @warnings << "Actions #{action_names} produce docspec '#{docspec}', but no action takes that docspec as input."
           end
@@ -341,8 +341,8 @@ module Armagh
         finished_working = []
 
         @action_outputs.each do |_action_name, specs|
-          working_types = specs.collect { |s| s.type if s.state == DocState::WORKING }.compact
-          ready_types = specs.collect { |s| s.type if s.state == DocState::READY }.compact
+          working_types = specs.collect { |s| s.type if s.state == Documents::DocState::WORKING }.compact
+          ready_types = specs.collect { |s| s.type if s.state == Documents::DocState::READY }.compact
 
           unfinished_working.concat working_types - ready_types
           finished_working.concat working_types & ready_types
@@ -374,9 +374,9 @@ module Armagh
       private def create_input_docspec(input_doc_type, action_type)
         case action_type
           when 'consume'
-            DocSpec.new(input_doc_type, DocState::PUBLISHED)
+            Documents::DocSpec.new(input_doc_type, Documents::DocState::PUBLISHED)
           else
-            DocSpec.new(input_doc_type, DocState::READY)
+            Documents::DocSpec.new(input_doc_type, Documents::DocState::READY)
         end
       end
 
@@ -388,10 +388,10 @@ module Armagh
         @docspec_flow[input_docspec] ||= []
 
         if output_docspecs.is_a? String
-          @docspec_flow[input_docspec] << DocSpec.new(output_docspecs, DocState::PUBLISHED)
+          @docspec_flow[input_docspec] << Documents::DocSpec.new(output_docspecs, Documents::DocState::PUBLISHED)
         else
           output_docspecs.each do |_name, spec|
-            @docspec_flow[input_docspec] << DocSpec.new(spec['type'], spec['state'])
+            @docspec_flow[input_docspec] << Documents::DocSpec.new(spec['type'], spec['state'])
           end
         end
       end

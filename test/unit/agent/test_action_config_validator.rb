@@ -22,12 +22,12 @@ require_relative '../../../lib/configuration/action_config_validator'
 require 'test/unit'
 require 'mocha/test_unit'
 
-class TestPublisher < Armagh::PublishAction; end
-class TestCollector < Armagh::CollectAction; end
-class TestParser < Armagh::ParseAction; end
-class TestConsumer < Armagh::ConsumeAction; end
-class TestSplitter < Armagh::CollectionSplitter; end
-class BadAction < Armagh::Action; end
+class TestPublisher < Armagh::Actions::Publish; end
+class TestCollector < Armagh::Actions::Collect; end
+class TestParser < Armagh::Actions::Parse; end
+class TestConsumer < Armagh::Actions::Consume; end
+class TestSplitter < Armagh::Actions::CollectionSplitter; end
+class BadAction < Armagh::Actions::Action; end
 
 class TestActionConfigValidator < Test::Unit::TestCase
 

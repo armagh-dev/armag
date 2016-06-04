@@ -30,7 +30,7 @@ require 'armagh/actions'
 
 class TestEditCallback < Test::Unit::TestCase
 
-  class TestParser < Armagh::ParseAction
+  class TestParser < Armagh::Actions::Parse
     attr_accessor :doc_id
     attr_accessor :doc_was_new
     attr_reader :doc_class
@@ -71,20 +71,20 @@ class TestEditCallback < Test::Unit::TestCase
     agent.instance_variable_set(:@current_doc, doc)
 
     @output_type = 'OutputDocument'
-    @output_state = Armagh::DocState::WORKING
-    output_docspecs = {'test_document' => Armagh::DocSpec.new(@output_type, @output_state)}
+    @output_state = Armagh::Documents::DocState::WORKING
+    output_docspecs = {'test_document' => Armagh::Documents::DocSpec.new(@output_type, @output_state)}
     @parser = TestParser.new('parser', agent, @logger, {}, output_docspecs)
   end
 
   def test_edit_new
     @parser.doc_id = 'non_existing_doc_id'
     assert_nil Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
-    action_doc = Armagh::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
                                             draft_metadata: {}, published_metadata: {},
-                                            docspec: Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
+                                            docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY))
     @parser.parse(action_doc)
 
-    assert_equal(Armagh::ActionDocument, @parser.doc_class)
+    assert_equal(Armagh::Documents::ActionDocument, @parser.doc_class)
     assert_true(@parser.doc_was_new)
 
     doc = Armagh::Document.find(@parser.doc_id, @output_type, @output_state)
@@ -109,9 +109,9 @@ class TestEditCallback < Test::Unit::TestCase
     assert_false doc.locked?
 
     @parser.doc_id = doc_id
-    action_doc = Armagh::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'triggering_id', draft_content: {}, published_content: {},
                                             draft_metadata: {}, published_metadata: {},
-                                            docspec: Armagh::DocSpec.new('TriggerDocument', Armagh::DocState::READY))
+                                            docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY))
     @parser.parse(action_doc)
 
     doc = Armagh::Document.find(@parser.doc_id, @output_type, @output_state)

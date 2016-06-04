@@ -46,22 +46,22 @@ class TestDocumentIntegration < Test::Unit::TestCase
   def test_document_get_for_processing_order
     4.times do |count|
       Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {}, draft_metadata: {},
-                              published_metadata: {}, pending_actions: ['action'], state: Armagh::DocState::READY,
+                              published_metadata: {}, pending_actions: ['action'], state: Armagh::Documents::DocState::READY,
                               id: "doc_#{count}")
       sleep 1
     end
 
     Armagh::Document.create(type: 'PublishedTestDocument', draft_content: {}, published_content: {},
-                            draft_metadata: {}, published_metadata: {}, pending_actions: ['action'], state: Armagh::DocState::PUBLISHED,
+                            draft_metadata: {}, published_metadata: {}, pending_actions: ['action'], state: Armagh::Documents::DocState::PUBLISHED,
                             id:'published_document')
 
     # Make doc_3 more recently updated
-    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::DocState::READY, true) do |doc|
+    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true) do |doc|
       doc.draft_content['modified'] = true
     end
 
     # Make doc_1 most recently updated
-    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::DocState::READY, true) do |doc|
+    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::Documents::DocState::READY, true) do |doc|
       doc.draft_content['modified'] = true
     end
 
@@ -75,22 +75,22 @@ class TestDocumentIntegration < Test::Unit::TestCase
 
   def test_document_too_large
     content = {'field' => 'a'*100_000_000}
-    assert_raise(Armagh::ActionErrors::DocumentSizeError) do
+    assert_raise(Armagh::Documents::Errors::DocumentSizeError) do
       Armagh::Document.create(type: 'TestDocument', draft_content: content, published_content: {},
                               draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                              state: Armagh::DocState::READY, id: 'test_doc')
+                              state: Armagh::Documents::DocState::READY, id: 'test_doc')
     end
   end
 
   def test_create_duplicate
     Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
                             draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                            state: Armagh::DocState::READY, id: 'test_doc', new: true)
+                            state: Armagh::Documents::DocState::READY, id: 'test_doc', new: true)
 
-    assert_raise(Armagh::ActionErrors::DocumentUniquenessError) do
+    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError) do
       Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
                               draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                              state: Armagh::DocState::READY, id: 'test_doc', new: true)
+                              state: Armagh::Documents::DocState::READY, id: 'test_doc', new: true)
     end
   end
 end

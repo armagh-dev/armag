@@ -29,12 +29,12 @@ require 'mocha/test_unit'
 require 'test/unit'
 require 'log4r'
 
-class CollectTest < Armagh::CollectAction; end
-class ParseTest < Armagh::ParseAction; end
-class PublishTest < Armagh::PublishAction; end
-class ConsumeTest < Armagh::ConsumeAction; end
-class SplitterTest < Armagh::CollectionSplitter; end
-class UnknownAction < Armagh::Action; end
+class CollectTest < Armagh::Actions::Collect; end
+class ParseTest < Armagh::Actions::Parse; end
+class PublishTest < Armagh::Actions::Publish; end
+class ConsumeTest < Armagh::Actions::Consume; end
+class SplitterTest < Armagh::Actions::CollectionSplitter; end
+class UnknownAction < Armagh::Actions::Action; end
 
 class TestAgent < Test::Unit::TestCase
   include ArmaghTest
@@ -149,7 +149,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -172,9 +172,9 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(ParseTest)
 
-    action_doc = Armagh::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
                                             draft_metadata: 'old meta', published_metadata: 'published meta',
-                                            docspec: Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+                                            docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
     action.expects(:parse).with(action_doc)
 
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :deleted? => true)
@@ -200,12 +200,12 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(PublishTest)
     pending_actions = %w(one two)
 
-    action_doc = Armagh::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
                                             draft_metadata: 'old meta', published_metadata: 'published meta',
-                                            docspec: Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+                                            docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
     doc.expects(:to_publish_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -216,7 +216,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:draft_content=, {})
     doc.expects(:published_metadata=, action_doc.draft_content)
     doc.expects(:draft_metadata=, {})
-    doc.expects(:state=, Armagh::DocState::PUBLISHED)
+    doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED)
     doc.expects(:add_pending_actions).with(pending_actions)
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
@@ -236,12 +236,12 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(ConsumeTest)
 
-    action_doc = Armagh::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'id', draft_content: 'old content', published_content: 'published content',
                                             draft_metadata: 'old meta', published_metadata: 'published meta',
-                                            docspec: Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+                                            docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
     action.expects(:consume).with(action_doc)
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -267,7 +267,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     splitter = SplitterTest.new(@agent, @logger, {}, {})
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(splitter).at_least_once
@@ -287,7 +287,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(UnknownAction)
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -311,7 +311,7 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(CollectTest)
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::DocState::WORKING, :deleted? => false)
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -433,10 +433,10 @@ class TestAgent < Test::Unit::TestCase
     @agent.instance_variable_set(:'@current_action', action)
     Armagh::Document.expects(:create).with(type: 'DocumentType', draft_content: 'draft_content', published_content: 'published_content',
                                            draft_metadata: 'draft_meta', published_metadata: 'published_meta',
-                                           pending_actions: [], state: Armagh::DocState::WORKING, id: 'id', new: true)
-    action_doc = Armagh::ActionDocument.new(id: 'id', draft_content: 'draft_content', published_content: 'published_content',
+                                           pending_actions: [], state: Armagh::Documents::DocState::WORKING, id: 'id', new: true)
+    action_doc = Armagh::Documents::ActionDocument.new(id: 'id', draft_content: 'draft_content', published_content: 'published_content',
                                             draft_metadata: 'draft_meta', published_metadata: 'published_meta',
-                                            docspec: Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING))
+                                            docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING))
     @agent.create_document action_doc
   end
 
@@ -444,11 +444,11 @@ class TestAgent < Test::Unit::TestCase
     id = 'id'
     @current_doc_mock.expects(:id).returns(id)
 
-    action_doc = Armagh::ActionDocument.new(id: id, draft_content: 'draft_content', published_content: 'published_content',
+    action_doc = Armagh::Documents::ActionDocument.new(id: id, draft_content: 'draft_content', published_content: 'published_content',
                                             draft_metadata: 'draft_metadata', published_metadata: 'published_metadata',
-                                            docspec: Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING))
+                                            docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING))
 
-    e = assert_raise(Armagh::ActionErrors::DocumentError) do
+    e = assert_raise(Armagh::Documents::Errors::DocumentError) do
       @agent.create_document action_doc
     end
 
@@ -460,15 +460,15 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
     new_content = 'new content'
     new_meta = 'new meta'
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
+    new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
 
     doc.expects(:clear_pending_actions)
     doc.expects(:add_pending_actions).with([])
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id: id, draft_content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(id: id, draft_content: 'old content',
                                                                         published_content: 'published content',
                                                                         draft_metadata: 'old meta',
                                                                         published_metadata: 'published meta',
@@ -485,7 +485,7 @@ class TestAgent < Test::Unit::TestCase
 
     executed_block = false
     @agent.edit_document(id, old_docspec) do |doc|
-      assert_equal(Armagh::ActionDocument, doc.class)
+      assert_equal(Armagh::Documents::ActionDocument, doc.class)
       assert_false doc.new_document?
       doc.draft_metadata = new_meta
       doc.draft_content = new_content
@@ -500,8 +500,8 @@ class TestAgent < Test::Unit::TestCase
     id = 'id'
     @current_doc_mock.expects(:id).returns(id)
 
-    e = assert_raise(Armagh::ActionErrors::DocumentError) do
-      @agent.edit_document(id, Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+    e = assert_raise(Armagh::Documents::Errors::DocumentError) do
+      @agent.edit_document(id, Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
     end
 
     assert_equal("Cannot edit document 'id'.  It is the same document that was passed into the action.", e.message)
@@ -511,7 +511,7 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     logger = @agent.instance_variable_get(:@logger)
     logger.expects(:warn).with("edit_document called for document '123' but no block was given.  Ignoring.")
-    @agent.edit_document(123, Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY))
+    @agent.edit_document(123, Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
   end
 
   def test_edit_document_new
@@ -519,7 +519,7 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
 
     id = 'id'
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     content = 'new content'
     meta = 'new meta'
 
@@ -530,7 +530,7 @@ class TestAgent < Test::Unit::TestCase
 
     executed_block = false
     @agent.edit_document(id, docspec) do |doc|
-      assert_equal(Armagh::ActionDocument, doc.class)
+      assert_equal(Armagh::Documents::ActionDocument, doc.class)
       assert_true doc.new_document?
       doc.draft_metadata = meta
       doc.draft_content = content
@@ -546,10 +546,10 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('ChangedType', Armagh::DocState::WORKING)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+    new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id: id, draft_content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(id: id, draft_content: 'old content',
                                                                         published_content: 'published content',
                                                                         draft_metadata: 'old meta',
                                                                         published_metadata: 'published meta',
@@ -557,7 +557,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
@@ -571,9 +571,9 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id: id, draft_content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(id: id, draft_content: 'old content',
                                                                         published_content: 'published content',
                                                                         draft_metadata: 'old meta',
                                                                         published_metadata: 'published meta',
@@ -595,10 +595,10 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::PUBLISHED)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+    new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id: id, draft_content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(id: id, draft_content: 'old content',
                                                                         published_content: 'published content',
                                                                         draft_metadata: 'old meta',
                                                                         published_metadata: 'published meta',
@@ -606,7 +606,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
@@ -620,10 +620,10 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::ActionDocument.new(id: id, draft_content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(id: id, draft_content: 'old content',
                                                                         published_content: 'published content',
                                                                         draft_metadata: 'old meta',
                                                                         published_metadata: 'published meta',
@@ -631,7 +631,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
@@ -644,12 +644,12 @@ class TestAgent < Test::Unit::TestCase
     id = 'id'
     @current_doc_mock.expects(:id).returns('current_id')
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('ChangedType', Armagh::DocState::WORKING)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+    new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
@@ -663,7 +663,7 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:id).returns('current_id')
     id = 'id'
 
-    docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
     doc.expects(:finish_processing).returns nil
 
@@ -679,12 +679,12 @@ class TestAgent < Test::Unit::TestCase
     id = 'id'
     @current_doc_mock.expects(:id).returns('current_id')
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::PUBLISHED)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+    new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
@@ -697,12 +697,12 @@ class TestAgent < Test::Unit::TestCase
     id = 'id'
     @current_doc_mock.expects(:id).returns('current_id')
 
-    old_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::READY)
-    new_docspec = Armagh::DocSpec.new('DocumentType', Armagh::DocState::WORKING)
+    old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
 
-    e = assert_raise(Armagh::ActionErrors::DocSpecError) do
+    e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @agent.edit_document(id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end

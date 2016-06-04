@@ -20,7 +20,6 @@ require_relative '../utils/processing_backoff'
 require_relative '../connection'
 
 require 'armagh/documents'
-require 'armagh/action_errors'
 
 module Armagh
   class Document
@@ -146,7 +145,7 @@ module Armagh
     end
     
     def self.collection(type = nil, state = nil)
-      type_collection = (state == DocState::PUBLISHED) ? type : nil
+      type_collection = (state == Documents::DocState::PUBLISHED) ? type : nil
       Connection.documents(type_collection)
     end
 
@@ -288,7 +287,7 @@ module Armagh
 
       delete_orig = false
 
-      if failed? && state != DocState::PUBLISHED
+      if failed? && state != Documents::DocState::PUBLISHED
         save_collection = Connection.failures
         delete_orig = true
       elsif @pending_publish
@@ -303,7 +302,7 @@ module Armagh
         @pending_delete = false
         delete_orig = true
         save_collection = nil
-      elsif state == DocState::PUBLISHED
+      elsif state == Documents::DocState::PUBLISHED
         save_collection = Connection.documents(type)
       else
         save_collection = Connection.documents
@@ -320,10 +319,10 @@ module Armagh
       Connection.documents.delete_one({ '_id': id}) if delete_orig
 
     rescue Mongo::Error::MaxBSONSize
-      raise ActionErrors::DocumentSizeError.new("Document #{id} is too large.  Consider using a splitter or parser to split the document.")
+      raise Documents::Errors::DocumentSizeError.new("Document #{id} is too large.  Consider using a splitter or parser to split the document.")
     rescue Mongo::Error::OperationFailure => e
       if e.message =~ /^E11000/
-        raise ActionErrors::DocumentUniquenessError.new("Unable to create document #{id}.  This document already exists.")
+        raise Documents::Errors::DocumentUniquenessError.new("Unable to create document #{id}.  This document already exists.")
       else
         raise e
       end
@@ -334,34 +333,34 @@ module Armagh
     end
 
     def state=(state)
-      if DocState.valid_state?(state)
+      if Documents::DocState.valid_state?(state)
         @db_doc['state'] = state
       else
-        raise ActionErrors::StateError.new "Tried to set state to an unknown state: '#{state}'."
+        raise Documents::Errors::DocStateError.new "Tried to set state to an unknown state: '#{state}'."
       end
     end
 
     def ready?
-      state == DocState::READY
+      state == Documents::DocState::READY
     end
 
     def working?
-      state == DocState::WORKING
+      state == Documents::DocState::WORKING
     end
 
     def published?
-      state == DocState::PUBLISHED
+      state == Documents::DocState::PUBLISHED
     end
 
     def to_action_document
-      docspec = DocSpec.new(type, state)
-      ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
+      docspec = Documents::DocSpec.new(type, state)
+      Documents::ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
                          draft_metadata: draft_metadata, published_metadata: published_metadata, docspec: docspec)
     end
 
     def to_publish_action_document
-      docspec = DocSpec.new(type, state)
-      published_doc = self.class.find(id, type, DocState::PUBLISHED)
+      docspec = Documents::DocSpec.new(type, state)
+      published_doc = self.class.find(id, type, Documents::DocState::PUBLISHED)
       if published_doc
         pub_content = published_doc.published_content
         pub_metadata = published_doc.published_metadata
@@ -369,7 +368,7 @@ module Armagh
         pub_content = published_content
         pub_metadata = published_metadata
       end
-      ActionDocument.new(id: id, draft_content: draft_content, published_content: pub_content,
+      Documents::ActionDocument.new(id: id, draft_content: draft_content, published_content: pub_content,
                          draft_metadata: draft_metadata, published_metadata: pub_metadata, docspec: docspec)
     end
 

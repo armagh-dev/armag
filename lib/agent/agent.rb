@@ -22,7 +22,6 @@ require 'tmpdir'
 
 require 'armagh/actions'
 require 'armagh/documents'
-require 'armagh/action_errors'
 
 require_relative '../action/action_manager'
 require_relative '../document/document'
@@ -74,7 +73,7 @@ module Armagh
 
     def create_document(action_doc)
       docspec = action_doc.docspec
-      raise ActionErrors::DocumentError, "Cannot create document '#{action_doc.id}'.  It is the same document that was passed into the action." if action_doc.id == @current_doc.id
+      raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.id}'.  It is the same document that was passed into the action." if action_doc.id == @current_doc.id
       pending_actions = @action_manager.get_action_names_for_docspec(docspec)
       Document.create(type: docspec.type, draft_content: action_doc.draft_content, published_content: action_doc.published_content,
                       draft_metadata: action_doc.draft_metadata, published_metadata: action_doc.published_metadata,
@@ -83,7 +82,7 @@ module Armagh
     end
 
     def edit_document(id, docspec)
-      raise ActionErrors::DocumentError, "Cannot edit document '#{id}'.  It is the same document that was passed into the action." if id == @current_doc.id
+      raise Documents::Errors::DocumentError, "Cannot edit document '#{id}'.  It is the same document that was passed into the action." if id == @current_doc.id
       if block_given?
         Document.modify_or_create(id, docspec.type, docspec.state, @running, @logger) do |doc|
           edit_or_create(id, docspec, doc) do |doc|
@@ -104,8 +103,8 @@ module Armagh
 
         new_docspec = action_doc.docspec
 
-        raise ActionErrors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
-        raise ActionErrors::DocSpecError, "Document '#{id}' state can only be changed from #{DocState::WORKING} to #{DocState::READY}." unless ((initial_docspec.state == new_docspec.state) || (initial_docspec.state == DocState::WORKING && new_docspec.state == DocState::READY))
+        raise Documents::Errors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless initial_docspec.type == new_docspec.type
+        raise Documents::Errors::DocSpecError, "Document '#{id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((initial_docspec.state == new_docspec.state) || (initial_docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
         # Output can only equal to input state unless input was working and output is ready.
         doc.update_from_action_document(action_doc)
@@ -116,15 +115,15 @@ module Armagh
           doc.add_pending_actions pending_actions
         end
       else
-        action_doc = ActionDocument.new(id: id, draft_content: {}, published_content: {}, draft_metadata: {},
+        action_doc = Documents::ActionDocument.new(id: id, draft_content: {}, published_content: {}, draft_metadata: {},
                                         published_metadata: {}, docspec: docspec, new: true)
 
         yield action_doc
 
         new_docspec = action_doc.docspec
 
-        raise ActionErrors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
-        raise ActionErrors::DocSpecError, "Document '#{id}' state can only be changed from #{DocState::WORKING} to #{DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == DocState::WORKING && new_docspec.state == DocState::READY))
+        raise Documents::Errors::DocSpecError, "Document '#{id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
+        raise Documents::Errors::DocSpecError, "Document '#{id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
         pending_actions = @action_manager.get_action_names_for_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
@@ -216,33 +215,33 @@ module Armagh
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
       case action
-        when CollectAction
+        when Actions::Collect
           @num_creates = 0
           action.collect
           doc.draft_metadata.merge!({
             'docs_collected' => @num_creates
           })
           doc.mark_archive
-        when ParseAction
+        when Actions::Parse
           action_doc = doc.to_action_document
           action.parse action_doc
           doc.mark_delete
-        when PublishAction
+        when Actions::Publish
           action_doc = doc.to_publish_action_document
           action.publish action_doc
           doc.published_metadata = action_doc.draft_metadata
           doc.published_content = action_doc.draft_content
           doc.draft_metadata = {}
           doc.draft_content = {}
-          doc.state = DocState::PUBLISHED
-          doc.add_pending_actions(@action_manager.get_action_names_for_docspec(DocSpec.new(doc.type, doc.state)))
+          doc.state = Documents::DocState::PUBLISHED
+          doc.add_pending_actions(@action_manager.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
-        when ConsumeAction
+        when Actions::Consume
           action_doc = doc.to_action_document
           action.consume action_doc
           doc.draft_content = action_doc.draft_content
           doc.draft_metadata = action_doc.draft_metadata
-        when Action
+        when Actions::Action
           @logger.error "#{action.name} is an unknown action type."
         else
           @logger.error "#{action} is an not an action."

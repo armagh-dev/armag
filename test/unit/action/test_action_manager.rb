@@ -23,14 +23,14 @@ require 'mocha/test_unit'
 
 require 'armagh/actions'
 
-class Action1 < Armagh::Action; end
-class Action2 < Armagh::Action; end
-class ActionShared < Armagh::Action; end
-class TestPublisher < Armagh::PublishAction; end
-class TestCollector < Armagh::CollectAction; end
-class TestParser < Armagh::ParseAction; end
-class TestConsumer < Armagh::ConsumeAction; end
-class TestSplitter < Armagh::CollectionSplitter; end
+class Action1 < Armagh::Actions::Action; end
+class Action2 < Armagh::Actions::Action; end
+class ActionShared < Armagh::Actions::Action; end
+class TestPublisher < Armagh::Actions::Publish; end
+class TestCollector < Armagh::Actions::Collect; end
+class TestParser < Armagh::Actions::Parse; end
+class TestConsumer < Armagh::Actions::Consume; end
+class TestSplitter < Armagh::Actions::CollectionSplitter; end
 
 # Strickly for testing
 module Armagh
@@ -131,11 +131,11 @@ class TestActionManager < Test::Unit::TestCase
   end
 
   def test_get_action_instances
-    actions = @action_manager.get_action_names_for_docspec(Armagh::DocSpec.new('InputDocument2', 'ready'))
+    actions = @action_manager.get_action_names_for_docspec(Armagh::Documents::DocSpec.new('InputDocument2', 'ready'))
     assert_equal(1, actions.length)
     assert_equal('action_2' , actions.first)
 
-    actions = @action_manager.get_action_names_for_docspec(Armagh::DocSpec.new('InputDocument1', 'ready'))
+    actions = @action_manager.get_action_names_for_docspec(Armagh::Documents::DocSpec.new('InputDocument1', 'ready'))
     assert_equal('action_1' , actions.first)
     assert_equal('action_shared' , actions.last)
   end
@@ -208,25 +208,25 @@ class TestActionManager < Test::Unit::TestCase
 
   def test_publish
     action = @action_manager.get_action 'publisher'
-    assert_equal({'' => Armagh::DocSpec.new('PublishDocument', Armagh::DocState::PUBLISHED)}, action.output_docspecs)
+    assert_equal({'' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}, action.output_docspecs)
   end
 
   def test_parse
     action = @action_manager.get_action 'parser'
-    assert_equal({'parse_output' => Armagh::DocSpec.new('ParseOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
+    assert_equal({'parse_output' => Armagh::Documents::DocSpec.new('ParseOutDoc', Armagh::Documents::DocState::READY)}, action.output_docspecs)
   end
 
   def test_collect
     action = @action_manager.get_action 'collector'
     assert_equal({
-                     'collect_output_no_split' => Armagh::DocSpec.new('CollectedDocumentRaw', Armagh::DocState::WORKING),
-                     'collect_output_with_split' => Armagh::DocSpec.new('CollectedDocument', Armagh::DocState::WORKING)
+                     'collect_output_no_split' => Armagh::Documents::DocSpec.new('CollectedDocumentRaw', Armagh::Documents::DocState::WORKING),
+                     'collect_output_with_split' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING)
                  }, action.output_docspecs)
   end
 
   def test_consume
     action = @action_manager.get_action 'consumer'
-    assert_equal({'consume_output' => Armagh::DocSpec.new('ConsumeOutDoc', Armagh::DocState::READY)}, action.output_docspecs)
+    assert_equal({'consume_output' => Armagh::Documents::DocSpec.new('ConsumeOutDoc', Armagh::Documents::DocState::READY)}, action.output_docspecs)
   end
 
   def test_get_action_unknown
@@ -237,7 +237,7 @@ class TestActionManager < Test::Unit::TestCase
 
   def test_splitter
     splitter = @action_manager.get_splitter('collector', 'collect_output_with_split')
-    assert_equal(Armagh::DocSpec.new('CollectedDocument', Armagh::DocState::WORKING), splitter.output_docspec)
+    assert_equal(Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING), splitter.output_docspec)
   end
 
   def test_no_splitter

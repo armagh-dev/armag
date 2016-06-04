@@ -19,7 +19,7 @@ require_relative '../../lib/document/document'
 require 'armagh/documents/doc_state'
 
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", content "([^"]*)", metadata "([^"]*)"$/) do |count, doc_type, state, id, content, meta|
-  docspec = Armagh::DocSpec.new(doc_type, state)
+  docspec = Armagh::Documents::DocSpec.new(doc_type, state)
   pending_actions = @action_manager.get_action_names_for_docspec docspec
 
   content = content.nil? ? {} : eval(content)
@@ -34,7 +34,7 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", content "(
 end
 
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, id "([^"]*)", published content "([^"]*)", published metadata "([^"]*)"$/) do |count, doc_type, state, id, content, meta|
-  docspec = Armagh::DocSpec.new(doc_type, state)
+  docspec = Armagh::Documents::DocSpec.new(doc_type, state)
   pending_actions = @action_manager.get_action_names_for_docspec docspec
 
   content = content.nil? ? {} : eval(content)

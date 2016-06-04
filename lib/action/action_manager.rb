@@ -42,18 +42,18 @@ module Armagh
 
         clazz = Object::const_get(action_class_name)
 
-        if clazz < PublishAction
+        if clazz < Actions::Publish
           input_doc_type = action_details['doc_type']
-          output_docspecs = {'' => DocSpec.new(action_details['doc_type'], DocState::PUBLISHED)}
+          output_docspecs = {'' => Documents::DocSpec.new(action_details['doc_type'], Documents::DocState::PUBLISHED)}
         else
           input_doc_type = action_details['input_doc_type']
           raw_output_docspecs = action_details['output_docspecs']
           output_docspecs = self.class.map_docspec_states(raw_output_docspecs)
-          map_splitters(action_name, raw_output_docspecs) if clazz < CollectAction
+          map_splitters(action_name, raw_output_docspecs) if clazz < Actions::Collect
         end
 
-        input_state = clazz < ConsumeAction ? DocState::PUBLISHED : DocState::READY
-        input_docspec = DocSpec.new(input_doc_type, input_state)
+        input_state = clazz < Actions::Consume ? Documents::DocState::PUBLISHED : Documents::DocState::READY
+        input_docspec = Documents::DocSpec.new(input_doc_type, input_state)
 
         action_settings = {'name' => action_name, 'input_docspec' => input_docspec, 'output_docspecs' => output_docspecs,
                            'parameters' => parameters, 'class_name' => action_class_name, 'class' => clazz}
@@ -101,7 +101,7 @@ module Armagh
       converted_docspecs = {}
 
       docspecs.each do |name, details|
-        converted_docspecs[name] = DocSpec.new(details['type'], details['state'])
+        converted_docspecs[name] = Documents::DocSpec.new(details['type'], details['state'])
       end
       converted_docspecs
     end
