@@ -164,6 +164,28 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
+    if specified_actions.include? 'notify_ops'
+      available_actions['notify_ops'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestParserNotifyOps',
+          'input_doc_type' => 'NotifyOpsDocType',
+          'output_docspecs' => {
+              'notify_ops_output' => {'type' => 'NotifyOpsDocTypeOutput', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'notify_dev'
+      available_actions['notify_dev'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestParserNotifyDev',
+          'input_doc_type' => 'NotifyDevDocType',
+          'output_docspecs' => {
+              'notify_dev_output' => {'type' => 'NotifyDevDocTypeOutput', 'state' => 'working'}
+          },
+          'parameters' => {}
+      }
+    end
+
     if specified_actions.include? 'full_workflow'
       full_workflow = {
           'test_collect' => {

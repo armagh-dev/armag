@@ -59,15 +59,15 @@ module Armagh
         begin
           db_config = Connection.config.find('type' => @type).projection({'type' => 0, '_id' => 0}).limit(1).first || {}
         rescue => e
-          Logging.error_exception(@logger, e, "Problem getting #{@type} configuration.")
+          Logging.ops_error_exception(@logger, e, "Problem getting #{@type} configuration.")
           db_config = {}
         end
 
         if db_config.empty?
-          @logger.warn "No #{@type} configuration found.  Using default #{@default_config}."
+          @logger.ops_warn "No #{@type} configuration found.  Using default #{@default_config}."
         else
           missing = @default_config.keys - db_config.keys
-          @logger.warn "Partial #{@type} configuration found.  Using default values for #{missing.sort.join(', ')}." unless missing.empty?
+          @logger.ops_warn "Partial #{@type} configuration found.  Using default values for #{missing.sort.join(', ')}." unless missing.empty?
         end
 
         config = @default_config.merge db_config
@@ -83,7 +83,7 @@ module Armagh
 
         if level_num.nil?
           default = @default_config['log_level']
-          @logger.error "Unknown log level #{level_str}. Reverting to #{default}."
+          @logger.ops_error "Unknown log level #{level_str}. Reverting to #{default}."
           level_num = get_log_level(default)
         end
         level_num
@@ -163,7 +163,7 @@ module Armagh
         new = true
         if config['timestamp'].is_a?(Time) && @last_config_timestamp
           if config['timestamp'] < @last_config_timestamp
-            @logger.warn "#{@type} configuration received that was older than last applied."
+            @logger.ops_warn "#{@type} configuration received that was older than last applied."
             new = false
           elsif config['timestamp'] == @last_config_timestamp
             # We are up to date
@@ -177,12 +177,12 @@ module Armagh
         validation_result = self.class.validate(config)
 
         if validation_result['valid']
-          @logger.warn "#{@type} configuration validation is usable but had warnings:\n #{self.class.format_validation_results(validation_result)}" if validation_result['warnings'].any?
+          @logger.ops_warn "#{@type} configuration validation is usable but had warnings:\n #{self.class.format_validation_results(validation_result)}" if validation_result['warnings'].any?
           @last_config_timestamp = config['timestamp']
           config['log_level'] = get_log_level(config['log_level'])
         else
           config = nil
-          @logger.error "#{@type} configuration validation failed:\n #{self.class.format_validation_results(validation_result)}"
+          @logger.ops_error "#{@type} configuration validation failed:\n #{self.class.format_validation_results(validation_result)}"
         end
         config
       end

@@ -36,6 +36,19 @@ class ConsumeTest < Armagh::Actions::Consume; end
 class SplitterTest < Armagh::Actions::CollectionSplitter; end
 class UnknownAction < Armagh::Actions::Action; end
 
+class FakeBlockLogger
+  attr_reader :method
+  def info
+    @method = :info
+    yield
+  end
+
+  def debug
+    @method = :debug
+    yield
+  end
+end
+
 class TestAgent < Test::Unit::TestCase
   include ArmaghTest
 
@@ -154,6 +167,9 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
 
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_archive)
     doc.expects(:draft_metadata).returns({})
@@ -181,6 +197,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
     doc.expects(:mark_delete)
     doc.expects(:finish_processing).at_least_once
+
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -221,6 +240,8 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -250,6 +271,8 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:draft_metadata=, action_doc.draft_metadata)
     doc.expects(:draft_content=, action_doc.draft_content)
     doc.expects(:delete).never
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
 
@@ -265,7 +288,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_splitter
     action_name = 'action_name'
-    splitter = SplitterTest.new(@agent, @logger, {}, {})
+    splitter = SplitterTest.new('name', @agent, @logger, {}, {})
 
     doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
@@ -277,7 +300,7 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock.expects(:reset).at_least_once
 
     @agent.instance_variable_set(:@running, true)
-    @logger.expects(:error).with("#{splitter} is an not an action.")
+    @logger.expects(:dev_error).with("#{splitter} is an not an action.")
 
     Thread.new {@agent.send(:run)}
     sleep THREAD_SLEEP_TIME
@@ -298,8 +321,73 @@ class TestAgent < Test::Unit::TestCase
     @agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
     @agent.instance_variable_set(:@running, true)
-    @logger.expects(:error).with("#{action.name} is an unknown action type.")
+    @logger.expects(:dev_error).with("#{action.name} is an unknown action type.")
+
+    Thread.new {@agent.send(:run)}
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_action_with_dev_errors
+    action_name = 'action_name'
+    action = setup_action(CollectTest)
+
+    action.expects(:collect).with()
+
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
+
+    doc.expects(:dev_errors).returns({'action_name' => ['BROKEN']})
+    doc.expects(:ops_errors).returns({})
+
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_archive)
+    doc.expects(:draft_metadata).returns({})
+
+    @agent.expects(:update_config).at_least_once
+    @agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @logger.expects(:dev_error)
+    @logger.expects(:ops_error).never
+
+    @agent.instance_variable_set(:@running, true)
+
+    Thread.new {@agent.send(:run)}
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_action_with_ops_errors
+    action_name = 'action_name'
+    action = setup_action(CollectTest)
+
+    action.expects(:collect).with()
+
+    doc = stub(:id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
+
+    doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
+    doc.expects(:dev_errors).returns({})
+
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_archive)
+    doc.expects(:draft_metadata).returns({})
+
+    @agent.expects(:update_config).at_least_once
+    @agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @logger.expects(:dev_error).never
+    @logger.expects(:ops_error)
+
+    @agent.instance_variable_set(:@running, true)
 
     Thread.new {@agent.send(:run)}
     sleep THREAD_SLEEP_TIME
@@ -316,8 +404,10 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
 
-    doc.expects(:add_failed_action)
+    doc.expects(:add_dev_error)
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -325,7 +415,7 @@ class TestAgent < Test::Unit::TestCase
 
     @agent.instance_variable_set(:@running, true)
 
-    Armagh::Logging.expects(:error_exception).with do |_logger, e, msg|
+    Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
       assert_equal "Error while executing action '#{action_name}'.", msg
       true
@@ -340,7 +430,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     doc = stub(:id => 'document_id', :pending_actions => [action_name])
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    doc.expects(:add_failed_action).at_least_once
+    doc.expects(:add_ops_error).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(nil).at_least_once
@@ -377,7 +467,7 @@ class TestAgent < Test::Unit::TestCase
     exception = RuntimeError.new 'Exception'
     @agent.expects(:update_config).raises(exception)
 
-    Armagh::Logging.expects(:error_exception).with do |_logger, e, msg|
+    Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
       assert_equal 'An unexpected error occurred.', msg
       true
@@ -510,7 +600,7 @@ class TestAgent < Test::Unit::TestCase
   def test_edit_document_no_block
     @current_doc_mock.expects(:id).returns('current_id')
     logger = @agent.instance_variable_get(:@logger)
-    logger.expects(:warn).with("edit_document called for document '123' but no block was given.  Ignoring.")
+    logger.expects(:dev_warn).with("edit_document called for document '123' but no block was given.  Ignoring.")
     @agent.edit_document(123, Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY))
   end
 
@@ -712,7 +802,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_get_splitter
-    splitter = SplitterTest.new(@agent, @logger, {}, {})
+    splitter = SplitterTest.new('Splitter-name', @agent, @logger, {}, {})
     Armagh::ActionManager.any_instance.expects(:get_splitter).returns(splitter)
     assert_equal(splitter, @agent.get_splitter('invalid', 'invalid'))
   end
@@ -720,5 +810,57 @@ class TestAgent < Test::Unit::TestCase
   def test_get_splitter_none
     Armagh::ActionManager.any_instance.expects(:get_splitter).returns(nil)
     assert_nil @agent.get_splitter('invalid', 'invalid')
+  end
+
+  def test_log_debug
+    message = 'test message'
+    logger_name = 'test_logger'
+    logger = mock('logger')
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    logger.expects(:debug).with(message)
+    @agent.log_debug(logger_name, message)
+  end
+
+  def test_log_debug_block
+    logger_name = 'test_logger'
+    logger = FakeBlockLogger.new
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger).yields(nil)
+    block_called = false
+    @agent.log_debug(logger_name) {block_called = true}
+    assert_true block_called
+    assert_equal(:debug, logger.method)
+  end
+
+  def test_log_info
+    message = 'test message'
+    logger_name = 'test_logger'
+    logger = mock('logger')
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    logger.expects(:info).with(message)
+    @agent.log_info(logger_name, message)
+  end
+
+  def test_log_info_block
+    logger_name = 'test_logger'
+    logger = FakeBlockLogger.new
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger).yields(nil)
+    block_called = false
+    @agent.log_info(logger_name) {block_called = true}
+    assert_true block_called
+    assert_equal(:info, logger.method)
+  end
+
+  def test_notify_ops
+    action_name = 'action'
+    message = 'message'
+    @current_doc_mock.expects(:add_ops_error).with(action_name, message)
+    @agent.notify_ops(action_name, message)
+  end
+
+  def test_notify_dev
+    action_name = 'action'
+    message = 'message'
+    @current_doc_mock.expects(:add_dev_error).with(action_name, message)
+    @agent.notify_dev(action_name, message)
   end
 end

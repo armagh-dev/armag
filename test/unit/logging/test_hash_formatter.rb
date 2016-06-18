@@ -67,6 +67,31 @@ class TestHashFormatter < Test::Unit::TestCase
     assert_equal(expected, result)
   end
 
+  def test_format_enhanced_exception
+    e = RuntimeError.new 'Failed!'
+    ee = Armagh::Logging::EnhancedException.new('details', e)
+    event = stub(name: 'item', level: Log4r::WARN, data: ee, tracer: ['one', 'two'])
+
+    expected = {
+        'component' => 'item',
+        'hostname' => Socket.gethostname,
+        'level' => 'WARN',
+        'message' => 'details',
+        'exception' => {
+            'class' => 'RuntimeError',
+            'message' => 'Failed!',
+            'trace' => nil
+        },
+        'trace' => ['one', 'two'],
+        'pid' => $$
+    }
+
+    result = @hash_formatter.format(event)
+    assert_in_delta(Time.now, result['timestamp'], 1)
+    result.delete('timestamp')
+    assert_equal(expected, result)
+  end
+
   def test_format_exception
     e = RuntimeError.new 'Failed!'
     event = stub(name: 'item', level: Log4r::WARN, data: e, tracer: ['one', 'two'])

@@ -15,6 +15,11 @@
 # limitations under the License.
 #
 
+def replace_trace(hash)
+  hash['trace'] = 'placeholder' if hash['trace']
+  hash['cause'] = 'placeholder' if hash['cause']
+end
+
 And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
   doc_info = table.rows_hash
   found_matching_doc = false
@@ -26,15 +31,30 @@ And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, 
       doc_problems[doc_id] = {}
       found_matching_doc = true
       doc_info.each do |key, value|
+
         # This is a potential match
         expected = eval(value)
 
         if expected.is_a?(Hash) && doc[key].is_a?(Hash)
-          expected.collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
-          doc[key].collect{|_k,v| v['trace'] = 'placeholder' if v.is_a?(Hash) && v['trace']}
+          expected.collect do |_k, v|
+            if v.is_a? Hash
+              replace_trace v
+            elsif v.is_a? Array
+              v.each do |i|
+                replace_trace(i) if i.is_a? Hash
+              end
+            end
+          end
 
-          expected.collect{|_k,v| v['cause'] = 'placeholder' if v.is_a?(Hash) && v['cause']}
-          doc[key].collect{|_k,v| v['cause'] = 'placeholder' if v.is_a?(Hash) && v['cause']}
+          doc[key].collect do |_k, v|
+            if v.is_a? Hash
+              replace_trace v
+            elsif v.is_a? Array
+              v.each do |i|
+                replace_trace(i) if i.is_a? Hash
+              end
+            end
+          end
         end
 
         if expected != doc[key]
@@ -53,7 +73,7 @@ end
 When(/^I insert the following document$/) do |table|
   doc_info = table.rows_hash
 
-  doc_info.each {|k, v| doc_info[k] = eval(v)}
+  doc_info.each { |k, v| doc_info[k] = eval(v) }
 
   Armagh::Document.create(doc_info['type'], doc_info['content'], doc_info['meta'], doc_info['pending_actions'], doc_info['state'], doc_info['id'])
 end

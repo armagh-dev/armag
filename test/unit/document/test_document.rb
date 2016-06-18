@@ -172,24 +172,25 @@ class TestDocument < Test::Unit::TestCase
     assert_empty @doc.pending_actions
   end
 
-  def test_failed_actions
-    assert_empty(@doc.failed_actions)
-    assert_false @doc.failed?
+  def test_dev_errors
+    assert_empty(@doc.dev_errors)
+    assert_false @doc.error?
 
     failures = [
         {name: 'failed_action', details: RuntimeError.new('runtime error')},
         {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
 
-    assert_equal(2, @doc.failed_actions.length)
-    assert_true @doc.failed?
+    assert_equal(2, @doc.dev_errors.length)
+    assert_true @doc.error?
 
     failures.each do |failure|
       name = failure[:name]
       details = failure[:details]
-      assert_true(@doc.failed_actions.has_key? name)
-      db_details = @doc.failed_actions[name]
+
+      assert_true(@doc.dev_errors.has_key? name)
+      db_details = @doc.dev_errors[name].first
       if details.is_a? Exception
         assert_equal(details.message, db_details['message'])
         assert_equal(details.backtrace, db_details['trace'])
@@ -197,50 +198,91 @@ class TestDocument < Test::Unit::TestCase
         assert_equal(details, db_details['message'])
       end
 
-      @doc.remove_failed_action(name)
-      assert_false(@doc.failed_actions.has_key?(name))
+      @doc.remove_dev_error(name)
+      assert_false(@doc.dev_errors.has_key?(name))
     end
 
-    assert_empty @doc.failed_actions
-    assert_false @doc.failed?
+    assert_empty @doc.dev_errors
+    assert_false @doc.error?
 
-    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
 
-    assert_true @doc.failed?
+    assert_true @doc.error?
 
-    @doc.clear_failed_actions
-    assert_false @doc.failed?
-    assert_empty @doc.failed_actions
-
+    @doc.clear_dev_errors
+    assert_false @doc.error?
+    assert_empty @doc.dev_errors
   end
 
-  def test_pending_and_failed
-    assert_false @doc.pending_work?
-    assert_false @doc.failed?
-
-    pending_actions = %w(Action1 Action2 Action3)
-    @doc.add_pending_actions pending_actions
-
-    assert_true @doc.pending_work?
-    assert_false @doc.failed?
+  def test_ops_errors
+    assert_empty(@doc.ops_errors)
+    assert_false @doc.error?
 
     failures = [
         {name: 'failed_action', details: RuntimeError.new('runtime error')},
         {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each { |f| @doc.add_failed_action(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_ops_error(f[:name], f[:details]) }
 
+    assert_equal(2, @doc.ops_errors.length)
+    assert_true @doc.error?
+
+    failures.each do |failure|
+      name = failure[:name]
+      details = failure[:details]
+
+      assert_true(@doc.ops_errors.has_key? name)
+      db_details = @doc.ops_errors[name].first
+      if details.is_a? Exception
+        assert_equal(details.message, db_details['message'])
+        assert_equal(details.backtrace, db_details['trace'])
+      else
+        assert_equal(details, db_details['message'])
+      end
+
+      @doc.remove_ops_error(name)
+      assert_false(@doc.ops_errors.has_key?(name))
+    end
+
+    assert_empty @doc.ops_errors
+    assert_false @doc.error?
+
+    failures.each { |f| @doc.add_ops_error(f[:name], f[:details]) }
+
+    assert_true @doc.error?
+
+    @doc.clear_ops_errors
+    assert_false @doc.error?
+    assert_empty @doc.ops_errors
+  end
+
+  def test_pending_and_failed
     assert_false @doc.pending_work?
-    assert_true @doc.failed?
+    assert_false @doc.error?
 
-    @doc.clear_failed_actions
+    pending_actions = %w(Action1 Action2 Action3)
+    @doc.add_pending_actions pending_actions
 
     assert_true @doc.pending_work?
-    assert_false @doc.failed?
+    assert_false @doc.error?
+
+    failures = [
+        {name: 'failed_action', details: RuntimeError.new('runtime error')},
+        {name: 'failed_action2', details: 'string error'},
+    ]
+    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
+
+    assert_false @doc.pending_work?
+    assert_true @doc.error?
+
+    @doc.clear_dev_errors
+
+    assert_true @doc.pending_work?
+    assert_false @doc.error?
 
     @doc.clear_pending_actions
     assert_false @doc.pending_work?
-    assert_false @doc.failed?
+    assert_false @doc.error?
   end
 
   def test_timestamps
@@ -390,6 +432,21 @@ class TestDocument < Test::Unit::TestCase
     end
   end
 
+  def test_modify_or_create_error
+    id = 'docid'
+    type = 'testdoc'
+    state = Documents::DocState::WORKING
+    mock_document_find_one_and_update({'_id' => 'docid'})
+    Document.expects(:unlock)
+
+    e = RuntimeError.new 'Error'
+    assert_raise(e) do
+      Document.modify_or_create(id, type, state, true) do |doc|
+        raise e
+      end
+    end
+  end
+
   def test_delete
     @documents.expects(:delete_one).with({:'_id' => '123'})
     Document.delete('123', 'type', 'state')
@@ -522,7 +579,7 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:delete_one).with({'_id': @doc.id})
     failures.expects(:replace_one)
 
-    @doc.add_failed_action('test_action', 'Failure Details')
+    @doc.add_dev_error('test_action', 'Failure Details')
     @doc.save
   end
 
@@ -575,5 +632,20 @@ class TestDocument < Test::Unit::TestCase
     Armagh::Document.version['armagh'] = version
     @doc.save
     assert_equal({'armagh' => version}, @doc.version)
+  end
+
+  def test_clear_errors
+    @doc.add_dev_error('test', 'test')
+    @doc.add_ops_error('test', 'test')
+    assert_false @doc.dev_errors.empty?
+    assert_false @doc.ops_errors.empty?
+    @doc.clear_errors
+    assert_true @doc.dev_errors.empty?
+    assert_true @doc.ops_errors.empty?
+  end
+
+  def test_unlock
+    @documents.expects(:find_one_and_update).with({ '_id': 'id'}, {'$set' => {'locked' => false}})
+    Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)
   end
 end

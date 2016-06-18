@@ -19,6 +19,7 @@ require 'log4r/formatter/formatter'
 require 'socket'
 
 require_relative '../utils/exception_helper'
+require_relative 'enhanced_exception'
 
 module Log4r
   class HashFormatter < Log4r::Formatter
@@ -38,7 +39,10 @@ module Log4r
 
       log_msg['trace'] = event.tracer if event.tracer
 
-      if event.data.is_a? Exception
+      if event.data.is_a? Armagh::Logging::EnhancedException
+        log_msg['message'] = "#{event.data.additional_details}"
+        log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash event.data.exception
+      elsif event.data.is_a? Exception
         log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash event.data
       else
         log_msg['message'] = "#{event.data}"

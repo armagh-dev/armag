@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../test_helpers/mock_logger'
 
 require_relative '../../../lib/configuration/agent_config_manager'
 require_relative '../../../lib/configuration/action_config_validator'
@@ -37,6 +38,10 @@ class TestAgentConfigManager < Test::Unit::TestCase
     @logger.stubs(:warn)
     @logger.stubs(:error)
     @logger.stubs(:level=)
+    @logger.stubs(:ops_warn)
+    @logger.stubs(:ops_error)
+    @logger.stubs(:dev_warn)
+    @logger.stubs(:dev_error)
 
     @manager = AgentConfigManager.new(@logger)
   end

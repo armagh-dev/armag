@@ -67,7 +67,7 @@ class TestLogging < Test::Unit::TestCase
     assert_false File.directory? @log_dir
   end
 
-  def test_error_exception
+  def test_ops_error_exception
     logger = mock
     exception = nil
 
@@ -77,15 +77,16 @@ class TestLogging < Test::Unit::TestCase
       exception = e
     end
 
-    logger.expects(:error).with do |exception|
-      assert_equal 'Something bad happened.  Exception Details: Error', exception.message
+    logger.expects(:ops_error).with do |error|
+      assert_equal exception, error.exception
+      assert_equal 'Something bad happened.', error.additional_details
       true
     end
 
-    Armagh::Logging.error_exception(logger, exception, 'Something bad happened.')
+    Armagh::Logging.ops_error_exception(logger, exception, 'Something bad happened.')
   end
 
-  def test_warn_exception
+  def test_dev_error_exception
     logger = mock
     exception = nil
 
@@ -95,47 +96,13 @@ class TestLogging < Test::Unit::TestCase
       exception = e
     end
 
-    logger.expects(:warn).with do |exception|
-      assert_equal 'Something bad happened.  Exception Details: Error', exception.message
+    logger.expects(:dev_error).with do |error|
+      assert_equal exception, error.exception
+      assert_equal 'Something bad happened.', error.additional_details
       true
     end
 
-    Armagh::Logging.warn_exception(logger, exception, 'Something bad happened.')
+    Armagh::Logging.dev_error_exception(logger, exception, 'Something bad happened.')
   end
 
-  def test_info_exception
-    logger = mock
-    exception = nil
-
-    begin
-      raise 'Error'
-    rescue => e
-      exception = e
-    end
-
-    logger.expects(:info).with do |exception|
-      assert_equal 'Something bad happened.  Exception Details: Error', exception.message
-      true
-    end
-
-    Armagh::Logging.info_exception(logger, exception, 'Something bad happened.')
-  end
-
-  def test_debug_exception
-    logger = mock
-    exception = nil
-
-    begin
-      raise 'Error'
-    rescue => e
-      exception = e
-    end
-
-    logger.expects(:debug).with do |exception|
-      assert_equal 'Something bad happened.  Exception Details: Error', exception.message
-      true
-    end
-
-    Armagh::Logging.debug_exception(logger, exception, 'Something bad happened.')
-  end
 end

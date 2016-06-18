@@ -18,15 +18,17 @@
 require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
+require_relative '../../lib/logging'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
 
 require 'test/unit'
-require 'mocha/test_unit'
 
 require 'mongo'
 require 'connection'
 require 'armagh/actions'
+
+Armagh::Logging.init_log_env
 
 class TestEditCallback < Test::Unit::TestCase
 
@@ -53,6 +55,8 @@ class TestEditCallback < Test::Unit::TestCase
     puts 'Starting Mongo'
     Singleton.__init__(Armagh::Connection::MongoConnection)
     MongoSupport.instance.start_mongo
+
+    Armagh::Logging.init_log_env
   end
 
   def self.shutdown
@@ -73,7 +77,7 @@ class TestEditCallback < Test::Unit::TestCase
     @output_type = 'OutputDocument'
     @output_state = Armagh::Documents::DocState::WORKING
     output_docspecs = {'test_document' => Armagh::Documents::DocSpec.new(@output_type, @output_state)}
-    @parser = TestParser.new('parser', agent, @logger, {}, output_docspecs)
+    @parser = TestParser.new('parser', agent, 'log_name', {}, output_docspecs)
   end
 
   def test_edit_new

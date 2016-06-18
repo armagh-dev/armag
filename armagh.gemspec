@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   spec.license       = 'Apache-2.0'
 
   spec.files         = Dir.glob('{bin,config,lib}/**/*') + %w(LICENSE README)
-  spec.executables   = [ 'armaghd' ]
+  spec.executables   = Dir.glob('bin/*')
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 
@@ -39,7 +39,7 @@ Gem::Specification.new do |spec|
   # Caution: Since this is actually packaged as a gem, these just verify the required versions are installed.  The versions
   #            used at runtime may differ unless a version is explicitly set before the require.
 
-  spec.add_runtime_dependency 'armagh-base-actions', '>= 0.0.0.a'
+  spec.add_runtime_dependency 'armagh-base-actions', '< 2.0.0'
   spec.add_runtime_dependency 'mongo', '~> 2.1'
   spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
   spec.add_runtime_dependency 'daemons', '~> 1.2'

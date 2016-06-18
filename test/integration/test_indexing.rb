@@ -66,7 +66,7 @@ class TestIndexing < Test::Unit::TestCase
     MongoSupport.instance.set_config('launcher', {'launcher_details' => 'launcher config details'})
     MongoSupport.instance.set_config('agent', {'agent_details' => 'agent config details'})
 
-    logger = stub(:warn)
+    logger = stub(:ops_warn)
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     initial_ops = index_stats['accesses']['ops']
 

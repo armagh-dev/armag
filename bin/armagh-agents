@@ -175,7 +175,7 @@ def start_agent_in_process(agent=nil)
     begin
       agent.start
     rescue => e
-      Logging.error_exception(@logger, e, "Could not start agent #{agent.uuid}")
+      Logging.dev_error_exception(@logger, e, "Could not start agent #{agent.uuid}")
     end
   end
 
@@ -218,10 +218,10 @@ def load_actions
     @logger.info "Using StandardActions: #{Standard::VERSION}"
     Document.version['standard'] = StandardActions::VERSION
   rescue LoadError
-    @logger.warn "StandardActions gem is not deployed. These actions won't be available."
+    @logger.ops_warn "StandardActions gem is not deployed. These actions won't be available."
   rescue => e
     # An unexpected exception - things like syntax errors.
-    Logging.error_exception(@logger, e, 'Could not load StandardActions gem')
+    Logging.dev_error_exception(@logger, e, 'Could not load StandardActions gem')
     Armagh.send(:remove_const, :StandardActions)
   end
 
@@ -230,10 +230,10 @@ def load_actions
     @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
     Document.version[CustomActions::NAME] = CustomActions::VERSION
   rescue LoadError
-    @logger.warn "CustomActions gem is not deployed. These actions won't be available."
+    @logger.ops_warn "CustomActions gem is not deployed. These actions won't be available."
   rescue => e
     # An unexpected exception - things like syntax errors.
-    Logging.error_exception(@logger, e, 'Could not load CustomActions gem')
+    Logging.dev_error_exception(@logger, e, 'Could not load CustomActions gem')
     Armagh.send(:remove_const, :CustomActions)
   end
 
@@ -242,7 +242,7 @@ def load_actions
   if defined_actions.any?
     @logger.debug "Available actions are: #{defined_actions}"
   else
-    @logger.warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
+    @logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
   end
 end
 
@@ -264,7 +264,7 @@ begin
   @config = @launcher_config_manager.get_config
 
   if @config.nil?
-    @logger.error 'Invalid initial launcher configuration.  Exiting.'
+    @logger.ops_error 'Invalid initial launcher configuration.  Exiting.'
     exit 1
   end
 
@@ -275,7 +275,7 @@ begin
   update_agent_config
 
   if @agent_status.config.nil?
-    @logger.error 'Invalid initial agent configuration.  Exiting.'
+    @logger.ops_error 'Invalid initial agent configuration.  Exiting.'
     exit 1
   end
 
@@ -297,8 +297,7 @@ begin
   end
 
 rescue => e
-  @logger.error 'An unexpected error occurred.  Exiting.'
-  @logger.error e
+  Logging.dev_error_exception(@logger, e, 'An unexpceted error occurred.  Exiting.')
   kill_all_agents(:SIGINT)
   @exit_status = 1
 end

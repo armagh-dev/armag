@@ -90,8 +90,34 @@ module Armagh
           end
         end
       else
-        @logger.warn "edit_document called for document '#{id}' but no block was given.  Ignoring."
+        @logger.dev_warn "edit_document called for document '#{id}' but no block was given.  Ignoring."
       end
+    end
+
+    def log_debug(logger_name, msg = nil)
+      logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      if block_given?
+        logger.debug { yield }
+      else
+        logger.debug msg
+      end
+    end
+
+    def log_info(logger_name, msg = nil)
+      logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      if block_given?
+        logger.info { yield }
+      else
+        logger.info msg
+      end
+    end
+
+    def notify_ops(action_name, error)
+      @current_doc.add_ops_error(action_name, error)
+    end
+
+    def notify_dev(action_name, error)
+      @current_doc.add_dev_error(action_name, error)
     end
 
     private def edit_or_create(id, docspec, doc)
@@ -139,7 +165,7 @@ module Armagh
 
       @logger.info 'Terminated'
     rescue => e
-      Logging.error_exception(@logger, e, 'An unexpected error occurred.')
+      Logging.dev_error_exception(@logger, e, 'An unexpected error occurred.')
     end
 
     private; def connect_agent_status # ; is a workaround for yard and sub/gsub (https://github.com/lsegal/yard/issues/888)
@@ -181,7 +207,7 @@ module Armagh
         @current_doc.pending_actions.delete_if do |name|
           current_action = @action_manager.get_action(name)
 
-          @logger.error "Document: #{@current_doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
+          @logger.ops_error "Document: #{@current_doc.id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
           report_status(@current_doc, current_action)
 
           if current_action
@@ -192,15 +218,22 @@ module Armagh
                   execute_action(current_action, @current_doc)
                 end
               end
+            rescue Documents::Errors::DocumentSizeError => e
+              Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}'.")
+              @current_doc.add_ops_error(name, e)
             rescue Exception => e
-              Logging.error_exception(@logger, e, "Error while executing action '#{name}'.")
-              @current_doc.add_failed_action(name, e)
+              Logging.dev_error_exception(@logger, e, "Error while executing action '#{name}'.")
+              @current_doc.add_dev_error(name, e)
             end
           else
             # This could happen while actions are propagating through the system
-            @current_doc.add_failed_action(name, 'Undefined action')
+            @current_doc.add_ops_error(name, 'Undefined action')
             @backoff.interruptible_backoff { !@running }
           end
+
+          @logger.dev_error "Error executing action '#{name}' on '#{@current_doc.id}'.  See document for details." if @current_doc.dev_errors.any?
+          @logger.ops_error "Error executing action '#{name}' on '#{@current_doc.id}'.  See document for details." if @current_doc.ops_errors.any?
+
           true # Always remove this action from pending
         end
         @current_doc.finish_processing
@@ -242,9 +275,9 @@ module Armagh
           doc.draft_content = action_doc.draft_content
           doc.draft_metadata = action_doc.draft_metadata
         when Actions::Action
-          @logger.error "#{action.name} is an unknown action type."
+          @logger.dev_error "#{action.name} is an unknown action type."
         else
-          @logger.error "#{action} is an not an action."
+          @logger.dev_error "#{action} is an not an action."
       end
     end
 

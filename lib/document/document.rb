@@ -154,7 +154,7 @@ module Armagh
       @pending_publish = false
       @pending_archive = false
 
-      @db_doc = {'draft_metadata' => {}, 'published_metadata' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'failed_actions' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
+      @db_doc = {'draft_metadata' => {}, 'published_metadata' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'dev_errors' => {}, 'ops_errors' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
       @db_doc.merge! image
     end
 
@@ -241,31 +241,66 @@ module Armagh
       update_pending_work
     end
 
-    def add_failed_action(action, details)
+    def add_dev_error(action_name, details)
+      @db_doc['dev_errors'][action_name] ||= []
+
       if details.is_a? Exception
-        @db_doc['failed_actions'][action] = Utils::ExceptionHelper.exception_to_hash details
+        @db_doc['dev_errors'][action_name] << Utils::ExceptionHelper.exception_to_hash(details)
       else
-        @db_doc['failed_actions'][action] = {'message' => details.to_s}
+        @db_doc['dev_errors'][action_name] << {'message' => details.to_s}
       end
       update_pending_work
     end
 
-    def remove_failed_action(action)
-      @db_doc['failed_actions'].delete(action)
+    def remove_dev_error(action)
+      @db_doc['dev_errors'].delete(action)
       update_pending_work
     end
 
-    def clear_failed_actions
-      @db_doc['failed_actions'].clear
+    def clear_dev_errors
+      @db_doc['dev_errors'].clear
       update_pending_work
     end
 
-    def failed_actions
-      @db_doc['failed_actions']
+    def dev_errors
+      @db_doc['dev_errors']
     end
 
-    def failed?
-      @db_doc['failure'] ? true : false
+    def add_ops_error(action_name, details)
+      @db_doc['ops_errors'][action_name] ||= []
+      if details.is_a? Exception
+        @db_doc['ops_errors'][action_name] << Utils::ExceptionHelper.exception_to_hash(details)
+      else
+        @db_doc['ops_errors'][action_name] << {'message' => details.to_s}
+      end
+      update_pending_work
+    end
+
+    def remove_ops_error(action)
+      @db_doc['ops_errors'].delete(action)
+      update_pending_work
+    end
+
+    def clear_ops_errors
+      @db_doc['ops_errors'].clear
+      update_pending_work
+    end
+
+    def ops_errors
+      @db_doc['ops_errors']
+    end
+
+    def clear_errors
+      clear_dev_errors
+      clear_ops_errors
+    end
+    
+    def errors
+      dev_errors.merge(ops_errors){|_key, left, right| left + right}
+    end
+
+    def error?
+      @db_doc['error'] ? true : false
     end
 
     def pending_work?
@@ -287,7 +322,7 @@ module Armagh
 
       delete_orig = false
 
-      if failed? && state != Documents::DocState::PUBLISHED
+      if error? && state != Documents::DocState::PUBLISHED
         save_collection = Connection.failures
         delete_orig = true
       elsif @pending_publish
@@ -400,13 +435,13 @@ module Armagh
     end
 
     private def update_pending_work
-      if @db_doc['failed_actions'].any?
-        @db_doc['failure'] =  true
+      if errors.any?
+        @db_doc['error'] =  true
       else
-        @db_doc.delete 'failure'
+        @db_doc.delete 'error'
       end
 
-      if @db_doc['pending_actions'].any? && !@db_doc['failure']
+      if @db_doc['pending_actions'].any? && !@db_doc['error']
         @db_doc['pending_work'] = true
       else
         @db_doc.delete 'pending_work'

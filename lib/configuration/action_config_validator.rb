@@ -295,7 +295,7 @@ module Armagh
       private def validate_splitter_instance(action_name, clazz, parameters, docspec_settings)
         parameters ||= {}
         output_docspec = Documents::DocSpec.new(docspec_settings['type'], docspec_settings['state'])
-        instance = clazz.new(nil, nil, parameters, output_docspec)
+        instance = clazz.new("Splitter-#{action_name}", nil, nil, parameters, output_docspec)
         splitter_validation = instance.validate
 
         splitter_validation['errors'].each { |err| @errors << "Action '#{action_name}' splitter error: #{err}" }

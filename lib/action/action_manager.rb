@@ -64,7 +64,7 @@ module Armagh
         @actions_by_docspec[input_docspec] << action_settings
       end
     rescue => e
-      Logging.error_exception(@logger, e, 'Invalid agent configuration.  Could not configure actions.')
+      Logging.ops_error_exception(@logger, e, 'Invalid agent configuration.  Could not configure actions.')
       reset_actions
     end
 
@@ -73,7 +73,7 @@ module Armagh
       if action_details
         instantiate_action(action_details)
       else
-        @logger.error "Unknown action '#{name}'.  Available actions are #{@actions_by_name.keys}."
+        @logger.ops_error "Unknown action '#{name}'.  Available actions are #{@actions_by_name.keys}."
         nil
       end
     end
@@ -83,7 +83,7 @@ module Armagh
       if actions
         actions.collect { |a| a['name'] }
       else
-        @logger.warn "No actions defined for docspec '#{input_docspec}'"
+        @logger.ops_warn "No actions defined for docspec '#{input_docspec}'"
         []
       end
     end
@@ -134,14 +134,13 @@ module Armagh
 
     private def instantiate_action(action_details)
       logger_name = "Armagh::Application::Action::#{@caller.uuid}/Action-#{action_details['name']}"
-      action_logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
-      action_details['class'].new(action_details['name'], @caller, action_logger, action_details['parameters'], action_details['output_docspecs'])
+      action_details['class'].new(action_details['name'], @caller, logger_name, action_details['parameters'], action_details['output_docspecs'])
     end
 
     private def instantiate_splitter(action_name, splitter_details, docspec)
-      logger_name = "Armagh::Application::Splitter::#{@caller.uuid}/Splitter-#{action_name}"
-      splitter_logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
-      splitter_details['class'].new(@caller, splitter_logger, splitter_details['parameters'], docspec)
+      splitter_name = "Splitter-#{action_name}"
+      logger_name = "Armagh::Application::Splitter::#{@caller.uuid}/#{splitter_name}"
+      splitter_details['class'].new(splitter_name, @caller, logger_name, splitter_details['parameters'], docspec)
     end
   end
 end

@@ -15,30 +15,23 @@
 # limitations under the License.
 #
 
-require 'fileutils'
-require_relative '../../lib/logging'
+module Armagh
+  module Logging
+    class EnhancedException
+      attr_accessor :additional_details, :exception
 
-Armagh::Logging.init_log_env
+      def initialize(additional_details, exception)
+        @additional_details = additional_details
+        @exception = exception
+      end
 
-module LogSupport
+      def to_s
+        "#{@additional_details}: #{@exception.to_s}"
+      end
 
-  LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh' unless defined? LOG_DIR
-
-  def self.each_log
-    Dir.glob(File.join(LOG_DIR, '*.log')).each do |log_file|
-      yield log_file
+      def inspect
+        "#{@additional_details}: #{@exception.inspect}"
+      end
     end
   end
-
-  def self.empty_logs
-    each_log{|log| File.truncate(log, 0)}
-  end
-
-  def self.delete_logs
-    FileUtils.mkdir_p  LOG_DIR
-    raise "Invalid permissions on #{LOG_DIR}" unless File.readable?(LOG_DIR) && File.writable?(LOG_DIR)
-    each_log{|log| File.delete(log)}
-  end
 end
-
-

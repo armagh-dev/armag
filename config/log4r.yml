@@ -31,7 +31,11 @@ log4r_config:
       - DEBUG
       - INFO
       - WARN
+      - DEV_WARN
+      - OPS_WARN
       - ERROR
+      - DEV_ERROR
+      - OPS_ERROR
       - FATAL
       - ANY
 

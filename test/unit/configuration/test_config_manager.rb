@@ -37,6 +37,10 @@ class TestConfigManager < Test::Unit::TestCase
     @logger.stubs(:warn)
     @logger.stubs(:error)
     @logger.stubs(:level=)
+    @logger.stubs(:ops_warn)
+    @logger.stubs(:ops_error)
+    @logger.stubs(:dev_warn)
+    @logger.stubs(:dev_error)
 
     @config_manager = ConfigManager.new('generic', @logger)
 

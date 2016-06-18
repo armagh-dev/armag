@@ -23,6 +23,7 @@ require 'log4r'
 require 'log4r/yamlconfigurator'
 require 'log4r/outputter/datefileoutputter'
 
+require_relative 'logging/enhanced_exception'
 require_relative 'logging/hash_formatter'
 require_relative 'logging/mongo_outputter'
 
@@ -45,27 +46,12 @@ module Armagh
       cfg.load_yaml_file(File.join(__dir__, '..', 'config', 'log4r.yml'))
     end
 
-    def self.error_exception(logger, exception, additional_info)
-      logger.error create_log_exception(exception, additional_info)
+    def self.ops_error_exception(logger, exception, additional_info)
+      logger.ops_error EnhancedException.new(additional_info, exception)
     end
 
-    def self.warn_exception(logger, exception, additional_info)
-      logger.warn create_log_exception(exception, additional_info)
-    end
-
-    def self.info_exception(logger, exception, additional_info)
-      logger.info create_log_exception(exception, additional_info)
-    end
-
-    def self.debug_exception(logger, exception, additional_info)
-      logger.debug create_log_exception(exception, additional_info)
-    end
-
-    private
-    def self.create_log_exception(exception, additional_info)
-      log_exception = exception.class.new "#{additional_info}  Exception Details: #{exception.message}"
-      log_exception.set_backtrace(exception.backtrace)
-      log_exception
+    def self.dev_error_exception(logger, exception, additional_info)
+      logger.dev_error EnhancedException.new(additional_info, exception)
     end
   end
 end

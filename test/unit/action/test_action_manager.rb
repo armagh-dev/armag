@@ -141,7 +141,7 @@ class TestActionManager < Test::Unit::TestCase
   end
 
   def test_get_action_instances_none
-    @logger.expects(:warn).with("No actions defined for docspec 'fake_docspec'")
+    @logger.expects(:ops_warn).with("No actions defined for docspec 'fake_docspec'")
     assert_empty(@action_manager.get_action_names_for_docspec('fake_docspec'))
   end
 
@@ -184,9 +184,10 @@ class TestActionManager < Test::Unit::TestCase
   end
 
   def test_invalid_action_instance
-    @logger.expects(:error).with do |e|
-      assert_equal(NameError, e.class)
-      assert_match(/Invalid agent configuration.  Could not configure actions.  Exception Details: uninitialized constant (Object::){0,1}BadClass/, e.message)
+    @logger.expects(:ops_error).with do |e|
+      assert_equal(Armagh::Logging::EnhancedException, e.class)
+      assert_equal('Invalid agent configuration.  Could not configure actions.', e.additional_details)
+      assert_kind_of NameError, e.exception
       true
     end
 
@@ -231,7 +232,7 @@ class TestActionManager < Test::Unit::TestCase
 
   def test_get_action_unknown
     action_name = 'invalid'
-    @logger.expects(:error).with("Unknown action '#{action_name}'.  Available actions are #{@action_instances.keys}.")
+    @logger.expects(:ops_error).with("Unknown action '#{action_name}'.  Available actions are #{@action_instances.keys}.")
     @action_manager.get_action action_name
   end
 

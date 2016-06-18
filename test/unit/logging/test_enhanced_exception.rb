@@ -15,30 +15,25 @@
 # limitations under the License.
 #
 
-require 'fileutils'
-require_relative '../../lib/logging'
+require_relative '../../helpers/coverage_helper'
+require_relative '../../../lib/logging/enhanced_exception'
 
-Armagh::Logging.init_log_env
+require 'test/unit'
 
-module LogSupport
+class TestEnhancedException < Test::Unit::TestCase
 
-  LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh' unless defined? LOG_DIR
-
-  def self.each_log
-    Dir.glob(File.join(LOG_DIR, '*.log')).each do |log_file|
-      yield log_file
-    end
+  def setup
+    @additional_details = 'Some Details'
+    @exception = RuntimeError.new('EXCEPTION')
+    @ee = Armagh::Logging::EnhancedException.new(@additional_details, @exception)
   end
 
-  def self.empty_logs
-    each_log{|log| File.truncate(log, 0)}
+  def test_to_s
+    assert_equal 'Some Details: EXCEPTION', @ee.to_s
   end
 
-  def self.delete_logs
-    FileUtils.mkdir_p  LOG_DIR
-    raise "Invalid permissions on #{LOG_DIR}" unless File.readable?(LOG_DIR) && File.writable?(LOG_DIR)
-    each_log{|log| File.delete(log)}
+  def test_inspect
+    assert_equal 'Some Details: #<RuntimeError: EXCEPTION>', @ee.inspect
   end
+
 end
-
-

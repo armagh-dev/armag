@@ -37,6 +37,10 @@ class TestLauncherConfigManager < Test::Unit::TestCase
     @logger.stubs(:info)
     @logger.stubs(:warn)
     @logger.stubs(:error)
+    @logger.stubs(:ops_error)
+    @logger.stubs(:ops_warn)
+    @logger.stubs(:dev_error)
+    @logger.stubs(:dev_warn)
     @logger.stubs(:level=)
 
     @manager = LauncherConfigManager.new(@logger)
