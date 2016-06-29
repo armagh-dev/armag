@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   spec.license       = 'Apache-2.0'
 
   spec.files         = Dir.glob('{bin,config,lib}/**/*') + %w(LICENSE README)
-  spec.executables   = Dir.glob('bin/*')
+  spec.executables   = Dir.glob('bin/*').collect{|f|f.sub('bin/','')}
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 

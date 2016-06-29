@@ -215,7 +215,7 @@ def load_actions
 
   begin
     require 'armagh/standard_actions'
-    @logger.info "Using StandardActions: #{Standard::VERSION}"
+    @logger.info "Using StandardActions: #{StandardActions::VERSION}"
     Document.version['standard'] = StandardActions::VERSION
   rescue LoadError
     @logger.ops_warn "StandardActions gem is not deployed. These actions won't be available."
@@ -297,7 +297,7 @@ begin
   end
 
 rescue => e
-  Logging.dev_error_exception(@logger, e, 'An unexpceted error occurred.  Exiting.')
+  Logging.dev_error_exception(@logger, e, 'An unexpected error occurred.  Exiting.')
   kill_all_agents(:SIGINT)
   @exit_status = 1
 end
