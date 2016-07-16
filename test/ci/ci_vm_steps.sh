@@ -7,4 +7,4 @@ mongod --version
 cd /workspace
 gem install bundler --no-doc
 bundle install
-rake nightly
+rake ci_vm

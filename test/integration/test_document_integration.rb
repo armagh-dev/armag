@@ -47,13 +47,13 @@ class TestDocumentIntegration < Test::Unit::TestCase
     4.times do |count|
       Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {}, draft_metadata: {},
                               published_metadata: {}, pending_actions: ['action'], state: Armagh::Documents::DocState::READY,
-                              id: "doc_#{count}")
+                              document_id: "doc_#{count}", collection_task_ids: [], document_timestamp: nil)
       sleep 1
     end
 
     Armagh::Document.create(type: 'PublishedTestDocument', draft_content: {}, published_content: {},
                             draft_metadata: {}, published_metadata: {}, pending_actions: ['action'], state: Armagh::Documents::DocState::PUBLISHED,
-                            id:'published_document')
+                            document_id:'published_document', collection_task_ids: [], document_timestamp: nil)
 
     # Make doc_3 more recently updated
     Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true) do |doc|
@@ -66,11 +66,11 @@ class TestDocumentIntegration < Test::Unit::TestCase
     end
 
     # Expected order (based on last update and published first) - published_document, doc_0, doc_2, doc_3, doc_1
-    assert_equal('doc_0', Armagh::Document.get_for_processing.id)
-    assert_equal('doc_2', Armagh::Document.get_for_processing.id)
-    assert_equal('doc_3', Armagh::Document.get_for_processing.id)
-    assert_equal('doc_1', Armagh::Document.get_for_processing.id)
-    assert_equal('published_document', Armagh::Document.get_for_processing.id)
+    assert_equal('doc_0', Armagh::Document.get_for_processing.document_id)
+    assert_equal('doc_2', Armagh::Document.get_for_processing.document_id)
+    assert_equal('doc_3', Armagh::Document.get_for_processing.document_id)
+    assert_equal('doc_1', Armagh::Document.get_for_processing.document_id)
+    assert_equal('published_document', Armagh::Document.get_for_processing.document_id)
   end
 
   def test_document_too_large
@@ -78,19 +78,22 @@ class TestDocumentIntegration < Test::Unit::TestCase
     assert_raise(Armagh::Documents::Errors::DocumentSizeError) do
       Armagh::Document.create(type: 'TestDocument', draft_content: content, published_content: {},
                               draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                              state: Armagh::Documents::DocState::READY, id: 'test_doc')
+                              state: Armagh::Documents::DocState::READY, document_id: 'test_doc',
+                              collection_task_ids: [], document_timestamp: nil)
     end
   end
 
   def test_create_duplicate
     Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
                             draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                            state: Armagh::Documents::DocState::READY, id: 'test_doc', new: true)
+                            state: Armagh::Documents::DocState::READY, document_id: 'test_doc', new: true,
+                            collection_task_ids: [], document_timestamp: nil)
 
     assert_raise(Armagh::Documents::Errors::DocumentUniquenessError) do
       Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
                               draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                              state: Armagh::Documents::DocState::READY, id: 'test_doc', new: true)
+                              state: Armagh::Documents::DocState::READY, document_id: 'test_doc', new: true,
+                              collection_task_ids: [], document_timestamp: nil)
     end
   end
 end

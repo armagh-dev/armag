@@ -30,7 +30,7 @@ module Armagh
       @logger = logger
       @actions_by_name = {}
       @actions_by_docspec = {}
-      @splitter_by_action_docspec = {}
+      @divider_by_action_docspec = {}
     end
 
     def set_available_actions(action_config)
@@ -49,7 +49,7 @@ module Armagh
           input_doc_type = action_details['input_doc_type']
           raw_output_docspecs = action_details['output_docspecs']
           output_docspecs = self.class.map_docspec_states(raw_output_docspecs)
-          map_splitters(action_name, raw_output_docspecs) if clazz < Actions::Collect
+          map_dividers(action_name, raw_output_docspecs) if clazz < Actions::Collect
         end
 
         input_state = clazz < Actions::Consume ? Documents::DocState::PUBLISHED : Documents::DocState::READY
@@ -88,10 +88,10 @@ module Armagh
       end
     end
 
-    def get_splitter(action_name, output_docspec_name)
+    def get_divider(action_name, output_docspec_name)
       output_docspec = @actions_by_name[action_name]['output_docspecs'][output_docspec_name] if @actions_by_name[action_name] && @actions_by_name[action_name]['output_docspecs']
-      if @splitter_by_action_docspec[action_name] && @splitter_by_action_docspec[action_name][output_docspec_name] && output_docspec
-        instantiate_splitter(action_name, @splitter_by_action_docspec[action_name][output_docspec_name], output_docspec)
+      if @divider_by_action_docspec[action_name] && @divider_by_action_docspec[action_name][output_docspec_name] && output_docspec
+        instantiate_divider(action_name, @divider_by_action_docspec[action_name][output_docspec_name], output_docspec)
       else
         nil
       end
@@ -113,15 +113,15 @@ module Armagh
       actions
     end
 
-    private def map_splitters(action_name, output_docspecs)
+    private def map_dividers(action_name, output_docspecs)
       output_docspecs.each do |docspec_name, output_docspec|
-        splitter_details = output_docspec['splitter']
-        if splitter_details
-          splitter_class_name = splitter_details['splitter_class_name']
-          splitter_parameters = splitter_details['parameters'] || {}
-          splitter_settings = {'parameters' => splitter_parameters, 'class_name' => splitter_class_name, 'class' => Object::const_get(splitter_class_name)}
-          @splitter_by_action_docspec[action_name] ||= {}
-          @splitter_by_action_docspec[action_name][docspec_name] = splitter_settings
+        divider_details = output_docspec['divider']
+        if divider_details
+          divider_class_name = divider_details['divider_class_name']
+          divider_parameters = divider_details['parameters'] || {}
+          divider_settings = {'parameters' => divider_parameters, 'class_name' => divider_class_name, 'class' => Object::const_get(divider_class_name)}
+          @divider_by_action_docspec[action_name] ||= {}
+          @divider_by_action_docspec[action_name][docspec_name] = divider_settings
         end
       end
     end
@@ -129,7 +129,7 @@ module Armagh
     private def reset_actions
       @actions_by_name.clear
       @actions_by_docspec.clear
-      @splitter_by_action_docspec.clear
+      @divider_by_action_docspec.clear
     end
 
     private def instantiate_action(action_details)
@@ -137,10 +137,10 @@ module Armagh
       action_details['class'].new(action_details['name'], @caller, logger_name, action_details['parameters'], action_details['output_docspecs'])
     end
 
-    private def instantiate_splitter(action_name, splitter_details, docspec)
-      splitter_name = "Splitter-#{action_name}"
-      logger_name = "Armagh::Application::Splitter::#{@caller.uuid}/#{splitter_name}"
-      splitter_details['class'].new(splitter_name, @caller, logger_name, splitter_details['parameters'], docspec)
+    private def instantiate_divider(action_name, divider_details, docspec)
+      divider_name = "Divider-#{action_name}"
+      logger_name = "Armagh::Application::Divider::#{@caller.uuid}/#{divider_name}"
+      divider_details['class'].new(divider_name, @caller, logger_name, divider_details['parameters'], docspec)
     end
   end
 end

@@ -45,7 +45,8 @@ class TestConnection < Test::Unit::TestCase
   end
 
   def test_all_document_collections
-    indexes = mock(:create_one)
+    indexes = mock
+    indexes.expects(:create_one).twice
     documents = stub(name: 'documents', indexes: indexes)
     sometype1 = stub(name: 'documents.SomeType1', indexes: indexes)
     sometype2 = stub(name: 'documents.SomeType2', indexes: indexes)
@@ -149,17 +150,17 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1}, {unique: true, name: 'types'})
-    doc_indexes.expects(:create_one)
+    doc_indexes.expects(:create_one).twice
 
     Armagh::Connection.setup_indexes
   end
 
   def test_index_doc_collection
     indexes = mock
-    indexes.expects(:create_one)
+    indexes.expects(:create_one).twice
     collection = mock
     collection.stubs(:name).returns('test_name').twice
-    collection.stubs(:indexes).returns(indexes).once
+    collection.stubs(:indexes).returns(indexes).twice
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
   end

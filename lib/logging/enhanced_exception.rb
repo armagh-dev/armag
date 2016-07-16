@@ -26,7 +26,9 @@ module Armagh
       end
 
       def to_s
-        "#{@additional_details}: #{@exception.to_s}"
+        str = "#{@additional_details}: #{@exception.to_s}"
+        str << "\n  #{@exception.backtrace.join("\n  ")}" if @exception.backtrace
+        str
       end
 
       def inspect

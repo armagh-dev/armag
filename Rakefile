@@ -24,9 +24,8 @@ require 'fileutils'
 desc 'Run tests'
 
 task :ci => [:clean, :yard, :test]
-task :ci_vm => [:integration, :cucumber]
-task :nightly => [:clean, :test, :ci_vm]
-task :default => [:nightly]
+task :ci_vm => [:ci, :integration, :cucumber]
+task :default => [:ci_vm]
 
 Rake::TestTask.new(:test) do |t|
   log_dir = '/var/log/armagh'

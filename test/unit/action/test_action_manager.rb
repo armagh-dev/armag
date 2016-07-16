@@ -28,9 +28,9 @@ class Action2 < Armagh::Actions::Action; end
 class ActionShared < Armagh::Actions::Action; end
 class TestPublisher < Armagh::Actions::Publish; end
 class TestCollector < Armagh::Actions::Collect; end
-class TestParser < Armagh::Actions::Parse; end
+class TestSplitter < Armagh::Actions::Split; end
 class TestConsumer < Armagh::Actions::Consume; end
-class TestSplitter < Armagh::Actions::CollectionSplitter; end
+class TestDivider < Armagh::Actions::Divide; end
 
 # Strickly for testing
 module Armagh
@@ -102,23 +102,23 @@ class TestActionManager < Test::Unit::TestCase
             },
             'parameters' => {}
         },
-        'parser' => {
-            'input_doc_type' => 'InputParseDocument',
-            'action_class_name' => 'TestParser',
+        'splitter' => {
+            'input_doc_type' => 'InputSplitDocument',
+            'action_class_name' => 'TestSplitter',
             'output_docspecs' => {
-                'parse_output' => {'type' => 'ParseOutDoc', 'state' => 'ready'}
+                'split_output' => {'type' => 'SplitOutDoc', 'state' => 'ready'}
             },
             'parameters' => {}
         },
         'collector' => {
             'input_doc_type' => 'CollectDocument',
             'output_docspecs' => {
-                'collect_output_with_split' => {'type' => 'CollectedDocument', 'state' => 'working',
-                                     'splitter' => {
-                                         'splitter_class_name' => 'TestSplitter',
+                'collect_output_with_divide' => {'type' => 'CollectedDocument', 'state' => 'working',
+                                     'divider' => {
+                                         'divider_class_name' => 'TestDivider',
                                          'parameters' => {}
                                      }},
-                'collect_output_no_split' => {'type' => 'CollectedDocumentRaw', 'state' => 'working'}
+                'collect_output_no_divide' => {'type' => 'CollectedDocumentRaw', 'state' => 'working'}
             },
             'action_class_name' => 'TestCollector',
             'parameters' => {}
@@ -212,16 +212,16 @@ class TestActionManager < Test::Unit::TestCase
     assert_equal({'' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}, action.output_docspecs)
   end
 
-  def test_parse
-    action = @action_manager.get_action 'parser'
-    assert_equal({'parse_output' => Armagh::Documents::DocSpec.new('ParseOutDoc', Armagh::Documents::DocState::READY)}, action.output_docspecs)
+  def test_split
+    action = @action_manager.get_action 'splitter'
+    assert_equal({'split_output' => Armagh::Documents::DocSpec.new('SplitOutDoc', Armagh::Documents::DocState::READY)}, action.output_docspecs)
   end
 
   def test_collect
     action = @action_manager.get_action 'collector'
     assert_equal({
-                     'collect_output_no_split' => Armagh::Documents::DocSpec.new('CollectedDocumentRaw', Armagh::Documents::DocState::WORKING),
-                     'collect_output_with_split' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING)
+                     'collect_output_no_divide' => Armagh::Documents::DocSpec.new('CollectedDocumentRaw', Armagh::Documents::DocState::WORKING),
+                     'collect_output_with_divide' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING)
                  }, action.output_docspecs)
   end
 
@@ -236,17 +236,17 @@ class TestActionManager < Test::Unit::TestCase
     @action_manager.get_action action_name
   end
 
-  def test_splitter
-    splitter = @action_manager.get_splitter('collector', 'collect_output_with_split')
-    assert_equal(Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING), splitter.output_docspec)
+  def test_divider
+    divider = @action_manager.get_divider('collector', 'collect_output_with_divide')
+    assert_equal(Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::WORKING), divider.output_docspec)
   end
 
-  def test_no_splitter
-    assert_nil @action_manager.get_splitter('collector', 'collect_output_no_split')
+  def test_no_divider
+    assert_nil @action_manager.get_divider('collector', 'collect_output_no_divide')
   end
 
-  def test_non_existent_splitter
-    assert_nil @action_manager.get_splitter('invalid', 'invalid')
+  def test_non_existent_divider
+    assert_nil @action_manager.get_divider('invalid', 'invalid')
   end
 
 end

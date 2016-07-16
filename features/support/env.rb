@@ -51,7 +51,6 @@ quiet_raise "The custom actions gem that needs to be installed for testing is 'a
 
 quiet_raise 'Mongo appears to be running already.  Please shut it down before trying to run these tests.' if Armagh::Connection.can_connect?
 
-
 Before do
   LogSupport.delete_logs
 end

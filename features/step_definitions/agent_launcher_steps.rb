@@ -60,7 +60,7 @@ When(/^an agent is killed/) do
   @original_agents = LauncherSupport.get_agent_processes(@spawn_pid)
   @agent_to_kill = @original_agents.last
   Process.kill(:SIGKILL, @agent_to_kill)
-  sleep 1
+  sleep 3
 end
 
 Then(/^a new agent shall launch to take its place$/) do

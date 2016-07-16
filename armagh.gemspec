@@ -19,9 +19,24 @@
 
 require_relative 'lib/version'
 
+def get_build_version(version)
+  if ENV['ARMAGH_PRODUCTION_RELEASE']
+    version
+  else
+    revision = `hg identify --num 2>/dev/null`.strip.gsub('+', '-dev')
+    if revision.empty?
+      "#{version}-dev"
+    else
+      "#{version}.#{revision}"
+    end
+  end
+rescue
+  "#{version}-dev"
+end
+
 Gem::Specification.new do |spec|
   spec.name          = 'armagh'
-  spec.version       = Armagh::VERSION
+  spec.version       = get_build_version(Armagh::VERSION)
   spec.authors       = ['Noragh Analytics, Inc.']
   spec.email         = [ 'armagh@noragh.com' ]
   spec.summary       = ''
@@ -69,5 +84,5 @@ Gem::Specification.new do |spec|
     spec.add_runtime_dependency names.first
   end
 
-  spec.add_runtime_dependency 'standard_actions' unless Gem::Specification.find_all_by_name('armagh-standard_actions').empty?
+  spec.add_runtime_dependency 'armagh-standard_actions' unless Gem::Specification.find_all_by_name('armagh-standard_actions').empty?
 end

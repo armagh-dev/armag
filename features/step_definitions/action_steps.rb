@@ -20,6 +20,18 @@ def replace_trace(hash)
   hash['cause'] = 'placeholder' if hash['cause']
 end
 
+def replace_uuid(str)
+  str.gsub!(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/, '[UUID]')
+end
+
+def recent_timestamp
+  :recent_timestamp
+end
+
+def not_empty
+  :not_empty
+end
+
 And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
   doc_info = table.rows_hash
   found_matching_doc = false
@@ -49,18 +61,51 @@ And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, 
           doc[key].collect do |_k, v|
             if v.is_a? Hash
               replace_trace v
+              v.values.each {|vv| replace_uuid(vv) if vv.is_a? String}
             elsif v.is_a? Array
               v.each do |i|
-                replace_trace(i) if i.is_a? Hash
+                if i.is_a? Hash
+                  replace_trace(i)
+                  i.values.each do |val|
+                    replace_uuid(val) if val.is_a? String
+                    if val.is_a? Array
+                      val.each do |vv|
+                        replace_uuid(vv) if vv.is_a? String
+                      end
+                    end
+                  end
+                end
+                replace_uuid(i) if i.is_a? String
               end
+            elsif v.is_a? String
+              replace_uuid(v)
             end
           end
         end
 
-        if expected != doc[key]
-          doc_problems[doc_id][key] = "#{expected.to_s} != #{doc[key].to_s}"
-          found_matching_doc = false
-          next
+        actual = doc[key]
+
+        if expected == not_empty
+          if actual.empty?
+            doc_problems[doc_id][key] = "'#{expected.to_s}' !~~ '#{actual.to_s}'"
+            found_matching_doc = false
+            next
+          end
+        elsif expected == recent_timestamp
+          now = Time.now
+          if now - doc[key] > 60
+            doc_problems[doc_id][key] = "'#{now}' !~~ '#{actual.to_s}'"
+            found_matching_doc = false
+            next
+          end
+        else
+          replace_uuid(actual) if actual.is_a? String
+
+          if expected != actual
+            doc_problems[doc_id][key] = "'#{expected.to_s}' != '#{actual.to_s}'"
+            found_matching_doc = false
+            next
+          end
         end
       end
     end

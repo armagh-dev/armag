@@ -24,6 +24,8 @@ require 'armagh/documents'
 module Armagh
   class Document
 
+    attr_accessor :published_id
+
     class << self
       protected :new
     end
@@ -32,31 +34,49 @@ module Armagh
       @version ||= {}
     end
 
-    def self.create(type:, draft_content:, published_content:, draft_metadata:, published_metadata:, pending_actions:, state:, id: nil, new: false)
+    def self.create(type:,
+        draft_content:,
+        published_content:,
+        draft_metadata:,
+        published_metadata:,
+        pending_actions:,
+        state:,
+        document_id:,
+        title: nil,
+        copyright: nil,
+        source: nil,
+        collection_task_ids:,
+        document_timestamp:,
+        new: false)
       doc = Document.new
       doc.type = type
       doc.draft_content = draft_content
       doc.published_content = published_content
       doc.draft_metadata = draft_metadata
       doc.published_metadata = published_metadata
-      doc.id = id if id
+      doc.document_id = document_id
       doc.add_pending_actions pending_actions
       doc.state = state
-      doc.save(id.nil? || new)
+      doc.title = title if title
+      doc.copyright = copyright if copyright
+      doc.source = source if source
+      doc.collection_task_ids = collection_task_ids if collection_task_ids
+      doc.document_timestamp = document_timestamp if document_timestamp
+      doc.save(new)
       doc
     end
 
     def self.from_action_document(action_doc, pending_actions = [])
       doc = Document.new
-      doc.update_from_action_document(action_doc)
+      doc.update_from_draft_action_document(action_doc)
       doc.add_pending_actions pending_actions
       doc
     end
 
-    # Returns document if found, nil if it didn't exist, throws :already_locked when doc exists but locked already
-    def self.find_or_create_and_lock(id, type, state)
+    # Returns document if found, internal_id if it didn't exist, throws :already_locked when doc exists but locked already
+    def self.find_or_create_and_lock(document_id, type, state)
       begin
-        db_doc = collection(type, state).find_one_and_update({'_id' => id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :before, upsert: true})
+        db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
       rescue Mongo::Error::OperationFailure => e
         if e.message =~ /^E11000/
           # The document already exists.  It's already locked
@@ -66,19 +86,19 @@ module Armagh
         end
       end
 
-      if db_doc
+      if db_doc['type']
         db_doc['locked'] = true
         doc = Document.new(db_doc)
       else
         # The document doesn't exist
-        doc = nil
+        doc = db_doc['_id']
       end
 
       doc
     end
 
-    def self.find(id, type, state)
-      db_doc = collection(type, state).find('_id' => id).limit(1).first
+    def self.find(document_id, type, state)
+      db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
     end
 
@@ -92,12 +112,12 @@ module Armagh
       nil
     end
 
-    def self.exists?(id, type, state)
-      collection(type, state).find({'_id' => id}).limit(1).count != 0
+    def self.exists?(document_id, type, state)
+      collection(type, state).find({'document_id' => document_id}).limit(1).count != 0
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
-    def self.modify_or_create(id, type, state, running, logger = nil)
+    def self.modify_or_create(document_id, type, state, running, logger = nil)
       raise LocalJumpError.new 'No block given' unless block_given?
 
       backoff = Utils::ProcessingBackoff.new
@@ -106,12 +126,13 @@ module Armagh
 
       until doc
         already_locked = catch(:already_locked) do
-          doc = find_or_create_and_lock(id, type, state)
+          doc = find_or_create_and_lock(document_id, type, state)
+          false
         end
 
-        if doc.nil?
+        unless doc.is_a? Document
           if already_locked
-            logger.info "Document '#{id}' already locked for editing.  Backing off." if logger
+            logger.info "Document '#{document_id}' already locked for editing.  Backing off." if logger
             backoff.interruptible_backoff { !running }
           else
             # The document doesn't even exist - dont keep trying
@@ -123,25 +144,24 @@ module Armagh
       begin
         yield doc
       rescue => e
-        if doc
-          unlock(id, type, state) # Unlock - don't apply changes
+        if doc.is_a? Document
+          unlock(document_id, type, state) # Unlock - don't apply changes
         else
-          delete(id, type, state) # This was a new document.  Delete the locked placeholder.
+          delete(document_id, type, state) # This was a new document.  Delete the locked placeholder.
         end
-
         raise e
       end
-      doc.finish_processing if doc
 
+      doc.finish_processing if doc.is_a? Document
       nil
     end
 
-    def self.delete(id, type, state)
-      collection(type, state).delete_one({ '_id': id})
+    def self.delete(document_id, type, state)
+      collection(type, state).delete_one({ 'document_id': document_id})
     end
 
-    def self.unlock(id, type, state)
-      collection(type, state).find_one_and_update({ '_id': id}, {'$set' => {'locked' => false}})
+    def self.unlock(document_id, type, state)
+      collection(type, state).find_one_and_update({ 'document_id': document_id}, {'$set' => {'locked' => false}})
     end
     
     def self.collection(type = nil, state = nil)
@@ -154,16 +174,89 @@ module Armagh
       @pending_publish = false
       @pending_archive = false
 
-      @db_doc = {'draft_metadata' => {}, 'published_metadata' => {}, 'draft_content' => {}, 'published_content' => nil, 'type' => nil, 'locked' => false, 'pending_actions' => [], 'dev_errors' => {}, 'ops_errors' => {}, 'created_timestamp' => nil, 'updated_timestamp' => nil}
+      @db_doc = {
+          'draft_metadata' => {},
+          'published_metadata' => {},
+          'draft_content' => {},
+          'published_content' => nil,
+          'type' => nil,
+          'locked' => false,
+          'pending_actions' => [],
+          'dev_errors' => {},
+          'ops_errors' => {},
+          'created_timestamp' => nil,
+          'updated_timestamp' => nil,
+          'title' => nil,
+          'copyright' => nil,
+          'published_timestamp' => nil,
+          'collection_task_ids' => [],
+          'source' => {},
+          'document_timestamp' => nil}
       @db_doc.merge! image
     end
 
-    def id
+    def internal_id
       @db_doc['_id']
     end
 
-    def id=(id)
+    def internal_id=(id)
       @db_doc['_id'] = id
+    end
+
+    def document_id
+      @db_doc['document_id']
+    end
+
+    def document_id=(id)
+      @db_doc['document_id'] = id
+    end
+
+    def title
+      @db_doc['title']
+    end
+
+    def title=(title)
+      @db_doc['title'] = title
+    end
+
+    def copyright
+      @db_doc['copyright']
+    end
+
+    def copyright=(copyright)
+      @db_doc['copyright'] = copyright
+    end
+
+    def published_timestamp
+      @db_doc['published_timestamp']
+    end
+
+    def published_timestamp=(ts)
+      @db_doc['published_timestamp'] = ts
+    end
+
+    def collection_task_ids
+      @db_doc['collection_task_ids']
+    end
+
+    def collection_task_ids=(collection_task_ids)
+      @db_doc['collection_task_ids'] = collection_task_ids
+    end
+
+    def source
+      @db_doc['source']
+    end
+
+    def source=(source)
+      @db_doc['source'] = source
+    end
+
+    def document_timestamp
+      @db_doc['document_timestamp']
+    end
+
+    def document_timestamp=(document_timestamp)
+      @db_doc['document_timestamp'] = document_timestamp
     end
 
     def locked?
@@ -216,6 +309,10 @@ module Armagh
 
     def created_timestamp
       @db_doc['created_timestamp']
+    end
+
+    def created_timestamp=(ts)
+      @db_doc['created_timestamp'] = ts
     end
 
     def version
@@ -319,6 +416,7 @@ module Armagh
       @db_doc['created_timestamp'] ||= now
       @db_doc['updated_timestamp'] = now
       @db_doc['version'] = self.class.version
+      @db_doc['collection_task_ids'].uniq!
 
       delete_orig = false
 
@@ -327,7 +425,6 @@ module Armagh
         delete_orig = true
       elsif @pending_publish
         save_collection = Connection.documents(type)
-        @pending_publish = false
         delete_orig = true
       elsif @pending_archive
         save_collection = Connection.archive
@@ -344,20 +441,26 @@ module Armagh
       end
 
       if save_collection
-        if new
+        if new || internal_id.nil?
           @db_doc['_id'] = save_collection.insert_one(@db_doc).inserted_ids.first
         else
-          save_collection.replace_one({'_id': id}, @db_doc, {upsert: true})
+          if @pending_publish && @published_id
+            save_collection.replace_one({'document_id': document_id}, @db_doc.merge({'_id' => @published_id}), {upsert: true})
+          else
+            save_collection.replace_one({'_id': internal_id}, @db_doc, {upsert: true})
+          end
         end
       end
 
-      Connection.documents.delete_one({ '_id': id}) if delete_orig
+      Connection.documents.delete_one({ '_id': internal_id}) if delete_orig
 
+      @pending_publish = false
+      @published_id = nil
     rescue Mongo::Error::MaxBSONSize
-      raise Documents::Errors::DocumentSizeError.new("Document #{id} is too large.  Consider using a splitter or parser to split the document.")
+      raise Documents::Errors::DocumentSizeError.new("Document #{document_id} is too large.  Consider using a divider or splitter to break up the document.")
     rescue Mongo::Error::OperationFailure => e
       if e.message =~ /^E11000/
-        raise Documents::Errors::DocumentUniquenessError.new("Unable to create document #{id}.  This document already exists.")
+        raise Documents::Errors::DocumentUniquenessError.new("Unable to create document #{document_id}.  This document already exists.")
       else
         raise e
       end
@@ -387,32 +490,44 @@ module Armagh
       state == Documents::DocState::PUBLISHED
     end
 
-    def to_action_document
-      docspec = Documents::DocSpec.new(type, state)
-      Documents::ActionDocument.new(id: id, draft_content: draft_content, published_content: published_content,
-                         draft_metadata: draft_metadata, published_metadata: published_metadata, docspec: docspec)
+    def get_published_copy
+      self.class.find(document_id, type, Documents::DocState::PUBLISHED)
     end
 
-    def to_publish_action_document
+    def to_draft_action_document
       docspec = Documents::DocSpec.new(type, state)
-      published_doc = self.class.find(id, type, Documents::DocState::PUBLISHED)
-      if published_doc
-        pub_content = published_doc.published_content
-        pub_metadata = published_doc.published_metadata
-      else
-        pub_content = published_content
-        pub_metadata = published_metadata
-      end
-      Documents::ActionDocument.new(id: id, draft_content: draft_content, published_content: pub_content,
-                         draft_metadata: draft_metadata, published_metadata: pub_metadata, docspec: docspec)
+      Documents::ActionDocument.new(document_id: document_id,
+                                    title: title,
+                                    copyright: copyright,
+                                    content: draft_content,
+                                    metadata: draft_metadata,
+                                    docspec: docspec,
+                                    source: source,
+                                    document_timestamp: document_timestamp)
     end
 
-    def update_from_action_document(action_doc)
-      self.id = action_doc.id
-      self.draft_content = action_doc.draft_content
-      self.published_content = action_doc.published_content
-      self.draft_metadata = action_doc.draft_metadata
-      self.published_metadata = action_doc.published_metadata
+    def to_published_action_document
+      docspec = Documents::DocSpec.new(type, state)
+      Documents::ActionDocument.new(document_id: document_id,
+                                    title: title,
+                                    copyright: copyright,
+                                    content: published_content,
+                                    metadata: published_metadata,
+                                    docspec: docspec,
+                                    source: source,
+                                    document_timestamp: document_timestamp)
+    end
+
+    def update_from_draft_action_document(action_doc)
+      self.document_id = action_doc.document_id
+      self.draft_content = action_doc.content
+      self.published_content = {}
+      self.draft_metadata = action_doc.metadata
+      self.published_metadata = {}
+      self.source = action_doc.source
+      self.title = action_doc.title
+      self.copyright = action_doc.copyright
+      self.document_timestamp = action_doc.document_timestamp
       docspec = action_doc.docspec
       self.type = docspec.type
       self.state = docspec.state

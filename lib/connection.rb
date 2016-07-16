@@ -109,6 +109,9 @@ module Armagh
 
       # Unlocked Documents by ID (Document#find_or_create_and_lock) not needed to be indexed because ids are unique (mongo reverts to _id_ index)
 
+      #Document IDs
+      collection.indexes.create_one({'document_id' => 1}, unique: true, name: 'document_ids')
+
       # Unlocked documents pending work
       collection.indexes.create_one({'pending_work' => 1, 'locked' => 1, 'updated_timestamp' => 1},
                                     name: 'pending_unlocked',

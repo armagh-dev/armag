@@ -35,11 +35,11 @@ module Armagh
       DOCSPEC_FIELDS = {
           'type' => String,
           'state' => String
-          #splitter is handled separately since it depends on the action type
+          #divider is handled separately since it depends on the action type
       }
 
-      SPLITTER_FIELDS = {
-          'splitter_class_name' => String,
+      DIVIDER_FIELDS = {
+          'divider_class_name' => String,
           'parameters' => Hash
       }
 
@@ -105,15 +105,15 @@ module Armagh
           case
             when clazz < Actions::Collect
               validate_collect(action_name, action_settings)
-            when clazz < Actions::Parse
-              validate_parse(action_name, action_settings)
+            when clazz < Actions::Split
+              validate_split(action_name, action_settings)
             when clazz < Actions::Publish
               validate_publish(action_name, action_settings)
               output_docspecs = {'' => {'type' => action_settings['doc_type'], 'state' => Documents::DocState::PUBLISHED}}
             when clazz < Actions::Consume
               validate_consume(action_name, action_settings)
             else
-              @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, ParseAction, PublishAction, or ConsumeAction."
+              @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' is not a CollectAction, SplitAction, PublishAction, or ConsumeAction."
               return # We can't do additional checking if we don't know what action type we have
           end
 
@@ -152,8 +152,8 @@ module Armagh
         insert_action_for_loop_check(input_doc_type, action_settings['output_docspecs'], action_type)
       end
 
-      private def validate_parse(action_name, action_settings)
-        action_type = 'parse'
+      private def validate_split(action_name, action_settings)
+        action_type = 'split'
         input_doc_type = action_settings['input_doc_type']
         validate_input_doc_type(action_name, input_doc_type, action_type)
         validate_output_docspecs(action_name, input_doc_type, action_settings['output_docspecs'], action_type)
@@ -197,10 +197,10 @@ module Armagh
         end
       end
 
-      private def validate_output_docspecs(action_name, input_doc_type, output_docspecs, action_type, allow_splitter = false, allow_empty = false)
+      private def validate_output_docspecs(action_name, input_doc_type, output_docspecs, action_type, allow_divider = false, allow_empty = false)
         output_docspecs.each do |docspec_name, docspec_settings|
           validate_output_docspec_name(action_name, docspec_name)
-          validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_splitter)
+          validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_divider)
 
           if input_doc_type == docspec_settings['type']
             @errors << "Input doctype and output docspec '#{docspec_name}' from action '#{action_name}' are the same but they must be different."
@@ -244,7 +244,7 @@ module Armagh
         @errors << "Action '#{action_name}' had an output docspec without a name." if blank? docspec_name
       end
 
-      private def validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_splitter = false)
+      private def validate_output_docspec_fields(action_name, docspec_name, docspec_settings, allow_divider = false)
         DOCSPEC_FIELDS.each do |name, type|
           setting = docspec_settings[name]
 
@@ -257,51 +257,51 @@ module Armagh
 
         unknown_fields = docspec_settings.keys - DOCSPEC_FIELDS.keys
 
-        if allow_splitter && docspec_settings['splitter']
-          unknown_fields -= ['splitter']
-          validate_output_docspec_splitter(action_name, docspec_name, docspec_settings)
+        if allow_divider && docspec_settings['divider']
+          unknown_fields -= ['divider']
+          validate_output_docspec_divider(action_name, docspec_name, docspec_settings)
         end
 
         @warnings << "Action '#{action_name}', docspec '#{docspec_name}' has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
       end
 
-      private def validate_output_docspec_splitter(action_name, docspec_name, docspec_settings)
-        splitter_settings = docspec_settings['splitter']
+      private def validate_output_docspec_divider(action_name, docspec_name, docspec_settings)
+        divider_settings = docspec_settings['divider']
 
-        unless splitter_settings.is_a? Hash
-          @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter must be a 'Hash'.  It is a '#{splitter_settings.class}'."
+        unless divider_settings.is_a? Hash
+          @errors << "Action '#{action_name}', docspec '#{docspec_name}' divider must be a 'Hash'.  It is a '#{divider_settings.class}'."
           return
         end
 
-        SPLITTER_FIELDS.each do |name, type|
-          setting = splitter_settings[name]
+        DIVIDER_FIELDS.each do |name, type|
+          setting = divider_settings[name]
 
           if setting.nil?
-            @errors << "Action '#{action_name}', docspec '#{docspec_name}' splitter does not have '#{name}'."
+            @errors << "Action '#{action_name}', docspec '#{docspec_name}' divider does not have '#{name}'."
           elsif !setting.is_a?(type)
-            @errors << "Field '#{name}' from action '#{action_name}', docspec '#{docspec_name}' splitter must be a '#{type}'.  It is a '#{setting.class}'."
+            @errors << "Field '#{name}' from action '#{action_name}', docspec '#{docspec_name}' divider must be a '#{type}'.  It is a '#{setting.class}'."
           end
         end
 
-        unknown_fields = splitter_settings.keys - SPLITTER_FIELDS.keys
-        @warnings << "Action '#{action_name}', docspec '#{docspec_name}' splitter has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
+        unknown_fields = divider_settings.keys - DIVIDER_FIELDS.keys
+        @warnings << "Action '#{action_name}', docspec '#{docspec_name}' divider has the following unexpected fields: #{unknown_fields}." unless unknown_fields.empty?
 
         unless error?
-          clazz = Object.const_get(splitter_settings['splitter_class_name'])
-          validate_splitter_instance(action_name, clazz, splitter_settings['parameters'], docspec_settings)
+          clazz = Object.const_get(divider_settings['divider_class_name'])
+          validate_divider_instance(action_name, clazz, divider_settings['parameters'], docspec_settings)
         end
       end
 
-      private def validate_splitter_instance(action_name, clazz, parameters, docspec_settings)
+      private def validate_divider_instance(action_name, clazz, parameters, docspec_settings)
         parameters ||= {}
         output_docspec = Documents::DocSpec.new(docspec_settings['type'], docspec_settings['state'])
-        instance = clazz.new("Splitter-#{action_name}", nil, nil, parameters, output_docspec)
-        splitter_validation = instance.validate
+        instance = clazz.new("Divider-#{action_name}", nil, nil, parameters, output_docspec)
+        divider_validation = instance.validate
 
-        splitter_validation['errors'].each { |err| @errors << "Action '#{action_name}' splitter error: #{err}" }
-        splitter_validation['warnings'].each { |warn| @warnings << "Action '#{action_name}' splitter warning: #{warn}" }
+        divider_validation['errors'].each { |err| @errors << "Action '#{action_name}' divider error: #{err}" }
+        divider_validation['warnings'].each { |warn| @warnings << "Action '#{action_name}' divider warning: #{warn}" }
       rescue => e
-        @errors << "Action '#{action_name}' splitter validation failed: #{e}"
+        @errors << "Action '#{action_name}' divider validation failed: #{e}"
       end
 
       private def workflow_validation

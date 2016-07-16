@@ -43,9 +43,9 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
               'output_docspecs' => {
                   'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
-                  'split_collected_document' => {'type' => 'SplitCollectedDocument', 'state' => 'ready',
-                                                 'splitter' => {
-                                                     'splitter_class_name' => 'Armagh::CustomActions::TestSplitter',
+                  'divide_collected_document' => {'type' => 'DivideCollectedDocument', 'state' => 'ready',
+                                                 'divider' => {
+                                                     'divider_class_name' => 'Armagh::CustomActions::TestDivider',
                                                      'parameters' => {}
                                                  }
                   }
@@ -53,11 +53,11 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
               'parameters' => {}
           },
 
-          'test_parse' => {
-              'action_class_name' => 'Armagh::CustomActions::TestParser',
-              'input_doc_type' => 'ParseDocument',
+          'test_split' => {
+              'action_class_name' => 'Armagh::CustomActions::TestSplitter',
+              'input_doc_type' => 'SplitDocument',
               'output_docspecs' => {
-                  'parse_output' => {'type' => 'ParseOutputDocument', 'state' => 'working'}
+                  'split_output' => {'type' => 'SplitOutputDocument', 'state' => 'working'}
               },
               'parameters' => {}
           },
@@ -98,23 +98,12 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
-    if specified_actions.include? 'unimplemented_parser'
-      available_actions['unimplemented_parser'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestUnimplementedParser',
-          'input_doc_type' => 'UnimplementedParserInputDocument',
+    if specified_actions.include? 'unimplemented_splitter'
+      available_actions['unimplemented_splitter'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestUnimplementedSplitter',
+          'input_doc_type' => 'UnimplementedSplitterInputDocument',
           'output_docspecs' => {
-              'unimplemented_parser_output' => {'type' => 'UnimplementedParserOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'duplicate_collector'
-      available_actions['duplicate_collector'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestDuplicateCollector',
-          'input_doc_type' => 'DuplicateInputDocType',
-          'output_docspecs' => {
-              'duplicate_collector_output' => {'type' => 'DuplicateCollectorOutputDocument', 'state' => 'working'}
+              'unimplemented_splitter_output' => {'type' => 'UnimplementedSplitterOutputDocument', 'state' => 'working'}
           },
           'parameters' => {}
       }
@@ -131,34 +120,34 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       }
     end
 
-    if specified_actions.include? 'too_large_parser'
-      available_actions['too_large_parser'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestTooLargeParser',
+    if specified_actions.include? 'too_large_splitter'
+      available_actions['too_large_splitter'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestTooLargeSplitter',
           'input_doc_type' => 'TooLargeInputDocType',
           'output_docspecs' => {
-              'too_large_parser_output' => {'type' => 'TooLargeParserOutputDocument', 'state' => 'working'}
+              'too_large_splitter_output' => {'type' => 'TooLargeSplitterOutputDocument', 'state' => 'working'}
           },
           'parameters' => {}
       }
     end
 
-    if specified_actions.include? 'edit_current_parser'
-      available_actions['edit_current_parser'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestEditCurrentParser',
+    if specified_actions.include? 'edit_current_splitter'
+      available_actions['edit_current_splitter'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestEditCurrentSplitter',
           'input_doc_type' => 'EditCurrentInputDocType',
           'output_docspecs' => {
-              'edit_current_parser_output' => {'type' => 'EditCurrentParserOutputDocument', 'state' => 'working'}
+              'edit_current_splitter_output' => {'type' => 'EditCurrentSplitterOutputDocument', 'state' => 'working'}
           },
           'parameters' => {}
       }
     end
 
-    if specified_actions.include? 'update_error_parser'
-      available_actions['update_error_parser'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestUpdateErrorParser',
+    if specified_actions.include? 'update_error_splitter'
+      available_actions['update_error_splitter'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestUpdateErrorSplitter',
           'input_doc_type' => 'UpdateErrorInputDocType',
           'output_docspecs' => {
-              'update_error_parser_output' => {'type' => 'UpdateErrorParserOutputDocument', 'state' => 'working'}
+              'update_error_splitter_output' => {'type' => 'UpdateErrorSplitterOutputDocument', 'state' => 'working'}
           },
           'parameters' => {}
       }
@@ -166,7 +155,7 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
     if specified_actions.include? 'notify_ops'
       available_actions['notify_ops'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestParserNotifyOps',
+          'action_class_name' => 'Armagh::CustomActions::TestSplitterNotifyOps',
           'input_doc_type' => 'NotifyOpsDocType',
           'output_docspecs' => {
               'notify_ops_output' => {'type' => 'NotifyOpsDocTypeOutput', 'state' => 'working'}
@@ -177,11 +166,19 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
     if specified_actions.include? 'notify_dev'
       available_actions['notify_dev'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestParserNotifyDev',
+          'action_class_name' => 'Armagh::CustomActions::TestSplitterNotifyDev',
           'input_doc_type' => 'NotifyDevDocType',
           'output_docspecs' => {
               'notify_dev_output' => {'type' => 'NotifyDevDocTypeOutput', 'state' => 'working'}
           },
+          'parameters' => {}
+      }
+    end
+
+    if specified_actions.include? 'change_id_publisher'
+      available_actions['change_id_publisher'] = {
+          'action_class_name' => 'Armagh::CustomActions::TestChangeIdPublisher',
+          'doc_type' => 'PublishDocument',
           'parameters' => {}
       }
     end
@@ -194,9 +191,9 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
               'output_docspecs' => {
                   'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
-                  'split_collected_document' => {'type' => 'SplitCollectedDocument', 'state' => 'ready',
-                                                 'splitter' => {
-                                                     'splitter_class_name' => 'Armagh::CustomActions::TestSplitter',
+                  'divide_collected_document' => {'type' => 'DivideCollectedDocument', 'state' => 'ready',
+                                                 'divider' => {
+                                                     'divider_class_name' => 'Armagh::CustomActions::TestDivider',
                                                      'parameters' => {}
                                                  }
                   }
@@ -204,11 +201,11 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
               'parameters' => {}
           },
 
-          'test_parse_document' => {
-              'action_class_name' => 'Armagh::CustomActions::TestParser',
-              'input_doc_type' => 'SplitCollectedDocument',
+          'test_split_document' => {
+              'action_class_name' => 'Armagh::CustomActions::TestSplitter',
+              'input_doc_type' => 'DivideCollectedDocument',
               'output_docspecs' => {
-                  'parse_output' => {'type' => 'Document', 'state' => 'ready'}
+                  'split_output' => {'type' => 'Document', 'state' => 'ready'}
               },
               'parameters' => {}
           },
