@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+require_relative '../../../lib/environment.rb'
+Armagh::Environment.init
+
 require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/agent/agent'
 require_relative '../test_helpers/mock_logger'
@@ -58,7 +61,6 @@ class TestAgent < Test::Unit::TestCase
   STARTED = []
 
   def setup
-    Armagh::Logging.init_log_env
 
     @logger = mock_logger
 
@@ -72,7 +74,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def teardown
-    @agent.stop
+    @agent.stop if @agent
   end
 
   def setup_action(action_class)

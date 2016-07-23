@@ -190,7 +190,7 @@ module Armagh
       Logging.dev_error_exception(@logger, e, 'An unexpected error occurred')
     end
 
-    private; def connect_agent_status # ; is a workaround for yard and sub/gsub (https://github.com/lsegal/yard/issues/888)
+    private def connect_agent_status
       client_uri = IPC::DRB_CLIENT_URI % @uuid
       socket_file = client_uri.sub("drbunix://",'')
 

@@ -94,7 +94,7 @@ module Armagh
         @errors << 'An action was found without a name' if blank? action_name
       end
 
-      private; def validate_action_settings(action_name, action_settings)
+      private def validate_action_settings(action_name, action_settings)
         validate_action_fields(action_name, action_settings)
         return if error?
 

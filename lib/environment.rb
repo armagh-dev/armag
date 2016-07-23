@@ -23,8 +23,22 @@
 #
 
 require_relative 'configuration/file_based_configuration.rb'
-env_hash = Armagh::Configuration::FileBasedConfiguration.load( 'ENV' )
-env_hash.each do |k,v|
-  ENV[k] = v
+require_relative 'logging.rb'
+
+module Armagh
+  module Environment
+    
+    def self.init
+      init_env_vars
+      Armagh::Logging.init_log_env
+    end
+    
+    def self.init_env_vars
+      env_hash = Armagh::Configuration::FileBasedConfiguration.load( 'ENV' )
+      env_hash.each do |k,v|
+        ENV[k] = v
+      end
+    end
+  end
 end
 

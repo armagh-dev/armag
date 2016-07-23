@@ -15,10 +15,14 @@
 # limitations under the License.
 #
 
+require_relative '../../lib/environment'
+Armagh::Environment.init
+
 require_relative '../../lib/connection'
 require_relative '../../lib/version'
 
 require_relative '../../test/helpers/coverage_helper'
+
 require_relative '../../test/helpers/mongo_support'
 
 require_relative 'launcher_support'
@@ -28,6 +32,7 @@ require 'fileutils'
 require 'test/unit/assertions'
 
 FileUtils.mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
+
 
 def quiet_raise(msg)
   raise RuntimeError, msg, []

@@ -18,7 +18,7 @@ module Armagh
                       :cluster_design_filepath,
                       :logger
       
-        LOG_LOCATION = '/var/log/armagh/resource_admin_api.log'
+        #LOG_LOCATION = '/var/log/armagh/resource_admin_api.log'
       
         DEFAULTS = {
           'ip'             => '127.0.0.1',
@@ -38,8 +38,13 @@ module Armagh
           end
 
           @config = DEFAULTS.merge config
-          @config.delete 'key_filepath' unless File.exists? config[ 'key_filepath' ]
-          @config.delete 'cert_filepath' unless File.exists? config[ 'cert_filepath' ]
+          @config.delete 'key_filepath' unless File.exists? @config[ 'key_filepath' ]
+          @config.delete 'cert_filepath' unless File.exists? @config[ 'cert_filepath' ]
+          
+          @config.each do |k,v|
+            instance_variable_set "@#{k}", v
+          end
+          
         end
       
         def using_ssl?

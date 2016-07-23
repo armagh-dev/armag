@@ -30,6 +30,9 @@ require 'socket'
 
 require 'log4r'
 
+require_relative '../lib/environment'
+Armagh::Environment.init
+
 require_relative '../lib/agent/agent'
 require_relative '../lib/agent/agent_status'
 require_relative '../lib/action/action_manager'
@@ -43,8 +46,6 @@ require_relative '../lib/version'
 include Armagh
 
 TERM_SIGNALS = [:INT, :QUIT, :TERM]
-
-Logging.init_log_env
 
 unless Connection.can_connect?
   $stderr.puts "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."

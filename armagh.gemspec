@@ -19,11 +19,11 @@
 
 require_relative 'lib/version'
 
-def get_build_version(version)
+def self.get_build_version(version)
   if ENV['ARMAGH_PRODUCTION_RELEASE']
     version
   else
-    revision = `hg identify --num 2>/dev/null`.strip.gsub('+', '-dev')
+    revision = ENV['ARMAGH_INTEG_BUILD_REVISION']
     if revision.empty?
       "#{version}-dev"
     else
@@ -54,7 +54,7 @@ Gem::Specification.new do |spec|
   # Caution: Since this is actually packaged as a gem, these just verify the required versions are installed.  The versions
   #            used at runtime may differ unless a version is explicitly set before the require.
 
-  spec.add_runtime_dependency 'armagh-base-actions', '< 2.0.0'
+  spec.add_runtime_dependency 'armagh-base-actions', '< 2.0'
   spec.add_runtime_dependency 'mongo', '~> 2.1'
   spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
   spec.add_runtime_dependency 'daemons', '~> 1.2'
@@ -71,7 +71,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'simplecov-rcov', '~> 0.2'
   spec.add_development_dependency 'mocha', '~> 1.1'
   spec.add_development_dependency 'sys-proctable', '~> 0.9'
-  spec.add_development_dependency 'yard', '~> 0.8'
+  spec.add_development_dependency 'yard', '~> 0.9'
   spec.add_development_dependency 'fakefs', '~> 0.8'
   spec.add_development_dependency 'armagh_test-custom_actions'
 

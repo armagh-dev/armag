@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+require_relative '../../../lib/environment.rb'
+Armagh::Environment.init
+
 require_relative '../../helpers/coverage_helper'
 
 require_relative '../../../lib/configuration/action_config_validator'

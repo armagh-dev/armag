@@ -28,19 +28,11 @@ task :ci_vm => [:ci, :integration, :cucumber]
 task :default => [:ci_vm]
 
 Rake::TestTask.new(:test) do |t|
-  log_dir = '/var/log/armagh'
-  FileUtils.mkdir_p log_dir
-  raise "Invalid permissions on #{log_dir}" unless File.readable?(log_dir) && File.writable?(log_dir)
-
   t.libs << 'test'
   t.pattern = 'test/unit/**/test_*.rb'
 end
 
 Rake::TestTask.new(:integration) do |t|
-  log_dir = '/var/log/armagh'
-  FileUtils.mkdir_p log_dir
-  raise "Invalid permissions on #{log_dir}" unless File.readable?(log_dir) && File.writable?(log_dir)
-
   t.libs << 'integration'
   t.pattern = 'test/integration/**/test_*.rb'
 end

@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+require_relative '../../../lib/environment.rb'
+
 require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/logging'
 
@@ -29,9 +31,7 @@ class TestLogging < Test::Unit::TestCase
   def setup
     @dir = Dir.mktmpdir
     @log_dir = File.join(@dir, 'log')
-    Armagh::Logging::LOG_DIR.clear
-    Armagh::Logging::LOG_DIR << @log_dir
-
+    ENV[ 'ARMAGH_APP_LOG' ] = @log_dir
     @stderr = $stderr
   end
 

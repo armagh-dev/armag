@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+require_relative '../../lib/environment.rb'
+Armagh::Environment.init
+
 require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
@@ -27,8 +30,6 @@ require 'test/unit'
 require 'mongo'
 require 'connection'
 require 'armagh/actions'
-
-Armagh::Logging.init_log_env
 
 class TestEditCallback < Test::Unit::TestCase
 

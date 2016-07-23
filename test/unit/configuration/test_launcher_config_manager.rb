@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+require_relative '../../../lib/environment.rb'
+Armagh::Environment.init
 
 require_relative '../../helpers/coverage_helper'
 require_relative '../test_helpers/mock_logger'
@@ -30,7 +32,6 @@ class TestLauncherConfigManager < Test::Unit::TestCase
   include Armagh::Configuration
 
   def setup
-    Armagh::Logging.init_log_env
 
     @logger = mock
     @logger.stubs(:debug)

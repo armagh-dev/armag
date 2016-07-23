@@ -29,20 +29,20 @@ require_relative 'logging/mongo_outputter'
 
 module Armagh
   module Logging
-    LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
-
+    
     def self.init_log_env
-      unless File.directory?(LOG_DIR)
+      log_dir = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
+      unless File.directory?(log_dir)
         begin
-          FileUtils.mkdir_p LOG_DIR
+          FileUtils.mkdir_p log_dir
         rescue Errno::EACCES
-          $stderr.puts "Log directory '#{LOG_DIR}' does not exist and could not be created.  Please create the directory and grant the user running armagh full permissions."
+          $stderr.puts "Log directory '#{log_dir}' does not exist and could not be created.  Please create the directory and grant the user running armagh full permissions."
           exit 1
         end
       end
 
       cfg = Log4r::YamlConfigurator
-      cfg['LOG_DIR'] = LOG_DIR
+      cfg['LOG_DIR'] = log_dir
       cfg.load_yaml_file(File.join(__dir__, '..', 'config', 'log4r.yml'))
     end
 

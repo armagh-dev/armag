@@ -2,6 +2,9 @@
 require 'sinatra'
 require 'thin'
 
+require_relative '../lib/environment.rb'
+Armagh::Environment.init
+
 require_relative '../lib/admin/resource/api.rb'
 require_relative '../lib/admin/resource/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
@@ -14,8 +17,6 @@ require_relative '../lib/logging'
 #------------------------------------------------------------------------------------------------
 
 include Armagh
-
-Logging.init_log_env
 
 api = Admin::Resource::API.instance
 

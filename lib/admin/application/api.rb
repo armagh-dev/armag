@@ -38,8 +38,12 @@ module Armagh
           end
 
           @config = DEFAULTS.merge config
-          @config.delete 'key_filepath' unless File.exists? config[ 'key_filepath' ]
-          @config.delete 'cert_filepath' unless File.exists? config[ 'cert_filepath' ]
+          @config.delete 'key_filepath' unless File.exists? @config[ 'key_filepath' ]
+          @config.delete 'cert_filepath' unless File.exists? @config[ 'cert_filepath' ]
+          
+          @config.each do |k,v|
+            instance_variable_set( "@#{k}", v )
+          end
         end
       
         def using_ssl?
