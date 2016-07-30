@@ -16,6 +16,10 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
+Armagh::Environment.init
+
 require_relative '../../../lib/utils/exception_helper'
 
 require 'test/unit'

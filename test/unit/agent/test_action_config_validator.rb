@@ -15,10 +15,10 @@
 # limitations under the License.
 #
 
-require_relative '../../../lib/environment.rb'
-Armagh::Environment.init
-
 require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
+Armagh::Environment.init
 
 require_relative '../../../lib/configuration/action_config_validator'
 
@@ -27,6 +27,14 @@ require 'mocha/test_unit'
 
 class TestPublisher < Armagh::Actions::Publish
   define_parameter(name: 'arg', description: 'Description', type: String)
+end
+
+class TestPublisherBoolean < Armagh::Actions::Publish
+  define_parameter(name: 'arg', description: 'Description', type: Boolean)
+end
+
+class TestPublisherEncodedString < Armagh::Actions::Publish
+  define_parameter(name: 'arg', description: 'Description', type: EncodedString)
 end
 
 class TestConsumer < Armagh::Actions::Consume
@@ -468,6 +476,37 @@ class TestActionConfigValidator < Test::Unit::TestCase
     assert_equal expected_errors.sort, result['errors'].sort
   end
 
+  def test_encoded_string
+    config = valid_configuration
+    config['publisher']['action_class_name'] = 'TestPublisherEncodedString'
+
+    result = @action_config_validator.validate(config)
+    assert_equal({'errors' =>[], 'valid' =>true, 'warnings' =>[]}, result)
+  end
+
+  def test_boolean
+    config = valid_configuration
+    config['publisher']['action_class_name'] = 'TestPublisherBoolean'
+    config['publisher']['parameters']['arg'] = false
+
+    result = @action_config_validator.validate(config)
+    assert_equal({'errors' =>[], 'valid' =>true, 'warnings' =>[]}, result)
+  end
+
+  def test_type_mismatch
+    config = valid_configuration
+    config['publisher']['action_class_name'] = 'TestPublisherBoolean'
+    config['publisher']['parameters']['arg'] = 123
+
+    result = @action_config_validator.validate(config)
+    assert_equal(
+        {
+            'errors' =>["Action 'publisher' validation failed: Field 'arg' expected to be a  Boolean but was a Fixnum."],
+            'valid' =>false,
+            'warnings' =>[]
+        }, result)
+  end
+
   def test_shared_docspec_splitters
     config = valid_configuration
     config['splitter2'] = {
@@ -495,6 +534,7 @@ class TestActionConfigValidator < Test::Unit::TestCase
     config['publisher2'] = {
         'doc_type' => 'CollectedDocument',
         'action_class_name' => 'TestPublisher',
+        #
         'parameters' => {}
     }
 

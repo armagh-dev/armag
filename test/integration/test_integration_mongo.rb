@@ -15,10 +15,11 @@
 # limitations under the License.
 #
 
+require_relative '../helpers/coverage_helper'
+
 require_relative '../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/connection'

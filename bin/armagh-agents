@@ -238,10 +238,12 @@ def load_actions
     Armagh.send(:remove_const, :CustomActions)
   end
 
-  defined_actions = ActionManager.defined_actions
+  defined_actions = Actions.defined_actions
+  defined_dividers = Actions.defined_dividers
 
-  if defined_actions.any?
+  if defined_actions.any? || defined_dividers.any?
     @logger.debug "Available actions are: #{defined_actions}"
+    @logger.debug "Available dividers are: #{defined_dividers}"
   else
     @logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
   end

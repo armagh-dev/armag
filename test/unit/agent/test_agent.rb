@@ -15,12 +15,13 @@
 # limitations under the License.
 #
 
-require_relative '../../../lib/environment.rb'
+require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/agent/agent'
-require_relative '../test_helpers/mock_logger'
+require_relative '../../helpers/mock_logger'
 require_relative '../../../lib/agent/agent_status'
 require_relative '../../../lib/ipc'
 require_relative '../../../lib/document/document'
@@ -165,7 +166,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -175,7 +176,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_archive)
-    doc.expects(:draft_metadata).returns({})
+    doc.expects(:metadata).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -196,9 +197,9 @@ class TestAgent < Test::Unit::TestCase
                                                        source: {})
     action.expects(:split).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true},
-               :draft_metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
-    doc.expects(:to_draft_action_document).returns(action_doc)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+    doc.expects(:to_action_document).returns(action_doc)
     doc.expects(:mark_delete)
     doc.expects(:finish_processing).at_least_once
 
@@ -228,20 +229,18 @@ class TestAgent < Test::Unit::TestCase
                                                        source: {})
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true},
-               :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
                :deleted? => false, :collection_task_ids => [])
-    doc.expects(:to_draft_action_document).returns(action_doc)
+    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
-    doc.expects(:published_content=, action_doc.content)
-    doc.expects(:draft_content=, {})
-    doc.expects(:published_metadata=, action_doc.metadata)
-    doc.expects(:draft_metadata=, {})
+    doc.expects(:content=, action_doc.content)
+    doc.expects(:metadata=, action_doc.metadata)
     doc.expects(:title=, action_doc.title)
     doc.expects(:copyright=, action_doc.copyright)
     doc.expects(:source=, action_doc.source)
@@ -276,29 +275,41 @@ class TestAgent < Test::Unit::TestCase
                                                        source: {})
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true},
-               :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
-               :deleted? => false, :collection_task_ids => [], published_content: {'pub_cont': true}, published_metadata: {'pub_meta' => true},
-               :title => 'old_title', :copyright => 'old copyright')
+    doc = stub(:document_id => 'document_id',
+               :pending_actions => [action_name],
+               :content => {'content' => true},
+               :metadata => {'meta' => true},
+               :type => 'DocumentType',
+               :state => Armagh::Documents::DocState::WORKING,
+               :deleted? => false,
+               :collection_task_ids => [],
+               :title => 'old_title',
+               :copyright => 'old copyright')
 
-    pub_doc = stub(:document_id => 'document_id', :pending_actions => [], :draft_content => {},
-                   :draft_metadata => {}, :type => 'DocumentType', :state => Armagh::Documents::DocState::PUBLISHED,
-                   :deleted? => false, :collection_task_ids => [], published_content: {'pub_cont': true}, published_metadata: {'pub_meta' => true},
-                   :created_timestamp => 'created', :dev_errors => {}, :ops_errors => {}, :title => 'new title',
+    pub_doc = stub(:document_id => 'document_id',
+                   :pending_actions => [],
+                   :type => 'DocumentType',
+                   :state => Armagh::Documents::DocState::PUBLISHED,
+                   :deleted? => false,
+                   :collection_task_ids => [],
+                   :content => {'pub_cont': true},
+                   :metadata => {'pub_meta' => true},
+                   :created_timestamp => 'created',
+                   :dev_errors => {},
+                   :ops_errors => {},
+                   :title => 'new title',
                    :internal_id => 'internal')
 
 
-    doc.expects(:to_draft_action_document).returns(action_doc)
+    doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
-    doc.expects(:published_content=, action_doc.content)
-    doc.expects(:draft_content=, {})
-    doc.expects(:published_metadata=, action_doc.metadata)
-    doc.expects(:draft_metadata=, {})
+    doc.expects(:content=, action_doc.content)
+    doc.expects(:metadata=, action_doc.metadata)
     doc.expects(:title=, action_doc.title)
     doc.expects(:copyright=, action_doc.copyright)
     doc.expects(:source=, action_doc.source)
@@ -332,15 +343,17 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(ConsumeTest)
 
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
+    published_doc = Armagh::Documents::PublishedDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY),
                                                        source: {})
-    action.expects(:consume).with(action_doc)
+    action.expects(:consume).with(published_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true},
-               :draft_metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
-    doc.expects(:to_published_action_document).returns(action_doc)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+    doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:finish_processing).at_least_once
+
+    doc.expects(:metadata=).with published_doc.metadata
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
@@ -362,7 +375,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     divider = DividerTest.new('name', @agent, @logger, {}, {})
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true}, :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(divider).at_least_once
@@ -382,7 +395,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
     action = setup_action(UnknownAction)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true}, :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -409,7 +422,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -419,7 +432,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_archive)
-    doc.expects(:draft_metadata).returns({})
+    doc.expects(:metadata).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -440,7 +453,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :draft_metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -450,7 +463,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_archive)
-    doc.expects(:draft_metadata).returns({})
+    doc.expects(:metadata).returns({})
 
     @agent.expects(:update_config).at_least_once
     @agent.expects(:report_status).with(doc, action).at_least_once
@@ -471,7 +484,7 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(CollectTest)
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true}, :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     Armagh::ActionManager.any_instance.expects(:get_action).with(action_name).returns(action).at_least_once
@@ -593,12 +606,20 @@ class TestAgent < Test::Unit::TestCase
     action = mock
     @current_doc_mock.expects(:document_id).returns('current_id')
     @agent.instance_variable_set(:'@current_action', action)
-    Armagh::Document.expects(:create).with(type: 'DocumentType', draft_content: 'content', published_content: {},
-                                           draft_metadata: 'metadata', published_metadata: {},
-                                           pending_actions: [], state: Armagh::Documents::DocState::WORKING, document_id: 'id',
-                                           new: true, collection_task_ids: [], document_timestamp: nil,
-                                           source: {'some' => 'source'}, title: nil, copyright: nil)
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: 'content', metadata: 'metadata',
+    Armagh::Document.expects(:create).with(type: 'DocumentType',
+                                           content: 'content',
+                                           metadata: 'metadata',
+                                           pending_actions: [],
+                                           state: Armagh::Documents::DocState::WORKING,
+                                           document_id: 'id',
+                                           new: true,
+                                           collection_task_ids: [],
+                                           document_timestamp: nil,
+                                           source: {'some' => 'source'},
+                                           title: nil, copyright: nil)
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: 'content',
+                                                       metadata: 'metadata',
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING),
                                                        source: {'some' => 'source'})
     @agent.create_document action_doc
@@ -626,16 +647,16 @@ class TestAgent < Test::Unit::TestCase
 
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    new_content = 'new content'
-    new_meta = 'new meta'
+    new_content = {'new content' => true}
+    new_meta = {'new meta' => true}
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
 
     doc.expects(:clear_pending_actions)
     doc.expects(:add_pending_actions).with([])
-    doc.expects(:to_draft_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'content',
-                                                                                         metadata: 'meta',
-                                                                                         docspec: old_docspec,
-                                                                                         source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: {'content' => true},
+                                                                                   metadata: {'meta' => true},
+                                                                                   docspec: old_docspec,
+                                                                                   source: {}))
 
     doc.expects(:update_from_draft_action_document).with do |action_doc|
       assert_equal(new_content, action_doc.content)
@@ -683,8 +704,8 @@ class TestAgent < Test::Unit::TestCase
 
     id = 'id'
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
-    content = 'new content'
-    meta = 'new meta'
+    content = {'new content' => true}
+    meta = {'new meta' => true}
 
     doc.expects(:save).returns nil
 
@@ -713,9 +734,9 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_draft_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
-                                                                                         metadata: 'old meta',
-                                                                                         docspec: old_docspec, source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+                                                                                   metadata: 'old meta',
+                                                                                   docspec: old_docspec, source: {}))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -736,9 +757,9 @@ class TestAgent < Test::Unit::TestCase
 
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_draft_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
-                                                                                         metadata: 'old meta',
-                                                                                         docspec: docspec, source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+                                                                                   metadata: 'old meta',
+                                                                                   docspec: docspec, source: {}))
 
     doc.expects(:update_from_draft_action_document).with do |action_doc|
       assert_equal(docspec, action_doc.docspec)
@@ -760,9 +781,9 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    doc.expects(:to_draft_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
-                                                                                         metadata: 'old meta',
-                                                                                         docspec: old_docspec, source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+                                                                                   metadata: 'old meta',
+                                                                                   docspec: old_docspec, source: {}))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -784,8 +805,8 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_draft_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'content',
-                                                                                         metadata: 'meta', docspec: old_docspec, source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'content',
+                                                                                   metadata: 'meta', docspec: old_docspec, source: {}))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -876,7 +897,7 @@ class TestAgent < Test::Unit::TestCase
                                                        source: {})
     doc = mock('db doc')
     pub_action_doc = mock
-    doc.expects(:to_published_action_document).returns(pub_action_doc)
+    doc.expects(:to_published_document).returns(pub_action_doc)
 
     Armagh::Document.expects(:find).returns(doc)
     assert_equal(pub_action_doc, @agent.get_existing_published_document(action_doc))
@@ -959,8 +980,8 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(CollectTest)
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :draft_content => {'content' => true},
-               :draft_metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
                :dev_errors => [], :ops_errors => [], :eggs => 'wee'
     )
 

@@ -35,10 +35,8 @@ module Armagh
     end
 
     def self.create(type:,
-        draft_content:,
-        published_content:,
-        draft_metadata:,
-        published_metadata:,
+        content:,
+        metadata:,
         pending_actions:,
         state:,
         document_id:,
@@ -50,10 +48,8 @@ module Armagh
         new: false)
       doc = Document.new
       doc.type = type
-      doc.draft_content = draft_content
-      doc.published_content = published_content
-      doc.draft_metadata = draft_metadata
-      doc.published_metadata = published_metadata
+      doc.content = content
+      doc.metadata = metadata
       doc.document_id = document_id
       doc.add_pending_actions pending_actions
       doc.state = state
@@ -175,10 +171,8 @@ module Armagh
       @pending_archive = false
 
       @db_doc = {
-          'draft_metadata' => {},
-          'published_metadata' => {},
-          'draft_content' => {},
-          'published_content' => nil,
+          'metadata' => {},
+          'content' => {},
           'type' => nil,
           'locked' => false,
           'pending_actions' => [],
@@ -263,36 +257,20 @@ module Armagh
       @db_doc['locked']
     end
 
-    def published_content=(content)
-      @db_doc['published_content'] = content
+    def content=(content)
+      @db_doc['content'] = content
     end
 
-    def published_content
-      @db_doc['published_content']
+    def content
+      @db_doc['content']
     end
 
-    def draft_content=(content)
-      @db_doc['draft_content'] = content
+    def metadata
+      @db_doc['metadata']
     end
 
-    def draft_content
-      @db_doc['draft_content']
-    end
-
-    def draft_metadata
-      @db_doc['draft_metadata']
-    end
-
-    def draft_metadata=(meta)
-      @db_doc['draft_metadata'] = meta
-    end
-
-    def published_metadata
-      @db_doc['published_metadata']
-    end
-
-    def published_metadata=(meta)
-      @db_doc['published_metadata'] = meta
+    def metadata=(meta)
+      @db_doc['metadata'] = meta
     end
 
     def type=(type)
@@ -494,25 +472,25 @@ module Armagh
       self.class.find(document_id, type, Documents::DocState::PUBLISHED)
     end
 
-    def to_draft_action_document
+    def to_action_document
       docspec = Documents::DocSpec.new(type, state)
       Documents::ActionDocument.new(document_id: document_id,
                                     title: title,
                                     copyright: copyright,
-                                    content: draft_content,
-                                    metadata: draft_metadata,
+                                    content: content,
+                                    metadata: metadata,
                                     docspec: docspec,
                                     source: source,
                                     document_timestamp: document_timestamp)
     end
 
-    def to_published_action_document
+    def to_published_document
       docspec = Documents::DocSpec.new(type, state)
-      Documents::ActionDocument.new(document_id: document_id,
+      Documents::PublishedDocument.new(document_id: document_id,
                                     title: title,
                                     copyright: copyright,
-                                    content: published_content,
-                                    metadata: published_metadata,
+                                    content: content,
+                                    metadata: metadata,
                                     docspec: docspec,
                                     source: source,
                                     document_timestamp: document_timestamp)
@@ -520,10 +498,8 @@ module Armagh
 
     def update_from_draft_action_document(action_doc)
       self.document_id = action_doc.document_id
-      self.draft_content = action_doc.content
-      self.published_content = {}
-      self.draft_metadata = action_doc.metadata
-      self.published_metadata = {}
+      self.content = action_doc.content
+      self.metadata = action_doc.metadata
       self.source = action_doc.source
       self.title = action_doc.title
       self.copyright = action_doc.copyright

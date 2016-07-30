@@ -15,10 +15,11 @@
 # limitations under the License.
 #
 
-require_relative '../../../lib/environment.rb'
+require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/action/action_manager'
 
 require 'test/unit'
@@ -35,22 +36,42 @@ class TestSplitter < Armagh::Actions::Split; end
 class TestConsumer < Armagh::Actions::Consume; end
 class TestDivider < Armagh::Actions::Divide; end
 
-# Strickly for testing
+class TestDefault < Armagh::Actions::Action
+  define_parameter name: 'param',
+                   description: 'test parameter',
+                   type: String,
+                   default: 'Default Value'
+
+end
+
+class TestRequired < Armagh::Actions::Action
+  define_parameter name: 'param',
+                   description: 'test parameter',
+                   type: String,
+                   required: true
+
+end
+
+# Strictly for testing
 module Armagh
   module CustomActions
     @actions = []
+
     def self.set_actions(actions)
       @actions = actions
     end
+
     def self.defined_actions
       @actions
     end
   end
   module StandardActions
     @actions = []
+
     def self.set_actions(actions)
       @actions = actions
     end
+
     def self.defined_actions
       @actions
     end
@@ -117,10 +138,10 @@ class TestActionManager < Test::Unit::TestCase
             'input_doc_type' => 'CollectDocument',
             'output_docspecs' => {
                 'collect_output_with_divide' => {'type' => 'CollectedDocument', 'state' => 'working',
-                                     'divider' => {
-                                         'divider_class_name' => 'TestDivider',
-                                         'parameters' => {}
-                                     }},
+                                                 'divider' => {
+                                                     'divider_class_name' => 'TestDivider',
+                                                     'parameters' => {}
+                                                 }},
                 'collect_output_no_divide' => {'type' => 'CollectedDocumentRaw', 'state' => 'working'}
             },
             'action_class_name' => 'TestCollector',
@@ -136,15 +157,15 @@ class TestActionManager < Test::Unit::TestCase
   def test_get_action_instances
     actions = @action_manager.get_action_names_for_docspec(Armagh::Documents::DocSpec.new('InputDocument2', 'ready'))
     assert_equal(1, actions.length)
-    assert_equal('action_2' , actions.first)
+    assert_equal('action_2', actions.first)
 
     actions = @action_manager.get_action_names_for_docspec(Armagh::Documents::DocSpec.new('InputDocument1', 'ready'))
-    assert_equal('action_1' , actions.first)
-    assert_equal('action_shared' , actions.last)
+    assert_equal('action_1', actions.first)
+    assert_equal('action_shared', actions.last)
   end
 
   def test_get_action_instances_none
-    @logger.expects(:ops_warn).with("No actions defined for docspec 'fake_docspec'")
+    @logger.expects(:ops_warn).with("No actions defined with an input docspec of 'fake_docspec'")
     assert_empty(@action_manager.get_action_names_for_docspec('fake_docspec'))
   end
 
@@ -161,6 +182,7 @@ class TestActionManager < Test::Unit::TestCase
     test_get_action_from_name
   end
 
+  # TODO REMOVE ALL DEFINED ACTIONS TESTS.  THESE LINGER B/C OF A BAD MERGE
   def test_defined_actions_none
     assert_empty Armagh::ActionManager.defined_actions
   end
@@ -252,4 +274,12 @@ class TestActionManager < Test::Unit::TestCase
     assert_nil @action_manager.get_divider('invalid', 'invalid')
   end
 
+  def test_map_parameters_default
+    mapped_parameters = Armagh::ActionManager.map_parameters(TestDefault, {})
+    assert_equal({'param' => 'Default Value'}, mapped_parameters)
+  end
+
+  def test_map_parameters_required
+    assert_raise(Armagh::Errors::ConfigurationError.new("The required field 'param' has no value.")) { Armagh::ActionManager.map_parameters(TestRequired, {}) }
+  end
 end

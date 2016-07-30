@@ -15,10 +15,11 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/environment.rb'
+require_relative '../helpers/coverage_helper'
+
+require_relative '../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/logging'
@@ -42,7 +43,7 @@ class TestEditCallback < Test::Unit::TestCase
       edit(@doc_id, 'test_document') do |doc|
         @doc_class = doc.class
         doc.metadata['field'] = true
-        doc.content = 'DRAFT CONTENT'
+        doc.content = {'DRAFT CONTENT' => true}
         @doc_was_new = doc.new_document?
       end
     end
@@ -84,7 +85,9 @@ class TestEditCallback < Test::Unit::TestCase
   def test_edit_new
     @splitter.doc_id = 'non_existing_doc_id'
     assert_nil Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id', content: {}, metadata: {},
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
+                                                       content: {},
+                                                       metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
                                                        source: {})
     @splitter.split(action_doc)
@@ -97,25 +100,30 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)
     assert_equal(@splitter.doc_id, doc.document_id)
-    assert_equal('DRAFT CONTENT', doc.draft_content)
-    assert_equal({'field' => true}, doc.draft_metadata)
+    assert_equal({'DRAFT CONTENT' => true}, doc.content)
+    assert_equal({'field' => true}, doc.metadata)
     assert_false doc.locked?
   end
 
   def test_edit_existing
     doc_id = 'existing_doc_id'
     assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Document.create(type: @output_type, draft_content:{'draft_content' => 456},
-                            published_content: {'published_content' => 123}, draft_metadata: {'draft_meta' => 'bananas'},
-                            published_metadata: {'published_meta' => 'apples'},
-                            pending_actions: [], state: @output_state, document_id: doc_id, collection_task_ids: [],
+    Armagh::Document.create(type: @output_type,
+                            content:{'content' => 123},
+                            metadata: {'draft_meta' => 'bananas'},
+                            pending_actions: [],
+                            state: @output_state,
+                            document_id: doc_id,
+                            collection_task_ids: [],
                             document_timestamp: nil)
     doc = Armagh::Document.find(doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_false doc.locked?
 
     @splitter.doc_id = doc_id
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id', content: {}, metadata: {},
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
+                                                       content: {},
+                                                       metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
                                                        source: {})
     @splitter.split(action_doc)
@@ -125,8 +133,8 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)
     assert_equal(@splitter.doc_id, doc.document_id)
-    assert_equal('DRAFT CONTENT', doc.draft_content)
-    assert_equal({'field' => true, 'draft_meta' => 'bananas'}, doc.draft_metadata)
+    assert_equal({'DRAFT CONTENT' => true}, doc.content)
+    assert_equal({'field' => true, 'draft_meta' => 'bananas'}, doc.metadata)
     assert_false doc.locked?
   end
 end

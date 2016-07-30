@@ -28,21 +28,8 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   Armagh::Document.version.merge! APP_VERSION
 
   count.to_i.times do
-    Armagh::Document.create(type: doc_type, draft_content: content, published_content: {}, draft_metadata: meta,
-                            published_metadata: {}, pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
-  end
-end
-
-When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", published content "([^"]*)", published metadata "([^"]*)"$/) do |count, doc_type, state, document_id, content, meta|
-  docspec = Armagh::Documents::DocSpec.new(doc_type, state)
-  pending_actions = @action_manager.get_action_names_for_docspec docspec
-
-  content = content.nil? ? {} : eval(content)
-  meta = meta.nil? ? {} : eval(meta)
-
-  count.to_i.times do
-    Armagh::Document.create(type: doc_type, draft_content: {}, published_content: content, draft_metadata: {},
-                            published_metadata: meta, pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
+    Armagh::Document.create(type: doc_type, content: content, metadata: meta,
+                            pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
   end
 end
 

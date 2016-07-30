@@ -78,10 +78,8 @@ module Armagh
       collection_task_ids = []
       collection_task_ids << @collection_task_id if @collection_task_id
       Document.create(type: docspec.type,
-                      draft_content: action_doc.content,
-                      draft_metadata: action_doc.metadata,
-                      published_content: {},
-                      published_metadata: {},
+                      content: action_doc.content,
+                      metadata: action_doc.metadata,
                       pending_actions: pending_actions,
                       state: docspec.state,
                       document_id: action_doc.document_id,
@@ -108,7 +106,7 @@ module Armagh
 
     def get_existing_published_document(action_doc)
       doc = Document.find(action_doc.document_id, action_doc.docspec.type, Documents::DocState::PUBLISHED)
-      doc ? doc.to_published_action_document : nil
+      doc ? doc.to_published_document : nil
     end
 
     def log_debug(logger_name, msg = nil)
@@ -139,7 +137,7 @@ module Armagh
 
     private def edit_or_create(document_id, docspec, doc)
       if doc.is_a? Document
-        action_doc = doc.to_draft_action_document
+        action_doc = doc.to_action_document
         initial_docspec = action_doc.docspec
 
         yield action_doc
@@ -276,29 +274,27 @@ module Armagh
           @collection_task_id = doc.document_id
           @num_creates = 0
           action.collect
-          doc.draft_metadata.merge!({
+          doc.metadata.merge!({
             'docs_collected' => @num_creates
           })
           doc.mark_archive
           @num_creates = 0
         when Actions::Split
           @collection_task_id = doc.collection_task_ids.last
-          action_doc = doc.to_draft_action_document
+          action_doc = doc.to_action_document
           action.split action_doc
           doc.mark_delete
         when Actions::Publish
           timestamp = Time.now
           @collection_task_id = doc.collection_task_ids.last
           allowed_id_change = true
-          action_doc = doc.to_draft_action_document
+          action_doc = doc.to_action_document
           action.publish action_doc
           doc.document_id = action_doc.document_id
-          doc.published_metadata = action_doc.metadata
-          doc.published_content = action_doc.content
+          doc.metadata = action_doc.metadata
+          doc.content = action_doc.content
           doc.title = action_doc.title
           doc.copyright = action_doc.copyright
-          doc.draft_metadata = {}
-          doc.draft_content = {}
           doc.source = {}
           doc.document_timestamp = action_doc.document_timestamp || timestamp
 
@@ -321,9 +317,10 @@ module Armagh
           doc.mark_publish
         when Actions::Consume
           @collection_task_id = doc.collection_task_ids.last
-          action_doc = doc.to_published_action_document
-          action.consume action_doc
-          # Dont save any changes made to action_doc
+          published_doc = doc.to_published_document
+          action.consume published_doc
+          # Only metadata can be changed
+          doc.metadata = published_doc.metadata
         when Actions::Action
           @logger.dev_error "#{action.name} is an unknown action type."
         else

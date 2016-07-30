@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require_relative '../../../lib/environment.rb'
-Armagh::Environment.init
 
 require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
+Armagh::Environment.init
+
 require_relative '../../../lib/agent/agent_status'
 require 'test/unit'
 

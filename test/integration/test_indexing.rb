@@ -15,10 +15,11 @@
 # limitations under the License.
 #
 
+require_relative '../helpers/coverage_helper'
+
 require_relative '../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../helpers/coverage_helper'
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/configuration/launcher_config_manager'
@@ -59,9 +60,14 @@ class TestIndexing < Test::Unit::TestCase
 
   def create_documents(state)
     4_000.times do |i|
-      Armagh::Document.create(type: 'TestDocument', draft_content: {}, published_content: {},
-                              draft_metadata: {}, published_metadata: {}, pending_actions: ['action'],
-                              state: state, document_id: "id_#{i}", collection_task_ids: [], document_timestamp: nil)
+      Armagh::Document.create(type: 'TestDocument',
+                              content: {},
+                              metadata: {},
+                              pending_actions: ['action'],
+                              state: state,
+                              document_id: "id_#{i}",
+                              collection_task_ids: [],
+                              document_timestamp: nil)
     end
   end
 

@@ -41,6 +41,7 @@ module Armagh
         parameters = action_details['parameters'] || {}
 
         clazz = Object::const_get(action_class_name)
+        mapped_parameters = self.class.map_parameters(clazz, parameters)
 
         if clazz < Actions::Publish
           input_doc_type = action_details['doc_type']
@@ -56,7 +57,7 @@ module Armagh
         input_docspec = Documents::DocSpec.new(input_doc_type, input_state)
 
         action_settings = {'name' => action_name, 'input_docspec' => input_docspec, 'output_docspecs' => output_docspecs,
-                           'parameters' => parameters, 'class_name' => action_class_name, 'class' => clazz}
+                           'parameters' => mapped_parameters, 'class_name' => action_class_name, 'class' => clazz}
 
         @actions_by_name[action_name] = action_settings
 
@@ -83,7 +84,7 @@ module Armagh
       if actions
         actions.collect { |a| a['name'] }
       else
-        @logger.ops_warn "No actions defined for docspec '#{input_docspec}'"
+        @logger.ops_warn "No actions defined with an input docspec of '#{input_docspec}'"
         []
       end
     end
@@ -106,6 +107,28 @@ module Armagh
       converted_docspecs
     end
 
+    def self.map_parameters(clazz, parameters)
+      mapped_params = parameters.dup
+      defined_parameters = clazz.defined_parameters
+
+      defined_parameters.each do |defined_key, defined_details|
+        type = defined_details['type']
+        required = defined_details['required']
+        default = defined_details['default']
+
+        value = parameters[defined_key] || default
+
+        raise Errors::ConfigurationError, "The required field '#{defined_key}' has no value." if required && value.nil?
+
+        begin
+          mapped_params[defined_key] = value.is_a?(type) ? value : type.new(value) unless value.nil?
+        rescue
+          raise Errors::ConfigurationError, "Field '#{defined_key}' expected to be a  #{type} but was a #{value.class}."
+        end
+      end
+      mapped_params
+    end
+
     def self.defined_actions
       actions = []
       actions.concat CustomActions.defined_actions if defined? CustomActions
@@ -119,7 +142,9 @@ module Armagh
         if divider_details
           divider_class_name = divider_details['divider_class_name']
           divider_parameters = divider_details['parameters'] || {}
-          divider_settings = {'parameters' => divider_parameters, 'class_name' => divider_class_name, 'class' => Object::const_get(divider_class_name)}
+          clazz = Object::const_get(divider_class_name)
+          mapped_divider_parameters = self.class.map_parameters(clazz, divider_parameters)
+          divider_settings = {'parameters' => mapped_divider_parameters, 'class_name' => divider_class_name, 'class' => clazz}
           @divider_by_action_docspec[action_name] ||= {}
           @divider_by_action_docspec[action_name][docspec_name] = divider_settings
         end

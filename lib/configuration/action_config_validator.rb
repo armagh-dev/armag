@@ -120,7 +120,7 @@ module Armagh
           unless error?
             validate_action_instance(action_name, clazz, action_settings['parameters'], output_docspecs)
           end
-        rescue NameError => e
+        rescue NameError
           @errors << "Class '#{action_settings['action_class_name']}' from action '#{action_name}' does not exist."
         end
       end
@@ -178,7 +178,8 @@ module Armagh
       private def validate_action_instance(action_name, clazz, parameters, raw_output_docspecs)
         parameters ||= {}
         output_docspecs = ActionManager.map_docspec_states(raw_output_docspecs)
-        instance = clazz.new(action_name, nil, nil, parameters, output_docspecs)
+        mapped_parameters = ActionManager.map_parameters(clazz, parameters)
+        instance = clazz.new(action_name, nil, nil, mapped_parameters, output_docspecs)
         class_validation = instance.validate
         class_validation['errors'].each { |err| @errors << "Action '#{action_name}' error: #{err}" }
         class_validation['warnings'].each { |warn| @warnings << "Action '#{action_name}' warning: #{warn}" }
@@ -293,9 +294,9 @@ module Armagh
       end
 
       private def validate_divider_instance(action_name, clazz, parameters, docspec_settings)
-        parameters ||= {}
         output_docspec = Documents::DocSpec.new(docspec_settings['type'], docspec_settings['state'])
-        instance = clazz.new("Divider-#{action_name}", nil, nil, parameters, output_docspec)
+        mapped_parameters = ActionManager.map_parameters(clazz, parameters)
+        instance = clazz.new("Divider-#{action_name}", nil, nil, mapped_parameters, output_docspec)
         divider_validation = instance.validate
 
         divider_validation['errors'].each { |err| @errors << "Action '#{action_name}' divider error: #{err}" }

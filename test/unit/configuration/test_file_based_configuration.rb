@@ -15,11 +15,12 @@
 # limitations under the License.
 #
 
-require_relative '../../../lib/environment.rb'
+require_relative '../../helpers/coverage_helper'
+
+require_relative '../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/coverage_helper'
-require_relative '../test_helpers/mock_logger'
+require_relative '../../helpers/mock_logger'
 require_relative '../../../lib/configuration/file_based_configuration.rb'
 require 'test/unit'
 require 'mocha/test_unit'

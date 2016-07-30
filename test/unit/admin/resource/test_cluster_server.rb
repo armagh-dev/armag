@@ -15,10 +15,11 @@
 # limitations under the License.
 #
 
-require_relative '../../../../lib/environment.rb'
+require_relative '../../../helpers/coverage_helper'
+
+require_relative '../../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../../helpers/coverage_helper'
 require_relative '../../../../lib/admin/resource/cluster_server'
 
 require 'test/unit'

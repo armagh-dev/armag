@@ -22,8 +22,8 @@
 # time of installation and cannot be changed.
 #
 
-require_relative 'configuration/file_based_configuration.rb'
-require_relative 'logging.rb'
+require_relative 'configuration/file_based_configuration'
+require_relative 'logging'
 
 module Armagh
   module Environment

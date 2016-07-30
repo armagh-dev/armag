@@ -115,14 +115,6 @@ And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, 
   assert_true(found_matching_doc, "No #{doc_type} was found with the expected values.  Details: #{doc_problems}")
 end
 
-When(/^I insert the following document$/) do |table|
-  doc_info = table.rows_hash
-
-  doc_info.each { |k, v| doc_info[k] = eval(v) }
-
-  Armagh::Document.create(doc_info['type'], doc_info['content'], doc_info['meta'], doc_info['pending_actions'], doc_info['state'], doc_info['id'])
-end
-
 And(/^I should see (\d+) "([^"]*)" documents in the "([^"]*)" collection$/) do |count, doc_type, doc_collection|
   expected_count = count.to_i
   num_found = 0
