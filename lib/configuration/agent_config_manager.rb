@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+require_relative '../logging'
 require_relative 'config_manager'
 require_relative 'action_config_validator'
 
@@ -34,7 +35,7 @@ module Armagh
       end
 
       def self.default_log_level
-        logger = Log4r::Logger['Armagh::Application::Agent'] || Log4r::Logger.new('Armagh::Application::Agent')
+        logger = Logging.set_logger('Armagh::Application::Agent')
         logger.levels[logger.level].downcase
       end
 

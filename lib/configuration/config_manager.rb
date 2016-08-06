@@ -15,8 +15,6 @@
 # limitations under the License.
 #
 
-require 'log4r'
-
 require_relative '../connection'
 require_relative '../logging'
 
@@ -59,6 +57,7 @@ module Armagh
         begin
           db_config = Connection.config.find('type' => @type).projection({'type' => 0, '_id' => 0}).limit(1).first || {}
         rescue => e
+          e = Connection.convert_exception(e)
           Logging.ops_error_exception(@logger, e, "Problem getting #{@type} configuration.")
           db_config = {}
         end
@@ -100,7 +99,7 @@ module Armagh
       end
 
       def self.default_log_level
-        logger = Log4r::Logger["Armagh::Application"] || Log4r::Logger.new("Armagh::Application")
+        logger = Logging.set_logger('Armagh::Application')
         logger.levels[logger.level].downcase
       end
 

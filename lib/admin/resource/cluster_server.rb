@@ -126,6 +126,8 @@ module Armagh
             { '$set' => profile },
             :upsert => true
           )
+        rescue => e
+          raise Connection.convert_exception(e)
         end
       
       end

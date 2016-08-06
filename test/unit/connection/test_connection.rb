@@ -159,6 +159,17 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.setup_indexes
   end
 
+  def test_setup_indexes_error
+    e = RuntimeError.new('error')
+    config_indexes = mock
+    doc_indexes = mock
+    config = stub(indexes: config_indexes)
+    @connection.stubs(:[]).with('config').returns(config)
+    Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
+    config_indexes.expects(:create_one).raises(e)
+    assert_raise(Armagh::Errors::IndexError){Armagh::Connection.setup_indexes}
+  end
+
   def test_index_doc_collection
     indexes = mock
     indexes.expects(:create_one).twice
@@ -167,5 +178,15 @@ class TestConnection < Test::Unit::TestCase
     collection.stubs(:indexes).returns(indexes).twice
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
+  end
+
+  def test_index_doc_collection_error
+    e = RuntimeError.new('error')
+    indexes = mock
+    indexes.expects(:create_one).raises(e)
+    collection = mock
+    collection.stubs(:name).returns('test_name')
+    collection.stubs(:indexes).returns(indexes)
+    assert_raise(Armagh::Errors::IndexError){Armagh::Connection.index_doc_collection(collection)}
   end
 end

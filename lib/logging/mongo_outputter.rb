@@ -35,6 +35,8 @@ module Log4r
       else
         Armagh::Connection.log.insert_one data
       end
+    rescue => e
+      raise Armagh::Connection.convert_exception(e)
     end
   end
 end

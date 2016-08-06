@@ -20,5 +20,7 @@ module Armagh
     class ConfigurationError  < StandardError; end
     class ConnectionError < StandardError; end
     class DocumentMarkError < StandardError; end
+    class EncodingError < StandardError; end
+    class IndexError < StandardError; end
   end
 end

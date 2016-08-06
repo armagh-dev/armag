@@ -46,6 +46,10 @@ module Armagh
       cfg.load_yaml_file(File.join(__dir__, '..', 'config', 'log4r.yml'))
     end
 
+    def self.set_logger(name)
+      Log4r::Logger[name] || Log4r::Logger.new(name)
+    end
+
     def self.ops_error_exception(logger, exception, additional_info)
       logger.ops_error EnhancedException.new(additional_info, exception)
     end

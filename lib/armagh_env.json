@@ -8,7 +8,9 @@
     "ARMAGH_CA":            "/tmp/etc/armagh/ca",
     "ARMAGH_APP_LOG":       "/tmp/var/log/armagh",
     "ARMAGH_PID":           "/tmp/var/run/armagh",
-    "ARMAGH_ENV":           "DEVELOPMENT"
+    "ARMAGH_REPLSET_NAME":  "armagh",
+    "ARMAGH_ENV":           "DEVELOPMENT",
+    "ARMAGH_ENCODING":      "UTF-8"
   },
   
   "Armagh::Admin::Resource::API": {

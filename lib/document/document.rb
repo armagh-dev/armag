@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+require_relative '../utils/encoding_helper'
 require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative '../connection'
@@ -45,7 +46,7 @@ module Armagh
         source: nil,
         collection_task_ids:,
         document_timestamp:,
-        new: false)
+        new: false, logger: nil)
       doc = Document.new
       doc.type = type
       doc.content = content
@@ -58,7 +59,7 @@ module Armagh
       doc.source = source if source
       doc.collection_task_ids = collection_task_ids if collection_task_ids
       doc.document_timestamp = document_timestamp if document_timestamp
-      doc.save(new)
+      doc.save(new: new, logger: logger)
       doc
     end
 
@@ -73,13 +74,11 @@ module Armagh
     def self.find_or_create_and_lock(document_id, type, state)
       begin
         db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
-      rescue Mongo::Error::OperationFailure => e
-        if e.message =~ /^E11000/
-          # The document already exists.  It's already locked
-          throw :already_locked, true
-        else
-          raise e
-        end
+
+      rescue => e
+        e = Connection.convert_exception(e, document_id)
+        throw(:already_locked, true) if e.is_a? Documents::Errors::DocumentUniquenessError
+        raise e
       end
 
       if db_doc['type']
@@ -96,6 +95,8 @@ module Armagh
     def self.find(document_id, type, state)
       db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
+    rescue => e
+      raise Connection.convert_exception(e, document_id)
     end
 
     def self.get_for_processing
@@ -106,10 +107,14 @@ module Armagh
       end
 
       nil
+    rescue => e
+      raise Connection.convert_exception(e)
     end
 
     def self.exists?(document_id, type, state)
       collection(type, state).find({'document_id' => document_id}).limit(1).count != 0
+    rescue => e
+      raise Connection.convert_exception(e, document_id)
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
@@ -148,16 +153,20 @@ module Armagh
         raise e
       end
 
-      doc.finish_processing if doc.is_a? Document
+      doc.finish_processing(logger) if doc.is_a? Document
       nil
     end
 
     def self.delete(document_id, type, state)
       collection(type, state).delete_one({ 'document_id': document_id})
+    rescue => e
+      raise Connection.convert_exception(e, document_id)
     end
 
     def self.unlock(document_id, type, state)
       collection(type, state).find_one_and_update({ 'document_id': document_id}, {'$set' => {'locked' => false}})
+    rescue => e
+      raise Connection.convert_exception(e, document_id)
     end
     
     def self.collection(type = nil, state = nil)
@@ -382,19 +391,21 @@ module Armagh
       @db_doc['pending_work'] ? true : false
     end
 
-    def finish_processing
+    def finish_processing(logger)
       @db_doc['locked'] = false
       update_pending_work
-      save
+      save(logger: logger)
     end
 
     # TODO Document#save - Buffered writing
-    def save(new = false)
+    def save(new: false, logger: nil)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
       @db_doc['updated_timestamp'] = now
       @db_doc['version'] = self.class.version
       @db_doc['collection_task_ids'].uniq!
+
+      @db_doc = Armagh::Utils::EncodingHelper.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
 
       delete_orig = false
 
@@ -434,14 +445,8 @@ module Armagh
 
       @pending_publish = false
       @published_id = nil
-    rescue Mongo::Error::MaxBSONSize
-      raise Documents::Errors::DocumentSizeError.new("Document #{document_id} is too large.  Consider using a divider or splitter to break up the document.")
-    rescue Mongo::Error::OperationFailure => e
-      if e.message =~ /^E11000/
-        raise Documents::Errors::DocumentUniquenessError.new("Unable to create document #{document_id}.  This document already exists.")
-      else
-        raise e
-      end
+    rescue => e
+      raise Connection.convert_exception(e, document_id)
     end
 
     def state

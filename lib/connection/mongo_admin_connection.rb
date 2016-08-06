@@ -32,7 +32,7 @@ module Armagh
       attr_reader :connection
 
       def initialize
-        Mongo::Logger.logger = Log4r::Logger['Armagh::MongoAdminConnection'] || Log4r::Logger.new('Armagh::MongoAdminConnection')
+        Mongo::Logger.logger = Logging.set_logger('Armagh::MongoAdminConnection')
         config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
 
         config_keys = config.keys

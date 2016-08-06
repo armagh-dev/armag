@@ -21,6 +21,7 @@ require 'mongo'
 require 'singleton'
 require 'base64'
 
+require_relative '../logging'
 require_relative '../errors'
 require_relative '../configuration/file_based_configuration.rb'
 
@@ -32,7 +33,7 @@ module Armagh
       attr_reader :connection
 
       def initialize
-        Mongo::Logger.logger = Log4r::Logger['Armagh::MongoConnection'] || Log4r::Logger.new('Armagh::MongoConnection')
+        Mongo::Logger.logger = Logging.set_logger('Armagh::MongoConnection')
         config = Armagh::Configuration::FileBasedConfiguration.load( self.class.to_s )
 
         config_keys = config.keys

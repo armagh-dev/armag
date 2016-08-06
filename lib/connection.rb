@@ -17,6 +17,8 @@
 
 require 'set'
 
+require_relative 'errors'
+require_relative 'connection/mongo_error_handler'
 require_relative 'connection/mongo_connection'
 require_relative 'connection/mongo_admin_connection'
 
@@ -101,6 +103,9 @@ module Armagh
     def self.setup_indexes
       config.indexes.create_one({'type' => 1}, unique: true, name: 'types')
       all_document_collections.each { |c| index_doc_collection(c) }
+    rescue => e
+      e = Connection.convert_exception(e)
+      raise Errors::IndexError, "Unable to create indexes: #{e.message}"
     end
 
     def self.index_doc_collection(collection)
@@ -119,6 +124,8 @@ module Armagh
                                         'pending_work' => {'$exists' => true},
                                         'locked' => false
                                     })
+    rescue => e
+      raise Errors::IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
     end
   end
 end

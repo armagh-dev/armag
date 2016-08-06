@@ -133,10 +133,22 @@ class TestDocument < Test::Unit::TestCase
     assert_nil(doc)
   end
 
+  def test_find_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:find).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError){Document.find('id', 'testdoc', Documents::DocState::WORKING)}
+  end
+
   def test_get_for_processing
     mock_document_find_one_and_update({'document_id' => 'docid'})
     doc = Document.get_for_processing
     assert_equal('docid', doc.document_id)
+  end
+
+  def test_get_for_processing_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:find_one_and_update).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError){Document.get_for_processing}
   end
 
   def test_exists?
@@ -146,6 +158,13 @@ class TestDocument < Test::Unit::TestCase
     mock_document_find([])
     assert_false Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING)
   end
+
+  def test_exists_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:find).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError){Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING)}
+  end
+
 
   def test_pending_actions
     pending_actions = %w(Action1 Action2 Action3)
@@ -334,8 +353,9 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_finish_processing
+    logger = mock('logger')
     mock_document_replace
-    @doc.finish_processing
+    @doc.finish_processing(logger)
     assert_false @doc.locked?
   end
 
@@ -434,7 +454,7 @@ class TestDocument < Test::Unit::TestCase
 
     block_executed = false
 
-    assert_raise(Mongo::Error::OperationFailure) do
+    assert_raise(Armagh::Errors::ConnectionError.new('An unexpected connection error occurred from document docid: Unknown.')) do
       Document.modify_or_create(id, type, state, true) do |doc|
         block_executed = true
       end
@@ -482,6 +502,12 @@ class TestDocument < Test::Unit::TestCase
   def test_delete
     @documents.expects(:delete_one).with({:'document_id' => '123'})
     Document.delete('123', 'type', 'state')
+  end
+
+  def test_delete_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:delete_one).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError){Document.delete('123', 'type', 'state')}
   end
 
   def test_get_published_copy
@@ -547,6 +573,8 @@ class TestDocument < Test::Unit::TestCase
     Armagh::Connection.expects(:documents).with('testdoc').returns(testdoc_collection)
     testdoc_collection.expects(:replace_one)
     @documents.expects(:delete_one).with({'_id': @doc.internal_id})
+
+    Armagh::Utils::EncodingHelper.expects(:fix_encoding).returns(@doc.instance_variable_get(:@db_doc))
 
     assert_false @doc.instance_variable_get(:@pending_publish)
     @doc.mark_publish
@@ -642,10 +670,10 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_unknown_operation_error
-    expected = Mongo::Error::OperationFailure.new('Something')
-    @documents.expects(:insert_one).raises(expected)
+    error = Mongo::Error::OperationFailure.new('Something')
+    @documents.expects(:insert_one).raises(error)
 
-    error = assert_raise(Mongo::Error::OperationFailure) do
+    assert_raise(Armagh::Errors::ConnectionError.new('An unexpected connection error occurred from document id: Something.')) do
       Document.create(type: 'testdoc',
                       content: {'content' => true},
                       metadata: {'meta' => true},
@@ -656,8 +684,6 @@ class TestDocument < Test::Unit::TestCase
                       collection_task_ids: [],
                       document_timestamp: Time.now)
     end
-
-    assert_equal expected, error
   end
 
   def test_class_version
@@ -687,5 +713,11 @@ class TestDocument < Test::Unit::TestCase
   def test_unlock
     @documents.expects(:find_one_and_update).with({ 'document_id': 'id'}, {'$set' => {'locked' => false}})
     Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)
+  end
+
+  def test_unlock_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:find_one_and_update).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError){Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)}
   end
 end

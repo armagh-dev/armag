@@ -616,7 +616,7 @@ class TestAgent < Test::Unit::TestCase
                                            collection_task_ids: [],
                                            document_timestamp: nil,
                                            source: {'some' => 'source'},
-                                           title: nil, copyright: nil)
+                                           title: nil, copyright: nil, logger: @logger)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
                                                        content: 'content',
                                                        metadata: 'metadata',
@@ -972,6 +972,16 @@ class TestAgent < Test::Unit::TestCase
     message = 'message'
     @current_doc_mock.expects(:add_dev_error).with(action_name, message)
     @agent.notify_dev(action_name, message)
+  end
+
+  def test_fix_encoding
+    object = 'object'
+    proposed = 'proposed'
+    logger_name = 'test_logger'
+    logger = mock('logger')
+    Armagh::Logging.expects(:set_logger).with(logger_name).returns(logger)
+    Armagh::Utils::EncodingHelper.expects(:fix_encoding).with(object, proposed, logger)
+    @agent.fix_encoding(logger_name, object, proposed)
   end
 
   def test_too_large

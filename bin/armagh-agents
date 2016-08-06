@@ -52,7 +52,7 @@ unless Connection.can_connect?
   exit 1
 end
 
-@logger = Log4r::Logger['Armagh::Application::Launcher'] || Log4r::Logger.new('Armagh::Application::Launcher')
+@logger = Logging.set_logger('Armagh::Application::Launcher')
 
 @launcher_config_manager = Configuration::LauncherConfigManager.new(@logger)
 @agent_config_manager = Configuration::AgentConfigManager.new(@logger)
@@ -95,6 +95,8 @@ def checkin(status)
   Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
 
   @last_checkin = Time.now
+rescue => e
+  raise Connection.convert_exception(e)
 end
 
 def apply_launcher_config(config)

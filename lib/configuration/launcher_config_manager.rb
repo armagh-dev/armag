@@ -16,6 +16,7 @@
 #
 
 require_relative 'config_manager'
+require_relative '../logging'
 
 module Armagh
   module Configuration
@@ -35,7 +36,7 @@ module Armagh
       end
 
       def self.default_log_level
-        logger = Log4r::Logger['Armagh::Application::Launcher'] || Log4r::Logger.new('Armagh::Application::Launcher')
+        logger = Logging.set_logger('Armagh::Application::Launcher')
         logger.levels[logger.level].downcase
       end
 

@@ -1,5 +1,5 @@
 require 'singleton'
-require 'log4r'
+require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration.rb'
 require_relative './cluster_server.rb'
 
@@ -28,12 +28,12 @@ module Armagh
         }
       
         def initialize
-          @logger = Log4r::Logger['Armagh::ResourceAdminAPI'] || Log4r::Logger.new('Armagh::ResourceAdminAPI')
+          @logger = Logging.set_logger('Armagh::ResourceAdminAPI')
 
           begin
             config      = Configuration::FileBasedConfiguration.load( self.class.to_s )
           rescue => e
-            Logger.error_exception(@logger, e, "Invalid file based configuration for #{self.class.to_s}.  Reverting to default.")
+            Logging.dev_error_exception(@logger, e, "Invalid file based configuration for #{self.class.to_s}.  Reverting to default.")
             config = {}
           end
 

@@ -16,17 +16,18 @@
 #
 
 require 'drb/unix'
-require 'log4r'
 require 'securerandom'
 require 'tmpdir'
 
 require 'armagh/actions'
 require 'armagh/documents'
 
+require_relative '../logging'
 require_relative '../action/action_manager'
 require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../utils/processing_backoff'
+require_relative '../utils/encoding_helper'
 
 module Armagh
   class Agent
@@ -34,7 +35,7 @@ module Armagh
 
     def initialize
       @uuid = "Agent-#{SecureRandom.uuid}"
-      @logger = Log4r::Logger["Armagh::Application::Agent::#{@uuid}"] || Log4r::Logger.new("Armagh::Application::Agent::#{@uuid}")
+      @logger = Logging.set_logger("Armagh::Application::Agent::#{@uuid}")
 
       @running = false
 
@@ -87,7 +88,7 @@ module Armagh
                       title: action_doc.title,
                       copyright: action_doc.copyright,
                       document_timestamp: action_doc.document_timestamp,
-                      source: action_doc.source, new: true)
+                      source: action_doc.source, new: true, logger: @logger)
       @num_creates += 1
     end
 
@@ -110,7 +111,7 @@ module Armagh
     end
 
     def log_debug(logger_name, msg = nil)
-      logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      logger = Logging.set_logger(logger_name)
       if block_given?
         logger.debug { yield }
       else
@@ -119,7 +120,7 @@ module Armagh
     end
 
     def log_info(logger_name, msg = nil)
-      logger = Log4r::Logger[logger_name] || Log4r::Logger.new(logger_name)
+      logger = Logging.set_logger(logger_name)
       if block_given?
         logger.info { yield }
       else
@@ -133,6 +134,11 @@ module Armagh
 
     def notify_dev(action_name, error)
       @current_doc.add_dev_error(action_name, error)
+    end
+
+    def fix_encoding(logger_name, object, proposed_encoding)
+      logger = Logging.set_logger(logger_name)
+      Utils::EncodingHelper.fix_encoding(object, proposed_encoding, logger)
     end
 
     private def edit_or_create(document_id, docspec, doc)
@@ -173,7 +179,7 @@ module Armagh
         new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.collection_task_ids << @collection_task_id if @collection_task_id
         new_doc.internal_id = doc
-        new_doc.save
+        new_doc.save(logger: @logger)
       end
     end
 
@@ -256,7 +262,7 @@ module Armagh
 
           true # Always remove this action from pending
         end
-        @current_doc.finish_processing
+        @current_doc.finish_processing(@logger)
       else
         @logger.debug 'No document found for processing.'
         report_status(@current_doc, nil)
