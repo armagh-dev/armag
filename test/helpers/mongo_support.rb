@@ -35,8 +35,8 @@ class MongoSupport
 
 
   def initialize
-    @mongod_exec = `which mongod`
-    @mongo_exec = `which mongo`
+    @mongod_exec = `which mongod`.strip
+    @mongo_exec = `which mongo`.strip
     @mongo_pid = nil
     @client = nil
 
@@ -48,10 +48,16 @@ class MongoSupport
     raise 'No mongo found' if @mongo_exec.nil? || @mongo_exec.empty?
   end
 
-  def start_mongo
+  def start_mongo(arguments = nil)
+    if arguments
+      cmd = "#{@mongod_exec} #{arguments}"
+    else
+      cmd = @mongod_exec
+    end
+
     unless running?
       File.truncate(OUT_PATH, 0) if File.file? OUT_PATH
-      @mongo_pid = Process.spawn(@mongod_exec, :out => OUT_PATH)
+      @mongo_pid = Process.spawn(cmd, :out => OUT_PATH)
       sleep 1
     end
 
@@ -112,5 +118,16 @@ class MongoSupport
 
   def clean_database
     `mongo #{DATABASE_NAME} --eval "db.dropDatabase();"`
+    sleep 1
+  end
+
+  def initiate_replica_set
+    `mongo --eval "rs.initiate();"`
+    sleep 1
+  end
+
+  def clean_replica_set
+    `mongo local --eval "db.dropDatabase();"`
+    sleep 1
   end
 end

@@ -980,7 +980,7 @@ class TestAgent < Test::Unit::TestCase
     logger_name = 'test_logger'
     logger = mock('logger')
     Armagh::Logging.expects(:set_logger).with(logger_name).returns(logger)
-    Armagh::Utils::EncodingHelper.expects(:fix_encoding).with(object, proposed, logger)
+    Armagh::Utils::EncodingHelper.expects(:fix_encoding).with(object, proposed_encoding: proposed, logger: logger)
     @agent.fix_encoding(logger_name, object, proposed)
   end
 

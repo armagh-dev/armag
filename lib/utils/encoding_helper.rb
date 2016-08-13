@@ -26,17 +26,17 @@ module Armagh
       def self.fix_encoding(object, proposed_encoding: nil, logger: nil)
         # Strings, Hashes, and Arrays are the only supported BSON types that would require encoding
         if object.is_a? String
-          return fix_string_encoding(object, proposed_encoding: proposed_encoding, logger: logger)
+          return fix_string_encoding(object, proposed_encoding, logger)
         elsif object.is_a? Hash
-          return fix_hash_encoding(object, proposed_encoding: proposed_encoding, logger: logger)
+          return fix_hash_encoding(object, proposed_encoding, logger)
         elsif object.is_a? Array
-          return fix_array_encoding(object, proposed_encoding: proposed_encoding, logger: logger)
+          return fix_array_encoding(object, proposed_encoding, logger)
         else
           return object
         end
       end
 
-      private_class_method def self.fix_hash_encoding(hash, proposed_encoding: nil, logger: nil)
+      private_class_method def self.fix_hash_encoding(hash, proposed_encoding, logger)
         hash = hash.dup if hash.frozen?
         hash.each do |key, value|
           hash[key] = fix_encoding(value, proposed_encoding: proposed_encoding, logger: logger)
@@ -44,7 +44,7 @@ module Armagh
         return hash
       end
 
-      private_class_method def self.fix_array_encoding(array, proposed_encoding: nil, logger: nil)
+      private_class_method def self.fix_array_encoding(array, proposed_encoding, logger)
         array = array.dup if array.frozen?
         array.map! do |value|
           fix_encoding(value, proposed_encoding: proposed_encoding, logger: logger)
@@ -52,7 +52,7 @@ module Armagh
         return array
       end
 
-      private_class_method def self.fix_string_encoding(string, proposed_encoding: nil, logger: nil)
+      private_class_method def self.fix_string_encoding(string, proposed_encoding, logger)
         return string if string.encoding == TARGET_ENCODING && string.valid_encoding?
 
         string = string.dup if string.frozen?
@@ -123,7 +123,7 @@ module Armagh
         encodings << Encoding::WINDOWS_1254 if defined? Encoding::WINDOWS_1254
         encodings << Encoding::WINDOWS_874  if defined? Encoding::WINDOWS_874
         (encodings | Encoding.list).freeze
-                           end
+      end
 
       FALLBACK_ENCODING = Encoding::UTF_8
       TARGET_ENCODING = get_target_encoding

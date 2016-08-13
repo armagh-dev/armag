@@ -23,32 +23,32 @@ require 'mocha/test_unit'
 
 class TestMongoErrorHandler < Test::Unit::TestCase
   def test_convert_size
-    e = Armagh::Connection.convert_exception(Mongo::Error::MaxBSONSize.new('size'))
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'))
     assert_kind_of(Armagh::Documents::Errors::DocumentSizeError, e)
   end
 
   def test_convert_unique
-    e = Armagh::Connection.convert_exception(Mongo::Error::OperationFailure.new('E11000: something'))
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::OperationFailure.new('E11000: something'))
     assert_kind_of(Armagh::Documents::Errors::DocumentUniquenessError, e)
   end
 
   def test_convert_other_operation
-    e = Armagh::Connection.convert_exception(Mongo::Error::OperationFailure.new('E11999: something'))
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::OperationFailure.new('E11999: something'))
     assert_kind_of(Armagh::Errors::ConnectionError, e)
   end
 
   def test_convert_mongo_error
-    e = Armagh::Connection.convert_exception(Mongo::Error.new('mongo error'))
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error.new('mongo error'))
     assert_kind_of(Armagh::Errors::ConnectionError, e)
   end
 
   def test_convert_other_error
-    e = Armagh::Connection.convert_exception(EncodingError.new('encoding'))
+    e = Armagh::Connection.convert_mongo_exception(EncodingError.new('encoding'))
     assert_kind_of(EncodingError, e)
   end
 
   def test_convert_with_id
-    e = Armagh::Connection.convert_exception(Mongo::Error::MaxBSONSize.new('size'), 'document_id')
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'), 'document_id')
     assert_include(e.message, 'document_id')
   end
 end

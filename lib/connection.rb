@@ -21,6 +21,7 @@ require_relative 'errors'
 require_relative 'connection/mongo_error_handler'
 require_relative 'connection/mongo_connection'
 require_relative 'connection/mongo_admin_connection'
+require_relative 'utils/network_helper'
 
 module Armagh
   module Connection
@@ -74,11 +75,15 @@ module Armagh
     end
 
     def self.master?
-      # TODO Connection.master?  Is this a primary server?
+      MongoConnection.instance.connection.database.command(ismaster: 1).documents.first['ismaster']
     end
 
     def self.primaries
-      # TODO Connection.primaries Get the Primary Servers
+      primary_hosts = []
+      MongoConnection.instance.connection.cluster.servers.each do |server|
+        primary_hosts << server.address.host if server.primary?
+      end
+      primary_hosts
     end
 
     def self.can_connect?
@@ -104,7 +109,7 @@ module Armagh
       config.indexes.create_one({'type' => 1}, unique: true, name: 'types')
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e
-      e = Connection.convert_exception(e)
+      e = Connection.convert_mongo_exception(e)
       raise Errors::IndexError, "Unable to create indexes: #{e.message}"
     end
 

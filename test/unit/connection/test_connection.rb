@@ -37,12 +37,16 @@ class TestConnection < Test::Unit::TestCase
     instance = mock
     instance.stubs(:connection).returns(@connection)
 
+
     @admin_connection = mock
     admin_instance = mock
     admin_instance.stubs(:connection).returns(@admin_connection)
 
     @cluster = mock
     @connection.stubs(:cluster).returns(@cluster)
+
+    @database = mock
+    @connection.stubs(:database).returns(@database)
 
     Armagh::Connection::MongoConnection.stubs(:instance).returns(instance)
     Armagh::Connection::MongoAdminConnection.stubs(:instance).returns(admin_instance)
@@ -118,6 +122,31 @@ class TestConnection < Test::Unit::TestCase
   def test_resource_log
     @admin_connection.expects(:[]).with('log')
     Armagh::Connection.resource_log
+  end
+
+  def test_master_no_master
+    result = mock
+    result.expects(:documents).returns([{'ismaster' => false}])
+    @database.expects(:command).with(ismaster: 1).returns(result)
+    assert_false Armagh::Connection.master?
+  end
+
+  def test_master
+    result = mock
+    result.expects(:documents).returns([{'ismaster' => true}])
+    @database.expects(:command).with(ismaster: 1).returns(result)
+    assert_true Armagh::Connection.master?
+  end
+
+  def test_primaries
+    servers = [
+        stub(address: stub(host: '10.10.10.10'), primary?: true),
+        stub(address: stub(host: '10.10.10.11'), primary?: false),
+        stub(address: stub(host: '10.10.10.12'), primary?: true),
+        stub(address: stub(host: '10.10.10.13'), primary?: false)
+    ]
+    @cluster.expects(:servers).returns(servers)
+    assert_equal %w(10.10.10.10 10.10.10.12), Armagh::Connection.primaries
   end
 
   def test_can_connect_no_servers

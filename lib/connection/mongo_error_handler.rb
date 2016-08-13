@@ -20,7 +20,7 @@ require 'armagh/documents/errors'
 
 module Armagh
   module Connection
-    def self.convert_exception(e, id = nil)
+    def self.convert_mongo_exception(e, id = nil)
       if id
         unexpected_msg = "An unexpected connection error occurred from document #{id}: #{e.message}."
       else

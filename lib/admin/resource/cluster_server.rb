@@ -127,7 +127,7 @@ module Armagh
             :upsert => true
           )
         rescue => e
-          raise Connection.convert_exception(e)
+          raise Connection.convert_mongo_exception(e)
         end
       
       end

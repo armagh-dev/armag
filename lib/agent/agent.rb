@@ -138,7 +138,7 @@ module Armagh
 
     def fix_encoding(logger_name, object, proposed_encoding)
       logger = Logging.set_logger(logger_name)
-      Utils::EncodingHelper.fix_encoding(object, proposed_encoding, logger)
+      Utils::EncodingHelper.fix_encoding(object, proposed_encoding: proposed_encoding, logger: logger)
     end
 
     private def edit_or_create(document_id, docspec, doc)

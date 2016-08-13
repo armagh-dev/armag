@@ -36,7 +36,7 @@ module Log4r
         Armagh::Connection.log.insert_one data
       end
     rescue => e
-      raise Armagh::Connection.convert_exception(e)
+      raise Armagh::Connection.convert_mongo_exception(e)
     end
   end
 end

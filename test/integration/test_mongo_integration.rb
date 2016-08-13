@@ -30,7 +30,7 @@ require 'mocha/test_unit'
 
 require 'mongo'
 
-class TestIntegrationMongo < Test::Unit::TestCase
+class TestMongoIntegration < Test::Unit::TestCase
 
   def self.startup
     puts 'Starting Mongo'
@@ -40,15 +40,33 @@ class TestIntegrationMongo < Test::Unit::TestCase
 
   def self.shutdown
     puts 'Stopping Mongo'
+    MongoSupport.instance.clean_replica_set
     MongoSupport.instance.stop_mongo
   end
 
   def setup
     MongoSupport.instance.clean_database
+    MongoSupport.instance.clean_replica_set
   end
 
   def test_mongo_connection
     result = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
     assert_equal result.documents, [{ "n" => 1, "ok" => 1}]
+  end
+
+  def test_master
+    assert_true Armagh::Connection.master?
+  end
+
+  def test_primaries
+    assert_empty Armagh::Connection.primaries
+    MongoSupport.instance.stop_mongo
+    MongoSupport.instance.clean_database
+
+    MongoSupport.instance.start_mongo '--replSet test'
+    MongoSupport.instance.initiate_replica_set
+
+    Singleton.__init__(Armagh::Connection::MongoConnection)
+    assert_equal ['127.0.0.1'], Armagh::Connection.primaries
   end
 end

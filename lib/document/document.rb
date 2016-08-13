@@ -46,7 +46,8 @@ module Armagh
         source: nil,
         collection_task_ids:,
         document_timestamp:,
-        new: false, logger: nil)
+        new: false,
+        logger: nil)
       doc = Document.new
       doc.type = type
       doc.content = content
@@ -74,9 +75,8 @@ module Armagh
     def self.find_or_create_and_lock(document_id, type, state)
       begin
         db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
-
       rescue => e
-        e = Connection.convert_exception(e, document_id)
+        e = Connection.convert_mongo_exception(e, document_id)
         throw(:already_locked, true) if e.is_a? Documents::Errors::DocumentUniquenessError
         raise e
       end
@@ -96,7 +96,7 @@ module Armagh
       db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
     rescue => e
-      raise Connection.convert_exception(e, document_id)
+      raise Connection.convert_mongo_exception(e, document_id)
     end
 
     def self.get_for_processing
@@ -108,13 +108,13 @@ module Armagh
 
       nil
     rescue => e
-      raise Connection.convert_exception(e)
+      raise Connection.convert_mongo_exception(e)
     end
 
     def self.exists?(document_id, type, state)
       collection(type, state).find({'document_id' => document_id}).limit(1).count != 0
     rescue => e
-      raise Connection.convert_exception(e, document_id)
+      raise Connection.convert_mongo_exception(e, document_id)
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
@@ -160,13 +160,13 @@ module Armagh
     def self.delete(document_id, type, state)
       collection(type, state).delete_one({ 'document_id': document_id})
     rescue => e
-      raise Connection.convert_exception(e, document_id)
+      raise Connection.convert_mongo_exception(e, document_id)
     end
 
     def self.unlock(document_id, type, state)
       collection(type, state).find_one_and_update({ 'document_id': document_id}, {'$set' => {'locked' => false}})
     rescue => e
-      raise Connection.convert_exception(e, document_id)
+      raise Connection.convert_mongo_exception(e, document_id)
     end
     
     def self.collection(type = nil, state = nil)
@@ -446,7 +446,7 @@ module Armagh
       @pending_publish = false
       @published_id = nil
     rescue => e
-      raise Connection.convert_exception(e, document_id)
+      raise Connection.convert_mongo_exception(e, document_id)
     end
 
     def state

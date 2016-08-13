@@ -96,7 +96,7 @@ def checkin(status)
 
   @last_checkin = Time.now
 rescue => e
-  raise Connection.convert_exception(e)
+  raise Connection.convert_mongo_exception(e)
 end
 
 def apply_launcher_config(config)
