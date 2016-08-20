@@ -210,7 +210,7 @@ class TestEncodingHelper < Test::Unit::TestCase
     start = Time.now
     hash = Armagh::Utils::EncodingHelper.fix_encoding(hash, logger: @logger)
     elapsed = Time.now - start
-    assert_true elapsed < 0.1, "fix_encoding took longer than 0.1 seconds to execute (note: this did not execute the ideal case).  Consider evaluating the performance.  It took #{elapsed} seconds."
+    assert_true elapsed < 0.25, "fix_encoding took longer than 0.25 seconds to execute (note: this did not execute the ideal case).  Consider evaluating the performance.  It took #{elapsed} seconds."
 
     assert_true hash['content']['field_0'].valid_encoding?
   end

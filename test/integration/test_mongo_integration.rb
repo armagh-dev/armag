@@ -29,6 +29,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 require 'mongo'
+require 'socket'
 
 class TestMongoIntegration < Test::Unit::TestCase
 
@@ -51,7 +52,7 @@ class TestMongoIntegration < Test::Unit::TestCase
 
   def test_mongo_connection
     result = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })
-    assert_equal result.documents, [{ "n" => 1, "ok" => 1}]
+    assert_equal result.documents, [{'n' => 1, 'ok' => 1}]
   end
 
   def test_master
@@ -67,6 +68,8 @@ class TestMongoIntegration < Test::Unit::TestCase
     MongoSupport.instance.initiate_replica_set
 
     Singleton.__init__(Armagh::Connection::MongoConnection)
-    assert_equal ['127.0.0.1'], Armagh::Connection.primaries
+    primaries = Armagh::Connection.primaries
+    assert_equal 1, primaries.length
+    assert_includes ['127.0.0.1', Socket.gethostname], primaries.first
   end
 end
