@@ -1,11 +1,12 @@
 Vagrant.configure('2') do |config|
-  config.vm.hostname = 'armagh-ci'
+  vm_name = "armagh-#{`hg branch`.strip}-ci".gsub(/[^a-zA-Z\-\d.]/, '-')
+  config.vm.hostname = vm_name
 
-  config.vm.box = 'armagh-ci'
+  config.vm.box = vm_name
   config.vm.box_url = 'file:///var/vagrant_boxes/armagh-ci.box'
 
   config.vm.provider 'virtualbox' do |v|
-    v.name = 'armagh-ci'
+    v.name = vm_name
     v.memory = 1024
     v.cpus = 2
   end
