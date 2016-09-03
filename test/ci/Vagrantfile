@@ -17,6 +17,7 @@ Vagrant.configure('2') do |config|
   echo 'export GEM_HOME=$HOME/.gem'    >> /etc/profile.d/rubygems.sh
   echo 'export GEM_PATH=$HOME/.gem'    >> /etc/profile.d/rubygems.sh
   echo 'export PATH=$GEM_PATH/bin:$PATH' >> /etc/profile.d/rubygems.sh
+  echo 'export DBUS_SESSION_BUS_ADDRESS=""' >> /etc/profile.d/test_env.sh
   mkdir -p /var/log/armagh
   chown vagrant.vagrant /var/log/armagh
   mkdir -p /data/db
