@@ -10,7 +10,8 @@
     "ARMAGH_PID":           "/tmp/var/run/armagh",
     "ARMAGH_REPLSET_NAME":  "armagh",
     "ARMAGH_ENV":           "DEVELOPMENT",
-    "ARMAGH_ENCODING":      "UTF-8"
+    "ARMAGH_ENCODING":      "UTF-8",
+    "ARMAGH_BIND_IP":       "127.0.0.1"
   },
   
   "Armagh::Admin::Resource::API": {

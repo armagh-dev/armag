@@ -67,17 +67,4 @@ class TestAgentStatus < Test::Unit::TestCase
     assert_equal(agents.length - 1, Armagh::AgentStatus.get_statuses(@agent_status).length)
     assert_false Armagh::AgentStatus.get_statuses(@agent_status).has_key?(last_agent)
   end
-
-  def test_set_config
-    config = {'test' => 'config'}
-    @agent_status.config = config
-    assert_equal(config, Armagh::AgentStatus.get_config(@agent_status))
-  end
-
-  def test_update_config
-    config = {'test' => 'config'}
-    @agent_status.config = config
-    @agent_status.update_config('new', 'value')
-    assert_equal({'new' => 'value', 'test' => 'config'}, Armagh::AgentStatus.get_config(@agent_status))
-  end
 end

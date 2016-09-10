@@ -57,5 +57,26 @@ module Armagh
     def self.dev_error_exception(logger, exception, additional_info)
       logger.dev_error EnhancedException.new(additional_info, exception)
     end
+    
+    def self.default_log_level( logger )
+      temp_logger = set_logger( logger.name )
+      temp_logger.levels[temp_logger.level].downcase
+    end
+    
+    def self.set_level( logger, level_string )
+      level = logger.levels.index{ |ls| ls == level_string.upcase } || default_log_level( logger )
+      unless logger.level == level
+        logger.any "Changing log level to #{logger.levels[level]}"
+        logger.level = level
+      end
+    end
+    
+    def self.valid_log_levels
+      Log4r::Logger.new('temp').levels.collect{ |level| level.downcase }
+    end
+    
+    def self.valid_level?( candidate_level )
+      valid_log_levels.include?( candidate_level.downcase )
+    end
   end
 end

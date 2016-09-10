@@ -40,7 +40,7 @@ module Armagh
         else
           # hostname
           return true if host == Socket.gethostname
-          resolved_addresses = Resolv.getaddresses(host).collect{|addr| IPAddr.new(addr)}
+          resolved_addresses = Resolv.getaddresses(host).collect{|addr| IPAddr.new(addr.gsub(/\%.+$/,''))}
           return !(local_ip_addresses & resolved_addresses).empty?
         end
         false

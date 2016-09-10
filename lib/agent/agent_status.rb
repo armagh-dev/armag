@@ -18,10 +18,9 @@
 module Armagh
   class AgentStatus
 
-    attr_reader :config, :statuses
+    attr_reader :statuses
 
     def initialize
-      @config = nil
       @statuses = {}
       @lock = Mutex.new
     end
@@ -30,16 +29,6 @@ module Armagh
     # the dup object will immediately be GC'd by the server.
     def self.get_statuses(agent_status)
       agent_status.statuses.dup
-    end
-
-    # Preferred way to access config so we don't risk operating on the shared object.  Can't use dup in the instance because
-    # the dup object will immediately be GC'd by the server.
-    def self.get_config(agent_status, last_config_received = nil)
-      if agent_status.config && (last_config_received.nil? || last_config_received < agent_status.config['timestamp'])
-        agent_status.config.dup
-      else
-        nil
-      end
     end
 
     def report_status(agent_id, status)
@@ -54,16 +43,5 @@ module Armagh
       end
     end
 
-    def config=(config)
-      @lock.synchronize do
-        @config = config
-      end
-    end
-
-    def update_config(key, value)
-      @lock.synchronize do
-        @config[key] = value
-      end
-    end
   end
 end

@@ -19,11 +19,12 @@ require 'drb/unix'
 require 'securerandom'
 require 'tmpdir'
 
+require 'configh'
+
 require 'armagh/actions'
 require 'armagh/documents'
 
 require_relative '../logging'
-require_relative '../action/action_manager'
 require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../utils/processing_backoff'
@@ -31,15 +32,23 @@ require_relative '../utils/encoding_helper'
 
 module Armagh
   class Agent
+    include Configh::Configurable
+    
+    define_parameter name: 'log_level', type: 'populated_string', description: 'Logging level for agents', required: true, default: 'warn', group: 'agent'
+    define_group_validation_callback callback_class: Agent, callback_method: :report_validation_errors
+    
     attr_reader :uuid
 
-    def initialize
+    def initialize( agent_config, workflow )
+      
+      @config = agent_config
+      @workflow = workflow
+      
       @uuid = "Agent-#{SecureRandom.uuid}"
       @logger = Logging.set_logger("Armagh::Application::Agent::#{@uuid}")
+      Logging.set_level( @logger, @config.agent.log_level )
 
       @running = false
-
-      @action_manager = ActionManager.new(self, @logger)
 
       @backoff = Utils::ProcessingBackoff.new
       @backoff.logger = @logger
@@ -49,7 +58,6 @@ module Armagh
 
     def start
       connect_agent_status
-      update_config
 
       @logger.info 'Starting'
       @running = true
@@ -68,14 +76,10 @@ module Armagh
       @running
     end
 
-    def get_divider(action_name, docspec_name)
-      @action_manager.get_divider(action_name, docspec_name)
-    end
-
     def create_document(action_doc)
       docspec = action_doc.docspec
       raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.document_id}'.  It is the same document that was passed into the action." if action_doc.document_id == @current_doc.document_id
-      pending_actions = @action_manager.get_action_names_for_docspec(docspec)
+      pending_actions = @workflow.get_action_names_for_docspec(docspec)
       collection_task_ids = []
       collection_task_ids << @collection_task_id if @collection_task_id
       Document.create(type: docspec.type,
@@ -159,7 +163,7 @@ module Armagh
         doc.collection_task_ids << @collection_task_id if @collection_task_id
 
         unless initial_docspec == new_docspec
-          pending_actions = @action_manager.get_action_names_for_docspec(new_docspec)
+          pending_actions = @workflow.get_action_names_for_docspec(new_docspec)
           doc.clear_pending_actions
           doc.add_pending_actions pending_actions
         end
@@ -175,7 +179,7 @@ module Armagh
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
-        pending_actions = @action_manager.get_action_names_for_docspec(docspec)
+        pending_actions = @workflow.get_action_names_for_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.collection_task_ids << @collection_task_id if @collection_task_id
         new_doc.internal_id = doc
@@ -185,7 +189,6 @@ module Armagh
 
     private def run
       while @running
-        update_config
         execute
       end
 
@@ -207,22 +210,6 @@ module Armagh
       @agent_status = DRbObject.new_with_uri(IPC::DRB_URI)
     end
 
-    private def update_config
-      new_config = AgentStatus.get_config(@agent_status, @last_config_timestamp)
-      if new_config
-        apply_config(new_config)
-      else
-        @logger.debug 'Ignoring agent configuration update.'
-      end
-
-    end
-
-    private def apply_config(config)
-      change_log_level(config['log_level'])
-      @action_manager.set_available_actions(config['available_actions'])
-      @last_config_timestamp = config['timestamp']
-      @logger.debug "Updated configuration to #{config}"
-    end
 
     private def execute
       @current_doc = Document.get_for_processing
@@ -231,7 +218,7 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
-          current_action = @action_manager.get_action(name)
+          current_action = @workflow.get_action(name, self, @logger)
 
           @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
           report_status(@current_doc, current_action)
@@ -261,7 +248,7 @@ module Armagh
           @logger.ops_error "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document for details." if @current_doc.ops_errors.any?
 
           true # Always remove this action from pending
-        end
+        end #delete_if
         @current_doc.finish_processing(@logger)
       else
         @logger.debug 'No document found for processing.'
@@ -319,7 +306,7 @@ module Armagh
 
           doc.published_timestamp = timestamp
           doc.state = Documents::DocState::PUBLISHED
-          doc.add_pending_actions(@action_manager.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
+          doc.add_pending_actions(@workflow.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
           @collection_task_id = doc.collection_task_ids.last
@@ -333,13 +320,6 @@ module Armagh
           @logger.dev_error "#{action} is an not an action."
       end
       raise Documents::Errors::IDError, "Attempted to change Document's ID from '#{initial_id}' to '#{doc.document_id}.  IDs can only be changed from a publisher." unless initial_id == doc.document_id || allowed_id_change
-    end
-
-    private def change_log_level(level)
-      unless @logger.level == level
-        @logger.any "Changing log level to #{@logger.levels[level]}"
-        @logger.level = level
-      end
     end
 
     private def report_status(doc, action)
@@ -364,6 +344,14 @@ module Armagh
 
       @logger.info "Reporting Status #{status['status']}"
       @agent_status.report_status(@uuid, status)
+    end
+  
+    def Agent.report_validation_errors( candidate_config )
+      errors = nil
+      unless Logging.valid_level?( candidate_config.agent.log_level )
+        errors = "Log level must be one of #{ Logging.valid_log_levels.join(", ")}"
+      end
+      errors
     end
   end
 end

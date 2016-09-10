@@ -19,6 +19,14 @@
 #            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
 #            as part of the requirement as well as in the gemspec.
 
+#
+#
+#  DO NOT CHANGE THIS FILE
+#  DO NOT CHANGE THIS FILE
+#  DO NOT CHANGE THIS FILE
+#
+#
+
 
 line_format:  &line_format
   date_pattern: '%Y-%m-%d %H:%M:%S'
