@@ -15,17 +15,20 @@
 # limitations under the License.
 #
 
-require_relative '../utils/encoding_helper'
+require 'armagh/support/encoding'
+
 require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative '../connection'
 
 require 'armagh/documents'
+require 'securerandom'
 
 module Armagh
   class Document
 
     attr_accessor :published_id
+    attr_reader :db_doc
 
     class << self
       protected :new
@@ -62,6 +65,25 @@ module Armagh
       doc.document_timestamp = document_timestamp if document_timestamp
       doc.save(new: new, logger: logger)
       doc
+    end
+
+    def self.create_trigger_document(state:, type:, pending_actions:)
+      doc = Document.new
+      doc.document_id = SecureRandom.uuid
+      doc.type = type
+      doc.state = state
+      doc.add_pending_actions pending_actions
+      doc.metadata = {}
+      doc.content = {}
+      doc.created_timestamp = Time.now
+
+      Connection.documents.update_one(
+        {'type' => type, 'state' => state},
+        {'$setOnInsert': doc.db_doc},
+        {upsert: true}
+      )
+    rescue => e
+      raise Connection.convert_mongo_exception(e, doc.document_id)
     end
 
     def self.from_action_document(action_doc, pending_actions = [])
@@ -405,7 +427,7 @@ module Armagh
       @db_doc['version'] = self.class.version
       @db_doc['collection_task_ids'].uniq!
 
-      @db_doc = Armagh::Utils::EncodingHelper.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
+      @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
 
       delete_orig = false
 
@@ -485,27 +507,27 @@ module Armagh
                                     content: content,
                                     metadata: metadata,
                                     docspec: docspec,
-                                    source: source,
+                                    source: Armagh::Documents::Source.from_hash(source),
                                     document_timestamp: document_timestamp)
     end
 
     def to_published_document
       docspec = Documents::DocSpec.new(type, state)
       Documents::PublishedDocument.new(document_id: document_id,
-                                    title: title,
-                                    copyright: copyright,
-                                    content: content,
-                                    metadata: metadata,
-                                    docspec: docspec,
-                                    source: source,
-                                    document_timestamp: document_timestamp)
+                                       title: title,
+                                       copyright: copyright,
+                                       content: content,
+                                       metadata: metadata,
+                                       docspec: docspec,
+                                       source: Armagh::Documents::Source.from_hash(source),
+                                       document_timestamp: document_timestamp)
     end
 
     def update_from_draft_action_document(action_doc)
       self.document_id = action_doc.document_id
       self.content = action_doc.content
       self.metadata = action_doc.metadata
-      self.source = action_doc.source
+      self.source = action_doc.source.to_hash
       self.title = action_doc.title
       self.copyright = action_doc.copyright
       self.document_timestamp = action_doc.document_timestamp

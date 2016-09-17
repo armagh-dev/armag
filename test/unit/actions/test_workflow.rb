@@ -35,15 +35,18 @@ module Armagh
       define_output_docspec 'collected_a', 'collected documents of first type'
       define_output_docspec 'collected_b', 'collected documents of second type'
       
-      def self.make_test_config( store:, action_name:, collected_a_doctype:, collected_b_doctype: )
-        create_configuration( store, action_name, {
+      define_parameter name:'count', required: true, type: 'integer', default: 6, description: 'desc'
+      
+      def self.make_config_values( action_name:, collected_a_doctype:, collected_b_doctype: )
+        {
           'action' => { 'name' => action_name, 'active' => true },
+          'collect' => { 'schedule' => '0 * * * *' },
           'input'  => {},
           'output' => {
             'collected_a' => Armagh::Documents::DocSpec.new( collected_a_doctype, DS_READY ),
             'collected_b' => Armagh::Documents::DocSpec.new( collected_b_doctype, DS_READY )
           }
-        })
+        }
       end
     end
 
@@ -51,12 +54,12 @@ module Armagh
       
       define_output_docspec 'divided', 'divided documents'
       
-      def self.make_test_config( store:, action_name:, input_doctype:, divided_doctype:)
-        create_configuration( store, action_name, {
+      def self.make_config_values( action_name:, input_doctype:, divided_doctype:)
+        {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
           'output' => { 'divided' => Armagh::Documents::DocSpec.new( divided_doctype, DS_READY ) }
-        })
+        }
       end   
     end
     
@@ -64,12 +67,12 @@ module Armagh
       
       define_output_docspec 'single', 'single instance'
       
-      def self.make_test_config( store:, action_name:, input_doctype:, single_doctype: )
-        create_configuration( store, action_name, {
+      def self.make_config_values( action_name:, input_doctype:, single_doctype: )
+        {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
           'output' => { 'single'  => Armagh::Documents::DocSpec.new( single_doctype, DS_READY )}
-        })
+        }
       end   
     end
     
@@ -77,12 +80,12 @@ module Armagh
       
       define_output_docspec 'published', 'published documents'
       
-      def self.make_test_config( store:, action_name:, published_doctype: )
-        create_configuration( store, action_name, {
+      def self.make_config_values( action_name:, published_doctype: )
+        {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec'   => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
           'output' => { 'published' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
-        })
+        }
       end
     end
     
@@ -90,92 +93,77 @@ module Armagh
       
       define_output_docspec 'published2', 'published docs'
       
-      def self.make_test_config( store:, action_name:, published_doctype: )
-        create_configuration( store, action_name, {
+      def self.make_config_values( action_name:, published_doctype: )
+        {
           'input' => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
           'output' => { 'published2' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
-        })
+        }
       end
     end
     
     class TWTestConsume < Actions::Consume
               
-      def self.make_test_config( store:, action_name:, input_doctype: )
-        create_configuration( store, action_name, {
+      def self.make_config_values( action_name:, input_doctype: )
+        {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_PUBLISHED) }
-        })
+        }
       end
     end
-    end
+  end
 end
 
 class TestWorkflow < Test::Unit::TestCase
   
   def setup
     @config_store = []
-    
-    @aasmod = Armagh::StandardActions
-    
-    @test_configs_fred_flow = {
-      "collect_freddocs_from_source" => 
-        @aasmod::TWTestCollect.make_test_config( 
-          store: @config_store,
-          action_name: 'collect_freddocs_from_source',
-          collected_a_doctype: 'a_freddoc',
-          collected_b_doctype: 'b_freddocs_aggr_big'
-      ),
-      "divide_b_freddocs" =>
-        @aasmod::TWTestDivide.make_test_config(
-          store: @config_store,
-          action_name: 'divide_b_freddocs',
-          input_doctype: 'b_freddocs_aggr_big',
-          divided_doctype: 'b_freddocs_aggr'
-      ),
-      "split_b_freddocs" =>
-        @aasmod::TWTestSplit.make_test_config(
-          store: @config_store,
-          action_name: 'split_b_freddocs',
-          input_doctype: 'b_freddocs_aggr',
-          single_doctype: 'b_freddoc'
-      ),
-      "publish_a_freddocs" =>
-        @aasmod::TWTestPublish.make_test_config(
-          store: @config_store,
-          action_name: 'publish_a_freddocs', 
-          published_doctype: 'a_freddoc'     
-      ),
-      "publish_b_freddocs" =>
-        @aasmod::TWTestPublish.make_test_config(
-          store: @config_store,
-          action_name: 'publish_b_freddocs',
-          published_doctype: 'b_freddoc'
-      ),
-      "consume_a_freddoc_1" =>
-        @aasmod::TWTestConsume.make_test_config(
-          store: @config_store,
-          action_name: 'consume_a_freddoc_1',
-          input_doctype: 'a_freddoc' 
-      ),
-      "consume_a_freddoc_2" =>
-        @aasmod::TWTestConsume.make_test_config(
-          store: @config_store,
-          action_name: 'consume_a_freddoc_2',
-          input_doctype: 'a_freddoc' 
-      ),
-      "consume_b_freddoc_1" =>
-        @aasmod::TWTestConsume.make_test_config(
-          store: @config_store,
-          action_name: 'consume_b_freddoc_1',
-          input_doctype: 'b_freddoc' 
-      )
-    }
-    
     @logger = mock
     @caller = mock
-    @a = Armagh::Actions
-    @d = Armagh::Documents
-    
+  
+    @test_action_setup = {
+      'Armagh::StandardActions::TWTestCollect' => [
+        { action_name: 'collect_freddocs_from_source',
+          collected_a_doctype: 'a_freddoc',
+          collected_b_doctype: 'b_freddocs_aggr_big'
+        }
+      ],
+      
+      'Armagh::StandardActions::TWTestDivide' => [
+        { action_name: 'divide_b_freddocs',
+          input_doctype: 'b_freddocs_aggr_big',
+          divided_doctype: 'b_freddocs_aggr'
+        }
+      ],
+      
+      'Armagh::StandardActions::TWTestSplit' => [
+        { action_name: 'split_b_freddocs',
+          input_doctype: 'b_freddocs_aggr',
+          single_doctype: 'b_freddoc'
+        }
+      ],
+      
+      'Armagh::StandardActions::TWTestPublish' => [
+         { action_name: 'publish_a_freddocs', 
+           published_doctype: 'a_freddoc'    
+         }, 
+         { action_name: 'publish_b_freddocs',
+           published_doctype: 'b_freddoc'
+         }
+      ],
+      
+      'Armagh::StandardActions::TWTestConsume' => [
+         { action_name: 'consume_a_freddoc_1',
+           input_doctype: 'a_freddoc' 
+         },
+         { action_name: 'consume_a_freddoc_2',
+           input_doctype: 'a_freddoc' 
+         },
+         { action_name: 'consume_b_freddoc_1',
+           input_doctype: 'b_freddoc' 
+        }
+      ]
+    }
+ 
   end
   
   def teardown
@@ -183,47 +171,75 @@ class TestWorkflow < Test::Unit::TestCase
   
   def test_overlapping_docspecs
     
-    assert_equal [ 'published' ], @aasmod::TWTestPublish.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
-    assert_equal [ 'published2' ], @aasmod::TWTestPublish2.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
+    assert_equal [ 'published' ], Armagh::StandardActions::TWTestPublish.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
+    assert_equal [ 'published2' ], Armagh::StandardActions::TWTestPublish2.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
   end
-  
-  def test_fred_flow
-    
+
+  def do_add_configs
+      
     workflow = nil
     assert_nothing_raised {
-      workflow = @a::Workflow.new( @logger, @config_store )
+      workflow = Armagh::Actions::Workflow.new( @logger, @config_store )
     }
-    @test_configs_fred_flow.each do |action_name, config|
-      a = workflow.get_action( action_name, @caller, @logger )
-      assert_not_nil a
-      assert_equal config.input.docspec, a.config.input.docspec
+    @test_action_setup.each do |action_class_name, setup_values_list|
+      setup_values_list.each do |setup_values|
+        assert_nothing_raised do 
+          c = workflow.create_action( action_class_name, eval(action_class_name).make_config_values( **setup_values ))
+        end
+      end
     end
-  end    
+    workflow
+  end
   
+  def test_add_configs
+    
+    workflow = do_add_configs
+    assert_equal [ 'consume_a_freddoc_1', 'consume_a_freddoc_2'], workflow.get_action_names_for_docspec( Armagh::Documents::DocSpec.new( 'a_freddoc', 'published' ))
+  end  
+
   def test_loopy_flow
     
-    @loopy_flow = @test_configs_fred_flow
-    @loopy_flow[ 'backpath' ] = @aasmod::TWTestSplit.make_test_config(
-      store: @config_store,
-      action_name: 'backpath',
-      input_doctype: 'b_freddoc',
-      single_doctype: 'b_freddocs_aggr'
-    )
+    workflow = do_add_configs
     
-    e = assert_raises( @a::ConfigurationError ) {
-      @a::Workflow.new( @logger, @config_store )
+    e = assert_raises( Armagh::Actions::ConfigurationError ) {
+      workflow.create_action( 
+        'Armagh::StandardActions::TWTestSplit',
+        Armagh::StandardActions::TWTestSplit.make_config_values( 
+          action_name: 'backpath',
+          input_doctype: 'b_freddoc',
+          single_doctype: 'b_freddocs_aggr'
+        )
+      )
     }
     assert_equal "Action configuration has a cycle.", e.message
     
   end
-  
-  def test_get_action_names_for_docspec
-    workflow = nil
-    assert_nothing_raised {
-      workflow = @a::Workflow.new( @logger, @config_store )
-    }
-    want_docspec = @d::DocSpec.new( 'a_freddoc', @d::DocState::PUBLISHED )
-    action_names = workflow.get_action_names_for_docspec( want_docspec )
-    assert_equal [ 'consume_a_freddoc_1', 'consume_a_freddoc_2' ], action_names.sort
+
+  def test_update_config
+    workflow = do_add_configs
+
+    new_config = Armagh::StandardActions::TWTestCollect.make_config_values(
+      action_name: 'collect_freddocs_from_source',
+      collected_a_doctype: 'a_freddoc',
+      collected_b_doctype: 'b_freddocs_aggr_big'
+    )
+    new_config[ 'twtestcollect' ] ||= {}
+    new_config[ 'twtestcollect' ][ 'count' ] = 19
+ 
+    workflow.update_action( 
+      'Armagh::StandardActions::TWTestCollect',
+      new_config
+    )
+    
   end
+  
+  def test_instantiate_action
+    
+    workflow = do_add_configs
+    
+    paf = workflow.instantiate_action( 'publish_a_freddocs', @caller, @logger )
+    assert paf.is_a?( Armagh::StandardActions::TWTestPublish )
+    assert_equal 'a_freddoc', paf.config.input.docspec.type
+  end
+  
 end

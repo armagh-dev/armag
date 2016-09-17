@@ -22,10 +22,9 @@ Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 
-require_relative '../../lib/configuration/launcher_config_manager'
-require_relative '../../lib/configuration/agent_config_manager'
 require_relative '../../lib/connection'
 require_relative '../../lib/document/document'
+require_relative '../../lib/agent/agent'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -72,23 +71,20 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def test_config_idx
-    MongoSupport.instance.set_config('launcher', {'launcher_details' => 'launcher config details'})
-    MongoSupport.instance.set_config('agent', {'agent_details' => 'agent config details'})
+
+    Armagh::Agent.create_configuration( Armagh::Connection.config, 'default', {} )
 
     logger = stub(:ops_warn)
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     initial_ops = index_stats['accesses']['ops']
-
-    launcher_manager = Armagh::Configuration::LauncherConfigManager.new(logger)
-    agent_manager = Armagh::Configuration::AgentConfigManager.new(logger)
-
-    launcher_manager.get_config
-
+    
+    Armagh::Agent.find_configuration( Armagh::Connection.config, 'default' )
+    
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     new_ops = index_stats['accesses']['ops']
     assert_equal(initial_ops + 1, new_ops)
 
-    agent_manager.get_config
+    Armagh::Agent.find_configuration( Armagh::Connection.config, 'default' )
 
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     new_ops = index_stats['accesses']['ops']

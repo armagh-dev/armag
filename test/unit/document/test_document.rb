@@ -523,7 +523,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.metadata, action_doc.metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
-    assert_equal(@doc.source, action_doc.source)
+    assert_equal(@doc.source, action_doc.source.to_hash.delete_if{|k,v| v.nil?})
   end
 
   def test_to_published_document
@@ -532,7 +532,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.metadata, pub_doc.metadata)
     assert_equal(@doc.state, pub_doc.docspec.state)
     assert_equal(@doc.type, pub_doc.docspec.type)
-    assert_equal(@doc.source, pub_doc.source)
+    assert_equal(@doc.source, pub_doc.source.to_hash.delete_if{|k,v| v.nil?})
   end
 
   def test_update_from_draft_action_document
@@ -574,7 +574,7 @@ class TestDocument < Test::Unit::TestCase
     testdoc_collection.expects(:replace_one)
     @documents.expects(:delete_one).with({'_id': @doc.internal_id})
 
-    Armagh::Utils::EncodingHelper.expects(:fix_encoding).returns(@doc.instance_variable_get(:@db_doc))
+    #Armagh::Utils::EncodingHelper.expects(:fix_encoding).returns(@doc.instance_variable_get(:@db_doc))
 
     assert_false @doc.instance_variable_get(:@pending_publish)
     @doc.mark_publish

@@ -1,12 +1,15 @@
 require 'singleton'
 
 require_relative '../../logging'
-require_relative '../../configuration/file_based_configuration.rb'
+require_relative '../../configuration/file_based_configuration'
+require_relative '../../action/workflow'
 
 module Armagh
   module Admin
     module Application
     
+      class APIError < StandardError; end
+      
       class API
         include Singleton
 
@@ -58,6 +61,19 @@ module Armagh
         def root_directory
           File.join( __dir__, 'www_root' )
         end
+        
+        def create_action_configuration( action_class_name, configuration_hash )
+          
+          workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )
+          workflow.create_action( action_class_name, configuration_hash )
+        end
+        
+        def update_action_configuration( action_class_name, configuration_hash )
+          
+          workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )
+          workflow.update_action( action_class_name, configuration_hash )
+        end
+          
       end         
     end
   end

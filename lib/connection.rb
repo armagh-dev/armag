@@ -106,7 +106,7 @@ module Armagh
     end
 
     def self.setup_indexes
-      config.indexes.create_one({'type' => 1}, unique: true, name: 'types')
+      config.indexes.create_one({'type' => 1, 'name' => 1, 'timestamp' => -1}, unique: true, name: 'types')
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e
       e = Connection.convert_mongo_exception(e)

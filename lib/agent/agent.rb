@@ -28,7 +28,7 @@ require_relative '../logging'
 require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../utils/processing_backoff'
-require_relative '../utils/encoding_helper'
+
 
 module Armagh
   class Agent
@@ -76,6 +76,10 @@ module Armagh
       @running
     end
 
+    def instantiate_divider( docspec )
+      @workflow.get_divider( docspec, self, @logger )
+    end
+    
     def create_document(action_doc)
       docspec = action_doc.docspec
       raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.document_id}'.  It is the same document that was passed into the action." if action_doc.document_id == @current_doc.document_id
@@ -140,9 +144,8 @@ module Armagh
       @current_doc.add_dev_error(action_name, error)
     end
 
-    def fix_encoding(logger_name, object, proposed_encoding)
-      logger = Logging.set_logger(logger_name)
-      Utils::EncodingHelper.fix_encoding(object, proposed_encoding: proposed_encoding, logger: logger)
+    def get_logger(logger_name)
+      Logging.set_logger(logger_name)
     end
 
     private def edit_or_create(document_id, docspec, doc)
@@ -218,7 +221,7 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
-          current_action = @workflow.get_action(name, self, @logger)
+          current_action = @workflow.instantiate_action(name, self, @logger)
 
           @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
           report_status(@current_doc, current_action)

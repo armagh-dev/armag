@@ -113,7 +113,6 @@ class MongoSupport
     Process.kill(:SIGTERM, @mongo_pid)
     Process.wait(@mongo_pid)
     @client = nil
-    @mongo_pid = nil
   end
 
   def clean_database

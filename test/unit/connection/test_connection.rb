@@ -182,7 +182,7 @@ class TestConnection < Test::Unit::TestCase
     @connection.stubs(:[]).with('config').returns(config)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
-    config_indexes.expects(:create_one).with({'type' => 1}, {unique: true, name: 'types'})
+    config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
     doc_indexes.expects(:create_one).twice
 
     Armagh::Connection.setup_indexes

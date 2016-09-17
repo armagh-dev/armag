@@ -45,6 +45,8 @@ class TestDocumentIntegration < Test::Unit::TestCase
 
   def setup
     MongoSupport.instance.clean_database
+    Armagh::Connection.clear_indexed_doc_collections
+    Armagh::Connection.index_doc_collection( Armagh::Connection.documents )
   end
 
   def test_document_get_for_processing_order

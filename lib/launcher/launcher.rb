@@ -82,7 +82,8 @@ module Armagh
       @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {} )
       
       @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {} )
-      @workflow = Actions::Workflow.new( Connection.config )
+      @workflow = Actions::Workflow.new( @logger, Connection.config )
+      @collection_trigger = CollectionTrigger.new(@workflow)
       
       @hostname = Socket.gethostname
       @agents = {}
@@ -106,7 +107,7 @@ module Armagh
       @logger.info "Checking In: #{status}"
 
       checkin = {
-          'versions' => @versions
+          'versions' => @versions,
           'last_update' => Time.now,
           'status' => status,
           'agents' => AgentStatus.get_statuses(@agent_status)
@@ -206,6 +207,7 @@ module Armagh
       Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }
       @running = false
       Thread.new{ kill_all_agents(signal) }
+      @collection_trigger.stop
     end
 
     def refresh_config
@@ -280,6 +282,8 @@ module Armagh
 
         apply_config
 
+        @collection_trigger.start
+
         @running = true
         checkin('running')
 
@@ -297,13 +301,16 @@ module Armagh
       rescue => e
         Logging.dev_error_exception(@logger, e, 'An unexpected error occurred.  Exiting.')
         kill_all_agents(:SIGINT)
+        @collection_trigger.stop
         @exit_status = 1
       end
 
       checkin('stopping')
 
+      @collection_trigger.stop
       Process.waitall
       @server.stop_service
+
 
       checkin('stopped')
 

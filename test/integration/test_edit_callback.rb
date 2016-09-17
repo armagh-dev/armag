@@ -25,6 +25,7 @@ require_relative '../helpers/mongo_support'
 require_relative '../../lib/logging'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
+require_relative '../../lib/action/workflow'
 
 require 'test/unit'
 
@@ -32,22 +33,28 @@ require 'mongo'
 require 'connection'
 require 'armagh/actions'
 
-class TestEditCallback < Test::Unit::TestCase
+module Armagh
+  module StandardActions
+    class TestSplitter < Actions::Split
+      define_output_docspec 'test_document', 'desc'
+      
+      attr_accessor :doc_id
+      attr_accessor :doc_was_new
+      attr_reader :doc_class
 
-  class TestSplitter < Armagh::Actions::Split
-    attr_accessor :doc_id
-    attr_accessor :doc_was_new
-    attr_reader :doc_class
-
-    def split(_trigger)
-      edit(@doc_id, 'test_document') do |doc|
-        @doc_class = doc.class
-        doc.metadata['field'] = true
-        doc.content = {'DRAFT CONTENT' => true}
-        @doc_was_new = doc.new_document?
+      def split(_trigger)
+        edit(@doc_id, 'test_document') do |doc|
+          @doc_class = doc.class
+          doc.metadata['field'] = true
+          doc.content = {'DRAFT CONTENT' => true}
+          @doc_was_new = doc.new_document?
+        end
       end
     end
   end
+end
+
+class TestEditCallback < Test::Unit::TestCase
 
   class TestDocument
     attr_accessor :document_id
@@ -58,7 +65,7 @@ class TestEditCallback < Test::Unit::TestCase
     Singleton.__init__(Armagh::Connection::MongoConnection)
     MongoSupport.instance.start_mongo
 
-    Armagh::Logging.init_log_env
+#    Armagh::Logging.init_log_env
   end
 
   def self.shutdown
@@ -70,17 +77,29 @@ class TestEditCallback < Test::Unit::TestCase
     MongoSupport.instance.start_mongo unless MongoSupport.instance.running?
     MongoSupport.instance.clean_database
 
-    agent = Armagh::Agent.new
+    @output_type = 'OutputDocument'
+    @output_state = Armagh::Documents::DocState::WORKING
+
+    config_store = []
+    workflow = Armagh::Actions::Workflow.new( nil, config_store )
+    workflow.create_action( 
+      'Armagh::StandardActions::TestSplitter', 
+      { 'action' => { 'name' => 'test_splitter' },
+        'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( 'intype', 'ready' )},
+        'output' => { 'test_document' => Armagh::Documents::DocSpec.new( @output_type, @output_state )}
+      }
+    ) 
+    agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )
+    agent = Armagh::Agent.new( agent_config, workflow )
+
+    @splitter = workflow.instantiate_action( 'test_splitter', agent, nil )
+
     doc = TestDocument.new
     doc.document_id = 'some other id'
 
     agent.instance_variable_set(:@current_doc, doc)
 
-    @output_type = 'OutputDocument'
-    @output_state = Armagh::Documents::DocState::WORKING
-    output_docspecs = {'test_document' => Armagh::Documents::DocSpec.new(@output_type, @output_state)}
-    @splitter = TestSplitter.new('splitter', agent, 'log_name', {}, output_docspecs)
-  end
+   end
 
   def test_edit_new
     @splitter.doc_id = 'non_existing_doc_id'

@@ -33,6 +33,11 @@ module ArmaghTest
     logger.expects(:ops_error).at_least(0)
     logger.expects(:level).at_least(0)
     logger.expects(:levels).at_least(0).returns(Log4r::Logger.root.levels)
+    logger.expects(:debug?).at_least(0)
+    logger.expects(:info?).at_least(0)
+    logger.expects(:warn?).at_least(0)
+    logger.expects(:error?).at_least(0)
+
     logger.expects(:level=).at_least(0)
     Log4r::Logger.stubs(:[]).returns logger
     Log4r::Logger.stubs(:new).returns logger

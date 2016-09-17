@@ -31,7 +31,8 @@ module Armagh
     class ConfigurationError < StandardError; end
     
     class Workflow
-      
+      attr_accessor :config_store
+
       def initialize( logger, config_store )
         
         @logger = logger
@@ -39,9 +40,8 @@ module Armagh
         @input_docspecs = {}
         @output_docspecs = {}
         @config_store = config_store
-        @action_configs = {}
-        refresh 
-        
+        @action_configs_by_name = {}
+        refresh    
       end
       
       def set_logger( logger )
@@ -49,26 +49,24 @@ module Armagh
       end
       
       def refresh
-        
-        configs_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
-        ts_in_db      = configs_in_db.max_by{ |configured_class, config| config.__timestamp }
+        configs_with_classes_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
+        configs_in_db = configs_with_classes_in_db.collect{ | _klass, config| config }
+        ts_in_db      = configs_in_db.max_by{ |config| config.__timestamp }
         return false if ts_in_db == @last_timestamp
         
-        warnings, new_input_docspecs, new_output_docspecs = validate_and_return_warnings_inputs_outputs( configs_in_db )
-        ops_warn "While refreshing action workflow: #{warnings}" if warnings
+        warnings, 
+        new_input_docspecs, 
+        new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs( configs_in_db )
         
-        @input_docspecs = new_input_docspecs
-        @output_docspecs = new_output_docspecs
-        @action_configs.clear
-        @action_configs = Hash[ configs_in_db.collect{ |configured_class, config| [ config.__name, config ] } ]
-        
+        @action_names_by_input_docspecs = new_input_docspecs
+        @action_names_by_output_docspecs = new_output_docspecs
+        @action_configs_by_name = Hash[ configs_in_db.collect{ | config | [ config.action.name, config ]}]
         @last_timestamp = ts_in_db
         
-        return true
-        
+        return true   
       end
       
-      def validate_and_return_warnings_inputs_outputs( configs )
+      def Workflow.validate_and_return_warnings_inputs_outputs( configs )
         
         warnings = []
         
@@ -77,16 +75,16 @@ module Armagh
         try_docspec_flows   = Utils::TsortableHash.new
         
         begin
-          configs.each do | action_class_name, config |
+          configs.each do |config|
             if config.action.active
               try_input_docspecs[ config.input.docspec ] ||= []
-              try_input_docspecs[ config.input.docspec ] << config
+              try_input_docspecs[ config.input.docspec ] << config.action.name
               config.find_all_parameters{ |p| p.group == 'output' and p.type == 'docspec' }.each do |docspec_param|
                 docspec = docspec_param.value
                 try_output_docspecs[ docspec ] ||= []
-                try_output_docspecs[ docspec ] << config
+                try_output_docspecs[ docspec ] << config.action.name
                 try_docspec_flows[ config.input.docspec ] ||= []
-                try_docspec_flows[ config.input.docspec ] << docspec
+                try_docspec_flows[ config.input.docspec ] << docspec                
               end
             end
           end
@@ -107,12 +105,14 @@ module Armagh
           raise ConfigurationError, 'Action configuration has a cycle.'
         end
         
+        #TODO verify only one divider per doctype
+        
         [ warnings.empty? ? nil : warnings.join(', '), try_input_docspecs, try_output_docspecs ]
       end
       
-      def get_action( action_name, caller, logger )
+      def instantiate_action( action_name, caller, logger )
         
-        c = @action_configs[ action_name ]
+        c = @action_configs_by_name[ action_name ]
         return nil unless c
         
         c.__type.new( caller, logger, c )
@@ -120,12 +120,58 @@ module Armagh
         
       def get_action_names_for_docspec( docspec )
         
-        @input_docspecs
-          .collect{ |in_docspec,configs| configs.collect{ |config| config.__name if docspec == in_docspec }}
+        @action_names_by_input_docspecs
+          .collect{ |input_docspec, action_names_array| action_names_array if input_docspec == docspec }
           .flatten
           .compact
       end
+    
+      def instantiate_divider( docspec, caller, logger )
+        
+        divider_action_name = get_action_names_for_docspec( docspec )
+          .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divider }
+        instantiate_action( divider_action_name, caller, logger ) if divider_action_name
+      end
       
+      def create_action( action_class_name, candidate_configuration_values )
+          
+        candidate_action_name = candidate_configuration_values&.dig( 'action', 'name' )
+        raise( ConfigurationError, "Action named #{ candidate_action_name } already exists.") if @action_configs_by_name[ candidate_action_name ]
+        
+        update_action( action_class_name, candidate_configuration_values )
+      end
+      
+      def update_action( action_class_name, candidate_configuration_values )
+          
+        candidate_action_name = candidate_configuration_values&.dig( 'action', 'name' )
+        raise ConfigurationError, "Configuration must include an action name" unless candidate_action_name
+        raise ConfigurationError, "Action class name must be provided" unless action_class_name.is_a?(String)
+        raise ConfigurationError, "Action class must be member of Armagh::StandardActions or Armagh::CustomActions" unless action_class_name[/^Armagh::(Standard|Custom)Actions::/]
+        begin
+          action_class = eval( action_class_name )
+        rescue
+          raise ConfigurationError, "Action class #{ action_class_name } is not defined"
+        end
+
+        candidate_config = nil
+        begin
+          candidate_config = action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values )
+        rescue Configh::ConfigInitError => e
+          raise ConfigurationError, e.message
+        end
+        candidate_action_configs = @action_configs_by_name.values
+        candidate_action_configs.delete_if{ |ac| ac.action.name == candidate_action_name }
+        candidate_action_configs << candidate_config
+        
+        begin
+          warnings, new_input_docspecs, new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs( candidate_action_configs )
+        rescue => e
+          raise( ConfigurationError, e.message )
+        end
+        
+        action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values ) 
+        refresh      
+      end
     end
   end
 end
