@@ -13,7 +13,7 @@ options = {
     force_kill_waittime: 86_400,   
     monitor: true,                # Restart mongod if it dies
     backtrace: true,              # If there was an uncaught exception that caused termination, log it
-    app_name: 'armagh-app-admind',    # Give the daemon a clean name
+    app_name: 'armagh-app-admind',# Give the daemon a clean name
     dir_mode: :normal,            # Allows custom PID directory
     dir: '/var/log/armagh'        # Default PID directory.  Can't sep PID and log dir for daemons.
 }

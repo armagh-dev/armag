@@ -32,6 +32,9 @@ module Armagh
       
         def initialize
           @logger = Logging.set_logger('Armagh::ApplicationAdminAPI')
+          def @logger.<<( message )
+            @logger.info( message )
+          end
 
           begin
             config  = Configuration::FileBasedConfiguration.load( self.class.to_s )
@@ -53,7 +56,7 @@ module Armagh
           ( @config['key_filepath'] and (!@config['key_filepath'].empty?) and @config['cert_filepath'] and (!@config['cert_filepath'].empty?) )
         end
       
-        def authenticate_and_authorize(user, password)how
+        def authenticate_and_authorize(user, password)
           # TODO - admin api, replace authenticate_and_authorize with LDAP call, verify admin privileges
           true
         end
@@ -62,6 +65,10 @@ module Armagh
           File.join( __dir__, 'www_root' )
         end
         
+        def get_status
+          Connection.status.find().to_a
+        end
+          
         def create_action_configuration( action_class_name, configuration_hash )
           
           workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )

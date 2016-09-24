@@ -1,3 +1,4 @@
+require 'thin'
 module Armagh
   module Admin
     module Resource

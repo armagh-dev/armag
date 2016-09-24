@@ -33,7 +33,7 @@ class TestEnhancedException < Test::Unit::TestCase
   end
 
   def test_to_s
-    assert_equal 'Some Details: EXCEPTION', @ee.to_s
+    assert_equal 'Some Details: RuntimeError => EXCEPTION', @ee.to_s
   end
 
   def test_inspect

@@ -91,4 +91,46 @@ class TestExceptionHelper < Test::Unit::TestCase
     assert_true executed, 'Nested exception block never executed'
   end
 
+  def test_exception_to_string
+    exception_message = 'this is the exception'
+    backtrace = %w(back trace)
+    exception = StandardError.new(exception_message)
+    exception.set_backtrace(backtrace)
+    expected = "StandardError => this is the exception\n  back\n  trace"
+
+    assert_equal(expected, Armagh::Utils::ExceptionHelper.exception_to_string(exception))
+  end
+
+  def test_exception_to_string_nested
+    executed = false
+    exception = StandardError.new('Exception')
+    backtrace = %w(one two)
+    exception_middle = NameError.new('Exception middle')
+    backtrace_middle = %w(three four)
+    exception_root = EncodingError.new('Exception root')
+    backtrace_root = %w(five six)
+
+    expected = "StandardError => Exception\n  one\n  two\nCaused By: NameError => Exception middle\n  three\n  four\nCaused By: EncodingError => Exception root\n  five\n  six"
+
+    begin
+      begin
+        begin
+          raise exception_root
+        rescue => e
+          e.set_backtrace backtrace_root
+          raise exception_middle
+        end
+      rescue => e
+        e.set_backtrace backtrace_middle
+        raise exception
+      end
+    rescue => e
+      e.set_backtrace backtrace
+      assert_equal(expected, Armagh::Utils::ExceptionHelper.exception_to_string(e))
+      executed = true
+    end
+
+    assert_true executed, 'Nested exception block never executed'
+  end
+
 end

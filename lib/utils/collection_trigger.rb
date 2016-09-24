@@ -44,7 +44,7 @@ module Armagh
 
       def stop
         @running = false
-        @thread.join
+        @thread.join if @thread
         @thread = nil
       end
 

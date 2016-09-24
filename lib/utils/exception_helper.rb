@@ -27,6 +27,13 @@ module Armagh
         hash['cause'] = exception_to_hash(exception.cause) if exception.cause
         hash
       end
+
+      def self.exception_to_string(exception)
+        str = "#{exception.class} => #{exception.message}"
+        str << "\n  #{exception.backtrace.join("\n  ")}" if exception.backtrace
+        str << "\nCaused By: #{exception_to_string(exception.cause)}" if exception.cause
+        str
+      end
     end
   end
 end

@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require 'sinatra'
 require 'thin'
+require 'json'
 
 require_relative '../lib/environment.rb'
 Armagh::Environment.init
@@ -69,6 +70,7 @@ helpers do
   end
   
   def route_after_error( format, error_detail, html_redirect_to )
+    api.logger.error( error_detail )
     case format
     when 'json'
       return [ 500, { :error_detail => error_detail }.to_json ]
@@ -106,6 +108,18 @@ post '/noop.?:format?' do
     return route_after_error( params[ 'format' ], e.message, '/some/url' )
   end
   return route_after_success( params[ 'format' ], "You did something right!", '/noop')
+end
+
+get '/status.json' do
+  
+  return [200, {'yay'=>1}.to_json ]
+  status = []
+  begin
+    status = @api.get_status
+  rescue => e
+    return[ 500, { :error_detail => e.message }.to_json ]
+  end
+  return[ 200, status.to_json ]
 end
 
 

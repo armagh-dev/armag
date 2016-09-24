@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require 'sinatra'
 require 'thin'
+require 'json'
 
 require_relative '../lib/environment.rb'
 Armagh::Environment.init
@@ -112,6 +113,25 @@ post '/noop.?:format?' do
     return route_after_error( params[ 'format' ], e.message, '/some/url' )
   end
   return route_after_success( params[ 'format' ], "You did something right!", '/noop')
+end
+
+post '/implode.json' do
+  
+  confirmed = params[ 'confirmed' ]
+  if confirmed == "1"
+    begin
+      imploded = api.implode( true )
+      if imploded
+        return[ 200, { result: 'Implosion complete' }.to_json ]
+      else
+        return[ 500, { result: 'Implosion failed unexpectedly, with no errors raised' }.to_json ]
+      end
+    rescue => e
+      return[ 500, { error_detail: e.message }.to_json ]
+    end
+  else
+    return[ 200, { result: "No implosion.  You must post data confirmed=1"}.to_json]
+  end
 end
 
 

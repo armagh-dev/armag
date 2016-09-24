@@ -136,12 +136,16 @@ module Armagh
       end
     end
 
-    def notify_ops(action_name, error)
+    def notify_ops(logger_name, action_name, error)
       @current_doc.add_ops_error(action_name, error)
+      logger = Logging.set_logger(logger_name)
+      error.is_a?(Exception) ? Logging.ops_error_exception(logger, error, 'Notify Ops') : logger.ops_error(error)
     end
 
-    def notify_dev(action_name, error)
+    def notify_dev(logger_name, action_name, error)
       @current_doc.add_dev_error(action_name, error)
+      logger = Logging.set_logger(logger_name)
+      error.is_a?(Exception) ? Logging.dev_error_exception(logger, error, 'Notify Dev') : logger.dev_error(error)
     end
 
     def get_logger(logger_name)

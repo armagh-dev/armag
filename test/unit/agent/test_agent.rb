@@ -976,17 +976,47 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_notify_ops
+    logger_name = 'logger'
     action_name = 'action'
     message = 'message'
+    logger = mock
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
     @current_doc_mock.expects(:add_ops_error).with(action_name, message)
-    @default_agent.notify_ops(action_name, message)
+    logger.expects(:ops_error).with(message)
+    @default_agent.notify_ops(logger_name, action_name, message)
   end
 
   def test_notify_dev
+    logger_name = 'logger'
     action_name = 'action'
     message = 'message'
+    logger = mock
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
     @current_doc_mock.expects(:add_dev_error).with(action_name, message)
-    @default_agent.notify_dev(action_name, message)
+    logger.expects(:dev_error).with(message)
+    @default_agent.notify_dev(logger_name, action_name, message)
+  end
+
+  def test_notify_ops_exception
+    logger_name = 'logger'
+    action_name = 'action'
+    error = RuntimeError.new('error')
+    logger = mock
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    @current_doc_mock.expects(:add_ops_error).with(action_name, error)
+    Armagh::Logging.expects(:ops_error_exception).with(logger, error, 'Notify Ops')
+    @default_agent.notify_ops(logger_name, action_name, error)
+  end
+
+  def test_notify_dev_exception
+    logger_name = 'logger'
+    action_name = 'action'
+    error = RuntimeError.new('error')
+    logger = mock
+    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    @current_doc_mock.expects(:add_dev_error).with(action_name, error)
+    Armagh::Logging.expects(:dev_error_exception).with(logger, error, 'Notify Dev')
+    @default_agent.notify_dev(logger_name, action_name, error)
   end
 
   def test_get_logger

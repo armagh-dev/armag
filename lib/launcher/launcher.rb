@@ -37,6 +37,7 @@ Armagh::Environment.init
 require_relative '../agent/agent'
 require_relative '../agent/agent_status'
 require_relative '../action/workflow'
+require_relative '../utils/collection_trigger'
 require_relative '../connection'
 require_relative '../ipc'
 require_relative '../logging'
@@ -48,6 +49,7 @@ module Armagh
       
     define_parameter name: "num_agents",        description: "Number of agents",                      type: 'positive_integer', required: true, default: 1,      group: 'launcher'
     define_parameter name: "update_frequency",  description:  "Configuration refresh rate (seconds)", type: 'positive_integer', required: true, default: 60,     group: 'launcher'            
+    define_parameter name: "checkin_frequency", description: "Status update rate (seconds)",          type: 'positive_integer', required: true, default: 60,     group: 'launcher'
     define_parameter name: "log_level",         description: "Log level",                             type: 'populated_string', required: true, default: 'info', group: 'launcher'
     define_group_validation_callback callback_class: Launcher, callback_method: :report_validation_errors
 
@@ -64,13 +66,13 @@ module Armagh
     
     def initialize( launcher_name = 'default' )
 
+      @logger = Logging.set_logger('Armagh::Application')
+
       unless Connection.can_connect?
-        $stderr.puts "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
+        @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
         exit 1
       end
-
-      @logger = Logging.set_logger('Armagh::Application::Launcher')
-
+      
       @versions = get_versions
       Document.version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
@@ -83,7 +85,7 @@ module Armagh
       
       @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {} )
       @workflow = Actions::Workflow.new( @logger, Connection.config )
-      @collection_trigger = CollectionTrigger.new(@workflow)
+      @collection_trigger = Utils::CollectionTrigger.new(@workflow)
       
       @hostname = Socket.gethostname
       @agents = {}
@@ -122,7 +124,7 @@ module Armagh
     end
 
     def apply_config
-      Logging.change_log_level(@logger, @config.launcher.log_level)
+      Logging.set_level(@logger, @config.launcher.log_level)
       change_num_agents(@config.launcher.num_agents)
       @logger.debug "Updated configuration to log level #{ @config.launcher.log_level }, num agents #{ @config.launcher.num_agents }"
     end
@@ -252,11 +254,9 @@ module Armagh
       end
 
       defined_actions = Actions.defined_actions
-      defined_dividers = Actions.defined_dividers
 
-      if defined_actions.any? || defined_dividers.any?
+      if defined_actions.any? 
         @logger.debug "Available actions are: #{defined_actions}"
-        @logger.debug "Available dividers are: #{defined_dividers}"
       else
         @logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
       end
@@ -288,7 +288,7 @@ module Armagh
         checkin('running')
 
         while @running do
-          if @last_checkin.nil? || @last_checkin < Time.now - @config.checkin_frequency
+          if @last_checkin.nil? || @last_checkin < Time.now - @config.launcher.checkin_frequency
             reconcile_agents
             refresh_config
             checkin('running')

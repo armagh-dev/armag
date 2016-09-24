@@ -123,7 +123,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     sleep 1 if sec < 1
 
     @collection_trigger.start
-    wait_for_documents(60)
+    wait_for_documents(70)
 
     MongoSupport.instance.clean_database
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a

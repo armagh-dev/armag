@@ -14,25 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require_relative '../../lib/utils/exception_helper'
 
-module Armagh
-  module Logging
-    class EnhancedException
-      attr_accessor :additional_details, :exception
+puts __dir__
 
-      def initialize(additional_details, exception)
-        @additional_details = additional_details
-        @exception = exception
-      end
-
-      def to_s
-        "#{@additional_details}: #{Armagh::Utils::ExceptionHelper.exception_to_string(@exception)}"
-      end
-
-      def inspect
-        "#{@additional_details}: #{@exception.inspect}"
-      end
-    end
-  end
+Dir.glob( File.join( __dir__, '/**/*.rb' )).each do |rb_file|
+  require_relative rb_file
 end
