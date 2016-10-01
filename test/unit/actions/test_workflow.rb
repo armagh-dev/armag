@@ -23,6 +23,7 @@ require_relative '../../../lib/environment'
 Armagh::Environment.init
 
 require_relative '../../../lib/action/workflow'
+require_relative '../../../lib/connection'
 
 module Armagh
   module StandardActions
@@ -164,6 +165,8 @@ class TestWorkflow < Test::Unit::TestCase
       ]
     }
  
+    @state_coll = mock
+    Armagh::Connection.stubs( :config ).returns( @state_coll )
   end
   
   def teardown
@@ -237,7 +240,7 @@ class TestWorkflow < Test::Unit::TestCase
     
     workflow = do_add_configs
     
-    paf = workflow.instantiate_action( 'publish_a_freddocs', @caller, @logger )
+    paf = workflow.instantiate_action( 'publish_a_freddocs', @caller, @logger, @state_coll )
     assert paf.is_a?( Armagh::StandardActions::TWTestPublish )
     assert_equal 'a_freddoc', paf.config.input.docspec.type
   end

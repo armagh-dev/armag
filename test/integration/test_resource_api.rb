@@ -34,8 +34,9 @@ class TestIntegrationResourceAPI < Test::Unit::TestCase
   def self.startup
     puts 'Starting Mongo'
     Singleton.__init__(Armagh::Connection::MongoConnection)
+    Singleton.__init__(Armagh::Connection::MongoAdminConnection)
     MongoSupport.instance.start_mongo
-    MongoSupport.instance.clean_database
+    Armagh::Connection::MongoConnection.instance.connection.database.collections.each{ |col| col.drop }
   end
 
   def self.shutdown
@@ -44,7 +45,7 @@ class TestIntegrationResourceAPI < Test::Unit::TestCase
   end
 
   def setup
-    MongoSupport.instance.clean_database
+    Armagh::Connection::MongoConnection.instance.connection.database.collections.each{ |col| col.drop }
     Armagh::Connection.clear_indexed_doc_collections
     Armagh::Connection.setup_indexes    
     

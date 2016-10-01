@@ -26,6 +26,7 @@ require_relative '../../../lib/agent/agent_status'
 require_relative '../../../lib/ipc'
 require_relative '../../../lib/document/document'
 require_relative '../../../lib/logging'
+require_relative '../../../lib/connection'
 
 require 'mocha/test_unit'
 require 'test/unit'
@@ -75,6 +76,8 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock = mock('current_doc')
     @running = true
     @default_agent = prep_an_agent( 'default', {} )
+    @state_coll = mock
+    Armagh::Connection.stubs( :config ).returns( @state_coll )
   end
   
   def prep_an_agent( config_name, config_values )    
@@ -197,7 +200,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
@@ -235,7 +238,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -267,7 +270,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
@@ -340,7 +343,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
@@ -394,7 +397,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -414,7 +417,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger).returns(divider).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(divider).at_least_once
 
     @default_agent.expects(:report_status).with(doc, divider).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -439,7 +442,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
     doc.expects(:ops_errors).returns({})
@@ -474,7 +477,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
 
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
     doc.expects(:dev_errors).returns({})
@@ -509,7 +512,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:add_dev_error)
     doc.expects(:finish_processing).at_least_once
@@ -539,7 +542,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:add_ops_error).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger).returns(nil).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(nil).at_least_once
 
     @default_agent.expects(:report_status).with(doc, nil).at_least_once
 
@@ -1043,7 +1046,7 @@ class TestAgent < Test::Unit::TestCase
     )
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:add_ops_error)
 

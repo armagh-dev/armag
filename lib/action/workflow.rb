@@ -110,12 +110,12 @@ module Armagh
         [ warnings.empty? ? nil : warnings.join(', '), try_input_docspecs, try_output_docspecs ]
       end
       
-      def instantiate_action( action_name, caller, logger )
+      def instantiate_action( action_name, caller, logger, state_collection )
         
         c = @action_configs_by_name[ action_name ]
         return nil unless c
         
-        c.__type.new( caller, logger, c )
+        c.__type.new( caller, logger, c, state_collection )
       end
         
       def get_action_names_for_docspec( docspec )

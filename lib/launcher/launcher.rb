@@ -66,7 +66,7 @@ module Armagh
     
     def initialize( launcher_name = 'default' )
 
-      @logger = Logging.set_logger('Armagh::Application')
+      @logger = Logging.set_logger('Armagh::Application')  
 
       unless Connection.can_connect?
         @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."

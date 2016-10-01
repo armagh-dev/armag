@@ -77,7 +77,7 @@ module Armagh
     end
 
     def instantiate_divider( docspec )
-      @workflow.get_divider( docspec, self, @logger )
+      @workflow.get_divider( docspec, self, @logger, Connection.config )
     end
     
     def create_document(action_doc)
@@ -225,7 +225,7 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
-          current_action = @workflow.instantiate_action(name, self, @logger)
+          current_action = @workflow.instantiate_action(name, self, @logger, Connection.config )
 
           @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
           report_status(@current_doc, current_action)

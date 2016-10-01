@@ -92,7 +92,7 @@ class TestEditCallback < Test::Unit::TestCase
     agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )
     agent = Armagh::Agent.new( agent_config, workflow )
 
-    @splitter = workflow.instantiate_action( 'test_splitter', agent, nil )
+    @splitter = workflow.instantiate_action( 'test_splitter', agent, nil, nil )
 
     doc = TestDocument.new
     doc.document_id = 'some other id'

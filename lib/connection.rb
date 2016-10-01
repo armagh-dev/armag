@@ -35,8 +35,9 @@ module Armagh
       doc_collections
     end
 
-    def self.documents(type_collection = nil)
-      collection_name = type_collection ? "documents.#{type_collection}" : 'documents'
+    def self.documents(type_name = nil)
+      
+      collection_name = type_name ? "documents.#{ type_name }" : 'documents'          
       collection = MongoConnection.instance.connection[collection_name]
       index_doc_collection collection
       collection

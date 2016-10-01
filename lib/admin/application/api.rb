@@ -3,6 +3,7 @@ require 'singleton'
 require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../action/workflow'
+require_relative '../../document/document'
 
 module Armagh
   module Admin
@@ -33,7 +34,7 @@ module Armagh
         def initialize
           @logger = Logging.set_logger('Armagh::ApplicationAdminAPI')
           def @logger.<<( message )
-            @logger.info( message )
+            info( message )
           end
 
           begin
@@ -68,7 +69,11 @@ module Armagh
         def get_status
           Connection.status.find().to_a
         end
-          
+        
+        def get_document_counts    
+          counts = Armagh::Document.count_working_by_doctype
+        end
+        
         def create_action_configuration( action_class_name, configuration_hash )
           
           workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )

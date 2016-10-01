@@ -114,6 +114,23 @@ module Armagh
       doc
     end
 
+
+    def self.count_working_by_doctype
+      
+      counts = {}      
+      Connection.all_document_collections.each do |doc_coll|
+        counts[ doc_coll.name ] = {}
+        doc_coll.aggregate( [
+          { '$group' => { '_id'   => { 'type' => '$type', 'state' => '$state' }, 
+                          'count' => { '$sum' => 1 }}}
+        ]).to_a.each do |h|
+          docspec_brief =  "#{h[ '_id' ]['type']}:#{h['_id']['state']}"
+          counts[ doc_coll.name ][ docspec_brief ] = h[ 'count']
+        end
+      end
+      counts
+    end
+    
     def self.find(document_id, type, state)
       db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
