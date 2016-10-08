@@ -4,6 +4,7 @@ require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../action/workflow'
 require_relative '../../document/document'
+require_relative '../../launcher/launcher'
 
 module Armagh
   module Admin
@@ -70,19 +71,24 @@ module Armagh
           Connection.status.find().to_a
         end
         
+        def configure_launcher( params )
+          config = Launcher.create_configuration( Connection.config, Launcher.config_name, params, maintain_history: true )
+          config.__values
+        end
+        
         def get_document_counts    
-          counts = Armagh::Document.count_working_by_doctype
+          counts = Document.count_working_by_doctype
         end
         
         def create_action_configuration( action_class_name, configuration_hash )
           
-          workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )
+          workflow = Actions::Workflow.new( @logger, Connection.config )
           workflow.create_action( action_class_name, configuration_hash )
         end
         
         def update_action_configuration( action_class_name, configuration_hash )
           
-          workflow = Armagh::Actions::Workflow.new( @logger, Connection.config )
+          workflow = Actions::Workflow.new( @logger, Connection.config )
           workflow.update_action( action_class_name, configuration_hash )
         end
           

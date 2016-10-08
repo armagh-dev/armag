@@ -24,7 +24,7 @@ require_relative '../logging'
 require_relative '../../lib/document/document'
 require_relative '../ipc'
 require_relative '../action/workflow'
-require 'agent/agent_status'
+require_relative '../agent/agent_status'
 
 module Armagh
   module Utils
@@ -46,12 +46,6 @@ module Armagh
         @running = false
         @thread.join if @thread
         @thread = nil
-      end
-
-      def restart
-        stop if @running
-        sleep 1
-        start
       end
 
       def running?

@@ -49,6 +49,8 @@ module Armagh
         source: nil,
         collection_task_ids:,
         document_timestamp:,
+        display: nil,
+        archive_file: nil,
         new: false,
         logger: nil)
       doc = Document.new
@@ -63,6 +65,8 @@ module Armagh
       doc.source = source if source
       doc.collection_task_ids = collection_task_ids if collection_task_ids
       doc.document_timestamp = document_timestamp if document_timestamp
+      doc.display = display if display
+      doc.archive_file = archive_file if archive_file
       doc.save(new: new, logger: logger)
       doc
     end
@@ -116,21 +120,20 @@ module Armagh
 
 
     def self.count_working_by_doctype
-      
-      counts = {}      
+      counts = {}
       Connection.all_document_collections.each do |doc_coll|
-        counts[ doc_coll.name ] = {}
-        doc_coll.aggregate( [
-          { '$group' => { '_id'   => { 'type' => '$type', 'state' => '$state' }, 
-                          'count' => { '$sum' => 1 }}}
-        ]).to_a.each do |h|
-          docspec_brief =  "#{h[ '_id' ]['type']}:#{h['_id']['state']}"
-          counts[ doc_coll.name ][ docspec_brief ] = h[ 'count']
+        counts[doc_coll.name] = {}
+        doc_coll.aggregate([
+                             {'$group' => {'_id' => {'type' => '$type', 'state' => '$state'},
+                                           'count' => {'$sum' => 1}}}
+                           ]).to_a.each do |h|
+          docspec_brief = "#{h['_id']['type']}:#{h['_id']['state']}"
+          counts[doc_coll.name][docspec_brief] = h['count']
         end
       end
       counts
     end
-    
+
     def self.find(document_id, type, state)
       db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
       db_doc ? Document.new(db_doc) : nil
@@ -139,7 +142,6 @@ module Armagh
     end
 
     def self.get_for_processing
-      # TODO Document.get_for_processing: Ability to pull multiple documents
       Connection.all_document_collections.each do |collection|
         db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
         return Document.new(db_doc) if db_doc
@@ -197,17 +199,17 @@ module Armagh
     end
 
     def self.delete(document_id, type, state)
-      collection(type, state).delete_one({ 'document_id': document_id})
+      collection(type, state).delete_one({'document_id': document_id})
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
     end
 
     def self.unlock(document_id, type, state)
-      collection(type, state).find_one_and_update({ 'document_id': document_id}, {'$set' => {'locked' => false}})
+      collection(type, state).find_one_and_update({'document_id': document_id}, {'$set' => {'locked' => false}})
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
     end
-    
+
     def self.collection(type = nil, state = nil)
       type_collection = (state == Documents::DocState::PUBLISHED) ? type : nil
       Connection.documents(type_collection)
@@ -233,7 +235,10 @@ module Armagh
           'published_timestamp' => nil,
           'collection_task_ids' => [],
           'source' => {},
-          'document_timestamp' => nil}
+          'document_timestamp' => nil,
+          'display' => nil,
+          'archive_file' => nil
+      }
       @db_doc.merge! image
     end
 
@@ -301,6 +306,14 @@ module Armagh
       @db_doc['document_timestamp'] = document_timestamp
     end
 
+    def display
+      @db_doc['display']
+    end
+
+    def display=(display)
+      @db_doc['display'] = display
+    end
+
     def locked?
       @db_doc['locked']
     end
@@ -343,6 +356,14 @@ module Armagh
 
     def version
       @db_doc['version']
+    end
+
+    def archive_file
+      @db_doc['archive_file']
+    end
+
+    def archive_file=(file)
+      @db_doc['archive_file'] = file
     end
 
     def pending_actions
@@ -417,9 +438,9 @@ module Armagh
       clear_dev_errors
       clear_ops_errors
     end
-    
+
     def errors
-      dev_errors.merge(ops_errors){|_key, left, right| left + right}
+      dev_errors.merge(ops_errors) { |_key, left, right| left + right }
     end
 
     def error?
@@ -436,7 +457,6 @@ module Armagh
       save(logger: logger)
     end
 
-    # TODO Document#save - Buffered writing
     def save(new: false, logger: nil)
       now = Time.now
       @db_doc['created_timestamp'] ||= now
@@ -480,7 +500,7 @@ module Armagh
         end
       end
 
-      Connection.documents.delete_one({ '_id': internal_id}) if delete_orig
+      Connection.documents.delete_one({'_id': internal_id}) if delete_orig
 
       @pending_publish = false
       @published_id = nil
@@ -525,7 +545,9 @@ module Armagh
                                     metadata: metadata,
                                     docspec: docspec,
                                     source: Armagh::Documents::Source.from_hash(source),
-                                    document_timestamp: document_timestamp)
+                                    document_timestamp: document_timestamp,
+                                    display: display,
+                                    archive_file: archive_file)
     end
 
     def to_published_document
@@ -537,7 +559,10 @@ module Armagh
                                        metadata: metadata,
                                        docspec: docspec,
                                        source: Armagh::Documents::Source.from_hash(source),
-                                       document_timestamp: document_timestamp)
+                                       document_timestamp: document_timestamp,
+                                       display: display,
+                                       archive_file: archive_file)
+
     end
 
     def update_from_draft_action_document(action_doc)
@@ -548,6 +573,8 @@ module Armagh
       self.title = action_doc.title
       self.copyright = action_doc.copyright
       self.document_timestamp = action_doc.document_timestamp
+      self.display = action_doc.display
+      self.archive_file = action_doc.archive_file
       docspec = action_doc.docspec
       self.type = docspec.type
       self.state = docspec.state
@@ -571,7 +598,7 @@ module Armagh
 
     private def update_pending_work
       if errors.any?
-        @db_doc['error'] =  true
+        @db_doc['error'] = true
       else
         @db_doc.delete 'error'
       end

@@ -21,7 +21,7 @@
 #            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
 #
 
-gem 'daemons', '~> 1.2'
+require 'bundler/setup'
 require 'daemons'
 
 file = File.join(File.dirname(__FILE__), 'armagh-agents')
@@ -32,7 +32,7 @@ options = {
     backtrace: true,              # If there was an uncaught exception that caused termination, log it
     app_name: 'armagh-agentsd',   # Give the daemon a clean name
     dir_mode: :normal,            # Allows custom PID directory
-    dir: '/var/log/armagh'            # Default PID directory
+    dir: '/var/log/armagh',       # Default PID directory
 }
 
 Daemons.run(file, options)

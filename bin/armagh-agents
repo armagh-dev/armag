@@ -17,6 +17,7 @@
 # limitations under the License.
 #
 #
-require 'armagh'
+require 'bundler/setup'
+require_relative '../lib/armagh'
 
 Armagh::Launcher.new( 'default' ).run

@@ -75,6 +75,10 @@ module Armagh
       MongoAdminConnection.instance.connection['log']
     end
 
+    def self.ip
+      MongoConnection.instance.ip
+    end
+    
     def self.master?
       MongoConnection.instance.connection.database.command(ismaster: 1).documents.first['ismaster']
     end

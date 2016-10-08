@@ -75,14 +75,14 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock = mock('backoff')
     @current_doc_mock = mock('current_doc')
     @running = true
-    @default_agent = prep_an_agent( 'default', {} )
+    @default_agent = prep_an_agent('default', {})
     @state_coll = mock
-    Armagh::Connection.stubs( :config ).returns( @state_coll )
+    Armagh::Connection.stubs(:config).returns(@state_coll)
   end
-  
-  def prep_an_agent( config_name, config_values )    
-    agent_config = Armagh::Agent.create_configuration( @config_store, config_name, config_values )
-    agent = Armagh::Agent.new( agent_config, @workflow)
+
+  def prep_an_agent(config_name, config_values)
+    agent_config = Armagh::Agent.create_configuration(@config_store, config_name, config_values)
+    agent = Armagh::Agent.new(agent_config, @workflow)
     agent.instance_variable_set(:@backoff, @backoff_mock)
     agent.instance_variable_set(:@current_doc, @current_doc_mock)
     agent.instance_variable_set(:@running, @running)
@@ -90,12 +90,12 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def teardown
-    @default_agent.stop if @agent
+    @default_agent.stop if @default_agent
   end
 
   def setup_action(action_class, config_values={})
-    config = action_class.create_configuration( @config_store, /::(.*?)$/.match(action_class.name).captures.first.downcase, config_values )
-    action_class.new(@default_agent, @logger, config ) 
+    config = action_class.create_configuration(@config_store, action_class.name[/::(.*?)$/, 1].downcase, config_values)
+    action_class.new(@default_agent, @logger, config, nil)
   end
 
   def test_stop
@@ -118,16 +118,16 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_valid_config
-    config = Armagh::Agent.create_configuration( @config_store, 'good', { 
-      'agent' => { 'log_level' => 'debug' }
+    config = Armagh::Agent.create_configuration(@config_store, 'good', {
+      'agent' => {'log_level' => 'debug'}
     })
-    assert_equal 'debug', config.agent.log_level  
+    assert_equal 'debug', config.agent.log_level
   end
 
   def test_invalid_config
-    e = assert_raises( Configh::ConfigInitError ) {
-      Armagh::Agent.create_configuration( @config_store, 'bad', {
-        'agent' => { 'log_level' => 'justbelowthesurface' }
+    e = assert_raises(Configh::ConfigInitError) {
+      Armagh::Agent.create_configuration(@config_store, 'bad', {
+        'agent' => {'log_level' => 'justbelowthesurface'}
       })
     }
     assert_equal "Unable to create configuration Armagh::Agent bad: Log level must be one of all, debug, info, warn, dev_warn, ops_warn, error, dev_error, ops_error, fatal, any, off", e.message
@@ -135,7 +135,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_with_config
     @logger.expects(:level=).with(Log4r::ERROR).at_least_once
-    agent = prep_an_agent( 'logserror', { 'agent' => { 'log_level' => 'error' }})
+    agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}})
 
     agent_status = mock
 
@@ -185,12 +185,11 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_collect_action
-    
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action'  => { 'name' => 'testc' },
-      'collect' => { 'schedule' => '0 * * * *'},
-      'input'   => { 'docspec' => '__COLLECT__testc:ready' },
-      'output'  => { 'collected_doc' => 'dancollected:ready' }
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -199,8 +198,47 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
+
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_archive)
+    doc.expects(:metadata).returns({})
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_collect_action_archive
+    archiver = @default_agent.instance_variable_get(:@archiver)
+    archiver.expects(:within_archive_context).yields
+
+    Armagh::Actions::Collect.stubs(:report_validation_errors)
+
+    action = setup_action(Armagh::StandardActions::CollectTest, {
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => true},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
+    })
+
+    action_name = action.config.action.name
+
+    action.expects(:collect).with()
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
@@ -219,11 +257,10 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_split_action
-  
-    input_docspec = Armagh::Documents::DocSpec.new( 'DocumentType', Armagh::Documents::DocState::READY )
-    action = setup_action(Armagh::StandardActions::SplitTest, { 'input' => { 'docspec' => input_docspec }})
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    action = setup_action(Armagh::StandardActions::SplitTest, {'input' => {'docspec' => input_docspec}})
     action_name = action.config.action.name
-    
+
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
                                                        docspec: input_docspec, source: {})
     action.expects(:split).with(action_doc)
@@ -238,7 +275,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -250,12 +287,12 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_publish_action
-    input_docspec = Armagh::Documents::DocSpec.new( 'DocumentType', Armagh::Documents::DocState::READY)
-    output_docspec = Armagh::Documents::DocSpec.new( 'DocumentType', Armagh::Documents::DocState::PUBLISHED )
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    output_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    action = setup_action(Armagh::StandardActions::PublishTest, { 
-      'input' => { 'docspec' => input_docspec},
-      'output' => { 'docspec' => output_docspec }
+    action = setup_action(Armagh::StandardActions::PublishTest, {
+      'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
     })
     action_name = action.config.action.name
     pending_actions = %w(one two)
@@ -266,11 +303,11 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
-               :deleted? => false, :collection_task_ids => [])
+               :deleted? => false, :collection_task_ids => [], :source => Armagh::Documents::Source.new)
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
@@ -278,7 +315,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:metadata=, action_doc.metadata)
     doc.expects(:title=, action_doc.title)
     doc.expects(:copyright=, action_doc.copyright)
-    doc.expects(:source=, action_doc.source)
     doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED)
     doc.expects(:document_timestamp=)
     doc.expects(:add_pending_actions).with(pending_actions)
@@ -289,6 +325,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
     doc.expects(:get_published_copy).returns(nil)
     doc.expects(:published_timestamp=)
+    doc.expects(:display=)
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -300,12 +337,12 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_publish_action_update
-    input_docspec = Armagh::Documents::DocSpec.new( 'DocumentType', Armagh::Documents::DocState::READY)
-    output_docspec = Armagh::Documents::DocSpec.new( 'DocumentType', Armagh::Documents::DocState::PUBLISHED )
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    output_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    action = setup_action(Armagh::StandardActions::PublishTest, { 
-      'input' => { 'docspec' => input_docspec},
-      'output' => { 'docspec' => output_docspec }
+    action = setup_action(Armagh::StandardActions::PublishTest, {
+      'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
     })
     action_name = action.config.action.name
     pending_actions = %w(one two)
@@ -323,7 +360,10 @@ class TestAgent < Test::Unit::TestCase
                :deleted? => false,
                :collection_task_ids => [],
                :title => 'old_title',
-               :copyright => 'old copyright')
+               :copyright => 'old copyright',
+               :display => 'old_display',
+               :source => 'old_source',
+               :archive_file => 'archive_file')
 
     pub_doc = stub(:document_id => 'document_id',
                    :pending_actions => [],
@@ -336,14 +376,17 @@ class TestAgent < Test::Unit::TestCase
                    :created_timestamp => 'created',
                    :dev_errors => {},
                    :ops_errors => {},
+                   :source => Armagh::Documents::Source.new,
                    :title => 'new title',
-                   :internal_id => 'internal')
+                   :internal_id => 'internal',
+                   :display => 'new_display',
+                   :archive_file => 'new_archive_file')
 
 
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
     doc.expects(:document_id=, action_doc.document_id)
@@ -351,7 +394,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:metadata=, action_doc.metadata)
     doc.expects(:title=, action_doc.title)
     doc.expects(:copyright=, action_doc.copyright)
-    doc.expects(:source=, action_doc.source)
     doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED)
     doc.expects(:document_timestamp=)
     doc.expects(:add_pending_actions).with(pending_actions)
@@ -362,6 +404,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({}).at_least_once
     doc.expects(:get_published_copy).returns(pub_doc)
     doc.expects(:published_timestamp=)
+    doc.expects(:display=).with(action_doc.display)
 
     doc.expects(:created_timestamp=).with(pub_doc.created_timestamp)
 
@@ -379,11 +422,11 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_consume_action
     input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
-    action = setup_action(Armagh::StandardActions::ConsumeTest, { 'input' => { 'docspec' => input_docspec }})
+    action = setup_action(Armagh::StandardActions::ConsumeTest, {'input' => {'docspec' => input_docspec}})
     action_name = action.config.action.name
 
     published_doc = Armagh::Documents::PublishedDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
-                                                       docspec: input_docspec, source: {})
+                                                             docspec: input_docspec, source: {})
     action.expects(:consume).with(published_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
@@ -397,7 +440,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -411,9 +454,9 @@ class TestAgent < Test::Unit::TestCase
   def test_run_divider
 
     input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
-    divider = setup_action(Armagh::StandardActions::DividerTest, { 'input' => { 'docspec' => input_docspec }})
+    divider = setup_action(Armagh::StandardActions::DividerTest, {'input' => {'docspec' => input_docspec}})
     action_name = divider.config.action.name
-    
+
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -430,10 +473,10 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_action_with_dev_errors
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action'  => { 'name' => 'testc' },
-      'collect' => { 'schedule' => '0 * * * *'},
-      'input'   => { 'docspec' => '__COLLECT__testc:ready' },
-      'output'  => { 'collected_doc' => 'dancollected:ready' }
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -442,7 +485,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
     doc.expects(:ops_errors).returns({})
@@ -465,10 +508,10 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_action_with_ops_errors
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action'  => { 'name' => 'testc' },
-      'collect' => { 'schedule' => '0 * * * *'},
-      'input'   => { 'docspec' => '__COLLECT__testc:ready' },
-      'output'  => { 'collected_doc' => 'dancollected:ready' }
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -477,7 +520,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll ).returns(action).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
     doc.expects(:dev_errors).returns({})
@@ -501,10 +544,10 @@ class TestAgent < Test::Unit::TestCase
   def test_run_failed_action
     exception = RuntimeError.new
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action'  => { 'name' => 'testc' },
-      'collect' => { 'schedule' => '0 * * * *'},
-      'input'   => { 'docspec' => '__COLLECT__testc:ready' },
-      'output'  => { 'collected_doc' => 'dancollected:ready' }
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
@@ -542,7 +585,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:add_ops_error).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @workflow.expects(:instantiate_action).with(action_name,@default_agent,@logger,@state_coll).returns(nil).at_least_once
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(nil).at_least_once
 
     @default_agent.expects(:report_status).with(doc, nil).at_least_once
 
@@ -570,9 +613,36 @@ class TestAgent < Test::Unit::TestCase
     @default_agent.stop
   end
 
+  def test_run_not_action
+    action = 'Not an action'
+    action_name = 'action_name'
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+
+    doc.expects(:finish_processing).at_least_once
+
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+
+    @logger.expects(:dev_error).with("#{action} is not an action.")
+
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
   def test_run_unexpected_error
     exception = RuntimeError.new 'Exception'
-    Armagh::Document.expects(:get_for_processing).raises( exception )
+    Armagh::Document.expects(:get_for_processing).raises(exception)
 
     Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
@@ -624,11 +694,17 @@ class TestAgent < Test::Unit::TestCase
     DRb.stop_service
   end
 
+  def test_instantiate_divider
+    docspec = Armagh::Documents::DocSpec.new('type', Armagh::Documents::DocState::READY)
+    @workflow.expects(:instantiate_divider).with(docspec, @default_agent, @logger, @state_coll)
+    @default_agent.instantiate_divider(docspec)
+  end
+
   def test_create_document
     action = mock
     @current_doc_mock.expects(:document_id).returns('current_id')
     @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
-    
+
     @default_agent.instance_variable_set(:'@current_action', action)
     Armagh::Document.expects(:create).with(type: 'DocumentType',
                                            content: 'content',
@@ -640,7 +716,11 @@ class TestAgent < Test::Unit::TestCase
                                            collection_task_ids: [],
                                            document_timestamp: nil,
                                            source: {'some' => 'source'},
-                                           title: nil, copyright: nil, logger: @logger)
+                                           title: nil,
+                                           copyright: nil,
+                                           logger: @logger,
+                                           archive_file: nil,
+                                           display: nil)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
                                                        content: 'content',
                                                        metadata: 'metadata',
@@ -668,7 +748,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
-    
+
     @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
 
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
@@ -727,7 +807,7 @@ class TestAgent < Test::Unit::TestCase
     doc = mock('document')
     @current_doc_mock.expects(:document_id).returns('current_id')
     doc.expects(:internal_id=)
-    
+
     @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
 
     id = 'id'
@@ -758,7 +838,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
-    
+
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
@@ -871,7 +951,7 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
-    @workflow.expects( :get_action_names_for_docspec ).returns( [] ).at_least_once
+    @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
     doc.expects(:save).returns
@@ -1029,13 +1109,53 @@ class TestAgent < Test::Unit::TestCase
     assert_equal logger, @default_agent.get_logger(logger_name)
   end
 
+  def test_archive
+    logger_name = 'test_logger'
+    action_name = 'test_action'
+    file_path = 'file'
+    metadata = {}
+    source = Armagh::Documents::Source.new
+    archiver = @default_agent.instance_variable_get(:@archiver)
+    archiver.expects(:archive_file).with(file_path, metadata, source)
+
+    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+  end
+
+  def test_archive_archive_error
+    logger_name = 'test_logger'
+    action_name = 'test_action'
+    file_path = 'file'
+    metadata = {}
+    source = Armagh::Documents::Source.new
+    error = Armagh::Errors::ArchiveError.new('archive_error')
+    archiver = @default_agent.instance_variable_get(:@archiver)
+    archiver.expects(:archive_file).with(file_path, metadata, source).raises(error)
+    @default_agent.expects(:notify_dev).with(logger_name, action_name, error)
+
+    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+  end
+
+  def test_archive_sftp_error
+    logger_name = 'test_logger'
+    action_name = 'test_action'
+    file_path = 'file'
+    metadata = {}
+    source = Armagh::Documents::Source.new
+    error = Armagh::Support::SFTP::SFTPError.new('sftp error')
+    archiver = @default_agent.instance_variable_get(:@archiver)
+    archiver.expects(:archive_file).with(file_path, metadata, source).raises(error)
+    @default_agent.expects(:notify_ops).with(logger_name, action_name, error)
+
+    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+  end
+
   def test_too_large
     exception = Armagh::Documents::Errors::DocumentSizeError.new('too large')
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action'  => { 'name' => 'testc' },
-      'collect' => { 'schedule' => '0 * * * *'},
-      'input'   => { 'docspec' => '__COLLECT__testc:ready' },
-      'output'  => { 'collected_doc' => 'dancollected:ready' }
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)

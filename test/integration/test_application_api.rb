@@ -120,7 +120,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     test_config = { 
       'action' => { 'name' => 'my_fred_action' },
-      'collect' => { 'schedule' => '0 * * * *'},
+      'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
 
@@ -142,7 +142,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     test_config = { 
       'action' => { 'name' => 'my_fred_action' },
-      'collect' => { 'schedule' => '0 * * * *'},
+      'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
     
@@ -176,7 +176,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     test_config = { 
       'action' => { 'name' => 'my_fred_action' },
-      'collect' => { 'schedule' => '0 * * * *'},
+      'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
     

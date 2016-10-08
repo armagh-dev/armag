@@ -21,9 +21,6 @@
 #            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
 #            as part of the requirement as well as in the gemspec.
 
-require 'rubygems'
-require 'bundler/setup'
-
 require 'drb/unix'
 require 'fileutils'
 require 'socket'
@@ -59,30 +56,36 @@ module Armagh
     
       errors = nil
       unless Logging.valid_level?( candidate_config.launcher.log_level)
-        errors << "Log level must be one of #{ Logging.valid_levels.join(', ')}"
+        errors = "Log level must be one of #{ Logging.valid_log_levels.join(', ')}"
       end
       errors
     end
     
+    def Launcher.config_name( launcher_name = 'default' )
+      [ Connection.ip, launcher_name ].join("_")
+    end
+    
     def initialize( launcher_name = 'default' )
-
-      @logger = Logging.set_logger('Armagh::Application')  
+      @logger = Logging.set_logger('Armagh::Application::Launcher')
 
       unless Connection.can_connect?
         @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
         exit 1
       end
-      
+
+      bind_ip = Connection.ip
+      launcher_config_name = [ bind_ip, launcher_name ].join("_")
+      @logger.any "Using Launcher Config: #{launcher_config_name}"
+      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {} )
+
+      Logging.set_level(@logger, @config.launcher.log_level)
+
       @versions = get_versions
       Document.version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
         Document.version[ package ] = version
       end
 
-      bind_ip = ENV[ "ARMAGH_BIND_IP" ] || '127.0.0.1'
-      launcher_config_name = [ bind_ip, launcher_name ].join("_")
-      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {} )
-      
       @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {} )
       @workflow = Actions::Workflow.new( @logger, Connection.config )
       @collection_trigger = Utils::CollectionTrigger.new(@workflow)
@@ -106,7 +109,7 @@ module Armagh
     end
 
     def checkin(status)
-      @logger.info "Checking In: #{status}"
+      @logger.debug "Checking In: #{status}"
 
       checkin = {
           'versions' => @versions,
@@ -125,25 +128,17 @@ module Armagh
 
     def apply_config
       Logging.set_level(@logger, @config.launcher.log_level)
-      change_num_agents(@config.launcher.num_agents)
-      @logger.debug "Updated configuration to log level #{ @config.launcher.log_level }, num agents #{ @config.launcher.num_agents }"
+      set_num_agents(@config.launcher.num_agents)
+      @logger.debug "Updated configuration to log level #{ @config.launcher.log_level.upcase }, num agents #{ @config.launcher.num_agents }"
     end
 
-    def change_num_agents(num_agents)
-      running_agents = @agents.length
-      @logger.debug "Changing number of agents from #{running_agents} to #{num_agents}"
-
-      if running_agents < num_agents
-        @logger.info "Increasing number of agents from #{running_agents} to #{num_agents}"
-        launch_agents(num_agents - running_agents)
-      elsif running_agents > num_agents
-        @logger.info "Decreasing number of agents from #{running_agents} to #{num_agents}"
-        kill_agents(running_agents - num_agents)
-      end
+    def set_num_agents(num_agents)
+      kill_all_agents
+      @logger.any "Setting number of agents to #{num_agents}"
+      launch_agents(num_agents)
     end
 
     def launch_agents(num_agents)
-      @logger.debug "Launching #{num_agents} agents"
       num_agents.times do
         start_agent_in_process
       end
@@ -213,8 +208,13 @@ module Armagh
     end
 
     def refresh_config
-      if @config.refresh || @agent_config.refresh || @workflow.refresh
-        @logger.info "Configuration change detected.  Restarting agents..."
+      # Explicitly call them all out to refresh all if there any any to refresh
+      config = @config.refresh
+      agent_config = @agent_config.refresh
+      workflow = @workflow.refresh
+
+      if config || agent_config || workflow
+        @logger.any 'Configuration change detected.  Restarting agents...'
         kill_all_agents
         apply_config
       else
@@ -223,7 +223,6 @@ module Armagh
     end
 
     def get_versions
-      
       versions = { 
         'armagh'  => VERSION,
         'actions' => {}
@@ -265,7 +264,6 @@ module Armagh
     end
     
     def run
-
       # Stop agents before stopping armagh
       TERM_SIGNALS.each do |signal|
         trap(signal) { shutdown(signal) }

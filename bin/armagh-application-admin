@@ -74,7 +74,7 @@ helpers do
     api.logger.error( error_detail )
     case format
     when 'json'
-      return [ 500, { :error_detail => error_detail }.to_json ]
+      return [ 200, { :error_detail => error_detail }.to_json ]
     when 'html'
       session[ 'message' ] = error_detail
       redirect to( html_redirect_to )
@@ -117,7 +117,7 @@ get '/status.json' do
   begin
     status = api.get_status
   rescue => e
-    return[ 500, { :error_detail => e.message }.to_json ]
+    return[ 200, { :error_detail => e.message }.to_json ]
   end
   return[ 200, status.to_json ]
 end
@@ -128,8 +128,31 @@ get '/document_counts.json' do
   begin
     counts = api.get_document_counts
   rescue => e
-    return [ 500, { :error_detail => e.message }.to_json ]
+    return [ 200, { :error_detail => e.message }.to_json ]
   end
 end
 
+post '/configure_launcher.json' do
+  
+  begin
+    new_config = {}
+    config_hash = eval( params[ 'launcher' ])
+    raise ArgumentError, "must include params[ 'launcher' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
+    new_config = api.configure_launcher( { 'launcher' => config_hash } )
+  rescue => e
+    return[ 200, { :error_detail => e.message }.to_json ]
+  end
+  return[ 200, new_config.to_json ]
+end
 
+post '/create_action_configuration.json' do
+  
+  begin
+    new_config = {}
+    action_class_name = params[ 'action' ].delete( 'action_class_name' )
+    api.create_action_configuration( action_class_name, eval(params[ 'action' ]))
+  rescue => e
+    return[ 200, { :error_detail => "action class name:  *#{ action_class_name }*" }.to_json ]
+  end
+  return[ 200, "success".to_json ]
+end

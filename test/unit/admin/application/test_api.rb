@@ -47,7 +47,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     Armagh::Connection.stubs( :config ).returns( @config_store )
     @base_values_hash = { 
       'output' => { 'collected_document' => Armagh::Documents::DocSpec.new( 'dansdoc', Armagh::Documents::DocState::READY)},
-      'collect' => { 'schedule' => '0 * * * *'}
+      'collect' => { 'schedule' => '0 * * * *', 'archive' => false}
     }
   end
   

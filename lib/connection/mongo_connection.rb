@@ -30,7 +30,7 @@ module Armagh
     class MongoConnection
       include Singleton
 
-      attr_reader :connection
+      attr_reader :connection, :ip
 
       def initialize
         Mongo::Logger.logger = Logging.set_logger('Armagh::MongoConnection')
@@ -44,6 +44,7 @@ module Armagh
         begin
           conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config['db']}"
           @connection = Mongo::Client.new( conn_uri )
+          @ip = config['ip']
         rescue
           raise Errors::ConnectionError, 'Unable to establish database connection.'
         end

@@ -22,5 +22,6 @@ module Armagh
     class DocumentMarkError < StandardError; end
     class EncodingError < StandardError; end
     class IndexError < StandardError; end
+    class ArchiveError < StandardError; end
   end
 end

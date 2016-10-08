@@ -45,8 +45,8 @@ class TestDocument < Test::Unit::TestCase
                            pending_actions: [],
                            state: Armagh::Documents::DocState::WORKING,
                            document_id: 'id',
-                           collection_task_ids:[],
-                           document_timestamp: Time.new(2016,1,1,0,0,0,0).utc)
+                           collection_task_ids: [],
+                           document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc)
   end
 
   def test_new
@@ -91,13 +91,27 @@ class TestDocument < Test::Unit::TestCase
                           state: Armagh::Documents::DocState::WORKING,
                           document_id: 'id',
                           collection_task_ids: [],
-                          document_timestamp: Time.new(2016,1,1,0,0,0,0).utc)
+                          document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
+                          archive_file: 'whatever',
+    )
 
     assert_equal('testdoc', doc.type)
     assert_equal({'content' => true}, doc.content)
     assert_equal({'meta' => true}, doc.metadata)
     assert_equal('id', doc.document_id)
+    assert_equal('whatever', doc.archive_file)
     assert_equal(@internal_id, doc.internal_id)
+  end
+
+  def test_create_trigger_document
+    @documents.expects(:update_one)
+    Document.create_trigger_document(state: Documents::DocState::READY, type: 'type', pending_actions: [])
+  end
+
+  def test_create_trigger_document_error
+    e = RuntimeError.new('error')
+    @documents.expects(:update_one).raises(e)
+    assert_raise(e) { Document.create_trigger_document(state: Documents::DocState::READY, type: 'type', pending_actions: []) }
   end
 
   def test_from_action_document
@@ -108,8 +122,10 @@ class TestDocument < Test::Unit::TestCase
     new_doc = true
     pending_actions = %w(pend1 pend2)
     source = {'some' => 'source'}
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: id, content: content, metadata: metadata,
-                                                       docspec: docspec, new: new_doc, source: source)
+    display = 'display'
+    title = 'title'
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: id, content: content, metadata: metadata, title: title,
+                                                       docspec: docspec, new: new_doc, source: source, display: display)
     doc = Document.from_action_document(action_doc, pending_actions)
 
     assert_equal(id, doc.document_id)
@@ -119,6 +135,8 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(docspec.state, doc.state)
     assert_equal(pending_actions, doc.pending_actions)
     assert_equal(source, doc.source)
+    assert_equal(display, doc.display)
+    assert_equal(title, doc.title)
   end
 
   def test_find
@@ -136,7 +154,7 @@ class TestDocument < Test::Unit::TestCase
   def test_find_error
     e = Mongo::Error.new('error')
     @documents.expects(:find).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError){Document.find('id', 'testdoc', Documents::DocState::WORKING)}
+    assert_raise(Armagh::Errors::ConnectionError) { Document.find('id', 'testdoc', Documents::DocState::WORKING) }
   end
 
   def test_get_for_processing
@@ -148,7 +166,7 @@ class TestDocument < Test::Unit::TestCase
   def test_get_for_processing_error
     e = Mongo::Error.new('error')
     @documents.expects(:find_one_and_update).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError){Document.get_for_processing}
+    assert_raise(Armagh::Errors::ConnectionError) { Document.get_for_processing }
   end
 
   def test_exists?
@@ -162,7 +180,7 @@ class TestDocument < Test::Unit::TestCase
   def test_exists_error
     e = Mongo::Error.new('error')
     @documents.expects(:find).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError){Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING)}
+    assert_raise(Armagh::Errors::ConnectionError) { Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING) }
   end
 
 
@@ -193,8 +211,8 @@ class TestDocument < Test::Unit::TestCase
     assert_false @doc.error?
 
     failures = [
-        {name: 'failed_action', details: RuntimeError.new('runtime error')},
-        {name: 'failed_action2', details: 'string error'},
+      {name: 'failed_action', details: RuntimeError.new('runtime error')},
+      {name: 'failed_action2', details: 'string error'},
     ]
     failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
 
@@ -235,8 +253,8 @@ class TestDocument < Test::Unit::TestCase
     assert_false @doc.error?
 
     failures = [
-        {name: 'failed_action', details: RuntimeError.new('runtime error')},
-        {name: 'failed_action2', details: 'string error'},
+      {name: 'failed_action', details: RuntimeError.new('runtime error')},
+      {name: 'failed_action2', details: 'string error'},
     ]
     failures.each { |f| @doc.add_ops_error(f[:name], f[:details]) }
 
@@ -283,8 +301,8 @@ class TestDocument < Test::Unit::TestCase
     assert_false @doc.error?
 
     failures = [
-        {name: 'failed_action', details: RuntimeError.new('runtime error')},
-        {name: 'failed_action2', details: 'string error'},
+      {name: 'failed_action', details: RuntimeError.new('runtime error')},
+      {name: 'failed_action2', details: 'string error'},
     ]
     failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
 
@@ -349,7 +367,7 @@ class TestDocument < Test::Unit::TestCase
     assert_empty @doc.collection_task_ids
     @doc.collection_task_ids = [1]
     @doc.collection_task_ids << 2
-    assert_equal([1,2], @doc.collection_task_ids)
+    assert_equal([1, 2], @doc.collection_task_ids)
   end
 
   def test_finish_processing
@@ -507,7 +525,7 @@ class TestDocument < Test::Unit::TestCase
   def test_delete_error
     e = Mongo::Error.new('error')
     @documents.expects(:delete_one).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError){Document.delete('123', 'type', 'state')}
+    assert_raise(Armagh::Errors::ConnectionError) { Document.delete('123', 'type', 'state') }
   end
 
   def test_get_published_copy
@@ -523,7 +541,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.metadata, action_doc.metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
-    assert_equal(@doc.source, action_doc.source.to_hash.delete_if{|k,v| v.nil?})
+    assert_equal(@doc.source, action_doc.source.to_hash.delete_if { |k, v| v.nil? })
   end
 
   def test_to_published_document
@@ -532,7 +550,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.metadata, pub_doc.metadata)
     assert_equal(@doc.state, pub_doc.docspec.state)
     assert_equal(@doc.type, pub_doc.docspec.type)
-    assert_equal(@doc.source, pub_doc.source.to_hash.delete_if{|k,v| v.nil?})
+    assert_equal(@doc.source, pub_doc.source.to_hash.delete_if { |k, v| v.nil? })
   end
 
   def test_update_from_draft_action_document
@@ -711,13 +729,13 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_unlock
-    @documents.expects(:find_one_and_update).with({ 'document_id': 'id'}, {'$set' => {'locked' => false}})
+    @documents.expects(:find_one_and_update).with({'document_id': 'id'}, {'$set' => {'locked' => false}})
     Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)
   end
 
   def test_unlock_error
     e = Mongo::Error.new('error')
     @documents.expects(:find_one_and_update).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError){Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)}
+    assert_raise(Armagh::Errors::ConnectionError) { Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED) }
   end
 end

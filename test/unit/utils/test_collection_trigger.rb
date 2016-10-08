@@ -35,7 +35,7 @@ class UTAction < Armagh::Actions::Collect
   def self.make_test_config(store:, action_name:, collected_doctype:)
     create_configuration(store, action_name, {
       'action' => {'name' => action_name, 'active' => true},
-      'collect' => {'schedule' => '* * * * *'},
+      'collect' => {'schedule' => '* * * * *', 'archive' => false},
       'input' => {},
       'output' => {
         'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),

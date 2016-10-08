@@ -27,26 +27,27 @@ require 'armagh/documents'
 require_relative '../logging'
 require_relative '../document/document'
 require_relative '../ipc'
+require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
 
 
 module Armagh
   class Agent
     include Configh::Configurable
-    
-    define_parameter name: 'log_level', type: 'populated_string', description: 'Logging level for agents', required: true, default: 'warn', group: 'agent'
+
+    define_parameter name: 'log_level', type: 'populated_string', description: 'Logging level for agents', required: true, default: 'info', group: 'agent'
     define_group_validation_callback callback_class: Agent, callback_method: :report_validation_errors
-    
+
     attr_reader :uuid
 
-    def initialize( agent_config, workflow )
-      
+    def initialize(agent_config, workflow)
+
       @config = agent_config
       @workflow = workflow
-      
+
       @uuid = "Agent-#{SecureRandom.uuid}"
       @logger = Logging.set_logger("Armagh::Application::Agent::#{@uuid}")
-      Logging.set_level( @logger, @config.agent.log_level )
+      Logging.set_level(@logger, @config.agent.log_level)
 
       @running = false
 
@@ -54,6 +55,7 @@ module Armagh
       @backoff.logger = @logger
 
       @num_creates = 0
+      @archiver = Utils::Archiver.new(@logger)
     end
 
     def start
@@ -76,10 +78,10 @@ module Armagh
       @running
     end
 
-    def instantiate_divider( docspec )
-      @workflow.get_divider( docspec, self, @logger, Connection.config )
+    def instantiate_divider(docspec)
+      @workflow.instantiate_divider(docspec, self, @logger, Connection.config)
     end
-    
+
     def create_document(action_doc)
       docspec = action_doc.docspec
       raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.document_id}'.  It is the same document that was passed into the action." if action_doc.document_id == @current_doc.document_id
@@ -96,7 +98,11 @@ module Armagh
                       title: action_doc.title,
                       copyright: action_doc.copyright,
                       document_timestamp: action_doc.document_timestamp,
-                      source: action_doc.source, new: true, logger: @logger)
+                      display: action_doc.display,
+                      source: action_doc.source,
+                      archive_file: action_doc.archive_file,
+                      new: true,
+                      logger: @logger)
       @num_creates += 1
     end
 
@@ -150,6 +156,14 @@ module Armagh
 
     def get_logger(logger_name)
       Logging.set_logger(logger_name)
+    end
+
+    def archive(logger_name, action_name, file_path, metadata, source)
+      @archiver.archive_file(file_path, metadata, source)
+    rescue Errors::ArchiveError => e
+      notify_dev(logger_name, action_name, e)
+    rescue Support::SFTP::SFTPError => e
+      notify_ops(logger_name, action_name, e)
     end
 
     private def edit_or_create(document_id, docspec, doc)
@@ -206,7 +220,7 @@ module Armagh
 
     private def connect_agent_status
       client_uri = IPC::DRB_CLIENT_URI % @uuid
-      socket_file = client_uri.sub("drbunix://",'')
+      socket_file = client_uri.sub("drbunix://", '')
 
       if File.exists? socket_file
         @logger.debug "Deleting #{socket_file}.  This may have existed already due to a previous crash of the agent."
@@ -225,7 +239,7 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
-          current_action = @workflow.instantiate_action(name, self, @logger, Connection.config )
+          current_action = @workflow.instantiate_action(name, self, @logger, Connection.config)
 
           @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
           report_status(@current_doc, current_action)
@@ -273,12 +287,17 @@ module Armagh
         when Actions::Collect
           @collection_task_id = doc.document_id
           @num_creates = 0
-          action.collect
-          doc.metadata.merge!({
-            'docs_collected' => @num_creates
-          })
+
+          if action.config.collect.archive
+            @archiver.within_archive_context do
+              action.collect
+            end
+          else
+            action.collect
+          end
+
+          doc.metadata.merge!({'docs_collected' => @num_creates})
           doc.mark_archive
-          @num_creates = 0
         when Actions::Split
           @collection_task_id = doc.collection_task_ids.last
           action_doc = doc.to_action_document
@@ -295,20 +314,22 @@ module Armagh
           doc.content = action_doc.content
           doc.title = action_doc.title
           doc.copyright = action_doc.copyright
-          doc.source = {}
           doc.document_timestamp = action_doc.document_timestamp || timestamp
+          doc.display = action_doc.display
 
           published_doc = doc.get_published_copy
           if published_doc
             doc.created_timestamp = published_doc.created_timestamp
 
-            doc.dev_errors.merge!(published_doc.dev_errors) { |_key, v1, v2| v2 + v1}
-            doc.ops_errors.merge!(published_doc.ops_errors) { |_key, v1, v2| v2 + v1}
+            doc.dev_errors.merge!(published_doc.dev_errors) { |_key, v1, v2| v2 + v1 }
+            doc.ops_errors.merge!(published_doc.ops_errors) { |_key, v1, v2| v2 + v1 }
             doc.collection_task_ids.unshift(*(published_doc.collection_task_ids))
 
             doc.title ||= published_doc.title
             doc.copyright ||= published_doc.copyright
             doc.published_id = published_doc.internal_id
+            doc.display ||= published_doc.display
+            doc.source ||= published_doc.source
           end
 
           doc.published_timestamp = timestamp
@@ -324,9 +345,11 @@ module Armagh
         when Actions::Action
           @logger.dev_error "#{action.name} is an unknown action type."
         else
-          @logger.dev_error "#{action} is an not an action."
+          @logger.dev_error "#{action} is not an action."
       end
       raise Documents::Errors::IDError, "Attempted to change Document's ID from '#{initial_id}' to '#{doc.document_id}.  IDs can only be changed from a publisher." unless initial_id == doc.document_id || allowed_id_change
+    ensure
+      @num_creates = 0
     end
 
     private def report_status(doc, action)
@@ -335,8 +358,8 @@ module Armagh
       if doc && action
         @idle_since = nil
         status['task'] = {
-            'document' => doc.document_id,
-            'action' => action.name
+          'document' => doc.document_id,
+          'action' => action.name
         }
         status['running_since'] = Time.now
         status['status'] = 'running'
@@ -349,13 +372,13 @@ module Armagh
 
       status['last_update'] = Time.now
 
-      @logger.info "Reporting Status #{status['status']}"
+      @logger.debug "Reporting Status #{status['status']}"
       @agent_status.report_status(@uuid, status)
     end
-  
-    def Agent.report_validation_errors( candidate_config )
+
+    def Agent.report_validation_errors(candidate_config)
       errors = nil
-      unless Logging.valid_level?( candidate_config.agent.log_level )
+      unless Logging.valid_level?(candidate_config.agent.log_level)
         errors = "Log level must be one of #{ Logging.valid_log_levels.join(", ")}"
       end
       errors

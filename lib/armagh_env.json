@@ -11,7 +11,11 @@
     "ARMAGH_REPLSET_NAME":  "armagh",
     "ARMAGH_ENV":           "DEVELOPMENT",
     "ARMAGH_ENCODING":      "UTF-8",
-    "ARMAGH_BIND_IP":       "127.0.0.1"
+    "ARMAGH_BIND_IP":       "127.0.0.1",
+    "ARMAGH_ARCHIVE_HOST":  "127.0.0.1",
+    "ARMAGH_ARCHIVE_PORT":  "22",
+    "ARMAGH_ARCHIVE_PATH":  "/tmp/var/archive",
+    "ARMAGH_ARCHIVE_USER":  "armagh"
   },
   
   "Armagh::Admin::Resource::API": {

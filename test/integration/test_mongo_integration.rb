@@ -72,4 +72,8 @@ class TestMongoIntegration < Test::Unit::TestCase
     assert_equal 1, primaries.length
     assert_includes ['127.0.0.1', Socket.gethostname], primaries.first
   end
+  
+  def test_ip
+    assert_equal '127.0.0.1', Armagh::Connection.ip
+  end
 end

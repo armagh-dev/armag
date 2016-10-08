@@ -125,16 +125,16 @@ module Armagh
           .flatten
           .compact
       end
-    
-      def instantiate_divider( docspec, caller, logger )
-        
+
+      def instantiate_divider( docspec, caller, logger, state_collection )
+
         divider_action_name = get_action_names_for_docspec( docspec )
-          .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divider }
-        instantiate_action( divider_action_name, caller, logger ) if divider_action_name
+                                .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divider }
+        instantiate_action( divider_action_name, caller, logger, state_collection ) if divider_action_name
       end
-      
+    
       def create_action( action_class_name, candidate_configuration_values )
-          
+
         candidate_action_name = candidate_configuration_values&.dig( 'action', 'name' )
         raise( ConfigurationError, "Action named #{ candidate_action_name } already exists.") if @action_configs_by_name[ candidate_action_name ]
         

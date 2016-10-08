@@ -41,7 +41,7 @@ module Armagh
       def self.make_config_values( action_name:, collected_a_doctype:, collected_b_doctype: )
         {
           'action' => { 'name' => action_name, 'active' => true },
-          'collect' => { 'schedule' => '0 * * * *' },
+          'collect' => { 'schedule' => '0 * * * *', 'archive' => false },
           'input'  => {},
           'output' => {
             'collected_a' => Armagh::Documents::DocSpec.new( collected_a_doctype, DS_READY ),

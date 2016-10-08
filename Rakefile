@@ -29,12 +29,14 @@ task :default => [:ci_vm]
 
 Rake::TestTask.new(:test) do |t|
   t.libs << 'test'
-  t.pattern = 'test/unit/**/test_*.rb'
+  t.pattern = "test/unit/**/test_*.rb"
+  t.warning = false
 end
 
 Rake::TestTask.new(:integration) do |t|
   t.libs << 'integration'
-  t.pattern = 'test/integration/**/test_*.rb'
+  t.pattern = "test/integration/**/test_*.rb"
+  t.warning = false
 end
 
 task :clean do

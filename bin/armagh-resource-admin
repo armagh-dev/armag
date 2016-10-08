@@ -133,5 +133,3 @@ post '/implode.json' do
     return[ 200, { result: "No implosion.  You must post data confirmed=1"}.to_json]
   end
 end
-
-

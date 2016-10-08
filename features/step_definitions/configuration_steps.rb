@@ -16,7 +16,9 @@
 #
 
 require_relative '../../test/helpers/mongo_support'
-require_relative '../../lib/action/action_manager'
+require_relative '../../lib/launcher/launcher'
+require_relative '../../lib/agent/agent'
+require_relative '../../lib/connection'
 
 require 'test/unit/assertions'
 
@@ -26,6 +28,7 @@ require 'time'
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
   config = table.rows_hash
+  config.default = nil
 
   config['num_agents'] = config['num_agents'].to_i if config['num_agents']
   config['checkin_frequency'] = config['checkin_frequency'].to_i if config['checkin_frequency']
@@ -236,13 +239,14 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
           'parameters' => {}
       }
     end
-
-
-    @action_manager ||= Armagh::ActionManager.new(nil, Log4r::Logger.root)
-    @action_manager.set_available_actions(available_actions)
-
-    config['available_actions'] = available_actions
   end
 
-  MongoSupport.instance.set_config(config_type, config)
+  case config_type
+    when 'launcher'
+      Armagh::Launcher.create_configuration(Armagh::Connection.config, '127.0.0.1_default', {'launcher' => config})
+    when 'agent'
+      Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {'agent' => config})
+    else
+      raise "Unknown config type #{config_type}"
+  end
 end

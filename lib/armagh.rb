@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 
-puts __dir__
+require 'rubygems'
+require 'bundler/setup'
 
 Dir.glob( File.join( __dir__, '/**/*.rb' )).each do |rb_file|
   require_relative rb_file
