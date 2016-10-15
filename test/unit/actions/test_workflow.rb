@@ -119,6 +119,7 @@ class TestWorkflow < Test::Unit::TestCase
   def setup
     @config_store = []
     @logger = mock
+    @logger.stubs(:fullname).returns('fred')
     @caller = mock
   
     @test_action_setup = {
@@ -239,7 +240,8 @@ class TestWorkflow < Test::Unit::TestCase
   def test_instantiate_action
     
     workflow = do_add_configs
-    
+
+    @logger.expects(:fullname).returns('some::logger::name')
     paf = workflow.instantiate_action( 'publish_a_freddocs', @caller, @logger, @state_coll )
     assert paf.is_a?( Armagh::StandardActions::TWTestPublish )
     assert_equal 'a_freddoc', paf.config.input.docspec.type

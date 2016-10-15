@@ -4,7 +4,7 @@ require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../action/workflow'
 require_relative '../../document/document'
-require_relative '../../launcher/launcher'
+require_relative '../../action/gem_manager'
 
 module Armagh
   module Admin
@@ -52,6 +52,9 @@ module Armagh
           @config.each do |k,v|
             instance_variable_set( "@#{k}", v )
           end
+          
+          gem_manager = Armagh::Actions::GemManager.new( @logger )
+          gem_manager.activate_installed_gems
         end
       
         def using_ssl?
@@ -80,13 +83,21 @@ module Armagh
           counts = Document.count_working_by_doctype
         end
         
-        def create_action_configuration( action_class_name, configuration_hash )
+        def create_action_configuration( configuration_hash )
           
+          @logger.debug( 'lib/admin/application/api create_action_configuration' )
+          @logger.debug( "... with configuration_hash #{ configuration_hash.inspect }")
+          
+          action_class_name = configuration_hash[ 'action_class_name' ]
+      
           workflow = Actions::Workflow.new( @logger, Connection.config )
           workflow.create_action( action_class_name, configuration_hash )
+            
         end
         
-        def update_action_configuration( action_class_name, configuration_hash )
+        def update_action_configuration( configuration_hash )
+          
+          action_class_name = configuration_hash[ 'action_class_name' ]
           
           workflow = Actions::Workflow.new( @logger, Connection.config )
           workflow.update_action( action_class_name, configuration_hash )

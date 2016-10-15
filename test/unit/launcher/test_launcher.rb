@@ -88,6 +88,6 @@ class TestLauncher < Test::Unit::TestCase
   def test_configure_set_log_level_invalid
     assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: Log level must be one of all, debug, info, warn, dev_warn, ops_warn, error, dev_error, ops_error, fatal, any, off' )
   end
-    
+      
 end
  

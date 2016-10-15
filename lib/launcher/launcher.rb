@@ -34,6 +34,7 @@ Armagh::Environment.init
 require_relative '../agent/agent'
 require_relative '../agent/agent_status'
 require_relative '../action/workflow'
+require_relative '../action/gem_manager'
 require_relative '../utils/collection_trigger'
 require_relative '../connection'
 require_relative '../ipc'
@@ -43,41 +44,41 @@ require_relative '../version'
 module Armagh
   class Launcher
     include Configh::Configurable
-      
+
     define_parameter name: "num_agents",        description: "Number of agents",                      type: 'positive_integer', required: true, default: 1,      group: 'launcher'
-    define_parameter name: "update_frequency",  description:  "Configuration refresh rate (seconds)", type: 'positive_integer', required: true, default: 60,     group: 'launcher'            
+    define_parameter name: "update_frequency",  description:  "Configuration refresh rate (seconds)", type: 'positive_integer', required: true, default: 60,     group: 'launcher'
     define_parameter name: "checkin_frequency", description: "Status update rate (seconds)",          type: 'positive_integer', required: true, default: 60,     group: 'launcher'
     define_parameter name: "log_level",         description: "Log level",                             type: 'populated_string', required: true, default: 'info', group: 'launcher'
     define_group_validation_callback callback_class: Launcher, callback_method: :report_validation_errors
 
-    TERM_SIGNALS = [:INT, :QUIT, :TERM]    
-    
+    TERM_SIGNALS = [:INT, :QUIT, :TERM]
+
     def Launcher.report_validation_errors( candidate_config )
-    
       errors = nil
       unless Logging.valid_level?( candidate_config.launcher.log_level)
         errors = "Log level must be one of #{ Logging.valid_log_levels.join(', ')}"
       end
       errors
     end
-    
+
     def Launcher.config_name( launcher_name = 'default' )
       [ Connection.ip, launcher_name ].join("_")
     end
-    
+
     def initialize( launcher_name = 'default' )
       @logger = Logging.set_logger('Armagh::Application::Launcher')
 
       unless Connection.can_connect?
+        Logging.disable_mongo_log
         @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
         exit 1
       end
-
+      
       bind_ip = Connection.ip
-      launcher_config_name = [ bind_ip, launcher_name ].join("_")
-      @logger.any "Using Launcher Config: #{launcher_config_name}"
-      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {} )
+      launcher_config_name = [ bind_ip, launcher_name ].join('_')
+      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, :maintain_history => true )
 
+      @logger.any "Using Launcher Config: #{launcher_config_name}"
       Logging.set_level(@logger, @config.launcher.log_level)
 
       @versions = get_versions
@@ -86,10 +87,11 @@ module Armagh
         Document.version[ package ] = version
       end
 
-      @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {} )
+      @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, :maintain_history => true )
       @workflow = Actions::Workflow.new( @logger, Connection.config )
       @collection_trigger = Utils::CollectionTrigger.new(@workflow)
-      
+      Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
+
       @hostname = Socket.gethostname
       @agents = {}
       @running = false
@@ -104,21 +106,20 @@ module Armagh
 
       reported_not_running.each {|id| @agent_status.remove_agent(id) }
 
-      @logger.error "The following agents are reported but not running: #{reported_not_running.join(", ")}" unless reported_not_running.empty?
-      @logger.error "The following agents are running but not reporting: #{running_not_reported}.join(", ")" unless running_not_reported.empty?
+      @logger.error "The following agents are reported but not running: #{reported_not_running.join(', ')}" unless reported_not_running.empty?
+      @logger.error "The following agents are running but not reporting: #{running_not_reported.join(', ')}" unless running_not_reported.empty?
     end
 
     def checkin(status)
-      @logger.debug "Checking In: #{status}"
-
       checkin = {
           'versions' => @versions,
           'last_update' => Time.now,
           'status' => status,
-          'agents' => AgentStatus.get_statuses(@agent_status)
       }
 
-      @logger.debug "Checkin Details: #{checkin}"
+      checkin['agents'] = AgentStatus.get_statuses(@agent_status) if @running
+
+      @logger.debug "Checking In: #{checkin}"
       Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
 
       @last_checkin = Time.now
@@ -128,6 +129,7 @@ module Armagh
 
     def apply_config
       Logging.set_level(@logger, @config.launcher.log_level)
+      Logging.set_level(@collection_trigger.logger, @config.launcher.log_level)
       set_num_agents(@config.launcher.num_agents)
       @logger.debug "Updated configuration to log level #{ @config.launcher.log_level.upcase }, num agents #{ @config.launcher.num_agents }"
     end
@@ -180,11 +182,13 @@ module Armagh
       agent ||= Agent.new( @agent_config, @workflow )
 
       pid = Process.fork do
+        Process.setproctitle("armagh-#{agent.uuid}")
         TERM_SIGNALS.each do |signal|
           trap(signal) {agent.stop}
         end
         begin
           agent.start
+          @logger.info "Agent #{agent.uuid} terminated"
         rescue => e
           Logging.dev_error_exception(@logger, e, "Could not start agent #{agent.uuid}")
         end
@@ -196,15 +200,17 @@ module Armagh
     def stop_agent(signal)
       pid = @agents.keys.first
       Process.kill(signal, pid)
-      pid = Process.wait
+      begin
+        pid = Process.wait
+      rescue Errno::ECHILD; end
       pid
     end
 
     def shutdown(signal)
-      Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }
+      Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }.join
       @running = false
-      Thread.new{ kill_all_agents(signal) }
       @collection_trigger.stop
+      Thread.new{kill_all_agents(signal)}.join
     end
 
     def refresh_config
@@ -213,8 +219,18 @@ module Armagh
       agent_config = @agent_config.refresh
       workflow = @workflow.refresh
 
+
       if config || agent_config || workflow
         @logger.any 'Configuration change detected.  Restarting agents...'
+
+        @logger.debug {
+          changed_configs = []
+          changed_configs << 'launcher' if config
+          changed_configs << 'agent' if agent_config
+          changed_configs << 'workflow' if workflow
+          "Triggered by configuration changes to #{changed_configs.join(', ')}"
+        }
+
         kill_all_agents
         apply_config
       else
@@ -223,46 +239,26 @@ module Armagh
     end
 
     def get_versions
-      versions = { 
+ 
+     versions = {
         'armagh'  => VERSION,
         'actions' => {}
       }
-
-      begin
-        require 'armagh/standard_actions'
-        @logger.info "Using StandardActions: #{StandardActions::VERSION}"
-        versions[ 'actions' ][ 'standard' ] = StandardActions::VERSION
-      rescue LoadError
-        @logger.ops_warn "StandardActions gem is not deployed. These actions won't be available."
-      rescue => e
-        # An unexpected exception - things like syntax errors.
-        Logging.dev_error_exception(@logger, e, 'Could not load StandardActions gem')
-        Armagh.send(:remove_const, :StandardActions)
-      end
-
-      begin
-        require 'armagh/custom_actions'
-        @logger.info "Using CustomActions: #{Armagh::CustomActions::NAME} (#{CustomActions::VERSION})"
-        versions[ 'actions' ][CustomActions::NAME] = CustomActions::VERSION
-      rescue LoadError
-        @logger.ops_warn "CustomActions gem is not deployed. These actions won't be available."
-      rescue => e
-        # An unexpected exception - things like syntax errors.
-        Logging.dev_error_exception(@logger, e, 'Could not load CustomActions gem')
-        Armagh.send(:remove_const, :CustomActions)
-      end
-
+      gem_manager = Actions::GemManager.new( @logger )
+      action_versions = gem_manager.activate_installed_gems
+      versions[ 'actions' ] = action_versions
+  
       defined_actions = Actions.defined_actions
 
-      if defined_actions.any? 
+      if defined_actions.any?
         @logger.debug "Available actions are: #{defined_actions}"
       else
         @logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
       end
-      
+
       versions
     end
-    
+
     def run
       # Stop agents before stopping armagh
       TERM_SIGNALS.each do |signal|
@@ -298,17 +294,15 @@ module Armagh
 
       rescue => e
         Logging.dev_error_exception(@logger, e, 'An unexpected error occurred.  Exiting.')
-        kill_all_agents(:SIGINT)
-        @collection_trigger.stop
+        shutdown(:SIGINT)
         @exit_status = 1
       end
 
       checkin('stopping')
 
-      @collection_trigger.stop
       Process.waitall
       @server.stop_service
-
+      DRb.thread.join
 
       checkin('stopped')
 

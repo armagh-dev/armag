@@ -42,10 +42,10 @@ APP_VERSION = {'armagh' => Armagh::VERSION}
 
 begin
   require 'armagh/standard_actions'
-  APP_VERSION['standard'] = StandardActions::VERSION
+  APP_VERSION['standard'] = Armagh::StandardActions::VERSION
 rescue LoadError
   # Not a problem in test
-rescue => e
+rescue
   Armagh.send(:remove_const, :StandardActions)
 end
 

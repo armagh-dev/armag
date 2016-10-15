@@ -48,11 +48,12 @@ module Armagh
         @logger = logger 
       end
       
-      def refresh
+      def refresh(force = false)
         configs_with_classes_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
         configs_in_db = configs_with_classes_in_db.collect{ | _klass, config| config }
-        ts_in_db      = configs_in_db.max_by{ |config| config.__timestamp }
-        return false if ts_in_db == @last_timestamp
+        ts_in_db = configs_in_db.collect{ |c| c.__timestamp }.max
+
+        return false if ts_in_db == @last_timestamp && !force
         
         warnings, 
         new_input_docspecs, 
@@ -115,7 +116,7 @@ module Armagh
         c = @action_configs_by_name[ action_name ]
         return nil unless c
         
-        c.__type.new( caller, logger, c, state_collection )
+        c.__type.new( caller, logger.fullname + "::#{action_name}", c, state_collection )
       end
         
       def get_action_names_for_docspec( docspec )
@@ -170,7 +171,7 @@ module Armagh
         end
         
         action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values ) 
-        refresh      
+        refresh(true)
       end
     end
   end

@@ -22,7 +22,7 @@ module LauncherSupport
   unless defined? EXEC_NAME
     EXEC_NAME = 'armagh-agents'
     DAEMON_NAME = 'armagh-agentsd'
-    MONITOR_NAME = DAEMON_NAME + '_monitor'
+    AGENT_PREFIX = 'armagh-Agent-'
 
     EXEC = File.join(File.dirname(__FILE__), '..', '..', 'bin', EXEC_NAME)
     DAEMON = File.join(File.dirname(__FILE__), '..', '..', 'bin', DAEMON_NAME)
@@ -58,29 +58,21 @@ module LauncherSupport
     false
   end
 
-  def self.get_agent_processes(spawned_pid)
-    launcher_processes = get_launcher_processes
-    launcher_child_map = {}
-    agent_processes = []
-
-    launcher_processes.each do |tp|
-      if launcher_child_map.key? tp.ppid
-        launcher_child_map[tp.ppid] << tp.pid
-      else
-        launcher_child_map[tp.ppid] = [tp.pid]
+  def self.get_agent_processes
+    processes = []
+    Sys::ProcTable.ps do |process|
+      if process.comm == 'ruby' && process.cmdline && process.cmdline.start_with?(AGENT_PREFIX)
+        processes << process
       end
     end
-
-    agent_processes = launcher_child_map[spawned_pid] if launcher_child_map[spawned_pid]
-
-    agent_processes
+    processes
   end
 
   def self.get_launcher_processes
     processes = []
     Sys::ProcTable.ps do |process|
       if process.comm == 'ruby' &&  process.cmdline &&
-          (process.cmdline.include?(EXEC_NAME) || (process.cmdline.include?(DAEMON_NAME) && !process.cmdline.include?(MONITOR_NAME)))
+          (process.cmdline.include?(EXEC_NAME) || (process.cmdline.include?(DAEMON_NAME)))
         processes << process
       end
     end
@@ -96,6 +88,9 @@ module LauncherSupport
     processes = LauncherSupport.get_launcher_processes
     processes.each do |process|
       Process.kill(:SIGTERM, process.pid)
+      begin
+        Process.waitpid(process.pid)
+      rescue Errno::ECHILD; end
     end
     sleep 1
   end

@@ -55,9 +55,8 @@ Gem::Specification.new do |spec|
   #            used at runtime may differ unless a version is explicitly set before the require.
 
   spec.add_runtime_dependency 'armagh-base-actions', '< 2.0'
-  spec.add_runtime_dependency 'mongo', '~> 2.1'
+  spec.add_runtime_dependency 'armagh-standard_actions', '< 2.0'
   spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
-  spec.add_runtime_dependency 'daemons', '~> 1.2'
   spec.add_runtime_dependency 'sinatra', '~> 1.4'
   spec.add_runtime_dependency 'thin', '~> 1.6'
   spec.add_runtime_dependency 'oj', '~> 2.14'
@@ -73,16 +72,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'sys-proctable', '~> 0.9'
   spec.add_development_dependency 'yard', '~> 0.9'
   spec.add_development_dependency 'fakefs', '~> 0.8'
-  spec.add_development_dependency 'armagh_test-custom_actions'
 
-  # Treat the actions as optional.  This only matters if the script is run w/in the context of a bundle
-#  names = Gem::Specification.each.collect { |spec| spec.name if spec.name.end_with? '-custom_actions' }.compact.uniq
-
-#  if names.length > 1
-#    raise "Multiple gems exist that match CustomActions: #{names}.  There can only be one."
-#  elsif names.length == 1
-#    spec.add_runtime_dependency names.first
-#  end
-
-  spec.add_runtime_dependency 'armagh-standard_actions' unless Gem::Specification.find_all_by_name('armagh-standard_actions').empty?
 end

@@ -68,8 +68,7 @@ module Armagh
 
     def stop
       if @running
-        Thread.new { @logger.info 'Stopping' }
-        @client.stop_service if @client
+        Thread.new { @logger.info 'Stopping' }.join
         @running = false
       end
     end
@@ -213,6 +212,9 @@ module Armagh
         execute
       end
 
+      Thread.new{@logger.info 'Stopping Client' }
+      @client.stop_service if @client
+      DRb.thread.join
       @logger.info 'Terminated'
     rescue => e
       Logging.dev_error_exception(@logger, e, 'An unexpected error occurred')
@@ -228,6 +230,7 @@ module Armagh
       end
 
       @client = DRb.start_service(client_uri)
+
       @agent_status = DRbObject.new_with_uri(IPC::DRB_URI)
     end
 
@@ -373,6 +376,8 @@ module Armagh
       status['last_update'] = Time.now
 
       @logger.debug "Reporting Status #{status['status']}"
+
+      Thread.new{@logger.info "Reporting Status"}
       @agent_status.report_status(@uuid, status)
     end
 

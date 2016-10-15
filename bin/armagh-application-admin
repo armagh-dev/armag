@@ -24,13 +24,17 @@ api = Admin::Application::API.instance
 
 configure do
   
-  set :environment, (ENV[ 'ARMAGH_ENV' ] || 'development').to_sym
+  if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
+    set :environment, :production
+  else
+    set :environment, :development
+    set :show_exceptions, :after_handler
+  end
   set :bind,   api.ip
   set :port,   api.port
   set :server, "thin"
   set :root,   api.root_directory
   set :run,    true
-
   class << settings
   
     def server_settings
@@ -81,6 +85,11 @@ helpers do
     end
   end
   
+end
+
+error 500 do
+  return[ 500, { :error_detail => env[ 'sinatra.error' ].message,
+                 :backtrace => env[ 'sinatra.error' ].backtrace.join("\n")}]
 end
 
 #------------------------------------------------------------------------------------------------
@@ -148,11 +157,14 @@ end
 post '/create_action_configuration.json' do
   
   begin
+    api.logger.debug( 'armagh-application-admin post create_action_configuration.json...')
+    api.logger.debug( "... with params: #{ params.inspect }")
     new_config = {}
-    action_class_name = params[ 'action' ].delete( 'action_class_name' )
-    api.create_action_configuration( action_class_name, eval(params[ 'action' ]))
+    config_hash = eval( params[ 'action' ])    
+    raise ArgumentError, "must include params[ 'action' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
+    result = api.create_action_configuration( config_hash )
   rescue => e
-    return[ 200, { :error_detail => "action class name:  *#{ action_class_name }*" }.to_json ]
+    return[ 200, { :error_detail => e.message }.to_json ]
   end
   return[ 200, "success".to_json ]
 end

@@ -32,7 +32,7 @@ def not_empty
   :not_empty
 end
 
-And(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
+When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
   doc_info = table.rows_hash
   found_matching_doc = false
   doc_problems = {}

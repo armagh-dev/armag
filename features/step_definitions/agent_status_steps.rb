@@ -70,6 +70,6 @@ Then(/^the valid reported status should contain agents with statuses$/) do |tabl
   assert_equal(expected_agent_statuses, seen_statuses, 'Incorrect agent statuses')
   assert_in_delta(start_time, status['last_update'], 5, 'Incorrect last_update')
 
-  assert_equal(Armagh::VERSION, status['version'], 'Invalid version')
+  assert_equal(Armagh::VERSION, status['versions']['armagh'], 'Invalid version')
 end
 

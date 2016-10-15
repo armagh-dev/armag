@@ -7,6 +7,10 @@
 op=$1
 bin_path=$2
 
+if [[ ! -d ${ARMAGH_PID} ]]; then
+  sudo mkdir -p ${ARMAGH_PID}
+fi
+
 case $op in
   start) 
     /bin/armagh-mongod start

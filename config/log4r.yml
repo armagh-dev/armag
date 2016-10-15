@@ -49,7 +49,6 @@ log4r_config:
 
   loggers:
     - name: 'Armagh::Application'
-      level: INFO
       outputters:
         - stdout
         - app_logfile

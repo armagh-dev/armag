@@ -62,7 +62,7 @@ module Armagh
       doc.state = state
       doc.title = title if title
       doc.copyright = copyright if copyright
-      doc.source = source if source
+      doc.source = source.to_hash if source
       doc.collection_task_ids = collection_task_ids if collection_task_ids
       doc.document_timestamp = document_timestamp if document_timestamp
       doc.display = display if display

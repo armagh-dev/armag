@@ -29,12 +29,14 @@ require_relative '../agent/agent_status'
 module Armagh
   module Utils
     class CollectionTrigger
-      def initialize(workflow, logger: nil)
+      attr_reader :logger
+
+      def initialize(workflow)
         @workflow = workflow
         @running = false
         @last_run = {}
         @seen_actions = []
-        @logger = logger || Logging.set_logger(self.class.to_s)
+        @logger = Logging.set_logger('Armagh::Application::CollectionTrigger')
       end
 
       def start
@@ -43,6 +45,7 @@ module Armagh
       end
 
       def stop
+        Thread.new {@logger.info 'Stopping Collection Trigger'}
         @running = false
         @thread.join if @thread
         @thread = nil
@@ -62,6 +65,7 @@ module Armagh
       end
 
       private def run
+        @logger.info 'Starting Collection trigger'
         @running = true
         while @running
           begin
@@ -75,7 +79,7 @@ module Armagh
       end
 
       private def trigger_actions
-        Actions::Collect.find_all_configurations(@workflow.config_store, include_descendants: true).each do |action_class, config|
+        Actions::Collect.find_all_configurations(@workflow.config_store, include_descendants: true).each do |_action_class, config|
           next unless config.action.active
           now = Time.now
           name = config.action.name

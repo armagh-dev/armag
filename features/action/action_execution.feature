@@ -39,15 +39,17 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level         | debug        |
+    And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 "CollectDocument" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
     Then I should see an agent with a status of "running" within 10 seconds
     Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "CollectedDocument" in "documents" with the following

@@ -42,6 +42,5 @@ module Armagh
         @statuses.delete(agent_id)
       end
     end
-
   end
 end

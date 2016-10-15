@@ -35,7 +35,7 @@ Then(/^the logs should contain "([^"]*)"$/) do |string|
   found_string = false
 
   LogSupport.each_log do |file|
-    if File.read(file).include?(string)
+    if File.read(file) =~ /#{string}/
       found_string = true
       break
     end

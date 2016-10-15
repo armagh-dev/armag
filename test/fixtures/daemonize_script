@@ -1,0 +1,4 @@
+puts 'STDOUT'
+$stderr.puts 'STDERR'
+
+sleep 1

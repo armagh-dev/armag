@@ -15,7 +15,15 @@
     "ARMAGH_ARCHIVE_HOST":  "127.0.0.1",
     "ARMAGH_ARCHIVE_PORT":  "22",
     "ARMAGH_ARCHIVE_PATH":  "/tmp/var/archive",
-    "ARMAGH_ARCHIVE_USER":  "armagh"
+    "ARMAGH_ARCHIVE_USER":  "armagh",
+    "ARMAGH_PROD_TACBALL_HOST":  "127.0.0.1",
+    "ARMAGH_PROD_TACBALL_PORT":  "22",
+    "ARMAGH_PROD_TACBALL_PATH":  "/var/spool/dataout/prod",
+    "ARMAGH_PROD_TACBALL_USER":  "armagh",
+    "ARMAGH_WSB_ACBALL_HOST":  "127.0.0.1",
+    "ARMAGH_WSB_TACBALL_PORT":  "22",
+    "ARMAGH_WSB_TACBALL_PATH":  "/var/spool/dataout/wsb",
+    "ARMAGH_WSB_TACBALL_USER":  "armagh"
   },
   
   "Armagh::Admin::Resource::API": {

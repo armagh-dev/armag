@@ -60,6 +60,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     Armagh::Connection.setup_indexes    
     
     @logger = mock
+    @logger.stubs(:fullname).returns('some::logger::name')
     @api = Armagh::Admin::Application::API.instance
 
   end
@@ -119,6 +120,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_create_action_configuration_good
     
     test_config = { 
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
       'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
@@ -128,7 +130,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     action = nil
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
+      @api.create_action_configuration( test_config )
       workflow.refresh
       action = workflow.instantiate_action( 'my_fred_action', self, @logger, nil )
     end
@@ -141,6 +143,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_create_action_configuration_bad_duplicate_name 
 
     test_config = { 
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
       'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
@@ -148,11 +151,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     action = nil
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
+      @api.create_action_configuration( test_config )
     end
     
     e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
+      @api.create_action_configuration( test_config )
     end
     assert_equal "Action named my_fred_action already exists.", e.message
   end  
@@ -160,13 +163,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_create_action_configuration_bad_config 
 
     test_config = { 
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
     
     action = nil
     e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
+      @api.create_action_configuration( test_config )
     end
 
     #TODO - figure out where's best to return the validation param set
@@ -175,6 +179,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_update_action_configuration_good
     
     test_config = { 
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
       'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
@@ -184,8 +189,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     action = nil
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
-      workflow.refresh
+      @api.create_action_configuration( test_config )
+      workflow.refresh(true)
       action = workflow.instantiate_action( 'my_fred_action', self, @logger, nil )
     end
     
@@ -196,8 +201,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     action2 = nil
     assert_nothing_raised do
-      @api.update_action_configuration( 'Armagh::StandardActions::TIAATestCollect', test_config )
-      workflow.refresh
+      @api.update_action_configuration( test_config )
+      workflow.refresh(true)
       action2 = workflow.instantiate_action( 'my_fred_action', self, @logger, nil )
     end
     

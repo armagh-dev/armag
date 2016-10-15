@@ -46,6 +46,7 @@ class TestIntegrationResourceAPI < Test::Unit::TestCase
 
   def setup
     Armagh::Connection::MongoConnection.instance.connection.database.collections.each{ |col| col.drop }
+    Armagh::Connection::MongoAdminConnection.instance.connection.database.collections.each{ |col| col.drop }
     Armagh::Connection.clear_indexed_doc_collections
     Armagh::Connection.setup_indexes    
     

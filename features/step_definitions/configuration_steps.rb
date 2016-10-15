@@ -25,6 +25,19 @@ require 'test/unit/assertions'
 require 'log4r'
 require 'time'
 
+When(/^armagh's workflow config is "([^"]*)"$/) do |config|
+  case config
+    when 'test_actions'
+      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
+        'action' => { 'name' => 'test_collect'},
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY) # TODO HOW TO SETUP DIVIDER?
+        }
+      })
+  end
+end
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
   config = table.rows_hash
@@ -39,6 +52,16 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     available_actions = {}
 
     if specified_actions.include? 'test_actions'
+      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
+        'action' => { 'name' => 'test_collect'},
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY) # TODO HOW TO SETUP DIVIDER?
+        }
+      })
+
+
       test_actions = {
           'test_collect' => {
               'action_class_name' => 'Armagh::CustomActions::TestCollector',
@@ -243,9 +266,9 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
 
   case config_type
     when 'launcher'
-      Armagh::Launcher.create_configuration(Armagh::Connection.config, '127.0.0.1_default', {'launcher' => config})
+      @launcher_config = Armagh::Launcher.create_configuration(Armagh::Connection.config, '127.0.0.1_default', {'launcher' => config})
     when 'agent'
-      Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {'agent' => config})
+      @agent_config = Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {'agent' => config})
     else
       raise "Unknown config type #{config_type}"
   end

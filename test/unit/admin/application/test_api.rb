@@ -16,7 +16,7 @@
 #
 
 require_relative '../../../helpers/coverage_helper'
-
+require_relative '../../../helpers/mock_logger'
 require_relative '../../../../lib/environment'
 Armagh::Environment.init
 
@@ -39,13 +39,17 @@ module Armagh
 end
 
 class TestAdminApplicationAPI < Test::Unit::TestCase
-
+  include ArmaghTest
+  
   def setup
-    @logger = mock
+    @logger = mock_logger
     @api = Armagh::Admin::Application::API.instance
     @config_store = []
     Armagh::Connection.stubs( :config ).returns( @config_store )
+    assert_equal Armagh::Connection.config, @config_store
     @base_values_hash = { 
+      'action_class_name' => 'Armagh::StandardActions::TATestCollect',
+      
       'output' => { 'collected_document' => Armagh::Documents::DocSpec.new( 'dansdoc', Armagh::Documents::DocState::READY)},
       'collect' => { 'schedule' => '0 * * * *', 'archive' => false}
     }
@@ -57,7 +61,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       'tatestcollect' => { 'host' => 'somehost' }
     })
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.create_action_configuration( values_hash )
     end
     assert_equal ['fred_the_action'], Armagh::Actions::Action.find_all_configurations( @config_store, :include_descendants => true ).collect{ |klass,config| config.action.name }
   end
@@ -68,12 +72,12 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       'tatestcollect' => { 'host' => 'somehost' }
     })
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.create_action_configuration( values_hash )
     end
     assert_equal ['fred_the_action'], Armagh::Actions::Action.find_all_configurations( @config_store, :include_descendants => true ).collect{ |klass,config| config.action.name }
     
     e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.create_action_configuration( values_hash )
     end
     assert_equal 'Action named fred_the_action already exists.', e.message
     
@@ -86,7 +90,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     })
     
     e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.create_action_configuration( values_hash )
     end
     assert_equal 'Unable to create configuration Armagh::StandardActions::TATestCollect fred_the_action: tatestcollect host: type validation failed: string is empty or nil', e.message
   end
@@ -97,7 +101,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       'tatestcollect' => { 'host' => 'somehost' }
     })
     assert_nothing_raised do
-      @api.create_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.create_action_configuration( values_hash )
     end
     stored_configs = Armagh::Actions::Action.find_all_configurations( @config_store, :include_descendants => true )
     assert_equal ['fred_the_action'], stored_configs.collect{ |klass,config| config.action.name }
@@ -105,7 +109,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     
     values_hash[ 'tatestcollect' ][ 'host' ] = 'someotherhost' 
     assert_nothing_raised do
-      @api.update_action_configuration( 'Armagh::StandardActions::TATestCollect', values_hash )
+      @api.update_action_configuration( values_hash )
     end
     stored_configs = Armagh::Actions::Action.find_all_configurations( @config_store, :include_descendants => true )
     assert_equal ['fred_the_action'], stored_configs.collect{ |klass,config| config.action.name }

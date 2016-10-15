@@ -29,18 +29,9 @@ Feature: Agent Launcher
     And the number of running agents equals 1
     And the armagh daemon can be stopped
 
-  Scenario: Handle daemon that dies
-    Given armagh isn't already running
-    And mongo is running
-    And mongo is clean
-    When I run armagh as a daemon
-    And the armagh daemon is killed
-    And I wait 60 seconds
-    Then a new daemon shall take its place
-
   Scenario: Unable to connect to database
     Given armagh isn't already running
     And mongo isn't running
     When I run armagh
     Then armagh should have exited
-    And stderr should contain "Unable to establish connection to the MongoConnection database configured in '/.+'.  Ensure the database is running."
+    And the logs should contain "Unable to establish connection to the MongoConnection database configured in '.+'.  Ensure the database is running."

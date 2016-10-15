@@ -53,18 +53,18 @@ Then(/^stderr should contain "([^"]*)"$/) do |message|
 end
 
 Then(/^the number of running agents equals (\d+)$/) do |num_agents|
-  assert_equal(num_agents.to_i, LauncherSupport.get_agent_processes(@spawn_pid).size)
+  assert_equal(num_agents.to_i, LauncherSupport.get_agent_processes.size)
 end
 
 When(/^an agent is killed/) do
-  @original_agents = LauncherSupport.get_agent_processes(@spawn_pid)
-  @agent_to_kill = @original_agents.last
+  @original_agents = LauncherSupport.get_agent_processes
+  @agent_to_kill = @original_agents.last.pid
   Process.kill(:SIGKILL, @agent_to_kill)
   sleep 3
 end
 
 Then(/^a new agent shall launch to take its place$/) do
-  agents = LauncherSupport.get_agent_processes(@spawn_pid)
+  agents = LauncherSupport.get_agent_processes
   assert_equal(@original_agents.size, agents.size)
   assert_false agents.include?(@agent_to_kill)
 end
@@ -75,7 +75,7 @@ end
 
 Then(/^armagh should run in the background$/) do
   status = LauncherSupport.get_daemon_status
-  assert_match(/running \[pid \d+\]/, status)
+  assert_match(/armagh-agentsd is running as PID \d+/, status)
   @spawn_pid = status[/\d+/].to_i
 end
 
@@ -92,9 +92,3 @@ When(/^the armagh daemon is killed$/) do
   Process.kill(:SIGTERM, @old_pid)
 end
 
-Then(/^a new daemon shall take its place$/) do
-  status = LauncherSupport.get_daemon_status
-  assert_match(/running \[pid \d+\]/, status)
-  @new_pid = status[/\d+/].to_i
-  assert_not_equal(@old_pid, @new_pid)
-end
