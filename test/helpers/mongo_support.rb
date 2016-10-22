@@ -20,6 +20,8 @@ require 'singleton'
 require 'socket'
 require 'log4r'
 
+require_relative '../../lib/connection'
+
 class MongoSupport
 
   include Singleton
@@ -58,8 +60,9 @@ class MongoSupport
     unless running?
       File.truncate(OUT_PATH, 0) if File.file? OUT_PATH
       @mongo_pid = Process.spawn(cmd, :out => OUT_PATH)
-      sleep 1
     end
+
+    sleep 0.5 until Armagh::Connection.can_connect?
 
     @client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => DATABASE_NAME)
 
@@ -74,6 +77,7 @@ class MongoSupport
         running = true
       rescue Errno::ESRCH
         running = false
+        @mongo_pid = nil
       end
     end
     running
@@ -113,6 +117,7 @@ class MongoSupport
     Process.kill(:SIGTERM, @mongo_pid)
     Process.wait(@mongo_pid)
     @client = nil
+    @mongo_pid = nil
   end
 
   def clean_database

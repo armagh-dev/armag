@@ -605,15 +605,15 @@ class TestDocument < Test::Unit::TestCase
 
   def test_archive_save
     archive_collection = mock
-    Armagh::Connection.expects(:archive).returns(archive_collection)
+    Armagh::Connection.expects(:collection_history).returns(archive_collection)
     archive_collection.expects(:replace_one)
     @documents.expects(:delete_one).with({'_id': @internal_id})
 
-    assert_false @doc.instance_variable_get(:@pending_archive)
-    @doc.mark_archive
-    assert_true @doc.instance_variable_get(:@pending_archive)
+    assert_false @doc.instance_variable_get(:@pending_collection_history)
+    @doc.mark_collection_history
+    assert_true @doc.instance_variable_get(:@pending_collection_history)
     @doc.save
-    assert_false @doc.instance_variable_get(:@pending_archive)
+    assert_false @doc.instance_variable_get(:@pending_collection_history)
   end
 
   def test_delete_save

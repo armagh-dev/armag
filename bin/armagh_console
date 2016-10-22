@@ -23,15 +23,9 @@
 
 require 'irb'
 
-require_relative '../lib/agent/agent'
-require_relative '../lib/agent/agent_status'
-require_relative '../lib/action/action_manager'
-require_relative '../lib/configuration/agent_config_manager'
-require_relative '../lib/configuration/launcher_config_manager'
-require_relative '../lib/connection'
-require_relative '../lib/ipc'
-require_relative '../lib/logging'
-require_relative '../lib/version'
+require_relative '../lib/armagh'
+
+Process.setproctitle(File.basename(__FILE__))
 
 include Armagh
 

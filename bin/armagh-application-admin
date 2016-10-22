@@ -12,6 +12,8 @@ require_relative '../lib/admin/application/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
 require_relative '../lib/logging'
 
+Process.setproctitle(File.basename(__FILE__))
+
 #------------------------------------------------------------------------------------------------
 #
 # SET UP ENVIRONMENT
@@ -63,61 +65,6 @@ end # use Rack::Auth::Basic
 
  
 helpers do
-  
-  def route_after_success( format, message, html_redirect_to )
-    case format
-    when 'json'
-      return [ 200, { :message => message }.to_json ]
-    when 'html'
-      session[ 'message' ] = error_detail
-      redirect to( html_redirect_to )
-    end
-  end
-  
-  def route_after_error( format, error_detail, html_redirect_to )
-    api.logger.error( error_detail )
-    case format
-    when 'json'
-      return [ 200, { :error_detail => error_detail }.to_json ]
-    when 'html'
-      session[ 'message' ] = error_detail
-      redirect to( html_redirect_to )
-    end
-  end
-  
-end
-
-error 500 do
-  return[ 500, { :error_detail => env[ 'sinatra.error' ].message,
-                 :backtrace => env[ 'sinatra.error' ].backtrace.join("\n")}]
-end
-
-#------------------------------------------------------------------------------------------------
-#
-# GET /noop
-#
-#------------------------------------------------------------------------------------------------
-get '/noop.?:format?' do
-  
-  @message = session.delete 'message'
-  
-  case params[ 'format' ]
-  when 'json'
-    return [ 200, { result: 'way to go!'}.to_json ]
-  when 'html'
-    erb "/views-subdir/page.html".to_sym #.erb
-  end
-end
-
-post '/noop.?:format?' do
-  
-  obj_params = params[ 'form_object' ]
-  begin
-    do_something( obj_params )
-  rescue => e
-    return route_after_error( params[ 'format' ], e.message, '/some/url' )
-  end
-  return route_after_success( params[ 'format' ], "You did something right!", '/noop')
 end
 
 get '/status.json' do
@@ -131,7 +78,53 @@ get '/status.json' do
   return[ 200, status.to_json ]
 end
 
-get '/document_counts.json' do
+post '/launcher.json' do
+  
+  begin
+    new_config = {}
+    config_hash = eval( params[ 'launcher' ] )
+    new_config = api.create_launcher_configuration( { 'launcher' => config_hash } )
+  rescue => e
+    return [ 500, { :error_detail => e.message }.to_json ]
+  end
+  return [ 200, new_config.to_json ]
+end
+
+post '/action.json' do
+  
+  begin
+    api.logger.debug( 'armagh-application-admin post action.json...')
+    api.logger.debug( "... with params: #{ params.inspect }")
+    new_config = {}
+    config_hash = eval( params[ 'action' ])    
+    raise ArgumentError, "must include params[ 'action' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
+    result = api.create_action_configuration( config_hash )
+  rescue => e
+    return [ 200, { :error_detail => e.message }.to_json ]
+  end
+  return [ 200, "success".to_json ]
+end
+
+get '/actions.json' do
+  #TODO implement
+end
+
+post '/actions/activate.json' do
+  
+  begin
+    api.logger.debug( 'armagh-application-admin post actions/activate.json...')
+    api.logger.debug( "... with params: #{ params.inspect }")
+    
+    api.activate_actions( params )
+  rescue => e
+    error_response = { :error_detail => e.message, :backtrace => e.backtrace.join("\n")}
+    api.logger.error( ".. reporting error #{error_response}")
+    return [ 200, error_response.to_json ]
+  end
+  return [ 200, "success".to_json ]
+end
+
+get '/documents/counts.json' do
   
   counts = []
   begin
@@ -141,30 +134,40 @@ get '/document_counts.json' do
   end
 end
 
-post '/configure_launcher.json' do
+get '/documents.json' do
   
   begin
-    new_config = {}
-    config_hash = eval( params[ 'launcher' ])
-    raise ArgumentError, "must include params[ 'launcher' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
-    new_config = api.configure_launcher( { 'launcher' => config_hash } )
+    
+    api.logger.debug( "armagh-applications-admin get documents" )
+    api.logger.debug( "... with params #{ params.inspect }")
+    
+    doc_type = params[ 'doc_type' ]
+    begin_ts = Time.parse( params[ 'begin_ts' ] ) if params.include? 'begin_ts'
+    end_ts   = Time.parse( params[ 'end_ts' ] ) if params.include? 'end_ts'
+    start_index = params[ 'start_index' ].to_i if params.include? 'start_index'
+    max_returns = params[ 'max_returns' ].to_i if params.include? 'max_returns'
+  
+    doc_list = api.get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
+    return [ 200, doc_list.to_json ]
+    
   rescue => e
-    return[ 200, { :error_detail => e.message }.to_json ]
+    return [ 200, { :error_detail => e.message }.to_json ]
   end
-  return[ 200, new_config.to_json ]
 end
 
-post '/create_action_configuration.json' do
+get '/document.json' do
   
   begin
-    api.logger.debug( 'armagh-application-admin post create_action_configuration.json...')
-    api.logger.debug( "... with params: #{ params.inspect }")
-    new_config = {}
-    config_hash = eval( params[ 'action' ])    
-    raise ArgumentError, "must include params[ 'action' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
-    result = api.create_action_configuration( config_hash )
+    
+    api.logger.debug( "armagh-application-admin get document" )
+    api.logger.debug( "... with params #{ params.inspect }" )
+    
+    doc_id = params[ 'document_id' ]
+    doc_type = params[ 'type' ]
+    doc = api.get_document( doc_id, doc_type )
+    return [ 200, doc.to_json ]
+    
   rescue => e
-    return[ 200, { :error_detail => e.message }.to_json ]
+    return [ 200, { :error_detail => e.message }.to_json ]
   end
-  return[ 200, "success".to_json ]
 end

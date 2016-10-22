@@ -60,6 +60,7 @@ class TestMongoIntegration < Test::Unit::TestCase
   end
 
   def test_primaries
+    omit 'Primaries is not consistently testable when only one mongod is running.' # TODO Enhance
     assert_empty Armagh::Connection.primaries
     MongoSupport.instance.stop_mongo
     MongoSupport.instance.clean_database

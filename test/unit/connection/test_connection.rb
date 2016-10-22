@@ -84,9 +84,9 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.documents('test_type')
   end
 
-  def test_archive
-    @connection.expects(:[]).with('archive')
-    Armagh::Connection.archive
+  def test_collection_history
+    @connection.expects(:[]).with('collection_history')
+    Armagh::Connection.collection_history
   end
 
   def test_failures

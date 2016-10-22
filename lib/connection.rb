@@ -43,8 +43,8 @@ module Armagh
       collection
     end
 
-    def self.archive
-      MongoConnection.instance.connection['archive']
+    def self.collection_history
+      MongoConnection.instance.connection['collection_history']
     end
 
     def self.failures

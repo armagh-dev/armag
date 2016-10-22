@@ -49,7 +49,7 @@ Feature: Launcher Configuration
     When armagh's "launcher" config is
       | num_agents        | 4 |
       | checkin_frequency | 1 |
-    And I wait 3 seconds
+    And I wait 5 seconds
     Then the number of running agents equals 4
 
   Scenario: Handle agents that die

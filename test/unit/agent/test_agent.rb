@@ -205,7 +205,41 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
-    doc.expects(:mark_archive)
+    doc.expects(:metadata).returns({})
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_collect_action_collection_history
+    action = setup_action(Armagh::StandardActions::CollectTest, {
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'collected_doc' => 'dancollected:ready'}
+    })
+    action_name = action.config.action.name
+
+    class << action
+      define_method(:collect, proc {@caller.instance_variable_set(:@num_creates, 3)})
+    end
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+
+    @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_collection_history)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -244,7 +278,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
-    doc.expects(:mark_archive)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -491,7 +524,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
-    doc.expects(:mark_archive)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -526,7 +558,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:dev_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
-    doc.expects(:mark_archive)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once

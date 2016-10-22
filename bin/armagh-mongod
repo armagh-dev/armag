@@ -5,7 +5,10 @@
 #
 
 require 'bundler/setup'
+
+require_relative '../lib/environment'
+Armagh::Environment.init
+
 require_relative '../lib/utils/daemonizer'
 
-file = File.join(__dir__, 'armagh-application-admin')
-Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-application-admin', work_dir: '/var/log/armagh')
+Armagh::Utils::Daemonizer.run("/bin/mongod -f #{ ENV['ARMAGH_CONFIG'] }/mongo/mongod-first.conf", app_name: 'armagh-mongod', work_dir: '/var/log/armagh')

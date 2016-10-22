@@ -58,7 +58,7 @@ class TestIntegrationResourceAPI < Test::Unit::TestCase
   def implode( confirmed )
     
     collections = [ :documents, 
-      :archive, 
+      :collection_history,
       :failures,
       :config, 
       :users, 

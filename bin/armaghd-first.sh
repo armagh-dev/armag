@@ -13,7 +13,7 @@ fi
 
 case $op in
   start) 
-    /bin/armagh-mongod start
+    ${bin_path}/armagh-mongod start
     ${bin_path}/armagh-resource-admind start
     ${bin_path}/armagh-application-admind start
     ${bin_path}/armagh-agentsd start
@@ -22,16 +22,16 @@ case $op in
     ${bin_path}/armagh-agentsd stop
     ${bin_path}/armagh-application-admind stop
     ${bin_path}/armagh-resource-admind stop
-    /bin/armagh-mongod stop
+    ${bin_path}/armagh-mongod stop
     ;;
   restart)
     $0 stop
     $0 start
     ;;
-  status)
+  stat|status)
     echo -e "\n--------------------------------------------------------"
     echo -e "Armagh Process Status"
-    /bin/armagh-mongod status
+    ${bin_path}/armagh-mongod status
     ${bin_path}/armagh-resource-admind status
     ${bin_path}/armagh-application-admind status
     ${bin_path}/armagh-agentsd status

@@ -32,8 +32,9 @@ module Armagh
 
         FileUtils.mkdir_p @work_dir
 
-        unless File.file? @script
-          $stderr.puts "Script '#{@script}' does not exist."
+        script_name = @script.split(/\s/)[0]
+        unless File.file? script_name
+          $stderr.puts "Script '#{script_name}' does not exist."
           exit 1
         end
 
@@ -53,8 +54,7 @@ module Armagh
         end
       end
 
-      private_class_method
-      def self.usage
+      private_class_method def self.usage
         $stderr.puts "#{@app_name} daemon utility\n" <<
                "  USAGE: #{$PROGRAM_NAME} (start|stop|restart|status)"
         exit 1
@@ -78,13 +78,13 @@ module Armagh
           Process.fork do
             redirect_io
 
-            Process.setproctitle(@app_name)
             Process.daemon(nil, true)
-            pid = Process.fork{load @script}
+            pid = Process.fork{exec @script}
             create_lock(pid)
             Process.detach(pid)
           end
           sleep 0.1 until new_pid = locked_pid
+          sleep 1
           puts "Started #{@app_name} as PID #{new_pid}"
         end
       end
@@ -143,7 +143,7 @@ module Armagh
 
       private_class_method def self.remove_lock
         File.delete @pid_file if File.file? @pid_file
-                           end
+      end
 
       private_class_method def self.redirect_io
         FileUtils.touch @log_file

@@ -300,7 +300,7 @@ module Armagh
           end
 
           doc.metadata.merge!({'docs_collected' => @num_creates})
-          doc.mark_archive
+          doc.mark_collection_history if @num_creates > 0
         when Actions::Split
           @collection_task_id = doc.collection_task_ids.last
           action_doc = doc.to_action_document
@@ -377,7 +377,6 @@ module Armagh
 
       @logger.debug "Reporting Status #{status['status']}"
 
-      Thread.new{@logger.info "Reporting Status"}
       @agent_status.report_status(@uuid, status)
     end
 

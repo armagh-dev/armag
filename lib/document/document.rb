@@ -17,6 +17,7 @@
 
 require 'armagh/support/encoding'
 
+require_relative '../../lib/utils/document_helper'
 require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative '../connection'
@@ -134,9 +135,27 @@ module Armagh
       counts
     end
 
-    def self.find(document_id, type, state)
+    def self.find_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
+      
+      options = {}
+      ts_options = {}
+      ts_options[ '$gte' ] = begin_ts if begin_ts
+      ts_options[ '$lte' ] = end_ts if end_ts
+      options[ 'document_timestamp' ] = ts_options unless ts_options.empty?
+      
+      skip = start_index || 0
+      limit = max_returns || 20
+      
+      collection( doc_type, 'published' ).find( options ).projection( { '_id' => 0, 'document_id' => 1, 'type' => 1, 'title' => 1, 'document_timestamp' => 1 } ).sort( 'document_timestamp' => -1 ).skip( skip ).limit( limit )
+    end
+
+    def self.find(document_id, type, state, raw: false)
       db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
-      db_doc ? Document.new(db_doc) : nil
+      if raw
+        return db_doc
+      else
+        db_doc ? Document.new(db_doc) : nil
+      end
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
     end
@@ -218,7 +237,7 @@ module Armagh
     def initialize(image = {})
       @pending_delete = false
       @pending_publish = false
-      @pending_archive = false
+      @pending_collection_history = false
 
       @db_doc = {
           'metadata' => {},
@@ -465,6 +484,7 @@ module Armagh
       @db_doc['collection_task_ids'].uniq!
 
       @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
+      Armagh::Utils::DocumentHelper.clean_document(self)
 
       delete_orig = false
 
@@ -474,9 +494,9 @@ module Armagh
       elsif @pending_publish
         save_collection = Connection.documents(type)
         delete_orig = true
-      elsif @pending_archive
-        save_collection = Connection.archive
-        @pending_archive = false
+      elsif @pending_collection_history
+        save_collection = Connection.collection_history
+        @pending_collection_history = false
         delete_orig = true
       elsif @pending_delete
         @pending_delete = false
@@ -582,18 +602,18 @@ module Armagh
     end
 
     def mark_delete
-      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or publish.' if @pending_archive || @pending_publish
+      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or publish.' if @pending_collection_history || @pending_publish
       @pending_delete = true
     end
 
     def mark_publish
-      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or delete.' if @pending_archive || @pending_delete
+      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or delete.' if @pending_collection_history || @pending_delete
       @pending_publish = true
     end
 
-    def mark_archive
-      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for delete or publish.' if @pending_delete || @pending_publish
-      @pending_archive = true
+    def mark_collection_history
+      raise DocumentMarkError, 'Document cannot be marked to save collection history.  It is already marked for delete or publish.' if @pending_delete || @pending_publish
+      @pending_collection_history = true
     end
 
     private def update_pending_work

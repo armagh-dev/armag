@@ -38,9 +38,9 @@ module Armagh
       
       define_parameter name:'count', required: true, type: 'integer', default: 6, description: 'desc'
       
-      def self.make_config_values( action_name:, collected_a_doctype:, collected_b_doctype: )
+      def self.make_config_values( action_name:, collected_a_doctype:, collected_b_doctype:, active: true )
         {
-          'action' => { 'name' => action_name, 'active' => true },
+          'action' => { 'name' => action_name, 'active' => active },
           'collect' => { 'schedule' => '0 * * * *', 'archive' => false },
           'input'  => {},
           'output' => {
@@ -55,9 +55,9 @@ module Armagh
       
       define_output_docspec 'divided', 'divided documents'
       
-      def self.make_config_values( action_name:, input_doctype:, divided_doctype:)
+      def self.make_config_values( action_name:, input_doctype:, divided_doctype:, active: true )
         {
-          'action' => { 'name' => action_name, 'active' => true },
+          'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
           'output' => { 'divided' => Armagh::Documents::DocSpec.new( divided_doctype, DS_READY ) }
         }
@@ -68,9 +68,9 @@ module Armagh
       
       define_output_docspec 'single', 'single instance'
       
-      def self.make_config_values( action_name:, input_doctype:, single_doctype: )
+      def self.make_config_values( action_name:, input_doctype:, single_doctype:, active: true )
         {
-          'action' => { 'name' => action_name, 'active' => true },
+          'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
           'output' => { 'single'  => Armagh::Documents::DocSpec.new( single_doctype, DS_READY )}
         }
@@ -81,9 +81,9 @@ module Armagh
       
       define_output_docspec 'published', 'published documents'
       
-      def self.make_config_values( action_name:, published_doctype: )
+      def self.make_config_values( action_name:, published_doctype:, active: true )
         {
-          'action' => { 'name' => action_name, 'active' => true },
+          'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec'   => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
           'output' => { 'published' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
         }
@@ -94,8 +94,9 @@ module Armagh
       
       define_output_docspec 'published2', 'published docs'
       
-      def self.make_config_values( action_name:, published_doctype: )
+      def self.make_config_values( action_name:, published_doctype:, active: true )
         {
+          'action' => { 'name' => action_name, 'active' => active },
           'input' => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
           'output' => { 'published2' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
         }
@@ -104,9 +105,9 @@ module Armagh
     
     class TWTestConsume < Actions::Consume
               
-      def self.make_config_values( action_name:, input_doctype: )
+      def self.make_config_values( action_name:, input_doctype:, active: true )
         {
-          'action' => { 'name' => action_name, 'active' => true },
+          'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_PUBLISHED) }
         }
       end
@@ -120,6 +121,7 @@ class TestWorkflow < Test::Unit::TestCase
     @config_store = []
     @logger = mock
     @logger.stubs(:fullname).returns('fred')
+    @logger.expects(:debug).at_least(0)
     @caller = mock
   
     @test_action_setup = {
@@ -179,7 +181,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal [ 'published2' ], Armagh::StandardActions::TWTestPublish2.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
   end
 
-  def do_add_configs
+  def do_add_configs( active: true )
       
     workflow = nil
     assert_nothing_raised {
@@ -188,7 +190,8 @@ class TestWorkflow < Test::Unit::TestCase
     @test_action_setup.each do |action_class_name, setup_values_list|
       setup_values_list.each do |setup_values|
         assert_nothing_raised do 
-          c = workflow.create_action( action_class_name, eval(action_class_name).make_config_values( **setup_values ))
+          method_args = setup_values.merge( active: active )
+          c = workflow.create_action( action_class_name, eval(action_class_name).make_config_values( method_args ))
         end
       end
     end
@@ -246,5 +249,20 @@ class TestWorkflow < Test::Unit::TestCase
     assert paf.is_a?( Armagh::StandardActions::TWTestPublish )
     assert_equal 'a_freddoc', paf.config.input.docspec.type
   end
+  
+  def test_active_actions
+    
+    workflow = do_add_configs( active: false )
+    workflow.activate_actions( [ 
+      ['Armagh::StandardActions::TWTestCollect','collect_freddocs_from_source' ],
+      [ 'Armagh::StandardActions::TWTestPublish', 'publish_a_freddocs' ]
+    ])
+    
+    new_workflow = nil
+    assert_nothing_raised {
+      new_workflow = Armagh::Actions::Workflow.new( @logger, @config_store )
+    }
+  end
+  
   
 end

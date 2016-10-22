@@ -70,7 +70,7 @@ module Armagh
             Connection.all_document_collections.each do |doc_coll|
               doc_coll.drop
             end
-            Connection.archive.drop
+            Connection.collection_history.drop
             Connection.config.drop
             Connection.documents.drop
             Connection.failures.drop

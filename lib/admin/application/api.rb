@@ -2,9 +2,11 @@ require 'singleton'
 
 require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
+require_relative '../../launcher/launcher'
 require_relative '../../action/workflow'
 require_relative '../../document/document'
 require_relative '../../action/gem_manager'
+
 
 module Armagh
   module Admin
@@ -74,9 +76,25 @@ module Armagh
           Connection.status.find().to_a
         end
         
-        def configure_launcher( params )
-          config = Launcher.create_configuration( Connection.config, Launcher.config_name, params, maintain_history: true )
-          config.__values
+        def create_launcher_configuration( params )
+          
+          @logger.debug( 'lib/admin/application/api create_launcher_configuration' )
+          @logger.debug( "...with params #{ params.inspect }")
+          begin
+            Launcher.create_configuration( Connection.config, Launcher.config_name, params, maintain_history: true )
+            config = get_launcher_configuration( {} )
+            @logger.debug( "...succcessfully configured #{ config.inspect }")
+            config[ '__message' ] = 'Configuration successful.'
+          rescue => e
+            @logger.debug( "...exception raised: #{ e.class.name }: #{ e.message }")
+            config = params
+            config[ '__message' ] = e.message
+          end
+          return config
+        end
+        
+        def get_launcher_configuration( params )
+          Launcher.find_configuration( Connection.config, Launcher.config_name )&.serialize
         end
         
         def get_document_counts    
@@ -102,7 +120,21 @@ module Armagh
           workflow = Actions::Workflow.new( @logger, Connection.config )
           workflow.update_action( action_class_name, configuration_hash )
         end
+        
+        def activate_actions( actions )
+          workflow = Actions::Workflow.new( @logger, Connection.config )
+          workflow.activate_actions( actions )
+        end
           
+        def get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
+          Document
+            .find_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
+            .to_a
+        end
+        
+        def get_document( doc_id, doc_type )
+          Document.find( doc_id, doc_type, 'published', raw: true )
+        end
       end         
     end
   end

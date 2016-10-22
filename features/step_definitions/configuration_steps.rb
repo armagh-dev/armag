@@ -29,12 +29,131 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
   case config
     when 'test_actions'
       Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'action' => { 'name' => 'test_collect'},
         'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
         'output' => {
           'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY) # TODO HOW TO SETUP DIVIDER?
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
         }
+      })
+
+      Armagh::CustomActions::TestDivider.create_configuration(Armagh::Connection.config, 'test_divider', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+      })
+
+      Armagh::CustomActions::TestSplitter.create_configuration(Armagh::Connection.config, 'test_split', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('SplitDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('SplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+      Armagh::CustomActions::TestPublisher.create_configuration(Armagh::Connection.config, 'test_publish', {
+        # TODO DO I NEED TO SPECIFY BOTH?
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
+
+      Armagh::CustomActions::TestConsumer.create_configuration(Armagh::Connection.config, 'test_consume', {
+        # TODO DO I NEED TO SPECIFY Full Input Docspec?
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('ConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'bad_publisher'
+      Armagh::CustomActions::TestBadPublisher.create_configuration(Armagh::Connection.config, 'bad_publisher', {
+        # TODO DO I NEED TO SPECIFY BOTH?
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
+
+    when 'bad_consumer'
+      Armagh::CustomActions::TestBadConsumer.create_configuration(Armagh::Connection.config, 'bad_consumer', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadConsumerDocument', Armagh::Documents::DocState::PUBLISHED)},
+        'output' => {}
+      })
+
+    when 'unimplemented_splitter'
+      Armagh::CustomActions::TestUnimplementedSplitter.create_configuration(Armagh::Connection.config, 'unimplemented_splitter', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('UnimplementedSplitterInputDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('UnimplementedSplitterOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'too_large_collector'
+      Armagh::CustomActions::TestTooLargeCollector.create_configuration(Armagh::Connection.config, 'too_large_collector', {
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('TooLargeCollectorOutputDocument', Armagh::Documents::DocState::WORKING)
+        }
+      })
+
+    when 'too_large_splitter'
+      Armagh::CustomActions::TestTooLargeSplitter.create_configuration(Armagh::Connection.config, 'too_large_splitter', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeInputDocType', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('TooLargeSplitterOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'edit_current_splitter'
+      Armagh::CustomActions::TestEditCurrentSplitter.create_configuration(Armagh::Connection.config, 'edit_current_splitter', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('EditCurrentInputDocType', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('EditCurrentSplitterOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'update_error_splitter'
+      Armagh::CustomActions::TestUpdateErrorSplitter.create_configuration(Armagh::Connection.config, 'update_error_splitter', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('UpdateErrorInputDocType', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('UpdateErrorSplitterOutputDocument', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'notify_ops'
+      Armagh::CustomActions::TestSplitterNotifyOps.create_configuration(Armagh::Connection.config, 'notify_ops', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyOpsDocType', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('NotifyOpsDocTypeOutput', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'notify_dev'
+      Armagh::CustomActions::TestSplitterNotifyDev.create_configuration(Armagh::Connection.config, 'notify_dev', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyDevDocType', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('NotifyDevDocTypeOutput', Armagh::Documents::DocState::WORKING)}
+      })
+
+    when 'change_id_publisher'
+      Armagh::CustomActions::TestChangeIdPublisher.create_configuration(Armagh::Connection.config, 'change_id_publisher', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
+
+    when 'non_collector'
+      Armagh::CustomActions::TestNonCollector.create_configuration(Armagh::Connection.config, 'non_collector', {
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {'collected_document' => Armagh::Documents::DocSpec.new('NonDocument', Armagh::Documents::DocState::READY)
+        }
+      })
+
+    when 'full_workflow'
+      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)
+        }
+      })
+
+      Armagh::CustomActions::TestDivider.create_configuration(Armagh::Connection.config, 'test_divider', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+      })
+
+      Armagh::CustomActions::TestSplitter.create_configuration(Armagh::Connection.config, 'test_split', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)}
+      })
+
+      Armagh::CustomActions::TestPublisher.create_configuration(Armagh::Connection.config, 'test_publish', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)}
+      })
+
+      Armagh::CustomActions::TestConsumer.create_configuration(Armagh::Connection.config, 'test_consume', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
       })
   end
 end
@@ -46,223 +165,6 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
   config['num_agents'] = config['num_agents'].to_i if config['num_agents']
   config['checkin_frequency'] = config['checkin_frequency'].to_i if config['checkin_frequency']
   config['timestamp'] = Time.parse(config['timestamp']) if config['timestamp']
-
-  if config['available_actions']
-    specified_actions = config['available_actions'].split(/\s*,\s*/)
-    available_actions = {}
-
-    if specified_actions.include? 'test_actions'
-      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'action' => { 'name' => 'test_collect'},
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
-        'output' => {
-          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY) # TODO HOW TO SETUP DIVIDER?
-        }
-      })
-
-
-      test_actions = {
-          'test_collect' => {
-              'action_class_name' => 'Armagh::CustomActions::TestCollector',
-              'input_doc_type' => 'CollectDocument',
-
-              'output_docspecs' => {
-                  'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
-                  'divide_collected_document' => {'type' => 'DivideCollectedDocument', 'state' => 'ready',
-                                                 'divider' => {
-                                                     'divider_class_name' => 'Armagh::CustomActions::TestDivider',
-                                                     'parameters' => {}
-                                                 }
-                  }
-              },
-              'parameters' => {}
-          },
-
-          'test_split' => {
-              'action_class_name' => 'Armagh::CustomActions::TestSplitter',
-              'input_doc_type' => 'SplitDocument',
-              'output_docspecs' => {
-                  'split_output' => {'type' => 'SplitOutputDocument', 'state' => 'working'}
-              },
-              'parameters' => {}
-          },
-
-          'test_publish' => {
-              'action_class_name' => 'Armagh::CustomActions::TestPublisher',
-              'doc_type' => 'PublishDocument',
-              'parameters' => {}
-          },
-
-          'test_consume' => {
-              'action_class_name' => 'Armagh::CustomActions::TestConsumer',
-              'input_doc_type' => 'ConsumeDocument',
-              'output_docspecs' => {
-                  'consume_output' => {'type' => 'ConsumeOutputDocument', 'state' => 'working'}
-              },
-              'parameters' => {}
-          }
-      }
-
-      available_actions.merge! test_actions
-    end
-
-    if specified_actions.include? 'bad_publisher'
-      available_actions['bad_publisher'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestBadPublisher',
-          'doc_type' => 'BadPublisherDocument',
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'bad_consumer'
-      available_actions['bad_consumer'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestBadConsumer',
-          'input_doc_type' => 'BadConsumerDocument',
-          'output_docspecs' => {},
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'unimplemented_splitter'
-      available_actions['unimplemented_splitter'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestUnimplementedSplitter',
-          'input_doc_type' => 'UnimplementedSplitterInputDocument',
-          'output_docspecs' => {
-              'unimplemented_splitter_output' => {'type' => 'UnimplementedSplitterOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'too_large_collector'
-      available_actions['too_large_collector'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestTooLargeCollector',
-          'input_doc_type' => 'TooLargeInputDocType',
-          'output_docspecs' => {
-              'too_large_collector_output' => {'type' => 'TooLargeCollectorOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'too_large_splitter'
-      available_actions['too_large_splitter'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestTooLargeSplitter',
-          'input_doc_type' => 'TooLargeInputDocType',
-          'output_docspecs' => {
-              'too_large_splitter_output' => {'type' => 'TooLargeSplitterOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'edit_current_splitter'
-      available_actions['edit_current_splitter'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestEditCurrentSplitter',
-          'input_doc_type' => 'EditCurrentInputDocType',
-          'output_docspecs' => {
-              'edit_current_splitter_output' => {'type' => 'EditCurrentSplitterOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'update_error_splitter'
-      available_actions['update_error_splitter'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestUpdateErrorSplitter',
-          'input_doc_type' => 'UpdateErrorInputDocType',
-          'output_docspecs' => {
-              'update_error_splitter_output' => {'type' => 'UpdateErrorSplitterOutputDocument', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'notify_ops'
-      available_actions['notify_ops'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestSplitterNotifyOps',
-          'input_doc_type' => 'NotifyOpsDocType',
-          'output_docspecs' => {
-              'notify_ops_output' => {'type' => 'NotifyOpsDocTypeOutput', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'notify_dev'
-      available_actions['notify_dev'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestSplitterNotifyDev',
-          'input_doc_type' => 'NotifyDevDocType',
-          'output_docspecs' => {
-              'notify_dev_output' => {'type' => 'NotifyDevDocTypeOutput', 'state' => 'working'}
-          },
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'change_id_publisher'
-      available_actions['change_id_publisher'] = {
-          'action_class_name' => 'Armagh::CustomActions::TestChangeIdPublisher',
-          'doc_type' => 'PublishDocument',
-          'parameters' => {}
-      }
-    end
-
-    if specified_actions.include? 'full_workflow'
-      full_workflow = {
-          'test_collect' => {
-              'action_class_name' => 'Armagh::CustomActions::TestCollector',
-              'input_doc_type' => 'CollectDocument',
-
-              'output_docspecs' => {
-                  'collected_document' => {'type' => 'CollectedDocument', 'state' => 'ready'},
-                  'divide_collected_document' => {'type' => 'DivideCollectedDocument', 'state' => 'ready',
-                                                 'divider' => {
-                                                     'divider_class_name' => 'Armagh::CustomActions::TestDivider',
-                                                     'parameters' => {}
-                                                 }
-                  }
-              },
-              'parameters' => {}
-          },
-
-          'test_split_document' => {
-              'action_class_name' => 'Armagh::CustomActions::TestSplitter',
-              'input_doc_type' => 'DivideCollectedDocument',
-              'output_docspecs' => {
-                  'split_output' => {'type' => 'Document', 'state' => 'ready'}
-              },
-              'parameters' => {}
-          },
-
-          'test_publish' => {
-              'action_class_name' => 'Armagh::CustomActions::TestPublisher',
-              'doc_type' => 'Document',
-              'parameters' => {}
-          },
-
-          'test_consume' => {
-              'action_class_name' => 'Armagh::CustomActions::TestConsumer',
-              'input_doc_type' => 'Document',
-              'output_docspecs' => {
-                  'consume_output' => {'type' => 'ConsumeOutputDocument', 'state' => 'ready'}
-              },
-              'parameters' => {}
-          }
-      }
-
-      available_actions.merge! full_workflow
-    end
-
-    if specified_actions.include? 'no_such_action'
-      available_actions['no_such_action'] = {
-          'action_class_name' => 'Armagh::CustomActions::NoSuchAction',
-          'doc_type' => 'NoActionDocument',
-          'parameters' => {}
-      }
-    end
-  end
 
   case config_type
     when 'launcher'

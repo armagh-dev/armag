@@ -42,7 +42,7 @@ class TestResourceApplicationAPI < Test::Unit::TestCase
     
     Armagh::Connection.expects( :all_document_collections ).returns( [] )
     [ :documents, 
-      :archive, 
+      :collection_history,
       :failures,
       :config, 
       :users, 

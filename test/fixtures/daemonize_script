@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 puts 'STDOUT'
 $stderr.puts 'STDERR'
 

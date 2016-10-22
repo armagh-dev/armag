@@ -11,6 +11,8 @@ require_relative '../lib/admin/resource/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
 require_relative '../lib/logging'
 
+Process.setproctitle(File.basename(__FILE__))
+
 #------------------------------------------------------------------------------------------------
 #
 # SET UP ENVIRONMENT

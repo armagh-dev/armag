@@ -72,5 +72,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'sys-proctable', '~> 0.9'
   spec.add_development_dependency 'yard', '~> 0.9'
   spec.add_development_dependency 'fakefs', '~> 0.8'
+  spec.add_development_dependency 'armagh_test-custom_actions', '< 2.0'
 
 end

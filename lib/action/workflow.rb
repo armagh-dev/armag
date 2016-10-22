@@ -120,17 +120,17 @@ module Armagh
       end
         
       def get_action_names_for_docspec( docspec )
-        
-        @action_names_by_input_docspecs
-          .collect{ |input_docspec, action_names_array| action_names_array if input_docspec == docspec }
-          .flatten
-          .compact
+        action_names = []
+        @action_names_by_input_docspecs.each do |input_docspec, action_names_array|
+          action_names.concat action_names_array if input_docspec == docspec
+        end
+        action_names
       end
 
       def instantiate_divider( docspec, caller, logger, state_collection )
 
         divider_action_name = get_action_names_for_docspec( docspec )
-                                .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divider }
+                                .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divide }
         instantiate_action( divider_action_name, caller, logger, state_collection ) if divider_action_name
       end
     
@@ -172,6 +172,16 @@ module Armagh
         
         action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values ) 
         refresh(true)
+      end
+      
+      def activate_actions( actions )
+        
+        actions.each do |action_class_name, action_name|
+          @logger.debug "activating #{ action_class_name }: #{action_name}"
+          config = eval( action_class_name ).find_configuration( @config_store, action_name ).__values
+          config[ 'action' ][ 'active' ] = true
+          update_action( action_class_name, config )
+        end
       end
     end
   end

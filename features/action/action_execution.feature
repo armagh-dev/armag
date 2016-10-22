@@ -43,7 +43,7 @@ Feature: Actions Execution
       | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
-      | log_level         | debug        |
+      | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
@@ -78,8 +78,8 @@ Feature: Actions Execution
       | version             | APP_VERSION                                                 |
       | source              | {'type' => 'url', 'url' => 'from test'}                     |
       | collection_task_ids | not_empty                                                   |
-    And I should see 0 "CollectDocument" documents in the "documents" collection
-    And I should see a "CollectDocument" in "archive" with the following
+    And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
+    And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | '123_trigger'             |
       | metadata        | {'docs_collected' => 2}   |
       | pending_actions | []                        |
@@ -95,15 +95,41 @@ Feature: Actions Execution
     And the logs should contain "Test Divider Running"
     And the logs should not contain "ERROR"
 
+  Scenario: Have a document for a collector that collects nothing
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "non_collector"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "__COLLECT__non_collector" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see 0 "__COLLECT__non_collector" documents in the "collection_history" collection
+    And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
+    And I should see 0 "NonDocument" documents in the "documents" collection
+    And the logs should contain "Test Non Collect Running"
+    And the logs should not contain "ERROR"
+
   Scenario: Have a document for a splitter
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -146,8 +172,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -181,8 +209,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
     And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
@@ -214,8 +244,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -263,8 +295,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | unimplemented_splitter |
+      | log_level | debug |
+    And armagh's workflow config is "unimplemented_splitter"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -293,8 +327,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | bad_publisher |
+      | log_level | debug |
+    And armagh's workflow config is "bad_publisher"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -323,8 +359,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | bad_consumer |
+      | log_level | debug |
+    And armagh's workflow config is "bad_consumer"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -353,16 +391,18 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | too_large_collector |
+      | log_level | debug |
+    And armagh's workflow config is "too_large_collector"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 "TooLargeInputDocType" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    When I insert 1 "__COLLECT__too_large_collector" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
     And I wait 7 seconds
     Then I should see 0 "TooLargeCollectorOutputDocument" documents in the "documents" collection
-    Then I should see a "TooLargeInputDocType" in "failures" with the following
+    Then I should see a "__COLLECT__too_large_collector" in "failures" with the following
       | document_id     | 'incoming'                                                                                                                                                                                                                                           |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                          |
       | pending_actions | []                                                                                                                                                                                                                                                   |
@@ -383,8 +423,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | too_large_splitter |
+      | log_level | debug |
+    And armagh's workflow config is "too_large_splitter"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -412,8 +454,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | edit_current_splitter |
+      | log_level | debug |
+    And armagh's workflow config is "edit_current_splitter"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -442,8 +486,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | update_error_splitter |
+      | log_level | debug |
+    And armagh's workflow config is "update_error_splitter"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -484,8 +530,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | notify_dev |
+      | log_level | debug |
+    And armagh's workflow config is "notify_dev"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -514,8 +562,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | notify_ops |
+      | log_level | debug |
+    And armagh's workflow config is "notify_ops"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -544,8 +594,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | change_id_publisher |
+      | log_level | debug |
+    And armagh's workflow config is "change_id_publisher"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
@@ -580,8 +632,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | change_id_publisher |
+      | log_level | debug |
+    And armagh's workflow config is "change_id_publisher"
     And I run armagh
     And I wait 3 seconds
     And I insert 1 "PublishDocument" with a "published" state, document_id "new_id", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
@@ -617,19 +671,23 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 2 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | full_workflow |
+      | log_level | debug |
+    And armagh's workflow config is "full_workflow"
     And I run armagh
     And I wait 3 seconds
     Then the valid reported status should contain agents with statuses
       | idle |
       | idle |
-    When I insert 1 "CollectDocument" with a "ready" state, document_id "collect_id", content "{'doesnt_matter' => true}", metadata "{}"
+    When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "collect_id", content "{'doesnt_matter' => true}", metadata "{}"
     And I wait 30 seconds
     Then the logs should contain "Test Collect Running"
     And the logs should contain "Test Divider Running"
-    And the logs should contain "Test Consume Running"
+    And the logs should contain "Test Split Running"
     And the logs should contain "Test Publish Running"
+    And the logs should contain "Test Consume Running"
+
     And the logs should not contain "ERROR"
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consume_1'                                                                     |
@@ -676,16 +734,16 @@ Feature: Actions Execution
       | copyright           | 'Copyright the future'                           |
       | title               | 'The Title'                                      |
     And I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | '[UUID]'       |
-      | state               | 'ready'        |
-      | locked              | false          |
-      | error               | nil            |
-      | pending_work        | nil            |
-      | version             | APP_VERSION    |
-      | collection_task_ids | ['collect_id'] |
-      | metadata            | {}             |
-      | content             | {'bson_binary' => BSON::Binary.new('collected content')}             |
-    And I should see a "CollectDocument" in "archive" with the following
+      | document_id         | '[UUID]'                                                 |
+      | state               | 'ready'                                                  |
+      | locked              | false                                                    |
+      | error               | nil                                                      |
+      | pending_work        | nil                                                      |
+      | version             | APP_VERSION                                              |
+      | collection_task_ids | ['collect_id']                                           |
+      | metadata            | {}                                                       |
+      | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
+    And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | 'collect_id'              |
       | metadata        | {'docs_collected' => 2}   |
       | pending_actions | []                        |
@@ -697,7 +755,7 @@ Feature: Actions Execution
       | error           | nil                       |
       | pending_work    | nil                       |
       | version         | APP_VERSION               |
-    And I should see 0 "CollectDocument" documents in the "document" collection
+    And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
 
   Scenario: Republishing a document with a newer armagh version updates the version in the document
     Given armagh isn't already running
@@ -706,8 +764,10 @@ Feature: Actions Execution
     When armagh's "launcher" config is
       | num_agents        | 1 |
       | checkin_frequency | 1 |
+      | log_level         | debug |
     And armagh's "agent" config is
-      | available_actions | test_actions |
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
     And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
     And I set all "documents.PublishDocument" documents to have the following
       | version | 'old_version' |
@@ -716,7 +776,7 @@ Feature: Actions Execution
       | version     | 'old_version' |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
     And I run armagh
-    And I wait 30 seconds
+    And I wait 3 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id | '123'       |
       | version     | APP_VERSION |
