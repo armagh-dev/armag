@@ -2,4 +2,4 @@
 puts 'STDOUT'
 $stderr.puts 'STDERR'
 
-sleep 1
+sleep 2

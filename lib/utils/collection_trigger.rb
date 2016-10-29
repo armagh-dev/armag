@@ -79,7 +79,7 @@ module Armagh
       end
 
       private def trigger_actions
-        Actions::Collect.find_all_configurations(@workflow.config_store, include_descendants: true).each do |_action_class, config|
+        @workflow.collect_actions.each do |config|
           next unless config.action.active
           now = Time.now
           name = config.action.name

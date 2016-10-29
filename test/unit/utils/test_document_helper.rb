@@ -73,10 +73,9 @@ class TestDocumentHelper < Test::Unit::TestCase
 
   def test_clean_document
     expected = {
-      'archive_file' =>nil,
+      'archive_files' =>[],
       'collection_task_ids' =>['abc'],
       'copyright' => 'copyright',
-      'created_timestamp' =>nil,
       'dev_errors' =>{},
       'display' => 'display',
       'document_id' => '123',
@@ -85,12 +84,10 @@ class TestDocumentHelper < Test::Unit::TestCase
       'metadata' =>{'something' =>['inside']},
       'ops_errors' =>{},
       'pending_actions' =>[],
-      'published_timestamp' =>nil,
       'source' =>{},
       'state' => 'ready',
       'title' => 'some title',
       'type' => 'type',
-      'updated_timestamp' =>nil,
 
       'content' => {
         'string' => 'this is some string',

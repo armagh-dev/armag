@@ -56,9 +56,9 @@ module Armagh
         end
 
         File.delete meta_filename
-        File.join(@archive_dir, file_path)
+        @logger.debug "Archived #{file_path} and #{file_path}.meta to #{@archive_dir}"
 
-        @logger.debug ("Archived #{file_path} and #{file_path}.meta to #{@archive_dir}")
+        File.join(@archive_dir, file_path)
       end
 
       private def update_archive_dir

@@ -24,8 +24,6 @@ require_relative '../../../../lib/admin/application/api'
 require_relative '../../../../lib/connection'
 require 'armagh/actions'
 
-
-
 require 'test/unit'
 require 'mocha/test_unit'
 

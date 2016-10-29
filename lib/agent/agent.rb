@@ -41,7 +41,6 @@ module Armagh
     attr_reader :uuid
 
     def initialize(agent_config, workflow)
-
       @config = agent_config
       @workflow = workflow
 
@@ -55,6 +54,7 @@ module Armagh
       @backoff.logger = @logger
 
       @num_creates = 0
+      @archives_for_collect = []
       @archiver = Utils::Archiver.new(@logger)
     end
 
@@ -86,7 +86,9 @@ module Armagh
       raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.document_id}'.  It is the same document that was passed into the action." if action_doc.document_id == @current_doc.document_id
       pending_actions = @workflow.get_action_names_for_docspec(docspec)
       collection_task_ids = []
-      collection_task_ids << @collection_task_id if @collection_task_id
+      collection_task_ids.concat @collection_task_ids if @collection_task_ids
+      archive_files = []
+      archive_files.concat @archive_files if @archive_files
       Document.create(type: docspec.type,
                       content: action_doc.content,
                       metadata: action_doc.metadata,
@@ -94,12 +96,12 @@ module Armagh
                       state: docspec.state,
                       document_id: action_doc.document_id,
                       collection_task_ids: collection_task_ids,
+                      archive_files: archive_files,
                       title: action_doc.title,
                       copyright: action_doc.copyright,
                       document_timestamp: action_doc.document_timestamp,
                       display: action_doc.display,
                       source: action_doc.source,
-                      archive_file: action_doc.archive_file,
                       new: true,
                       logger: @logger)
       @num_creates += 1
@@ -158,7 +160,9 @@ module Armagh
     end
 
     def archive(logger_name, action_name, file_path, metadata, source)
-      @archiver.archive_file(file_path, metadata, source)
+      archive_file = @archiver.archive_file(file_path, metadata, source)
+      @archives_for_collect << archive_file
+      @archive_files = [archive_file]
     rescue Errors::ArchiveError => e
       notify_dev(logger_name, action_name, e)
     rescue Support::SFTP::SFTPError => e
@@ -180,7 +184,8 @@ module Armagh
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((initial_docspec.state == new_docspec.state) || (initial_docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
         doc.update_from_draft_action_document(action_doc)
-        doc.collection_task_ids << @collection_task_id if @collection_task_id
+        doc.collection_task_ids.concat @collection_task_ids if @collection_task_ids
+        doc.archive_files.concat @archive_files if @archive_files
 
         unless initial_docspec == new_docspec
           pending_actions = @workflow.get_action_names_for_docspec(new_docspec)
@@ -201,7 +206,8 @@ module Armagh
 
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
-        new_doc.collection_task_ids << @collection_task_id if @collection_task_id
+        new_doc.collection_task_ids.concat @collection_task_ids if @collection_task_ids
+        new_doc.archive_files.concat @archive_files if @archive_files
         new_doc.internal_id = doc
         new_doc.save(logger: @logger)
       end
@@ -256,10 +262,10 @@ module Armagh
                 end
               end
             rescue Documents::Errors::DocumentSizeError => e
-              Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}'")
+              Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}' on '#{@current_doc.document_id}'")
               @current_doc.add_ops_error(name, e)
             rescue Exception => e
-              Logging.dev_error_exception(@logger, e, "Error while executing action '#{name}'")
+              Logging.dev_error_exception(@logger, e, "Error while executing action '#{name}' on '#{@current_doc.document_id}'")
               @current_doc.add_dev_error(name, e)
             end
           else
@@ -268,8 +274,7 @@ module Armagh
             @backoff.interruptible_backoff { !@running }
           end
 
-          @logger.dev_error "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document for details." if @current_doc.dev_errors.any?
-          @logger.ops_error "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document for details." if @current_doc.ops_errors.any?
+          @logger.warn "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document for details." if @current_doc.dev_errors.any? || @current_doc.ops_errors.any?
 
           true # Always remove this action from pending
         end #delete_if
@@ -288,27 +293,30 @@ module Armagh
       allowed_id_change = false
       case action
         when Actions::Collect
-          @collection_task_id = doc.document_id
+          @collection_task_ids = [doc.document_id]
           @num_creates = 0
+          @archives_for_collect.clear
+          @archive_files = nil
 
           if action.config.collect.archive
-            @archiver.within_archive_context do
-              action.collect
-            end
+            @archiver.within_archive_context {action.collect}
           else
             action.collect
           end
 
-          doc.metadata.merge!({'docs_collected' => @num_creates})
-          doc.mark_collection_history if @num_creates > 0
+          doc.metadata['docs_collected'] = @num_creates
+          doc.metadata['archived_files'] = @archives_for_collect unless @archives_for_collect.empty?
+          @num_creates == 0 ? doc.mark_delete : doc.mark_collection_history
         when Actions::Split
-          @collection_task_id = doc.collection_task_ids.last
+          @collection_task_ids = doc.collection_task_ids
+          @archive_files = doc.archive_files
           action_doc = doc.to_action_document
           action.split action_doc
           doc.mark_delete
         when Actions::Publish
           timestamp = Time.now
-          @collection_task_id = doc.collection_task_ids.last
+          @collection_task_ids = doc.collection_task_ids
+          @archive_files = doc.archive_files
           allowed_id_change = true
           action_doc = doc.to_action_document
           action.publish action_doc
@@ -327,6 +335,7 @@ module Armagh
             doc.dev_errors.merge!(published_doc.dev_errors) { |_key, v1, v2| v2 + v1 }
             doc.ops_errors.merge!(published_doc.ops_errors) { |_key, v1, v2| v2 + v1 }
             doc.collection_task_ids.unshift(*(published_doc.collection_task_ids))
+            doc.archive_files.unshift(*(published_doc.archive_files))
 
             doc.title ||= published_doc.title
             doc.copyright ||= published_doc.copyright
@@ -340,7 +349,8 @@ module Armagh
           doc.add_pending_actions(@workflow.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
-          @collection_task_id = doc.collection_task_ids.last
+          @collection_task_ids = doc.collection_task_ids
+          @archive_files = doc.archive_files
           published_doc = doc.to_published_document
           action.consume published_doc
           # Only metadata can be changed
@@ -353,6 +363,7 @@ module Armagh
       raise Documents::Errors::IDError, "Attempted to change Document's ID from '#{initial_id}' to '#{doc.document_id}.  IDs can only be changed from a publisher." unless initial_id == doc.document_id || allowed_id_change
     ensure
       @num_creates = 0
+      @archives_for_collect.clear
     end
 
     private def report_status(doc, action)

@@ -82,7 +82,7 @@ class TestEditCallback < Test::Unit::TestCase
     @output_state = Armagh::Documents::DocState::WORKING
 
     config_store = []
-    workflow = Armagh::Actions::Workflow.new( nil, config_store )
+    workflow = Armagh::Actions::Workflow.new( @logger, config_store )
     workflow.create_action( 
       'Armagh::StandardActions::TestSplitter', 
       { 'action' => { 'name' => 'test_splitter' },

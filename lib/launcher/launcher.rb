@@ -42,6 +42,11 @@ require_relative '../logging'
 require_relative '../version'
 
 module Armagh
+  
+  class LauncherConfigError < StandardError; end
+  class AgentConfigError    < StandardError; end
+  class WorkflowConfigError < StandardError; end
+  
   class Launcher
     include Configh::Configurable
 
@@ -76,8 +81,13 @@ module Armagh
       
       bind_ip = Connection.ip
       launcher_config_name = [ bind_ip, launcher_name ].join('_')
-      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, :maintain_history => true )
-
+      
+      begin
+        @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, :maintain_history => true )
+      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+        @logger.dev_error LauncherConfigError
+      end
+      
       @logger.any "Using Launcher Config: #{launcher_config_name}"
       Logging.set_level(@logger, @config.launcher.log_level)
 
@@ -86,15 +96,30 @@ module Armagh
       @versions[ 'actions' ].each do |package, version|
         Document.version[ package ] = version
       end
-
-      @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, :maintain_history => true )
-      @workflow = Actions::Workflow.new( @logger, Connection.config )
+      
+      begin
+        @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, :maintain_history => true )
+      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+        @logger.dev_error AgentConfigError
+      end
+      
+      begin
+        @workflow = Actions::Workflow.new( @logger, Connection.config )
+        @logger.any 'workflow init successful'
+      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+        @logger.any 'workflow init failed'
+        @logger.dev_error WorkflowConfigError
+      end
+      
       @collection_trigger = Utils::CollectionTrigger.new(@workflow)
       Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
 
       @hostname = Socket.gethostname
       @agents = {}
       @running = false
+    rescue => e
+      Logging.dev_error_exception(@logger, e, 'Error initializing launcher')
+      exit 1
     end
 
     def reconcile_agents
@@ -124,7 +149,7 @@ module Armagh
 
       @last_checkin = Time.now
     rescue => e
-      raise Connection.convert_exception(e)
+      raise Connection.convert_mongo_exception(e)
     end
 
     def apply_config
@@ -218,7 +243,6 @@ module Armagh
       config = @config.refresh
       agent_config = @agent_config.refresh
       workflow = @workflow.refresh
-
 
       if config || agent_config || workflow
         @logger.any 'Configuration change detected.  Restarting agents...'

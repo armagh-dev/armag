@@ -86,7 +86,7 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
         actual = doc[key]
 
         if expected == not_empty
-          if actual.empty?
+          if actual.compact.empty?
             doc_problems[doc_id][key] = "'#{expected.to_s}' !~~ '#{actual.to_s}'"
             found_matching_doc = false
             next

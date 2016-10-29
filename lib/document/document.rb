@@ -49,9 +49,9 @@ module Armagh
         copyright: nil,
         source: nil,
         collection_task_ids:,
+        archive_files: [],
         document_timestamp:,
         display: nil,
-        archive_file: nil,
         new: false,
         logger: nil)
       doc = Document.new
@@ -64,10 +64,10 @@ module Armagh
       doc.title = title if title
       doc.copyright = copyright if copyright
       doc.source = source.to_hash if source
-      doc.collection_task_ids = collection_task_ids if collection_task_ids
+      doc.collection_task_ids = collection_task_ids
+      doc.archive_files = archive_files
       doc.document_timestamp = document_timestamp if document_timestamp
       doc.display = display if display
-      doc.archive_file = archive_file if archive_file
       doc.save(new: new, logger: logger)
       doc
     end
@@ -253,10 +253,10 @@ module Armagh
           'copyright' => nil,
           'published_timestamp' => nil,
           'collection_task_ids' => [],
+          'archive_files' => [],
           'source' => {},
           'document_timestamp' => nil,
-          'display' => nil,
-          'archive_file' => nil
+          'display' => nil
       }
       @db_doc.merge! image
     end
@@ -377,12 +377,12 @@ module Armagh
       @db_doc['version']
     end
 
-    def archive_file
-      @db_doc['archive_file']
+    def archive_files
+      @db_doc['archive_files']
     end
 
-    def archive_file=(file)
-      @db_doc['archive_file'] = file
+    def archive_files=(archive_files)
+      @db_doc['archive_files'] = archive_files
     end
 
     def pending_actions
@@ -482,6 +482,7 @@ module Armagh
       @db_doc['updated_timestamp'] = now
       @db_doc['version'] = self.class.version
       @db_doc['collection_task_ids'].uniq!
+      @db_doc['archive_files'].uniq!
 
       @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
       Armagh::Utils::DocumentHelper.clean_document(self)
@@ -566,8 +567,8 @@ module Armagh
                                     docspec: docspec,
                                     source: Armagh::Documents::Source.from_hash(source),
                                     document_timestamp: document_timestamp,
-                                    display: display,
-                                    archive_file: archive_file)
+                                    display: display )
+#                                    archive_file: archive_file)
     end
 
     def to_published_document
@@ -580,8 +581,8 @@ module Armagh
                                        docspec: docspec,
                                        source: Armagh::Documents::Source.from_hash(source),
                                        document_timestamp: document_timestamp,
-                                       display: display,
-                                       archive_file: archive_file)
+                                       display: display )
+#                                       archive_file: archive_file)
 
     end
 
@@ -594,7 +595,6 @@ module Armagh
       self.copyright = action_doc.copyright
       self.document_timestamp = action_doc.document_timestamp
       self.display = action_doc.display
-      self.archive_file = action_doc.archive_file
       docspec = action_doc.docspec
       self.type = docspec.type
       self.state = docspec.state

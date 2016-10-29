@@ -37,9 +37,7 @@ module Armagh
     class CollectTest < Armagh::Actions::Collect
     end
     class SplitTest < Armagh::Actions::Split; end
-    class PublishTest < Armagh::Actions::Publish
-      define_output_docspec 'docspec', 'This is the output'
-    end
+    class PublishTest < Armagh::Actions::Publish; end
     class ConsumeTest < Armagh::Actions::Consume; end
     class DividerTest < Armagh::Actions::Divide; end
     class UnknownAction < Armagh::Actions::Action; end
@@ -205,6 +203,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -278,6 +277,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -299,7 +299,7 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:split).with(action_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
-               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [])
     doc.expects(:to_action_document).returns(action_doc)
     doc.expects(:mark_delete)
     doc.expects(:finish_processing).at_least_once
@@ -336,7 +336,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
-               :deleted? => false, :collection_task_ids => [], :source => Armagh::Documents::Source.new)
+               :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new)
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -396,7 +396,7 @@ class TestAgent < Test::Unit::TestCase
                :copyright => 'old copyright',
                :display => 'old_display',
                :source => 'old_source',
-               :archive_file => 'archive_file')
+               :archive_files => ['archive_file'])
 
     pub_doc = stub(:document_id => 'document_id',
                    :pending_actions => [],
@@ -413,7 +413,7 @@ class TestAgent < Test::Unit::TestCase
                    :title => 'new title',
                    :internal_id => 'internal',
                    :display => 'new_display',
-                   :archive_file => 'new_archive_file')
+                   :archive_files => ['new_archive_file'])
 
 
     doc.expects(:to_action_document).returns(action_doc)
@@ -463,7 +463,7 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:consume).with(published_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
-               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [])
     doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:finish_processing).at_least_once
 
@@ -521,16 +521,15 @@ class TestAgent < Test::Unit::TestCase
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
-    doc.expects(:ops_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @logger.expects(:dev_error)
-    @logger.expects(:ops_error).never
+    @logger.expects(:warn)
 
     @default_agent.instance_variable_set(:@running, true)
 
@@ -558,13 +557,13 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:dev_errors).returns({})
 
     doc.expects(:finish_processing).at_least_once
+    doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @logger.expects(:dev_error).never
-    @logger.expects(:ops_error)
+    @logger.expects(:warn)
 
     @default_agent.instance_variable_set(:@running, true)
 
@@ -588,6 +587,7 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
+    doc.stubs(:document_id).returns('doc_id')
     doc.expects(:add_dev_error)
     doc.expects(:finish_processing).at_least_once
     doc.expects(:dev_errors).returns({})
@@ -600,7 +600,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
-      assert_equal "Error while executing action '#{action_name}'", msg
+      assert_equal "Error while executing action '#{action_name}' on 'doc_id'", msg
       true
     end
 
@@ -750,7 +750,7 @@ class TestAgent < Test::Unit::TestCase
                                            title: nil,
                                            copyright: nil,
                                            logger: @logger,
-                                           archive_file: nil,
+                                           archive_files: [],
                                            display: nil)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
                                                        content: 'content',
@@ -1210,7 +1210,7 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Logging.expects(:ops_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
-      assert_equal "Error while executing action '#{action_name}'", msg
+      assert_equal "Error while executing action '#{action_name}' on 'document_id'", msg
       true
     end
 

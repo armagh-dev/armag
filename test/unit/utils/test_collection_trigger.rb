@@ -59,9 +59,8 @@ class TestCollectionTrigger < Test::Unit::TestCase
     @workflow.stubs(:config_store).returns(@config_store)
     @actions = ['one']
     @workflow.stubs(:get_action_names_for_docspec).returns(@actions)
-
     @config = UTAction.make_test_config(store: @config_store, action_name: 'name', collected_doctype: 'type')
-    Armagh::Actions::Collect.stubs(:find_all_configurations).returns({'name' => @config})
+    @workflow.stubs(:collect_actions).returns([@config] )
 
     Armagh::Logging.expects(:set_logger).returns(@logger)
     @trigger = Armagh::Utils::CollectionTrigger.new(@workflow)

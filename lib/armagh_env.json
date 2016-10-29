@@ -14,8 +14,7 @@
     "ARMAGH_BIND_IP":       "127.0.0.1",
     "ARMAGH_ARCHIVE_HOST":  "127.0.0.1",
     "ARMAGH_ARCHIVE_PORT":  "22",
-    "ARMAGH_ARCHIVE_PATH":  "/tmp/var/archive",
-    "ARMAGH_ARCHIVE_USER":  "armagh"
+    "ARMAGH_ARCHIVE_PATH":  "/tmp/var/archive"
   },
   
   "Armagh::Admin::Resource::API": {

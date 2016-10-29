@@ -61,6 +61,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     @logger = mock
     @logger.stubs(:fullname).returns('some::logger::name')
+    @logger.stubs(:any)
+    @logger.stubs(:debug)
     @api = Armagh::Admin::Application::API.instance
 
   end

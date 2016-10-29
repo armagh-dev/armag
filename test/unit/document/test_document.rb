@@ -92,14 +92,14 @@ class TestDocument < Test::Unit::TestCase
                           document_id: 'id',
                           collection_task_ids: [],
                           document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
-                          archive_file: 'whatever',
+                          archive_files: ['whatever'],
     )
 
     assert_equal('testdoc', doc.type)
     assert_equal({'content' => true}, doc.content)
     assert_equal({'meta' => true}, doc.metadata)
     assert_equal('id', doc.document_id)
-    assert_equal('whatever', doc.archive_file)
+    assert_equal(['whatever'], doc.archive_files)
     assert_equal(@internal_id, doc.internal_id)
   end
 

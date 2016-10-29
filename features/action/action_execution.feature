@@ -114,10 +114,38 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 10 seconds
     Then I should see an agent with a status of "idle" within 10 seconds
     Then I should see 0 "__COLLECT__non_collector" documents in the "collection_history" collection
-    And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
+    And I should see 0 "__COLLECT__non_collector" documents in the "documents" collection
     And I should see 0 "NonDocument" documents in the "documents" collection
     And the logs should contain "Test Non Collect Running"
     And the logs should not contain "ERROR"
+
+  Scenario: Have a document for a collector that gets archived
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the archive path is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "archive_collector"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "__COLLECT__archive_collector" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
+    And I should see 1 "CollectedDocument" documents in the "documents" collection
+    And I should see 1 "IntermediateDocument" documents in the "documents" collection
+    And I should see 0 "__COLLECT__archive_collector" documents in the "documents" collection
+    And I should see 1 "__COLLECT__archive_collector" documents in the "collection_history" collection
+    And the logs should contain "Test Collect Running"
+    And the logs should not contain "ERROR"
+    And the a file containing "collected content" should be archived
+    And the a file containing "dividing" should be archived
 
   Scenario: Have a document for a splitter
     Given armagh isn't already running
@@ -170,8 +198,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -207,8 +235,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -242,8 +270,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -293,8 +321,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -325,8 +353,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -357,8 +385,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -389,8 +417,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -421,8 +449,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -452,8 +480,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -484,8 +512,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -528,8 +556,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -560,8 +588,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -592,8 +620,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -630,8 +658,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -668,9 +696,10 @@ Feature: Actions Execution
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
+    And the archive path is clean
     When armagh's "launcher" config is
-      | num_agents        | 2 |
-      | checkin_frequency | 1 |
+      | num_agents        | 2     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -687,7 +716,6 @@ Feature: Actions Execution
     And the logs should contain "Test Split Running"
     And the logs should contain "Test Publish Running"
     And the logs should contain "Test Consume Running"
-
     And the logs should not contain "ERROR"
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consume_1'                                                                     |
@@ -697,6 +725,7 @@ Feature: Actions Execution
       | pending_work        | nil                                                                             |
       | version             | APP_VERSION                                                                     |
       | collection_task_ids | ['collect_id']                                                                  |
+      | archive_files       | not_empty                                                                       |
       | metadata            | {'touched_by' => ['block_1','block_3','block_1','block_3'], 'new' => 'block_1'} |
       | content             | {'text_1' => 'text_content_1', 'text_3' => 'text_content_3'}                    |
     And I should see a "ConsumeOutputDocument" in "documents" with the following
@@ -707,6 +736,7 @@ Feature: Actions Execution
       | pending_work        | nil                                                         |
       | version             | APP_VERSION                                                 |
       | collection_task_ids | ['collect_id']                                              |
+      | archive_files       | not_empty                                                   |
       | metadata            | {"touched_by" => ["block_2","block_2"], "new" => "block_2"} |
       | content             | {"text_2" => "text_content_2"}                              |
     And I should see a "Document" in "documents.Document" with the following
@@ -717,6 +747,7 @@ Feature: Actions Execution
       | pending_work        | nil                                                         |
       | version             | APP_VERSION                                                 |
       | collection_task_ids | ['collect_id']                                              |
+      | archive_files       | not_empty                                                   |
       | metadata            | {"touched_by" => ["block_1","block_3"], "new" => "block_1"} |
       | content             | {"text_1"=> "text_content_1","text_3"=> "text_content_3"}   |
       | copyright           | 'Copyright the future'                                      |
@@ -729,6 +760,7 @@ Feature: Actions Execution
       | pending_work        | nil                                              |
       | version             | APP_VERSION                                      |
       | collection_task_ids | ['collect_id']                                   |
+      | archive_files       | not_empty                                        |
       | metadata            | {"touched_by" => ["block_2"], "new"=> "block_2"} |
       | content             | {"text_2" => "text_content_2"}                   |
       | copyright           | 'Copyright the future'                           |
@@ -744,17 +776,17 @@ Feature: Actions Execution
       | metadata            | {}                                                       |
       | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
-      | document_id     | 'collect_id'              |
-      | metadata        | {'docs_collected' => 2}   |
-      | pending_actions | []                        |
-      | dev_errors      | {}                        |
-      | ops_errors      | {}                        |
-      | content         | {'doesnt_matter' => true} |
-      | state           | 'ready'                   |
-      | locked          | false                     |
-      | error           | nil                       |
-      | pending_work    | nil                       |
-      | version         | APP_VERSION               |
+      | document_id     | 'collect_id'                                                                                                                                 |
+      | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.strftime('%Y/%m/%d')}.0000/[UUID]","#{Time.now.strftime('%Y/%m/%d')}.0000/[UUID]"]} |
+      | pending_actions | []                                                                                                                                           |
+      | dev_errors      | {}                                                                                                                                           |
+      | ops_errors      | {}                                                                                                                                           |
+      | content         | {'doesnt_matter' => true}                                                                                                                    |
+      | state           | 'ready'                                                                                                                                      |
+      | locked          | false                                                                                                                                        |
+      | error           | nil                                                                                                                                          |
+      | pending_work    | nil                                                                                                                                          |
+      | version         | APP_VERSION                                                                                                                                  |
     And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
 
   Scenario: Republishing a document with a newer armagh version updates the version in the document
@@ -762,8 +794,8 @@ Feature: Actions Execution
     And mongo is running
     And mongo is clean
     When armagh's "launcher" config is
-      | num_agents        | 1 |
-      | checkin_frequency | 1 |
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
@@ -782,3 +814,32 @@ Feature: Actions Execution
       | version     | APP_VERSION |
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
+
+  Scenario: Add a new collect task id and archive file for updating a document
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
+    And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
+    And I set all "documents.PublishDocument" documents to have the following
+      | collection_task_ids | ['collect_1'] |
+      | archive_files       | ['archive_1'] |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
+    And I set all "documents" documents to have the following
+      | collection_task_ids | ['collect_2'] |
+      | archive_files       | ['archive_2'] |
+    And I run armagh
+    And I wait 3 seconds
+    And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
+      | document_id         | '123'                      |
+      | collection_task_ids | ['collect_1', 'collect_2'] |
+      | archive_files       | ['archive_1', 'archive_2'] |
+    And the logs should contain "Test Publish Running"
+    And the logs should not contain "ERROR"
+

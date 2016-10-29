@@ -31,7 +31,7 @@ module Armagh
     class ConfigurationError < StandardError; end
     
     class Workflow
-      attr_accessor :config_store
+      attr_accessor :collect_actions
 
       def initialize( logger, config_store )
         
@@ -41,6 +41,7 @@ module Armagh
         @output_docspecs = {}
         @config_store = config_store
         @action_configs_by_name = {}
+        @collect_actions = []
         refresh    
       end
       
@@ -50,11 +51,17 @@ module Armagh
       
       def refresh(force = false)
         configs_with_classes_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
-        configs_in_db = configs_with_classes_in_db.collect{ | _klass, config| config }
-        ts_in_db = configs_in_db.collect{ |c| c.__timestamp }.max
-
+        configs_in_db = configs_with_classes_in_db.collect{ |_class, config| config if config.action.active }.compact
+        ts_in_db = nil
+        begin
+          ts_in_db = configs_in_db.collect{ |c| c.__timestamp}.max 
+        rescue; end
+        
         return false if ts_in_db == @last_timestamp && !force
         
+        @logger.any "Refreshing workflow"
+        
+        begin
         warnings, 
         new_input_docspecs, 
         new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs( configs_in_db )
@@ -62,8 +69,12 @@ module Armagh
         @action_names_by_input_docspecs = new_input_docspecs
         @action_names_by_output_docspecs = new_output_docspecs
         @action_configs_by_name = Hash[ configs_in_db.collect{ | config | [ config.action.name, config ]}]
+        @collect_actions = configs_with_classes_in_db.collect{ |klass, config| config if klass < Actions::Collect }.compact
         @last_timestamp = ts_in_db
-        
+               
+      rescue => e
+        @logger.any e.message
+      end
         return true   
       end
       
@@ -178,7 +189,8 @@ module Armagh
         
         actions.each do |action_class_name, action_name|
           @logger.debug "activating #{ action_class_name }: #{action_name}"
-          config = eval( action_class_name ).find_configuration( @config_store, action_name ).__values
+          raw_config = eval( action_class_name ).find_configuration( @config_store, action_name, raw: true )
+          config = raw_config[ 'values' ]
           config[ 'action' ][ 'active' ] = true
           update_action( action_class_name, config )
         end

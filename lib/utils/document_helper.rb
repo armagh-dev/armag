@@ -20,6 +20,11 @@ module Armagh
     class DocumentHelper
       def self.clean_document(doc)
         clean_hash(doc.db_doc)
+        remove_root_nils(doc.db_doc)
+      end
+
+      private_class_method def self.remove_root_nils(hash)
+        hash.delete_if{|_k,v| v == nil}
       end
 
       private_class_method def self.clean(object)

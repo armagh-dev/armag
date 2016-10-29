@@ -79,26 +79,23 @@ module Armagh
     
     class TWTestPublish < Actions::Publish
       
-      define_output_docspec 'published', 'published documents'
       
       def self.make_config_values( action_name:, published_doctype:, active: true )
         {
           'action' => { 'name' => action_name, 'active' => active },
-          'input'  => { 'docspec'   => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
-          'output' => { 'published' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
+          'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
+          'output' => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
         }
       end
     end
     
     class TWTestPublish2 < Actions::Publish
-      
-      define_output_docspec 'published2', 'published docs'
-      
+            
       def self.make_config_values( action_name:, published_doctype:, active: true )
         {
           'action' => { 'name' => action_name, 'active' => active },
-          'input' => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
-          'output' => { 'published2' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
+          'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_READY ) },
+          'output' => { 'docspec' => Armagh::Documents::DocSpec.new( published_doctype, DS_PUBLISHED ) }
         }
       end
     end
@@ -122,6 +119,7 @@ class TestWorkflow < Test::Unit::TestCase
     @logger = mock
     @logger.stubs(:fullname).returns('fred')
     @logger.expects(:debug).at_least(0)
+    @logger.expects(:any).at_least(0)
     @caller = mock
   
     @test_action_setup = {
@@ -175,12 +173,6 @@ class TestWorkflow < Test::Unit::TestCase
   def teardown
   end
   
-  def test_overlapping_docspecs
-    
-    assert_equal [ 'published' ], Armagh::StandardActions::TWTestPublish.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
-    assert_equal [ 'published2' ], Armagh::StandardActions::TWTestPublish2.defined_parameters.collect{ |p| p.name if p.group == 'output' }.compact
-  end
-
   def do_add_configs( active: true )
       
     workflow = nil
@@ -250,7 +242,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal 'a_freddoc', paf.config.input.docspec.type
   end
   
-  def test_active_actions
+  def test_activate_actions
     
     workflow = do_add_configs( active: false )
     workflow.activate_actions( [ 
@@ -264,5 +256,25 @@ class TestWorkflow < Test::Unit::TestCase
     }
   end
   
+  def test_collect_actions
+    
+    workflow = do_add_configs( active: true )
+    assert_equal [ 'collect_freddocs_from_source' ], workflow.collect_actions.collect{ |c| c.action.name }
+  end
   
+  def test_only_pull_active_actions
+    workflow = do_add_configs( active: false )
+    workflow.activate_actions( [ 
+      ['Armagh::StandardActions::TWTestCollect','collect_freddocs_from_source' ],
+      [ 'Armagh::StandardActions::TWTestConsume', 'consume_a_freddoc_1' ]
+    ])
+    
+    new_workflow = nil
+    assert_nothing_raised {
+      new_workflow = Armagh::Actions::Workflow.new( @logger, @config_store )
+    }
+    assert_equal [ 'collect_freddocs_from_source' ], new_workflow.collect_actions.collect{ |c| c.action.name }
+    assert_equal [ 'consume_a_freddoc_1' ], workflow.get_action_names_for_docspec( Armagh::Documents::DocSpec.new( 'a_freddoc', 'published' ))
+  end
+    
 end

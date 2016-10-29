@@ -47,22 +47,19 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
       })
 
       Armagh::CustomActions::TestPublisher.create_configuration(Armagh::Connection.config, 'test_publish', {
-        # TODO DO I NEED TO SPECIFY BOTH?
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
       })
 
       Armagh::CustomActions::TestConsumer.create_configuration(Armagh::Connection.config, 'test_consume', {
-        # TODO DO I NEED TO SPECIFY Full Input Docspec?
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('ConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
         'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::WORKING)}
       })
 
     when 'bad_publisher'
       Armagh::CustomActions::TestBadPublisher.create_configuration(Armagh::Connection.config, 'bad_publisher', {
-        # TODO DO I NEED TO SPECIFY BOTH?
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)}
       })
 
     when 'bad_consumer'
@@ -117,7 +114,7 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
     when 'change_id_publisher'
       Armagh::CustomActions::TestChangeIdPublisher.create_configuration(Armagh::Connection.config, 'change_id_publisher', {
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
       })
 
     when 'non_collector'
@@ -127,9 +124,18 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
         }
       })
 
+    when 'archive_collector'
+      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'archive_collector', {
+        'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+        }
+      })
+
     when 'full_workflow'
       Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
         'output' => {
           'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
           'divide_collected_document' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)
@@ -148,7 +154,7 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
 
       Armagh::CustomActions::TestPublisher.create_configuration(Armagh::Connection.config, 'test_publish', {
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)}
       })
 
       Armagh::CustomActions::TestConsumer.create_configuration(Armagh::Connection.config, 'test_consume', {

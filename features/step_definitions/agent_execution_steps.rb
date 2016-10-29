@@ -45,3 +45,18 @@ And(/^I set all "([^"]*)" documents to have the following$/) do |collection, tab
     MongoSupport.instance.update_document(collection, document['_id'], new_doc_info)
   end
 end
+
+And(/^the archive path is clean$/) do
+  FileUtils.rmtree ENV['ARMAGH_ARCHIVE_PATH']
+end
+
+And(/^the a file containing "([^"]*)" should be archived$/) do |content|
+  has_content = false
+  now = Time.now
+  archive_path = File.join(ENV['ARMAGH_ARCHIVE_PATH'], '%02d' % now.year, '%02d' % now.month, '%02d.0000' % now.day)
+  Dir.glob(File.join(archive_path, '*')).each do |file|
+    has_content = File.read(file).include? content
+    break if has_content
+  end
+  assert_true(has_content, "No file containing #{content} was found in #{archive_path}")
+end
