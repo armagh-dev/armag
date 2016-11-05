@@ -22,24 +22,14 @@ Given(/^the logs are emptied/) do
 end
 
 Then(/^the logs should not contain "([^"]*)"$/) do |string|
-  bad_files = []
-
-  LogSupport.each_log do |file|
-    bad_files << file if File.read(file).include?(string)
-  end
-
-  assert_empty(bad_files, "Files containing #{string}: #{bad_files}")
+  assert_equal(0, LogSupport.count(string))
 end
 
 Then(/^the logs should contain "([^"]*)"$/) do |string|
-  found_string = false
+  assert_not_equal(0, LogSupport.count(string))
+end
 
-  LogSupport.each_log do |file|
-    if File.read(file) =~ /#{string}/
-      found_string = true
-      break
-    end
-  end
 
-  assert_true(found_string)
+Then(/^the logs should contain (\d+) "([^"]*)"$/) do |count, string|
+  assert_not_equal(count, LogSupport.count(string))
 end

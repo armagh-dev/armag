@@ -39,6 +39,16 @@ module LogSupport
     raise "Invalid permissions on #{LOG_DIR}" unless File.readable?(LOG_DIR) && File.writable?(LOG_DIR)
     each_log{|log| File.delete(log)}
   end
+
+  def self.count(string)
+    count = 0
+    each_log do |log|
+      File.foreach(log) do |line|
+        count += 1 if line =~ /#{string}/
+      end
+    end
+    count
+  end
 end
 
 

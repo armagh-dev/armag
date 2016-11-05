@@ -53,7 +53,7 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 10 seconds
     Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | '[UUID]'                                                 |
+      | document_id         | '[ID]'                                                 |
       | pending_actions     | []                                                       |
       | dev_errors          | {}                                                       |
       | ops_errors          | {}                                                       |
@@ -66,7 +66,7 @@ Feature: Actions Execution
       | source              | {'type' => 'url', 'url' => 'from test'}                  |
       | collection_task_ids | not_empty                                                |
     And I should see a "DivideCollectedDocument" in "documents" with the following
-      | document_id         | '[UUID]'                                                    |
+      | document_id         | '[ID]'                                                    |
       | pending_actions     | []                                                          |
       | dev_errors          | {}                                                          |
       | ops_errors          | {}                                                          |
@@ -435,7 +435,7 @@ Feature: Actions Execution
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                          |
       | pending_actions | []                                                                                                                                                                                                                                                   |
       | dev_errors      | {}                                                                                                                                                                                                                                                   |
-      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document [UUID] is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document [ID] is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                       |
       | state           | 'ready'                                                                                                                                                                                                                                              |
       | locked          | false                                                                                                                                                                                                                                                |
@@ -766,7 +766,7 @@ Feature: Actions Execution
       | copyright           | 'Copyright the future'                           |
       | title               | 'The Title'                                      |
     And I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | '[UUID]'                                                 |
+      | document_id         | '[ID]'                                                 |
       | state               | 'ready'                                                  |
       | locked              | false                                                    |
       | error               | nil                                                      |
@@ -777,7 +777,7 @@ Feature: Actions Execution
       | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | 'collect_id'                                                                                                                                 |
-      | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.strftime('%Y/%m/%d')}.0000/[UUID]","#{Time.now.strftime('%Y/%m/%d')}.0000/[UUID]"]} |
+      | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]"]} |
       | pending_actions | []                                                                                                                                           |
       | dev_errors      | {}                                                                                                                                           |
       | ops_errors      | {}                                                                                                                                           |
@@ -843,3 +843,23 @@ Feature: Actions Execution
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
 
+    Scenario: Collection is triggered on a schedule and then the configuration is changed
+      Given armagh isn't already running
+      And mongo is running
+      And mongo is clean
+      When armagh's "launcher" config is
+        | num_agents        | 1     |
+        | checkin_frequency | 1     |
+        | log_level         | debug |
+      And armagh's "agent" config is
+        | log_level | debug |
+      And armagh's workflow config is "minute_collect"
+      When I run armagh
+      Then I should see an agent with a status of "running" within 119 seconds
+      And the logs should contain 1 "Triggering test_collect collection"
+      And the logs should contain "Test Collect Running"
+      And the logs should not contain "ERROR"
+      Then armagh's workflow config is "test_actions"
+      And I wait 65 seconds
+      Then the logs should contain 1 "Triggering test_collect collection"
+      And the logs should not contain "ERROR"

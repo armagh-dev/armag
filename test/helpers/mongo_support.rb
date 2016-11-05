@@ -95,6 +95,10 @@ class MongoSupport
     @client['config'].find('type' => type).delete_one
   end
 
+  def find_document(collection, doc)
+    @client[collection].find(doc).to_a
+  end
+
   def set_config(type, config)
     @client['config'].find('type' => type).replace_one(config.merge({'type' => type}), {upsert: true})
   end

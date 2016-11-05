@@ -20,8 +20,9 @@ def replace_trace(hash)
   hash['cause'] = 'placeholder' if hash['cause']
 end
 
-def replace_uuid(str)
+def clean_string(str)
   str.gsub!(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/, '[UUID]')
+  str.gsub!(/[a-z0-9]{26}/, '[ID]')
 end
 
 def recent_timestamp
@@ -61,24 +62,24 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
           doc[key].collect do |_k, v|
             if v.is_a? Hash
               replace_trace v
-              v.values.each {|vv| replace_uuid(vv) if vv.is_a? String}
+              v.values.each {|vv| clean_string(vv) if vv.is_a? String}
             elsif v.is_a? Array
               v.each do |i|
                 if i.is_a? Hash
                   replace_trace(i)
                   i.values.each do |val|
-                    replace_uuid(val) if val.is_a? String
+                    clean_string(val) if val.is_a? String
                     if val.is_a? Array
                       val.each do |vv|
-                        replace_uuid(vv) if vv.is_a? String
+                        clean_string(vv) if vv.is_a? String
                       end
                     end
                   end
                 end
-                replace_uuid(i) if i.is_a? String
+                clean_string(i) if i.is_a? String
               end
             elsif v.is_a? String
-              replace_uuid(v)
+              clean_string(v)
             end
           end
         end
@@ -99,7 +100,7 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
             next
           end
         else
-          replace_uuid(actual) if actual.is_a? String
+          clean_string(actual) if actual.is_a? String
 
           if expected != actual
             doc_problems[doc_id][key] = "'#{expected.to_s}' != '#{actual.to_s}'"

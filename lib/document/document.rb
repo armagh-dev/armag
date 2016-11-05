@@ -23,7 +23,7 @@ require_relative '../utils/processing_backoff'
 require_relative '../connection'
 
 require 'armagh/documents'
-require 'securerandom'
+require 'armagh/support/random'
 
 module Armagh
   class Document
@@ -74,7 +74,7 @@ module Armagh
 
     def self.create_trigger_document(state:, type:, pending_actions:)
       doc = Document.new
-      doc.document_id = SecureRandom.uuid
+      doc.document_id = Armagh::Support::Random.random_id
       doc.type = type
       doc.state = state
       doc.add_pending_actions pending_actions

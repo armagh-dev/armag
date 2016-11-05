@@ -23,7 +23,7 @@ require 'time'
 
 Given(/^armagh isn't already running$/) do
   LauncherSupport.kill_launcher_processes
-  assert_true LauncherSupport.get_launcher_processes.empty?
+  assert_empty LauncherSupport.get_launcher_processes, 'Armagh is already running'
 end
 
 When(/^armagh doesn't have a "([^"]*)" config$/) do |config_type|

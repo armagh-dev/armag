@@ -45,7 +45,7 @@ module Armagh
       end
 
       def stop
-        Thread.new {@logger.info 'Stopping Collection Trigger'}
+        Thread.new {@logger.debug 'Stopping Collection Trigger'}.join
         @running = false
         @thread.join if @thread
         @thread = nil
@@ -56,7 +56,7 @@ module Armagh
       end
 
       def trigger_individual_collection(config)
-        @logger.debug "Collection #{config.action.name} triggered"
+        @logger.debug "Triggering #{config.action.name} collection"
         docspec = config.input.docspec
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
         Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
@@ -65,7 +65,7 @@ module Armagh
       end
 
       private def run
-        @logger.info 'Starting Collection trigger'
+        @logger.debug 'Starting Collection trigger'
         @running = true
         while @running
           begin

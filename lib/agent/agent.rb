@@ -44,7 +44,7 @@ module Armagh
       @config = agent_config
       @workflow = workflow
 
-      @uuid = "Agent-#{SecureRandom.uuid}"
+      @uuid = "agent-#{SecureRandom.uuid}"
       @logger = Logging.set_logger("Armagh::Application::Agent::#{@uuid}")
       Logging.set_level(@logger, @config.agent.log_level)
 
@@ -68,7 +68,7 @@ module Armagh
 
     def stop
       if @running
-        Thread.new { @logger.info 'Stopping' }.join
+        Thread.new { @logger.info 'Stopping Agent' }.join
         @running = false
       end
     end
@@ -218,7 +218,6 @@ module Armagh
         execute
       end
 
-      Thread.new{@logger.info 'Stopping Client' }
       @client.stop_service if @client
       DRb.thread.join
       @logger.info 'Terminated'

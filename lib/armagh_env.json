@@ -1,22 +1,23 @@
 { "ENV": {
-    "ARMAGH_HOME":          "/tmp/home/armagh",
-    "ARMAGH_CONFIG":        "/tmp/etc/armagh",
-    "ARMAGH_DATA":          "/tmp/var/armagh/data",
-    "ARMAGH_SECURE":        "/tmp/home/armagh/.ssl",
-    "ARMAGH_REPO":          "/tmp/home/armagh/repo",
-    "ARMAGH_CLUSTER_SETUP": "/tmp/home/armagh/cluster_setup",
-    "ARMAGH_CA":            "/tmp/etc/armagh/ca",
-    "ARMAGH_APP_LOG":       "/tmp/var/log/armagh",
-    "ARMAGH_PID":           "/tmp/var/run/armagh",
-    "ARMAGH_REPLSET_NAME":  "armagh",
-    "ARMAGH_ENV":           "DEVELOPMENT",
-    "ARMAGH_ENCODING":      "UTF-8",
-    "ARMAGH_BIND_IP":       "127.0.0.1",
-    "ARMAGH_ARCHIVE_HOST":  "127.0.0.1",
-    "ARMAGH_ARCHIVE_PORT":  "22",
-    "ARMAGH_ARCHIVE_PATH":  "/tmp/var/archive"
+    "ARMAGH_HOME":            "/tmp/home/armagh",
+    "ARMAGH_CONFIG":          "/tmp/etc/armagh",
+    "ARMAGH_DATA":            "/tmp/var/armagh/data",
+    "ARMAGH_SECURE":          "/tmp/home/armagh/.ssl",
+    "ARMAGH_REPO":            "/tmp/home/armagh/repo",
+    "ARMAGH_CLUSTER_SETUP":   "/tmp/home/armagh/cluster_setup",
+    "ARMAGH_CA":              "/tmp/etc/armagh/ca",
+    "ARMAGH_APP_LOG":         "/tmp/var/log/armagh",
+    "ARMAGH_PID":             "/tmp/var/run/armagh",
+    "ARMAGH_REPLSET_NAME":    "armagh",
+    "ARMAGH_ENV":             "DEVELOPMENT",
+    "ARMAGH_ENCODING":        "UTF-8",
+    "ARMAGH_BIND_IP":         "127.0.0.1",
+    "ARMAGH_ARCHIVE_HOST":    "127.0.0.1",
+    "ARMAGH_ARCHIVE_PORT":    "22",
+    "ARMAGH_ARCHIVE_PATH":    "/tmp/var/archive",
+    "ARMAGH_TAC_DOC_PREFIX":  "4027"
   },
-  
+
   "Armagh::Admin::Resource::API": {
     "ip":        "127.0.0.1",
     "port":      4598,
@@ -25,7 +26,7 @@
     "logfile":   "resource_admin_api.log",
     "str":       "YXJtYWdoCg=="
   },
-  
+
   "Armagh::Admin::Application::API": {
     "ip":        "127.0.0.1",
     "port":      4599,
@@ -34,7 +35,7 @@
     "logfile":   "application_admin_api.log",
     "str":       "YXJtYWdoCg=="
   },
-  
+
   "Armagh::Connection::MongoAdminConnection": {
     "ip": "127.0.0.1",
     "port": 27017,

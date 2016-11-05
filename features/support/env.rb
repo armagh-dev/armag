@@ -63,6 +63,7 @@ Before do
 end
 
 After('@agent') do
+  puts 'Stopping Armagh'
   LauncherSupport.kill_launcher_processes
 end
 

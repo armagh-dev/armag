@@ -144,7 +144,7 @@ module Armagh
 
       checkin['agents'] = AgentStatus.get_statuses(@agent_status) if @running
 
-      @logger.debug "Checking In: #{checkin}"
+      @logger.debug "Checking In: #{status}"
       Connection.status.find('_id' => @hostname).replace_one(checkin, {upsert: true})
 
       @last_checkin = Time.now

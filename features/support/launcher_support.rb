@@ -22,7 +22,7 @@ module LauncherSupport
   unless defined? EXEC_NAME
     EXEC_NAME = 'armagh-agents'
     DAEMON_NAME = 'armagh-agentsd'
-    AGENT_PREFIX = 'armagh-Agent-'
+    AGENT_PREFIX = 'armagh-agent-'
 
     EXEC = File.join(File.dirname(__FILE__), '..', '..', 'bin', EXEC_NAME)
     DAEMON = File.join(File.dirname(__FILE__), '..', '..', 'bin', DAEMON_NAME)
@@ -87,9 +87,12 @@ module LauncherSupport
     LauncherSupport.stop_launcher_daemon
     processes = LauncherSupport.get_launcher_processes
     processes.each do |process|
-      Process.kill(:SIGTERM, process.pid)
+      pid = process.pid
+
+      puts "Killing armagh running as PID #{pid}"
+      Process.kill(:SIGINT, pid)
       begin
-        Process.waitpid(process.pid)
+        Process.waitpid(pid)
       rescue Errno::ECHILD; end
     end
     sleep 1

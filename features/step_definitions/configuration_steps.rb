@@ -161,6 +161,14 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)},
         'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
       })
+    when 'minute_collect'
+      Armagh::CustomActions::TestCollector.create_configuration(Armagh::Connection.config, 'test_collect', {
+        'collect' => {'archive' => false, 'schedule' => '* * * * *'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+        }
+      })
   end
 end
 
