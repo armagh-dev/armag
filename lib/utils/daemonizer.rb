@@ -93,9 +93,7 @@ module Armagh
         current = locked_pid
         if current && running?(current)
           Process.kill(:INT, current)
-          begin
-            Process.waitpid(current)
-          rescue Errno::ECHILD; end
+          sleep 0.1 while running? current
           puts "Stopped PID #{current}"
         else
           puts "#{@app_name} was not running"
