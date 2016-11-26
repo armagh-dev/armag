@@ -738,4 +738,45 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:find_one_and_update).raises(e)
     assert_raise(Armagh::Errors::ConnectionError) { Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED) }
   end
+
+  def test_failures
+    failures = mock('failures')
+    failures.stubs(:find => [{'document_id' => 'fail id'}])
+    Armagh::Connection.stubs(:failures).returns(failures)
+
+    found_failures = Document.failures()
+    assert_equal 1, found_failures.length
+    assert_kind_of Document, found_failures.first
+    assert_equal 'fail id', found_failures.first.document_id
+  end
+
+  def test_raw_failures
+    failures = mock('failures')
+    failures.stubs(:find => [{'document_id' => 'raw fail id'}])
+    Armagh::Connection.stubs(:failures).returns(failures)
+    assert_equal([{'document_id' => 'raw fail id'}], Document.failures(raw: true))
+  end
+
+  def test_to_json
+    expected = {
+      metadata: @doc.metadata,
+      content: @doc.content,
+      type: @doc.type,
+      locked: @doc.locked?,
+      pending_actions: @doc.pending_actions,
+      dev_errors: @doc.dev_errors,
+      ops_errors: @doc.ops_errors,
+      created_timestamp: @doc.created_timestamp,
+      updated_timestamp: @doc.updated_timestamp,
+      collection_task_ids: @doc.collection_task_ids,
+      archive_files: @doc.archive_files,
+      source: @doc.source,
+      document_timestamp: @doc.document_timestamp,
+      document_id: @doc.document_id,
+      state: @doc.state,
+      version: @doc.version,
+      _id: @doc.internal_id
+    }.to_json
+    assert_equal(expected, @doc.to_json)
+  end
 end

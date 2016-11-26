@@ -169,6 +169,16 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
           'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
         }
       })
+
+    when 'publisher_notify_good_consumer'
+      Armagh::CustomActions::TestPublisherNotifyDev.create_configuration(Armagh::Connection.config, 'test_publisher_notify_dev', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
+      Armagh::CustomActions::TestConsumer.create_configuration(Armagh::Connection.config, 'test_consume', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)},
+        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
+      })
   end
 end
 

@@ -98,7 +98,7 @@ module Armagh
         end
         
         def get_document_counts    
-          counts = Document.count_working_by_doctype
+          Document.count_working_by_doctype
         end
         
         def create_action_configuration( configuration_hash )
@@ -134,6 +134,10 @@ module Armagh
         
         def get_document( doc_id, doc_type )
           Document.find( doc_id, doc_type, 'published', raw: true )
+        end
+
+        def get_failed_documents
+          Document.failures(raw: true)
         end
       end         
     end

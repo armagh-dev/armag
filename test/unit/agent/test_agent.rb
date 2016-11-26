@@ -66,7 +66,6 @@ class TestAgent < Test::Unit::TestCase
   STARTED = []
 
   def setup
-
     @logger = mock_logger
     @workflow = mock
     @config_store = []
@@ -193,7 +192,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
@@ -228,7 +227,7 @@ class TestAgent < Test::Unit::TestCase
       define_method(:collect, proc {@caller.instance_variable_set(:@num_creates, 3)})
     end
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
@@ -267,7 +266,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
@@ -299,7 +298,8 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:split).with(action_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
-               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [])
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [],
+               :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
     doc.expects(:mark_delete)
     doc.expects(:finish_processing).at_least_once
@@ -336,7 +336,8 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
-               :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new)
+               :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
+               :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -396,7 +397,8 @@ class TestAgent < Test::Unit::TestCase
                :copyright => 'old copyright',
                :display => 'old_display',
                :source => 'old_source',
-               :archive_files => ['archive_file'])
+               :archive_files => ['archive_file'],
+               :error? => false)
 
     pub_doc = stub(:document_id => 'document_id',
                    :pending_actions => [],
@@ -463,7 +465,8 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:consume).with(published_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
-               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [])
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :archive_files => [],
+               :error? => false)
     doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:finish_processing).at_least_once
 
@@ -490,7 +493,7 @@ class TestAgent < Test::Unit::TestCase
     divider = setup_action(Armagh::StandardActions::DividerTest, {'input' => {'docspec' => input_docspec}})
     action_name = divider.config.action.name
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(divider).at_least_once
@@ -515,7 +518,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
@@ -548,7 +551,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
@@ -582,7 +585,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
@@ -614,6 +617,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name])
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     doc.expects(:add_ops_error).at_least_once
+    doc.stubs(:error?).returns(false)
     @backoff_mock.expects(:reset).at_least_once
 
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(nil).at_least_once
@@ -649,7 +653,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action_name'
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
-               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [])
+               :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :error? => false)
 
     doc.expects(:finish_processing).at_least_once
 
@@ -1193,7 +1197,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
-               :dev_errors => [], :ops_errors => [], :eggs => 'wee'
+               :dev_errors => [], :ops_errors => [], :error? => false
     )
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
@@ -1217,5 +1221,4 @@ class TestAgent < Test::Unit::TestCase
     @default_agent.expects(:execute_action).raises(exception)
     @default_agent.send(:execute)
   end
-
 end

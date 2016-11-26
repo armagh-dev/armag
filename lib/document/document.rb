@@ -160,6 +160,19 @@ module Armagh
       raise Connection.convert_mongo_exception(e, document_id)
     end
 
+    def self.failures(raw: false)
+      if raw
+        documents = Connection.failures.find.to_a
+      else
+        documents = []
+        Connection.failures.find.each do |db_doc|
+          documents << Document.new(db_doc)
+        end
+      end
+
+      documents
+    end
+
     def self.get_for_processing
       Connection.all_document_collections.each do |collection|
         db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
@@ -463,7 +476,7 @@ module Armagh
     end
 
     def error?
-      @db_doc['error'] ? true : false
+      errors.any?
     end
 
     def pending_work?
@@ -483,6 +496,12 @@ module Armagh
       @db_doc['version'] = self.class.version
       @db_doc['collection_task_ids'].uniq!
       @db_doc['archive_files'].uniq!
+
+      if error?
+        @db_doc['error'] = true
+      else
+        @db_doc.delete 'error'
+      end
 
       @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
       Armagh::Utils::DocumentHelper.clean_document(self)
@@ -616,14 +635,12 @@ module Armagh
       @pending_collection_history = true
     end
 
-    private def update_pending_work
-      if errors.any?
-        @db_doc['error'] = true
-      else
-        @db_doc.delete 'error'
-      end
+    def to_json
+      @db_doc.to_json
+    end
 
-      if @db_doc['pending_actions'].any? && !@db_doc['error']
+    private def update_pending_work
+      if @db_doc['pending_actions'].any? && !error?
         @db_doc['pending_work'] = true
       else
         @db_doc.delete 'pending_work'

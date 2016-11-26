@@ -131,6 +131,7 @@ get '/documents/counts.json' do
   counts = []
   begin
     counts = api.get_document_counts
+    return [200, counts.to_json]
   rescue => e
     return [ 200, { 'error_detail' => e.message }.to_json ]
   end
@@ -172,6 +173,16 @@ get '/document.json' do
     
   rescue => e
     api.logger.error( "in application_admin get /document.json with params #{ params.inspect }: #{ e.message }" )
+    return [ 200, { 'error_detail' => e.message }.to_json ]
+  end
+end
+
+get '/documents/failures.json' do
+  begin
+    doc_list = api.get_failed_documents
+    return [200, doc_list.to_json]
+  rescue => e
+    api.logger.error( "in application_admin get /documents/failures.json: #{ e.message }" )
     return [ 200, { 'error_detail' => e.message }.to_json ]
   end
 end

@@ -247,6 +247,10 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
+          if @current_doc.error?
+            @logger.info("Skipping further actions on document '#{@current_doc.document_id}' since it has errors.")
+            break
+          end
           current_action = @workflow.instantiate_action(name, self, @logger, Connection.config)
 
           @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
@@ -344,7 +348,7 @@ module Armagh
           end
 
           doc.published_timestamp = timestamp
-          doc.state = Documents::DocState::PUBLISHED
+          doc.state = Documents::DocState::PUBLISHED unless doc.error?
           doc.add_pending_actions(@workflow.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume

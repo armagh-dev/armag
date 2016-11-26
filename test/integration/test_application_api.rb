@@ -210,4 +210,23 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     
     assert_equal 100, action2.config.params.p1
   end
+
+  def test_document_failures
+    count = 10
+    count.times do |i|
+      doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+                              pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "id_#{i}",
+                              collection_task_ids: [ '123' ], document_timestamp: Time.now )
+      doc.add_dev_error('test_action', 'details')
+      doc.save
+    end
+
+    failed_docs = @api.get_failed_documents
+    assert_equal(count, failed_docs.length)
+
+    ids = failed_docs.collect{|d| d['document_id']}
+    count.times do |i|
+      assert_include(ids, "id_#{i}")
+    end
+  end
 end

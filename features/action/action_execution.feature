@@ -380,7 +380,7 @@ Feature: Actions Execution
       | version         | APP_VERSION                                                                                                  |
     And the logs should contain "ERROR"
 
-  Scenario: Have a publisher to work on with an action that fails in the middle that remains published
+  Scenario: Have a consumer to work on with an action that fails in the middle that remains published
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
@@ -863,3 +863,37 @@ Feature: Actions Execution
       And I wait 65 seconds
       Then the logs should contain 1 "Triggering test_collect collection"
       And the logs should not contain "ERROR"
+
+  Scenario: Have a with a publisher and consumer where the publisher fails and the consumer never runs
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "publisher_notify_good_consumer"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "BadPublisherDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    And I wait 7 seconds
+    Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
+    And I should see 0 "ConsumeOutputDocument" documents in the "documents" collection
+    And I should see a "BadPublisherDocument" in "failures" with the following
+      | document_id     | '123'                                                                                                        |
+      | metadata        | {'meta' => 'incoming meta'}                                                                                  |
+      | dev_errors      | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |
+      | ops_errors      | {}                                                                                                           |
+      | content         | {'text' => 'incoming content'}                                                                               |
+      | state           | 'ready'                                                                                                      |
+      | locked          | false                                                                                                        |
+      | error           | true                                                                                                         |
+      | pending_work    | nil                                                                                                          |
+      | version         | APP_VERSION                                                                                                  |
+    And the logs should contain "ERROR"
+    And the logs should contain "Skipping further actions on document '123' since it has errors."
+    And the logs should not contain "test_consume"
