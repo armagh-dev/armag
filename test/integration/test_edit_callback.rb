@@ -64,8 +64,6 @@ class TestEditCallback < Test::Unit::TestCase
     puts 'Starting Mongo'
     Singleton.__init__(Armagh::Connection::MongoConnection)
     MongoSupport.instance.start_mongo
-
-#    Armagh::Logging.init_log_env
   end
 
   def self.shutdown
@@ -109,7 +107,10 @@ class TestEditCallback < Test::Unit::TestCase
                                                        content: {},
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
-                                                       source: {})
+                                                       source: {},
+                                                       document_timestamp: nil,
+                                                       title: nil,
+                                                       copyright: nil)
     @splitter.split(action_doc)
 
     assert_equal(Armagh::Documents::ActionDocument, @splitter.doc_class)
@@ -145,7 +146,10 @@ class TestEditCallback < Test::Unit::TestCase
                                                        content: {},
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
-                                                       source: {})
+                                                       source: {},
+                                                       document_timestamp: nil,
+                                                       title: nil,
+                                                       copyright: nil, new: true)
     @splitter.split(action_doc)
 
     doc = Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)

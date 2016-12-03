@@ -23,6 +23,7 @@ require 'configh'
 
 require 'armagh/actions'
 require 'armagh/documents'
+require 'armagh/support/random'
 
 require_relative '../logging'
 require_relative '../document/document'
@@ -159,8 +160,8 @@ module Armagh
       Logging.set_logger(logger_name)
     end
 
-    def archive(logger_name, action_name, file_path, metadata, source)
-      archive_file = @archiver.archive_file(file_path, metadata, source)
+    def archive(logger_name, action_name, file_path, archive_data)
+      archive_file = @archiver.archive_file(file_path, archive_data)
       @archives_for_collect << archive_file
       @archive_files = [archive_file]
     rescue Errors::ArchiveError => e
@@ -193,7 +194,15 @@ module Armagh
           doc.add_pending_actions pending_actions
         end
       else
-        action_doc = Documents::ActionDocument.new(document_id: document_id, content: {}, metadata: {}, docspec: docspec, source: {}, new: true)
+        action_doc = Documents::ActionDocument.new(document_id: document_id,
+                                                   content: {},
+                                                   metadata: {},
+                                                   docspec: docspec,
+                                                   source: {},
+                                                   title: nil,
+                                                   copyright: nil,
+                                                   document_timestamp: nil,
+                                                   new: true)
 
         yield action_doc
 
@@ -323,7 +332,7 @@ module Armagh
           allowed_id_change = true
           action_doc = doc.to_action_document
           action.publish action_doc
-          doc.document_id = action_doc.document_id
+          doc.document_id = action_doc.document_id || Armagh::Support::Random.random_id
           doc.metadata = action_doc.metadata
           doc.content = action_doc.content
           doc.title = action_doc.title

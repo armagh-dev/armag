@@ -22,7 +22,7 @@ require 'armagh/support/sftp'
 module Armagh
   module Utils
     class Archiver
-      MAX_FILES_PER_DIR = 10_000
+      MAX_ARCHIVES_PER_DIR = 5_000
 
       def initialize(logger)
         @logger = logger
@@ -42,11 +42,11 @@ module Armagh
         @archive_dir = nil
       end
 
-      def archive_file(file_path, metadata, source)
-        raise Errors::ArchiveError, 'Unable to archive file if an when outside of an archive context.' unless @sftp
+      def archive_file(file_path, archive_data)
+        raise Errors::ArchiveError, 'Unable to archive file when outside of an archive context.' unless @sftp
         update_archive_dir
 
-        meta_json = {'source' => source.to_hash, 'metadata' => metadata}.to_json
+        meta_json = archive_data.to_json
         meta_filename = "#{file_path}.meta"
         File.write(meta_filename, meta_json)
 
@@ -76,13 +76,13 @@ module Armagh
         archive_dir = File.join(month_dir, newest_today_dir)
         num_files = @sftp.ls(archive_dir).length
 
-        remaining = MAX_FILES_PER_DIR - num_files
+        remaining = MAX_ARCHIVES_PER_DIR - num_files
 
         if remaining > 0
           @remaining_files = remaining
           @archive_dir = archive_dir
         else
-          @remaining_files = MAX_FILES_PER_DIR
+          @remaining_files = MAX_ARCHIVES_PER_DIR
           dir_num = newest_today_dir.split('.').last.to_i + 1
           @archive_dir = File.join(month_dir, "#{day}.%04d") % dir_num
         end

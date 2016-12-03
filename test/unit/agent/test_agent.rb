@@ -293,8 +293,14 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(Armagh::StandardActions::SplitTest, {'input' => {'docspec' => input_docspec}})
     action_name = action.config.action.name
 
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
-                                                       docspec: input_docspec, source: {})
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'content' => 'old'},
+                                                       metadata: {'meta' => 'old'},
+                                                       docspec: input_docspec,
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
     action.expects(:split).with(action_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
@@ -330,8 +336,14 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     pending_actions = %w(one two)
 
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'old' => 'content'}, metadata: {'old' => 'meta'},
-                                                       docspec: input_docspec, source: {})
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'old' => 'content'},
+                                                       metadata: {'old' => 'meta'},
+                                                       docspec: input_docspec,
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
     action.expects(:publish).with(action_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
@@ -381,8 +393,14 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     pending_actions = %w(one two)
 
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'old' => 'content'}, metadata: {'old' => 'meta'},
-                                                       docspec: input_docspec, source: {})
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'old' => 'content'},
+                                                       metadata: {'old' => 'meta'},
+                                                       docspec: input_docspec,
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
     action.expects(:publish).with(action_doc)
 
     doc = stub(:document_id => 'document_id',
@@ -460,8 +478,14 @@ class TestAgent < Test::Unit::TestCase
     action = setup_action(Armagh::StandardActions::ConsumeTest, {'input' => {'docspec' => input_docspec}})
     action_name = action.config.action.name
 
-    published_doc = Armagh::Documents::PublishedDocument.new(document_id: 'id', content: {'content' => 'old'}, metadata: {'meta' => 'old'},
-                                                             docspec: input_docspec, source: {})
+    published_doc = Armagh::Documents::PublishedDocument.new(document_id: 'id',
+                                                             content: {'content' => 'old'},
+                                                             metadata: {'meta' => 'old'},
+                                                             docspec: input_docspec,
+                                                             source: {},
+                                                             title: nil,
+                                                             copyright: nil,
+                                                             document_timestamp: nil)
     action.expects(:consume).with(published_doc)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
@@ -737,6 +761,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_create_document
     action = mock
+    source = mock
     @current_doc_mock.expects(:document_id).returns('current_id')
     @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
 
@@ -750,7 +775,7 @@ class TestAgent < Test::Unit::TestCase
                                            new: true,
                                            collection_task_ids: [],
                                            document_timestamp: nil,
-                                           source: {'some' => 'source'},
+                                           source: source,
                                            title: nil,
                                            copyright: nil,
                                            logger: @logger,
@@ -760,16 +785,23 @@ class TestAgent < Test::Unit::TestCase
                                                        content: 'content',
                                                        metadata: 'metadata',
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING),
-                                                       source: {'some' => 'source'})
+                                                       source: source,
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
     @default_agent.create_document action_doc
   end
 
   def test_create_document_current
     id = 'id'
     @current_doc_mock.expects(:document_id).returns(id)
+    source = mock
 
     action_doc = Armagh::Documents::ActionDocument.new(document_id: id, content: 'content', metadata: 'metadata',
-                                                       docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: {})
+                                                       docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: source,
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocumentError) do
       @default_agent.create_document action_doc
@@ -797,7 +829,10 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: {'content' => true},
                                                                                    metadata: {'meta' => true},
                                                                                    docspec: old_docspec,
-                                                                                   source: {}))
+                                                                                   source: {},
+                                                                                   title: nil,
+                                                                                   copyright: nil,
+                                                                                   document_timestamp: nil))
 
     doc.expects(:update_from_draft_action_document).with do |action_doc|
       assert_equal(new_content, action_doc.content)
@@ -877,9 +912,14 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id,
+                                                                                   content: 'old content',
                                                                                    metadata: 'old meta',
-                                                                                   docspec: old_docspec, source: {}))
+                                                                                   docspec: old_docspec,
+                                                                                   source: {},
+                                                                                   title: nil,
+                                                                                   copyright: nil,
+                                                                                   document_timestamp: nil))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -900,9 +940,14 @@ class TestAgent < Test::Unit::TestCase
 
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id,
+                                                                                   content: 'old content',
                                                                                    metadata: 'old meta',
-                                                                                   docspec: docspec, source: {}))
+                                                                                   docspec: docspec,
+                                                                                   source: {},
+                                                                                   title: nil,
+                                                                                   copyright: nil,
+                                                                                   document_timestamp: nil))
 
     doc.expects(:update_from_draft_action_document).with do |action_doc|
       assert_equal(docspec, action_doc.docspec)
@@ -924,9 +969,14 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'old content',
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id,
+                                                                                   content: 'old content',
                                                                                    metadata: 'old meta',
-                                                                                   docspec: old_docspec, source: {}))
+                                                                                   docspec: old_docspec,
+                                                                                   source: {},
+                                                                                   title: nil,
+                                                                                   copyright: nil,
+                                                                                   document_timestamp: nil))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -948,8 +998,14 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: 'content',
-                                                                                   metadata: 'meta', docspec: old_docspec, source: {}))
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id,
+                                                                                   content: 'content',
+                                                                                   metadata: 'meta',
+                                                                                   docspec: old_docspec,
+                                                                                   source: {},
+                                                                                   title: nil,
+                                                                                   copyright: nil,
+                                                                                   document_timestamp: nil))
 
     Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
 
@@ -1036,9 +1092,14 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_get_existing_published_document
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'content' => true}, metadata: {'meta' => true},
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'content' => true},
+                                                       metadata: {'meta' => true},
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY),
-                                                       source: {})
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: Time.at(12345))
     doc = mock('db doc')
     pub_action_doc = mock
     doc.expects(:to_published_document).returns(pub_action_doc)
@@ -1048,9 +1109,14 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_get_existing_published_document_none
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: {'content' => true}, metadata: {'meta' => true},
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'content' => true},
+                                                       metadata: {'meta' => true},
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY),
-                                                       source: {})
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
     Armagh::Document.expects(:find).returns(nil)
     assert_nil @default_agent.get_existing_published_document(action_doc)
   end
@@ -1148,40 +1214,37 @@ class TestAgent < Test::Unit::TestCase
     logger_name = 'test_logger'
     action_name = 'test_action'
     file_path = 'file'
-    metadata = {}
-    source = Armagh::Documents::Source.new
+    archive_data = {'something' => 'details'}
     archiver = @default_agent.instance_variable_get(:@archiver)
-    archiver.expects(:archive_file).with(file_path, metadata, source)
+    archiver.expects(:archive_file).with(file_path, archive_data)
 
-    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+    @default_agent.archive(logger_name, action_name, file_path, archive_data)
   end
 
   def test_archive_archive_error
     logger_name = 'test_logger'
     action_name = 'test_action'
     file_path = 'file'
-    metadata = {}
-    source = Armagh::Documents::Source.new
+    archive_data = {'something' => 'details'}
     error = Armagh::Errors::ArchiveError.new('archive_error')
     archiver = @default_agent.instance_variable_get(:@archiver)
-    archiver.expects(:archive_file).with(file_path, metadata, source).raises(error)
+    archiver.expects(:archive_file).with(file_path, archive_data).raises(error)
     @default_agent.expects(:notify_dev).with(logger_name, action_name, error)
 
-    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+    @default_agent.archive(logger_name, action_name, file_path, archive_data)
   end
 
   def test_archive_sftp_error
     logger_name = 'test_logger'
     action_name = 'test_action'
     file_path = 'file'
-    metadata = {}
-    source = Armagh::Documents::Source.new
+    archive_data = {'something' => 'details'}
     error = Armagh::Support::SFTP::SFTPError.new('sftp error')
     archiver = @default_agent.instance_variable_get(:@archiver)
-    archiver.expects(:archive_file).with(file_path, metadata, source).raises(error)
+    archiver.expects(:archive_file).with(file_path, archive_data).raises(error)
     @default_agent.expects(:notify_ops).with(logger_name, action_name, error)
 
-    @default_agent.archive(logger_name, action_name, file_path, metadata, source)
+    @default_agent.archive(logger_name, action_name, file_path, archive_data)
   end
 
   def test_too_large

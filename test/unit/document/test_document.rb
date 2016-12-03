@@ -124,8 +124,18 @@ class TestDocument < Test::Unit::TestCase
     source = {'some' => 'source'}
     display = 'display'
     title = 'title'
-    action_doc = Armagh::Documents::ActionDocument.new(document_id: id, content: content, metadata: metadata, title: title,
-                                                       docspec: docspec, new: new_doc, source: source, display: display)
+    copyright = 'copyright'
+    document_timestamp = Time.at(0)
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: id,
+                                                       content: content,
+                                                       metadata: metadata,
+                                                       title: title,
+                                                       docspec: docspec,
+                                                       new: new_doc,
+                                                       source: source,
+                                                       display: display,
+                                                       copyright: copyright,
+                                                       document_timestamp: document_timestamp)
     doc = Document.from_action_document(action_doc, pending_actions)
 
     assert_equal(id, doc.document_id)
@@ -137,6 +147,8 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(source, doc.source)
     assert_equal(display, doc.display)
     assert_equal(title, doc.title)
+    assert_equal(copyright, doc.copyright)
+    assert_equal(document_timestamp, doc.document_timestamp)
   end
 
   def test_find
@@ -472,7 +484,7 @@ class TestDocument < Test::Unit::TestCase
 
     block_executed = false
 
-    assert_raise(Armagh::Errors::ConnectionError.new('An unexpected connection error occurred from document docid: Unknown.')) do
+    assert_raise(Armagh::Errors::ConnectionError.new("An unexpected connection error occurred from Document 'docid': Unknown.")) do
       Document.modify_or_create(id, type, state, true) do |doc|
         block_executed = true
       end
@@ -506,7 +518,7 @@ class TestDocument < Test::Unit::TestCase
     id = 'docid'
     type = 'testdoc'
     state = Documents::DocState::WORKING
-    mock_document_find_one_and_update({'_id' => id, 'draft_content' => 'doc content', 'published_content' => {}, 'meta' => 'doc meta', 'type' => type, 'state' => state})
+    mock_document_find_one_and_update({'_id' => id, 'content' => {'doc content' => true}, 'metadata' => {'doc meta' => true}, 'type' => type, 'state' => state, 'pending_actions' => []})
     Document.expects(:unlock)
 
     e = RuntimeError.new 'Error'
@@ -558,6 +570,9 @@ class TestDocument < Test::Unit::TestCase
     content = 'new content'
     metadata = 'new meta'
     source = {'some' => 'source'}
+    title = 'title'
+    copyright = 'copyright'
+    document_timestamp = Time.at(13249)
 
     docspec = Documents::DocSpec.new('type', Armagh::Documents::DocState::PUBLISHED)
 
@@ -565,12 +580,18 @@ class TestDocument < Test::Unit::TestCase
                                                             content: content,
                                                             metadata: metadata,
                                                             docspec: docspec,
-                                                            source: source)
+                                                            source: source,
+                                                            title: title,
+                                                            copyright: copyright,
+                                                            document_timestamp: document_timestamp)
 
     assert_not_equal(content, @doc.content)
     assert_not_equal(metadata, @doc.metadata)
     assert_not_equal(docspec.type, @doc.type)
     assert_not_equal(docspec.state, @doc.state)
+    assert_not_equal(title, @doc.title)
+    assert_not_equal(copyright, @doc.copyright)
+    assert_not_equal(document_timestamp, @doc.document_timestamp)
 
     @doc.update_from_draft_action_document(action_document)
 
@@ -578,6 +599,9 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(metadata, @doc.metadata)
     assert_equal(docspec.type, @doc.type)
     assert_equal(docspec.state, @doc.state)
+    assert_equal(title, @doc.title)
+    assert_equal(copyright, @doc.copyright)
+    assert_equal(document_timestamp, @doc.document_timestamp)
   end
 
   def test_locked?
@@ -666,7 +690,7 @@ class TestDocument < Test::Unit::TestCase
     end
 
 
-    assert_equal 'Document id is too large.  Consider using a divider or splitter to break up the document.', error.message
+    assert_equal "Document 'id' is too large.  Consider using a divider or splitter to break up the document.", error.message
   end
 
   def test_duplicate
@@ -684,14 +708,14 @@ class TestDocument < Test::Unit::TestCase
                       document_timestamp: Time.now)
     end
 
-    assert_equal 'Unable to create document id.  This document already exists.', error.message
+    assert_equal "Unable to create Document 'id'.  This document already exists.", error.message
   end
 
   def test_unknown_operation_error
     error = Mongo::Error::OperationFailure.new('Something')
     @documents.expects(:insert_one).raises(error)
 
-    assert_raise(Armagh::Errors::ConnectionError.new('An unexpected connection error occurred from document id: Something.')) do
+    assert_raise(Armagh::Errors::ConnectionError.new("An unexpected connection error occurred from Document 'id': Something.")) do
       Document.create(type: 'testdoc',
                       content: {'content' => true},
                       metadata: {'meta' => true},
@@ -729,7 +753,7 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_unlock
-    @documents.expects(:find_one_and_update).with({'document_id': 'id'}, {'$set' => {'locked' => false}})
+    @documents.expects(:find_one_and_update).with({'document_id': 'id','type' => 'type'}, {'$set' => {'locked' => false}})
     Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)
   end
 

@@ -25,19 +25,23 @@ require_relative 'utils/network_helper'
 
 module Armagh
   module Connection
+
+    def self.published_collection?(collection)
+      collection.name =~ /^documents\./
+    end
+
     def self.all_document_collections
       doc_collections = [documents]
 
       MongoConnection.instance.connection.collections.each do |collection|
-        doc_collections << collection if collection.name =~ /^documents\./
+        doc_collections << collection if published_collection?(collection)
       end
 
       doc_collections
     end
 
     def self.documents(type_name = nil)
-      
-      collection_name = type_name ? "documents.#{ type_name }" : 'documents'          
+      collection_name = type_name ? "documents.#{ type_name }" : 'documents'
       collection = MongoConnection.instance.connection[collection_name]
       index_doc_collection collection
       collection
@@ -78,7 +82,7 @@ module Armagh
     def self.ip
       MongoConnection.instance.ip
     end
-    
+
     def self.master?
       MongoConnection.instance.connection.database.command(ismaster: 1).documents.first['ismaster']
     end
@@ -124,15 +128,25 @@ module Armagh
 
       # Unlocked Documents by ID (Document#find_or_create_and_lock) not needed to be indexed because ids are unique (mongo reverts to _id_ index)
 
-      #Document IDs
-      collection.indexes.create_one({'document_id' => 1}, unique: true, name: 'document_ids')
+      if published_collection?(collection)
+        collection.indexes.create_one({'document_id' => 1},
+                                      unique: true,
+                                      partial_filter_expression: {'document_id' => {'$exists' => true}},
+                                      name: 'published_document_ids')
+      else
+        collection.indexes.create_one({'document_id' => 1, 'type' => 1},
+                                      unique: true,
+                                      partial_filter_expression: {'document_id' => {'$exists' => true}},
+                                      name: 'document_ids')
+
+      end
 
       # Unlocked documents pending work
       collection.indexes.create_one({'pending_work' => 1, 'locked' => 1, 'updated_timestamp' => 1},
                                     name: 'pending_unlocked',
                                     partial_filter_expression: {
-                                        'pending_work' => {'$exists' => true},
-                                        'locked' => false
+                                      'pending_work' => {'$exists' => true},
+                                      'locked' => false
                                     })
     rescue => e
       raise Errors::IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"

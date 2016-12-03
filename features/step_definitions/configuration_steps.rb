@@ -179,6 +179,19 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublisherDocument', Armagh::Documents::DocState::PUBLISHED)},
         'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
       })
+
+    when 'id_collector'
+      Armagh::CustomActions::TestCollectorSetsID.create_configuration(Armagh::Connection.config, 'test_collect', {
+        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+        'output' => {
+          'collected_document' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+        }
+      })
+    when 'id_publisher'
+      Armagh::CustomActions::TestPublisherSetsID.create_configuration(Armagh::Connection.config, 'test_publish', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
   end
 end
 

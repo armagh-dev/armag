@@ -101,14 +101,14 @@ module Armagh
     # Returns document if found, internal_id if it didn't exist, throws :already_locked when doc exists but locked already
     def self.find_or_create_and_lock(document_id, type, state)
       begin
-        db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
+        db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false, 'type' => type}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
       rescue => e
         e = Connection.convert_mongo_exception(e, document_id)
         throw(:already_locked, true) if e.is_a? Documents::Errors::DocumentUniquenessError
         raise e
       end
 
-      if db_doc['type']
+      if db_doc['pending_actions']
         db_doc['locked'] = true
         doc = Document.new(db_doc)
       else
@@ -150,7 +150,7 @@ module Armagh
     end
 
     def self.find(document_id, type, state, raw: false)
-      db_doc = collection(type, state).find('document_id' => document_id).limit(1).first
+      db_doc = collection(type, state).find('document_id' => document_id, 'type' => type).limit(1).first
       if raw
         return db_doc
       else
@@ -185,7 +185,7 @@ module Armagh
     end
 
     def self.exists?(document_id, type, state)
-      collection(type, state).find({'document_id' => document_id}).limit(1).count != 0
+      collection(type, state).find({'document_id' => document_id, 'type' => type}).limit(1).count != 0
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
     end
@@ -237,7 +237,7 @@ module Armagh
     end
 
     def self.unlock(document_id, type, state)
-      collection(type, state).find_one_and_update({'document_id': document_id}, {'$set' => {'locked' => false}})
+      collection(type, state).find_one_and_update({'document_id': document_id, 'type' => type}, {'$set' => {'locked' => false}})
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
     end

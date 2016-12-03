@@ -44,6 +44,7 @@ class TestArchiver < Test::Unit::TestCase
     file = 'file.txt'
     metadata = {'meta' => true}
     source = Armagh::Documents::Source.new(mime_type: 'test_type')
+    archive_data = {'metadata' => metadata, 'source' => source.to_hash}
 
     config = mock('config')
     sftp = mock('sftp)')
@@ -66,7 +67,7 @@ class TestArchiver < Test::Unit::TestCase
       FileUtils.touch(meta_filename)
       File.link(meta_filename, 'meta_reference') # Hardlink so we can access it after the automatic delete
       @archiver.within_archive_context do
-        @archiver.archive_file(file, metadata, source)
+        @archiver.archive_file(file, archive_data)
       end
       file_exists = File.exists? meta_filename
 
@@ -81,6 +82,7 @@ class TestArchiver < Test::Unit::TestCase
     file = 'file.txt'
     metadata = {'meta' => true}
     source = Armagh::Documents::Source.new(mime_type: 'test_type')
+    archive_data = {'metadata' => metadata, 'source' => source.to_hash}
 
     config = mock('config')
     sftp = mock('sftp)')
@@ -93,7 +95,7 @@ class TestArchiver < Test::Unit::TestCase
     sftp.expects(:ls).with('2010/02').returns(%w(15.0000 15.0001 15.0002))
 
     files = []
-    Armagh::Utils::Archiver::MAX_FILES_PER_DIR.times{|i| files << "file_#{i}"}
+    Armagh::Utils::Archiver::MAX_ARCHIVES_PER_DIR.times{|i| files << "file_#{i}"}
 
     sftp.expects(:ls).with('2010/02/15.0002').returns(files)
 
@@ -102,14 +104,13 @@ class TestArchiver < Test::Unit::TestCase
 
     FakeFS do
       @archiver.within_archive_context do
-        @archiver.archive_file(file, metadata, source)
+        @archiver.archive_file(file, archive_data)
       end
     end
   end
 
   def test_archive_file_no_context
-    source = mock
-    error = Armagh::Errors::ArchiveError.new('Unable to archive file if an when outside of an archive context.')
-    assert_raise(error){@archiver.archive_file('path', {}, source)}
+    error = Armagh::Errors::ArchiveError.new('Unable to archive file when outside of an archive context.')
+    assert_raise(error){@archiver.archive_file('path', {})}
   end
 end

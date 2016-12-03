@@ -58,33 +58,35 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def create_documents(state)
-    4_000.times do |i|
-      Armagh::Document.create(type: 'TestDocument',
-                              content: {},
-                              metadata: {},
-                              pending_actions: ['action'],
-                              state: state,
-                              document_id: "id_#{i}",
-                              collection_task_ids: [],
-                              document_timestamp: nil)
-    end
+    4_000.times { |i| create_document("id_#{i}", 'TestDocument', state) }
+  end
+
+  def create_document(id, type = 'TestDocument', state = Armagh::Documents::DocState::READY)
+    Armagh::Document.create(type: type,
+                            content: {},
+                            metadata: {},
+                            pending_actions: ['action'],
+                            state: state,
+                            document_id: id,
+                            collection_task_ids: [],
+                            document_timestamp: nil)
   end
 
   def test_config_idx
 
-    Armagh::Agent.create_configuration( Armagh::Connection.config, 'default', {} )
+    Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {})
 
-    logger = stub(:ops_warn)
+    #logger = stub(:ops_warn)
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     initial_ops = index_stats['accesses']['ops']
-    
-    Armagh::Agent.find_configuration( Armagh::Connection.config, 'default' )
-    
+
+    Armagh::Agent.find_configuration(Armagh::Connection.config, 'default')
+
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     new_ops = index_stats['accesses']['ops']
     assert_equal(initial_ops + 1, new_ops)
 
-    Armagh::Agent.find_configuration( Armagh::Connection.config, 'default' )
+    Armagh::Agent.find_configuration(Armagh::Connection.config, 'default')
 
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     new_ops = index_stats['accesses']['ops']
@@ -136,12 +138,12 @@ class TestIndexing < Test::Unit::TestCase
   def test_find_idx_published
     create_documents Armagh::Documents::DocState::PUBLISHED
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
     Armagh::Document.find('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
 
     assert_equal(initial_ops + 1, new_ops)
@@ -164,12 +166,12 @@ class TestIndexing < Test::Unit::TestCase
   def test_exists_published
     create_documents Armagh::Documents::DocState::PUBLISHED
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
     Armagh::Document.exists?('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
 
     assert_equal(initial_ops + 1, new_ops)
@@ -192,16 +194,41 @@ class TestIndexing < Test::Unit::TestCase
   def test_find_or_create_and_lock_idx_published
     create_documents Armagh::Documents::DocState::PUBLISHED
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
     Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
-    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'document_ids')
+    index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
 
     assert_equal(initial_ops + 1, new_ops)
-
   end
-  
+
+  def test_unpubished_doc_uniqueness
+    assert_nothing_raised {
+      create_document(nil, 'Type')
+      create_document(nil, 'Type')
+    }
+
+    create_document('id_123', 'Type')
+    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError) { create_document('id_123', 'Type') }
+
+    assert_nothing_raised {
+      create_document('id_123', 'Type1')
+      create_document('id_123', 'Type2')
+    }
+  end
+
+  def test_published_doc_uniqueness
+    create_document('id_123', 'Type', Armagh::Documents::DocState::PUBLISHED)
+    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError) {
+      create_document('id_123', 'Type', Armagh::Documents::DocState::PUBLISHED)
+    }
+
+    assert_nothing_raised {
+      create_document('id_123', 'Type1', Armagh::Documents::DocState::PUBLISHED)
+      create_document('id_123', 'Type2', Armagh::Documents::DocState::PUBLISHED)
+    }
+  end
 end

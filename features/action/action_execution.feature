@@ -53,7 +53,7 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 10 seconds
     Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | '[ID]'                                                 |
+      | document_id         | nil                                                      |
       | pending_actions     | []                                                       |
       | dev_errors          | {}                                                       |
       | ops_errors          | {}                                                       |
@@ -66,7 +66,7 @@ Feature: Actions Execution
       | source              | {'type' => 'url', 'url' => 'from test'}                  |
       | collection_task_ids | not_empty                                                |
     And I should see a "DivideCollectedDocument" in "documents" with the following
-      | document_id         | '[ID]'                                                    |
+      | document_id         | nil                                                         |
       | pending_actions     | []                                                          |
       | dev_errors          | {}                                                          |
       | ops_errors          | {}                                                          |
@@ -146,6 +146,41 @@ Feature: Actions Execution
     And the logs should not contain "ERROR"
     And the a file containing "collected content" should be archived
     And the a file containing "dividing" should be archived
+
+  Scenario: Have a document for a collector that sets an id
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "id_collector"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
+    And  I should see a "CollectedDocument" in "documents" with the following
+      | document_id         | 'collected_id'                                             |
+      | pending_actions     | []                                                       |
+      | dev_errors          | {}                                                       |
+      | ops_errors          | {}                                                       |
+      | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
+      | state               | 'ready'                                                  |
+      | locked              | false                                                    |
+      | error               | nil                                                      |
+      | pending_work        | nil                                                      |
+      | version             | APP_VERSION                                              |
+      | source              | {'type' => 'url', 'url' => 'from test'}                  |
+      | collection_task_ids | not_empty                                                |
+    And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
+    And the logs should contain "Test Collect Sets ID Running"
+    And the logs should not contain "ERROR"
 
   Scenario: Have a document for a splitter
     Given armagh isn't already running
@@ -262,6 +297,43 @@ Feature: Actions Execution
       | pending_work    | nil                                                                         |
       | version         | APP_VERSION                                                                 |
     And the logs should contain "Test Publish Running"
+    And the logs should not contain "ERROR"
+    And I should see 0 "PublishDocument" documents in the "documents" collection
+
+  Scenario: Have a document for a publisher that sets an ID
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "id_publisher"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}"
+    Then I should see an agent with a status of "running" within 10 seconds
+    Then I should see an agent with a status of "idle" within 10 seconds
+    And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
+      | document_id         | 'published_id'                |
+      | pending_actions     | []                            |
+      | dev_errors          | {}                            |
+      | ops_errors          | {}                            |
+      | metadata            | {'meta' => 'some meta'}       |
+      | content             | {'content' => 'some content'} |
+      | state               | 'published'                   |
+      | locked              | false                         |
+      | error               | nil                           |
+      | pending_work        | nil                           |
+      | version             | APP_VERSION                   |
+      | title               | 'The Title'                   |
+      | copyright           | 'Copyright the future'        |
+      | published_timestamp | recent_timestamp              |
+    And the logs should contain "Test Publish Sets ID Running"
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
 
@@ -431,17 +503,17 @@ Feature: Actions Execution
     And I wait 7 seconds
     Then I should see 0 "TooLargeCollectorOutputDocument" documents in the "documents" collection
     Then I should see a "__COLLECT__too_large_collector" in "failures" with the following
-      | document_id     | 'incoming'                                                                                                                                                                                                                                           |
-      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                          |
-      | pending_actions | []                                                                                                                                                                                                                                                   |
-      | dev_errors      | {}                                                                                                                                                                                                                                                   |
-      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document [ID] is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
-      | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                       |
-      | state           | 'ready'                                                                                                                                                                                                                                              |
-      | locked          | false                                                                                                                                                                                                                                                |
-      | error           | true                                                                                                                                                                                                                                                 |
-      | pending_work    | nil                                                                                                                                                                                                                                                  |
-      | version         | APP_VERSION                                                                                                                                                                                                                                          |
+      | document_id     | 'incoming'                                                                                                                                                                                                                                    |
+      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                   |
+      | pending_actions | []                                                                                                                                                                                                                                            |
+      | dev_errors      | {}                                                                                                                                                                                                                                            |
+      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                |
+      | state           | 'ready'                                                                                                                                                                                                                                       |
+      | locked          | false                                                                                                                                                                                                                                         |
+      | error           | true                                                                                                                                                                                                                                          |
+      | pending_work    | nil                                                                                                                                                                                                                                           |
+      | version         | APP_VERSION                                                                                                                                                                                                                                   |
     And the logs should contain "ERROR"
 
   Scenario: Have a splitter that edits documents that are too large
@@ -466,7 +538,7 @@ Feature: Actions Execution
       | document_id  | 'incoming'                                                                                                                                                                                                                                             |
       | metadata     | {'meta' => 'incoming meta'}                                                                                                                                                                                                                            |
       | dev_errors   | {}                                                                                                                                                                                                                                                     |
-      | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document split_123 is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document 'split_123' is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
       | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                         |
       | state        | 'ready'                                                                                                                                                                                                                                                |
       | locked       | false                                                                                                                                                                                                                                                  |
@@ -766,7 +838,7 @@ Feature: Actions Execution
       | copyright           | 'Copyright the future'                           |
       | title               | 'The Title'                                      |
     And I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | '[ID]'                                                 |
+      | document_id         | nil                                                      |
       | state               | 'ready'                                                  |
       | locked              | false                                                    |
       | error               | nil                                                      |
@@ -776,17 +848,17 @@ Feature: Actions Execution
       | metadata            | {}                                                       |
       | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
-      | document_id     | 'collect_id'                                                                                                                                 |
+      | document_id     | 'collect_id'                                                                                                                             |
       | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]"]} |
-      | pending_actions | []                                                                                                                                           |
-      | dev_errors      | {}                                                                                                                                           |
-      | ops_errors      | {}                                                                                                                                           |
-      | content         | {'doesnt_matter' => true}                                                                                                                    |
-      | state           | 'ready'                                                                                                                                      |
-      | locked          | false                                                                                                                                        |
-      | error           | nil                                                                                                                                          |
-      | pending_work    | nil                                                                                                                                          |
-      | version         | APP_VERSION                                                                                                                                  |
+      | pending_actions | []                                                                                                                                       |
+      | dev_errors      | {}                                                                                                                                       |
+      | ops_errors      | {}                                                                                                                                       |
+      | content         | {'doesnt_matter' => true}                                                                                                                |
+      | state           | 'ready'                                                                                                                                  |
+      | locked          | false                                                                                                                                    |
+      | error           | nil                                                                                                                                      |
+      | pending_work    | nil                                                                                                                                      |
+      | version         | APP_VERSION                                                                                                                              |
     And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
 
   Scenario: Republishing a document with a newer armagh version updates the version in the document
@@ -843,26 +915,26 @@ Feature: Actions Execution
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
 
-    Scenario: Collection is triggered on a schedule and then the configuration is changed
-      Given armagh isn't already running
-      And mongo is running
-      And mongo is clean
-      When armagh's "launcher" config is
-        | num_agents        | 1     |
-        | checkin_frequency | 1     |
-        | log_level         | debug |
-      And armagh's "agent" config is
-        | log_level | debug |
-      And armagh's workflow config is "minute_collect"
-      When I run armagh
-      Then I should see an agent with a status of "running" within 119 seconds
-      And the logs should contain 1 "Triggering test_collect collection"
-      And the logs should contain "Test Collect Running"
-      And the logs should not contain "ERROR"
-      Then armagh's workflow config is "test_actions"
-      And I wait 65 seconds
-      Then the logs should contain 1 "Triggering test_collect collection"
-      And the logs should not contain "ERROR"
+  Scenario: Collection is triggered on a schedule and then the configuration is changed
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "minute_collect"
+    When I run armagh
+    Then I should see an agent with a status of "running" within 119 seconds
+    And the logs should contain 1 "Triggering test_collect collection"
+    And the logs should contain "Test Collect Running"
+    And the logs should not contain "ERROR"
+    Then armagh's workflow config is "test_actions"
+    And I wait 65 seconds
+    Then the logs should contain 1 "Triggering test_collect collection"
+    And the logs should not contain "ERROR"
 
   Scenario: Have a with a publisher and consumer where the publisher fails and the consumer never runs
     Given armagh isn't already running
@@ -884,16 +956,16 @@ Feature: Actions Execution
     Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
     And I should see 0 "ConsumeOutputDocument" documents in the "documents" collection
     And I should see a "BadPublisherDocument" in "failures" with the following
-      | document_id     | '123'                                                                                                        |
-      | metadata        | {'meta' => 'incoming meta'}                                                                                  |
-      | dev_errors      | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |
-      | ops_errors      | {}                                                                                                           |
-      | content         | {'text' => 'incoming content'}                                                                               |
-      | state           | 'ready'                                                                                                      |
-      | locked          | false                                                                                                        |
-      | error           | true                                                                                                         |
-      | pending_work    | nil                                                                                                          |
-      | version         | APP_VERSION                                                                                                  |
+      | document_id  | '123'                                                             |
+      | metadata     | {'meta' => 'incoming meta'}                                       |
+      | dev_errors   | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |
+      | ops_errors   | {}                                                                |
+      | content      | {'text' => 'incoming content'}                                    |
+      | state        | 'ready'                                                           |
+      | locked       | false                                                             |
+      | error        | true                                                              |
+      | pending_work | nil                                                               |
+      | version      | APP_VERSION                                                       |
     And the logs should contain "ERROR"
     And the logs should contain "Skipping further actions on document '123' since it has errors."
     And the logs should not contain "test_consume"
