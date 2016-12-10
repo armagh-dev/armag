@@ -152,27 +152,37 @@ class TestConnection < Test::Unit::TestCase
   def test_can_connect_no_servers
     @cluster.expects(:servers).returns([])
     assert_false Armagh::Connection.can_connect?
+    assert_equal 'The database does not appear to be running.', Armagh::Connection.can_connect_message
   end
 
   def test_can_connect_servers_true
-    server = mock('object)')
-    server.stubs(:connectable?).returns(true)
+    server = mock
+    connection = mock
+    connection.expects(:ping).returns(true)
+    server.stubs(:with_connection).yields(connection)
     @cluster.expects(:servers).returns([server])
     assert_true Armagh::Connection.can_connect?
+    assert_nil Armagh::Connection.can_connect_message
   end
 
   def test_can_connect_servers_false
-    server = mock('object)')
-    server.stubs(:connectable?).returns(false)
+    server = mock
+    connection = mock
+    connection.expects(:ping).returns(false)
+    server.stubs(:with_connection).yields(connection)
     @cluster.expects(:servers).returns([server])
     assert_false Armagh::Connection.can_connect?
+    assert_nil Armagh::Connection.can_connect_message
   end
 
   def test_can_connect_servers_error
-    server = mock('object)')
-    server.stubs(:connectable?).raises (RuntimeError.new('error'))
+    server = mock
+    connection = mock
+    connection.expects(:ping).raises(RuntimeError.new('error message'))
+    server.stubs(:with_connection).yields(connection)
     @cluster.expects(:servers).returns([server])
     assert_false Armagh::Connection.can_connect?
+    assert_equal 'error message', Armagh::Connection.can_connect_message
   end
 
   def test_setup_indexes

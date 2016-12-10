@@ -96,18 +96,26 @@ module Armagh
     end
 
     def self.can_connect?
-      begin
-        connectable = false
-        MongoConnection.instance.connection.cluster.servers.each do |server|
-          if server.connectable?
-            connectable = true
-            break
-          end
-        end
-        connectable
-      rescue
-        false
+      @can_connect_message = nil
+      servers = MongoConnection.instance.connection.cluster.servers
+      if servers.empty?
+        @can_connect_message = 'The database does not appear to be running.'
+        return false
       end
+
+      servers.each do |server|
+        server.with_connection do |conn|
+          return true if conn.ping
+        end
+      end
+      false
+    rescue => e
+      @can_connect_message = e.message
+      false
+    end
+
+    def self.can_connect_message
+      @can_connect_message
     end
 
     def self.clear_indexed_doc_collections

@@ -75,7 +75,7 @@ module Armagh
 
       unless Connection.can_connect?
         Logging.disable_mongo_log
-        @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  Ensure the database is running."
+        @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  #{Connection.can_connect_message}"
         exit 1
       end
       

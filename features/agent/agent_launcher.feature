@@ -34,4 +34,4 @@ Feature: Agent Launcher
     And mongo isn't running
     When I run armagh
     Then armagh should have exited
-    And the logs should contain "Unable to establish connection to the MongoConnection database configured in '.+'.  Ensure the database is running."
+    And the logs should contain "Unable to establish connection to the MongoConnection database configured in '.+'.  The database does not appear to be running."
