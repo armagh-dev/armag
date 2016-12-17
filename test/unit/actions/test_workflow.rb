@@ -22,7 +22,7 @@ require 'mocha/test_unit'
 require_relative '../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/action/workflow'
+require_relative '../../../lib/actions/workflow'
 require_relative '../../../lib/connection'
 
 module Armagh

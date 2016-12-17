@@ -3,9 +3,9 @@ require 'singleton'
 require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../launcher/launcher'
-require_relative '../../action/workflow'
+require_relative '../../actions/workflow'
 require_relative '../../document/document'
-require_relative '../../action/gem_manager'
+require_relative '../../actions/gem_manager'
 
 
 module Armagh

@@ -22,7 +22,7 @@ require 'mocha/test_unit'
 require_relative '../../../lib/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/action/gem_manager'
+require_relative '../../../lib/actions/gem_manager'
 
 class TestGemManager < Test::Unit::TestCase
   

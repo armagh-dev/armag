@@ -49,6 +49,17 @@ module Armagh
           }
         })
       end
+
+      def self.make_long_test_config(store:, action_name:, collected_doctype:)
+        create_configuration(store, action_name, {
+          'action' => {'name' => action_name, 'active' => true},
+          'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
+          'input' => {},
+          'output' => {
+            'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+          }
+        })
+      end
     end
 
     class SplitActionForTest < Actions::Split
@@ -91,6 +102,10 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     @collection_trigger = Armagh::Utils::CollectionTrigger.new(@workflow)
   end
 
+  def teardown
+    @collection_trigger.stop if @collection_trigger.running?
+  end
+
   def wait_for_documents(seconds)
     end_time = Time.now + seconds
     while MongoSupport.instance.get_mongo_documents('documents').to_a.empty?
@@ -129,5 +144,22 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a
     wait_for_documents(60)
     @collection_trigger.stop
+  end
+
+  def test_collection_config_change
+    MongoSupport.instance.clean_database
+    @config_store.clear
+
+    Armagh::StandardActions::CollectActionForTest.make_long_test_config(store: @config_store, action_name: 'change_collect', collected_doctype: 'collect_type')
+    @workflow.refresh
+
+    @collection_trigger.start
+
+    sleep 62
+    Armagh::StandardActions::CollectActionForTest.make_test_config(store: @config_store, action_name: 'change_collect', collected_doctype: 'collect_type')
+    @workflow.refresh
+    sleep 1
+
+    assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a
   end
 end

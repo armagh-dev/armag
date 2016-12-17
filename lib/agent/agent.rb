@@ -267,7 +267,8 @@ module Armagh
 
           if current_action
             begin
-              @logger.debug "Executing #{name} on document '#{@current_doc.document_id}'."
+              exec_id = @current_doc.document_id || @current_doc.internal_id
+              @logger.debug "Executing #{name} on document '#{exec_id}'."
               Dir.mktmpdir do |tmp_dir|
                 Dir.chdir(tmp_dir) do
                   execute_action(current_action, @current_doc)

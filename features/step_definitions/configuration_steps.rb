@@ -208,6 +208,12 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       @launcher_config = Armagh::Launcher.create_configuration(Armagh::Connection.config, '127.0.0.1_default', {'launcher' => config})
     when 'agent'
       @agent_config = Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {'agent' => config})
+    when 'action'
+      config.merge! ({
+        'input' => {'docspec' => 'testdoc:ready'},
+        'output' => {'docspec' => 'testdoc:published'},
+      })
+      @action_config = Armagh::CustomActions::TestPublisher.create_configuration(Armagh::Connection.config, 'test-action', config)
     else
       raise "Unknown config type #{config_type}"
   end

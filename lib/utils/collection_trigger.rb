@@ -23,7 +23,7 @@ require_relative 'interruptible_sleep'
 require_relative '../logging'
 require_relative '../../lib/document/document'
 require_relative '../ipc'
-require_relative '../action/workflow'
+require_relative '../actions/workflow'
 require_relative '../agent/agent_status'
 
 module Armagh
@@ -33,6 +33,7 @@ module Armagh
 
       def initialize(workflow)
         @workflow = workflow
+        @last_timestamp = workflow.last_timestamp
         @running = false
         @last_run = {}
         @seen_actions = []
@@ -69,12 +70,21 @@ module Armagh
         @running = true
         while @running
           begin
+            reset_last_run
             trigger_actions
             remove_unseen_actions
           rescue => e
             Logging.dev_error_exception(@logger, e, 'Collection trigger failed.')
           end
-          InterruptibleSleep.interruptible_sleep(15) { !@running }
+          InterruptibleSleep.interruptible_sleep(1) { !@running }
+        end
+      end
+
+      private def reset_last_run
+        last_timestamp = @workflow.last_timestamp
+        unless last_timestamp == @last_timestamp
+          @last_run.clear
+          @last_timestamp = last_timestamp
         end
       end
 
@@ -90,6 +100,9 @@ module Armagh
           if now >= next_run
             trigger_individual_collection(config)
             @last_run[name] = now
+            @logger.debug("Collection #{name} scheduled to run at #{Armagh::Support::Cron.next_execution_time(schedule, now)}")
+          elsif now == @last_run[name]
+            @logger.debug("Collection #{name} scheduled to run at #{next_run}")
           end
         end
       end

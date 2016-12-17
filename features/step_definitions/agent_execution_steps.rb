@@ -16,7 +16,7 @@
 #
 
 require_relative '../../lib/document/document'
-require_relative '../../lib/action/workflow'
+require_relative '../../lib/actions/workflow'
 require_relative '../../lib/logging'
 
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"$/) do |count, doc_type, state, document_id, content, meta|
@@ -52,7 +52,7 @@ end
 
 And(/^the a file containing "([^"]*)" should be archived$/) do |content|
   has_content = false
-  now = Time.now
+  now = Time.now.utc
   archive_path = File.join(ENV['ARMAGH_ARCHIVE_PATH'], '%02d' % now.year, '%02d' % now.month, '%02d.0000' % now.day)
   Dir.glob(File.join(archive_path, '*')).each do |file|
     has_content = File.read(file).include? content

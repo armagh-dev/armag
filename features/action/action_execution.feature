@@ -849,7 +849,7 @@ Feature: Actions Execution
       | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | 'collect_id'                                                                                                                             |
-      | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.strftime('%Y/%m/%d')}.0000/[ID]"]} |
+      | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]"]} |
       | pending_actions | []                                                                                                                                       |
       | dev_errors      | {}                                                                                                                                       |
       | ops_errors      | {}                                                                                                                                       |
@@ -968,4 +968,4 @@ Feature: Actions Execution
       | version      | APP_VERSION                                                       |
     And the logs should contain "ERROR"
     And the logs should contain "Skipping further actions on document '123' since it has errors."
-    And the logs should not contain "test_consume"
+    And the logs should not contain "Test Consume Running"

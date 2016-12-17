@@ -31,10 +31,9 @@ module Armagh
     class ConfigurationError < StandardError; end
     
     class Workflow
-      attr_accessor :collect_actions
+      attr_accessor :collect_actions, :last_timestamp
 
       def initialize( logger, config_store )
-        
         @logger = logger
         @last_timestamp = Time.at(0)
         @input_docspecs = {}
@@ -48,34 +47,32 @@ module Armagh
       def set_logger( logger )
         @logger = logger 
       end
-      
+
       def refresh(force = false)
         configs_with_classes_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
         configs_in_db = configs_with_classes_in_db.collect{ |_class, config| config if config.action.active }.compact
         ts_in_db = nil
         begin
-          ts_in_db = configs_in_db.collect{ |c| c.__timestamp}.max 
+          ts_in_db = configs_in_db.collect{ |c| c.__timestamp}.max
         rescue; end
-        
+
         return false if ts_in_db == @last_timestamp && !force
-        
-        @logger.any "Refreshing workflow"
-        
+
+        @logger.any 'Refreshing workflow'
+
         begin
-        warnings, 
-        new_input_docspecs, 
-        new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs( configs_in_db )
-        
-        @action_names_by_input_docspecs = new_input_docspecs
-        @action_names_by_output_docspecs = new_output_docspecs
-        @action_configs_by_name = Hash[ configs_in_db.collect{ | config | [ config.action.name, config ]}]
-        @collect_actions = configs_with_classes_in_db.collect{ |klass, config| config if klass < Actions::Collect }.compact
-        @last_timestamp = ts_in_db
-               
-      rescue => e
-        @logger.any e.message
-      end
-        return true   
+          warnings, new_input_docspecs, new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs(configs_in_db)
+
+          @action_names_by_input_docspecs = new_input_docspecs
+          @action_names_by_output_docspecs = new_output_docspecs
+          @action_configs_by_name = Hash[configs_in_db.collect { |config| [config.action.name, config] }]
+          @collect_actions = configs_with_classes_in_db.collect { |klass, config| config if klass < Actions::Collect }.compact
+          @last_timestamp = ts_in_db
+          @logger.debug("Available actions: #{@action_configs_by_name.keys}")
+        rescue => e
+          @logger.any e.message
+        end
+        return true
       end
       
       def Workflow.validate_and_return_warnings_inputs_outputs( configs )

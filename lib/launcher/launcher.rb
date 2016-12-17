@@ -33,8 +33,8 @@ Armagh::Environment.init
 
 require_relative '../agent/agent'
 require_relative '../agent/agent_status'
-require_relative '../action/workflow'
-require_relative '../action/gem_manager'
+require_relative '../actions/workflow'
+require_relative '../actions/gem_manager'
 require_relative '../utils/collection_trigger'
 require_relative '../connection'
 require_relative '../ipc'

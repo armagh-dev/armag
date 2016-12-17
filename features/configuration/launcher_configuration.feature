@@ -113,3 +113,18 @@ Feature: Launcher Configuration
     And I wait 3 seconds
     Then the logs should not contain "DEBUG"
     But the logs should contain "INFO"
+
+  Scenario: Change action configuration
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    And the logs are emptied
+    When armagh's "action" config is
+      | iteration         | 1 |
+    And I run armagh
+    And I wait 3 seconds
+    When the logs are emptied
+    When armagh's "action" config is
+      | iteration         | 2 |
+    And I wait 61 seconds
+    Then the logs should contain "Configuration change detected"

@@ -42,6 +42,17 @@ class UTAction < Armagh::Actions::Collect
       }
     })
   end
+
+  def self.make_long_test_config(store:, action_name:, collected_doctype:)
+    create_configuration(store, action_name, {
+      'action' => {'name' => action_name, 'active' => true},
+      'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
+      'input' => {},
+      'output' => {
+        'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+      }
+    })
+  end
 end
 
 class TestCollectionTrigger < Test::Unit::TestCase
@@ -59,8 +70,10 @@ class TestCollectionTrigger < Test::Unit::TestCase
     @workflow.stubs(:config_store).returns(@config_store)
     @actions = ['one']
     @workflow.stubs(:get_action_names_for_docspec).returns(@actions)
+    @last_timestamp = Time.new(2010, 3, 5, 23, 32, 0)
+    @workflow.stubs(:last_timestamp).returns(@last_timestamp)
     @config = UTAction.make_test_config(store: @config_store, action_name: 'name', collected_doctype: 'type')
-    @workflow.stubs(:collect_actions).returns([@config] )
+    @workflow.stubs(:collect_actions).returns([@config])
 
     Armagh::Logging.expects(:set_logger).returns(@logger)
     @trigger = Armagh::Utils::CollectionTrigger.new(@workflow)
@@ -104,7 +117,6 @@ class TestCollectionTrigger < Test::Unit::TestCase
     @trigger.trigger_individual_collection(@config)
   end
 
-
   def test_unseen
     @trigger.instance_variable_set(:@last_run, {'name' => Time.at(0).utc, 'old' => Time.at(0).utc})
 
@@ -116,4 +128,19 @@ class TestCollectionTrigger < Test::Unit::TestCase
     assert_equal(['name'], @trigger.instance_variable_get(:@last_run).keys)
   end
 
+  def test_trigger_updated_workflow
+    Armagh::Document.expects(:create_trigger_document).never
+
+    @config = UTAction.make_long_test_config(store: @config_store, action_name: 'update', collected_doctype: 'type')
+    @workflow.stubs(:collect_actions).returns([@config])
+    @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 20, 35))
+    @trigger.start
+    sleep RUN_SLEEP
+
+    @config = UTAction.make_test_config(store: @config_store, action_name: 'update', collected_doctype: 'type')
+    @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 23, 35))
+    @workflow.stubs(:last_timestamp).returns(Time.now)
+    sleep RUN_SLEEP
+    @trigger.stop
+  end
 end

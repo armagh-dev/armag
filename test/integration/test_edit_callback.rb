@@ -25,7 +25,7 @@ require_relative '../helpers/mongo_support'
 require_relative '../../lib/logging'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
-require_relative '../../lib/action/workflow'
+require_relative '../../lib/actions/workflow'
 
 require 'test/unit'
 
