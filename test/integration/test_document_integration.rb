@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,21 +72,25 @@ class TestDocumentIntegration < Test::Unit::TestCase
                             document_timestamp: nil)
 
     # Make doc_3 more recently updated
-    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true) do |doc|
+    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
       doc.content['modified'] = true
     end
 
     # Make doc_1 most recently updated
-    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::Documents::DocState::READY, true) do |doc|
+    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
       doc.content['modified'] = true
     end
 
     # Expected order (based on last update and published first) - published_document, doc_0, doc_2, doc_3, doc_1
-    assert_equal('doc_0', Armagh::Document.get_for_processing.document_id)
-    assert_equal('doc_2', Armagh::Document.get_for_processing.document_id)
-    assert_equal('doc_3', Armagh::Document.get_for_processing.document_id)
-    assert_equal('doc_1', Armagh::Document.get_for_processing.document_id)
-    assert_equal('published_document', Armagh::Document.get_for_processing.document_id)
+    d = Armagh::Document.get_for_processing('test-agent1')
+    assert_equal('doc_0', d.document_id)
+    assert_equal('test-agent1', d.locked_by)
+    assert_true(d.locked?)
+
+    assert_equal('doc_2', Armagh::Document.get_for_processing('test-agent2').document_id)
+    assert_equal('doc_3', Armagh::Document.get_for_processing('test-agent3').document_id)
+    assert_equal('doc_1', Armagh::Document.get_for_processing('test-agent4').document_id)
+    assert_equal('published_document', Armagh::Document.get_for_processing('test-agent5').document_id)
   end
 
   def test_document_too_large
@@ -125,5 +129,37 @@ class TestDocumentIntegration < Test::Unit::TestCase
                               collection_task_ids: [],
                               document_timestamp: nil)
     end
+  end
+
+  def test_document_force_unlock
+    agent_id = 'test-agent-id'
+    id = 'doc_test'
+    Armagh::Document.create(type: 'TestDocument',
+                            content: {},
+                            metadata: {},
+                            pending_actions: ['action'],
+                            state: Armagh::Documents::DocState::READY,
+                            document_id: id,
+                            collection_task_ids: [],
+                            document_timestamp: nil)
+    sleep 1
+
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    assert_false doc.locked?
+    assert_nil doc.locked_by
+
+    Armagh::Document.get_for_processing(agent_id)
+
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    assert_true doc.locked?
+    assert_equal(agent_id, doc.locked_by)
+
+    Armagh::Document.force_unlock(agent_id)
+
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    assert_false doc.locked?
+    assert_nil doc.locked_by
+
+    assert_nothing_raised {Armagh::Document.force_unlock('not an existing id')}
   end
 end

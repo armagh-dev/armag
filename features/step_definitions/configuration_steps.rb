@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -189,6 +189,12 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
       })
     when 'id_publisher'
       Armagh::CustomActions::TestPublisherSetsID.create_configuration(Armagh::Connection.config, 'test_publish', {
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+      })
+
+    when 'long_publisher'
+      Armagh::CustomActions::TestLongPublisher.create_configuration(Armagh::Connection.config, 'test_long_publish', {
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
         'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
       })

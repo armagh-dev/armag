@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,14 +171,14 @@ class TestDocument < Test::Unit::TestCase
 
   def test_get_for_processing
     mock_document_find_one_and_update({'document_id' => 'docid'})
-    doc = Document.get_for_processing
+    doc = Document.get_for_processing('agent-123')
     assert_equal('docid', doc.document_id)
   end
 
   def test_get_for_processing_error
     e = Mongo::Error.new('error')
     @documents.expects(:find_one_and_update).raises(e)
-    assert_raise(Armagh::Errors::ConnectionError) { Document.get_for_processing }
+    assert_raise(Armagh::Errors::ConnectionError) { Document.get_for_processing('agent-123') }
   end
 
   def test_exists?
@@ -429,7 +429,7 @@ class TestDocument < Test::Unit::TestCase
     mock_document_delete
     block_executed = false
 
-    Document.modify_or_create(id, type, state, true) do |doc|
+    Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
       assert_kind_of(String, doc)
       block_executed = true
     end
@@ -445,7 +445,7 @@ class TestDocument < Test::Unit::TestCase
     mock_document_replace
     block_executed = false
 
-    Document.modify_or_create(id, type, state, true) do |doc|
+    Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
       assert_not_nil doc
       block_executed = true
     end
@@ -467,7 +467,7 @@ class TestDocument < Test::Unit::TestCase
     block_executed = false
 
     assert_raise(e) do
-      Document.modify_or_create(id, type, state, false) do |doc|
+      Document.modify_or_create(id, type, state, false, 'agent-123') do |doc|
         block_executed = true
       end
     end
@@ -485,7 +485,7 @@ class TestDocument < Test::Unit::TestCase
     block_executed = false
 
     assert_raise(Armagh::Errors::ConnectionError.new("An unexpected connection error occurred from Document 'docid': Unknown.")) do
-      Document.modify_or_create(id, type, state, true) do |doc|
+      Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
         block_executed = true
       end
     end
@@ -495,7 +495,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_modify_or_create_no_block
     assert_raise(LocalJumpError) do
-      Document.modify_or_create('id', 'type', Armagh::Documents::DocState::WORKING, true)
+      Document.modify_or_create('id', 'type', Armagh::Documents::DocState::WORKING, true, 'agent-123')
     end
   end
 
@@ -508,7 +508,7 @@ class TestDocument < Test::Unit::TestCase
 
     e = RuntimeError.new 'Error'
     assert_raise(e) do
-      Document.modify_or_create(id, type, state, true) do |doc|
+      Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
         raise e
       end
     end
@@ -523,7 +523,7 @@ class TestDocument < Test::Unit::TestCase
 
     e = RuntimeError.new 'Error'
     assert_raise(e) do
-      Document.modify_or_create(id, type, state, true) do |doc|
+      Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
         raise e
       end
     end
@@ -606,8 +606,15 @@ class TestDocument < Test::Unit::TestCase
 
   def test_locked?
     assert_false @doc.locked?
-    @doc.instance_variable_get(:@db_doc)['locked'] = true
+    @doc.instance_variable_get(:@db_doc)['locked'] = 'Some-agent'
     assert_true @doc.locked?
+  end
+
+  def test_locked_by
+    agent_name = 'agent-name'
+    assert_nil @doc.locked_by
+    @doc.instance_variable_get(:@db_doc)['locked'] = agent_name
+    assert_equal(agent_name, @doc.locked_by)
   end
 
   def test_publish_save
@@ -761,6 +768,17 @@ class TestDocument < Test::Unit::TestCase
     e = Mongo::Error.new('error')
     @documents.expects(:find_one_and_update).raises(e)
     assert_raise(Armagh::Errors::ConnectionError) { Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED) }
+  end
+
+  def test_force_unlock
+    @documents.expects(:update_many).with({'locked' => 'agent_id'},{'$set' => {'locked' => false}})
+    Document.force_unlock('agent_id')
+  end
+
+  def test_force_unlock_error
+    e = Mongo::Error.new('error')
+    @documents.expects(:update_many).raises(e)
+    assert_raise(Armagh::Errors::ConnectionError) { Document.force_unlock('id') }
   end
 
   def test_failures

@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 10 seconds
     Then I should see an agent with a status of "idle" within 10 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | 'collected_id'                                             |
+      | document_id         | 'collected_id'                                           |
       | pending_actions     | []                                                       |
       | dev_errors          | {}                                                       |
       | ops_errors          | {}                                                       |
@@ -535,16 +535,16 @@ Feature: Actions Execution
     And I wait 7 seconds
     Then I should see 0 "TooLargeSplitterOutputDocument" documents in the "documents" collection
     Then I should see a "TooLargeInputDocType" in "failures" with the following
-      | document_id  | 'incoming'                                                                                                                                                                                                                                             |
-      | metadata     | {'meta' => 'incoming meta'}                                                                                                                                                                                                                            |
-      | dev_errors   | {}                                                                                                                                                                                                                                                     |
+      | document_id  | 'incoming'                                                                                                                                                                                                                                               |
+      | metadata     | {'meta' => 'incoming meta'}                                                                                                                                                                                                                              |
+      | dev_errors   | {}                                                                                                                                                                                                                                                       |
       | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document 'split_123' is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
-      | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                         |
-      | state        | 'ready'                                                                                                                                                                                                                                                |
-      | locked       | false                                                                                                                                                                                                                                                  |
-      | error        | true                                                                                                                                                                                                                                                   |
-      | pending_work | nil                                                                                                                                                                                                                                                    |
-      | version      | APP_VERSION                                                                                                                                                                                                                                            |
+      | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                           |
+      | state        | 'ready'                                                                                                                                                                                                                                                  |
+      | locked       | false                                                                                                                                                                                                                                                    |
+      | error        | true                                                                                                                                                                                                                                                     |
+      | pending_work | nil                                                                                                                                                                                                                                                      |
+      | version      | APP_VERSION                                                                                                                                                                                                                                              |
     And the logs should contain "ERROR"
 
   Scenario: Have a splitter that edits the current document
@@ -848,17 +848,17 @@ Feature: Actions Execution
       | metadata            | {}                                                       |
       | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
-      | document_id     | 'collect_id'                                                                                                                             |
+      | document_id     | 'collect_id'                                                                                                                                     |
       | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]"]} |
-      | pending_actions | []                                                                                                                                       |
-      | dev_errors      | {}                                                                                                                                       |
-      | ops_errors      | {}                                                                                                                                       |
-      | content         | {'doesnt_matter' => true}                                                                                                                |
-      | state           | 'ready'                                                                                                                                  |
-      | locked          | false                                                                                                                                    |
-      | error           | nil                                                                                                                                      |
-      | pending_work    | nil                                                                                                                                      |
-      | version         | APP_VERSION                                                                                                                              |
+      | pending_actions | []                                                                                                                                               |
+      | dev_errors      | {}                                                                                                                                               |
+      | ops_errors      | {}                                                                                                                                               |
+      | content         | {'doesnt_matter' => true}                                                                                                                        |
+      | state           | 'ready'                                                                                                                                          |
+      | locked          | false                                                                                                                                            |
+      | error           | nil                                                                                                                                              |
+      | pending_work    | nil                                                                                                                                              |
+      | version         | APP_VERSION                                                                                                                                      |
     And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
 
   Scenario: Republishing a document with a newer armagh version updates the version in the document
@@ -969,3 +969,32 @@ Feature: Actions Execution
     And the logs should contain "ERROR"
     And the logs should contain "Skipping further actions on document '123' since it has errors."
     And the logs should not contain "Test Consume Running"
+
+  Scenario: A locked document being executed by an agent that is forcefully killed is unlocked for work
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "long_publisher"
+    And I run armagh
+    And I wait 3 seconds
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    Then I should see an agent with a status of "running" within 119 seconds
+    When an agent is killed
+    And I wait 5 seconds
+    Then I should see 0 "PublishDocument" documents in the "documents" collection
+    Then I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
+    And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
+      | document_id | '123'            |
+      | locked      | false            |
+      | title       | 'Document Title' |
+    And the logs should contain 2 "Test Long Publish Running"
+    And the logs should contain 1 "Test Long Publish Finished"
+

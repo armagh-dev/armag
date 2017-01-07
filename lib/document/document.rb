@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ module Armagh
     end
 
     # Returns document if found, internal_id if it didn't exist, throws :already_locked when doc exists but locked already
-    def self.find_or_create_and_lock(document_id, type, state)
+    def self.find_or_create_and_lock(document_id, type, state, agent_id)
       begin
         db_doc = collection(type, state).find_one_and_update({'document_id' => document_id, 'locked' => false, 'type' => type}, {'$set' => {'locked' => true}}, {return_document: :after, upsert: true})
       rescue => e
@@ -109,7 +109,7 @@ module Armagh
       end
 
       if db_doc['pending_actions']
-        db_doc['locked'] = true
+        db_doc['locked'] = agent_id
         doc = Document.new(db_doc)
       else
         # The document doesn't exist
@@ -118,7 +118,6 @@ module Armagh
 
       doc
     end
-
 
     def self.count_working_by_doctype
       counts = {}
@@ -173,9 +172,9 @@ module Armagh
       documents
     end
 
-    def self.get_for_processing
+    def self.get_for_processing(agent_id)
       Connection.all_document_collections.each do |collection|
-        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => true}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
+        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => agent_id}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
         return Document.new(db_doc) if db_doc
       end
 
@@ -191,7 +190,7 @@ module Armagh
     end
 
     # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
-    def self.modify_or_create(document_id, type, state, running, logger = nil)
+    def self.modify_or_create(document_id, type, state, running, agent_id, logger = nil)
       raise LocalJumpError.new 'No block given' unless block_given?
 
       backoff = Utils::ProcessingBackoff.new
@@ -200,7 +199,7 @@ module Armagh
 
       until doc
         already_locked = catch(:already_locked) do
-          doc = find_or_create_and_lock(document_id, type, state)
+          doc = find_or_create_and_lock(document_id, type, state, agent_id)
           false
         end
 
@@ -240,6 +239,14 @@ module Armagh
       collection(type, state).find_one_and_update({'document_id': document_id, 'type' => type}, {'$set' => {'locked' => false}})
     rescue => e
       raise Connection.convert_mongo_exception(e, document_id)
+    end
+
+    def self.force_unlock(agent_id)
+      Connection.all_document_collections.each do |collection|
+        collection.update_many({'locked' => agent_id}, {'$set' => {'locked' => false}})
+      end
+    rescue => e
+      raise Connection.convert_mongo_exception(e)
     end
 
     def self.collection(type = nil, state = nil)
@@ -347,7 +354,12 @@ module Armagh
     end
 
     def locked?
-      @db_doc['locked']
+      # only return true or false
+      @db_doc['locked'] != false
+    end
+
+    def locked_by
+      @db_doc['locked'] || nil
     end
 
     def content=(content)

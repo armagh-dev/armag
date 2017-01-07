@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@ class TestGemManager < Test::Unit::TestCase
   
   def test_activate_installed_gems
     
-    @logger.expects(:info).with( 'Using standard: 0.5.0' )
+    @logger.expects(:info).with("Using standard: #{Armagh::StandardActions::VERSION}")
     @logger.expects(:ops_warn).with( "CustomActions gem is not deployed. These actions won't be available.")
     
     gem_manager = Armagh::Actions::GemManager.new( @logger ) 
     action_versions = gem_manager.activate_installed_gems
-    assert_equal( { "standard" => "0.5.0" }, action_versions )
+    assert_equal({'standard' => Armagh::StandardActions::VERSION }, action_versions )
   end
 end

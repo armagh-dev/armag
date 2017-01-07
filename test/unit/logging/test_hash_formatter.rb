@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,14 +36,14 @@ class TestHashFormatter < Test::Unit::TestCase
   end
 
   def test_format_string
-    event = stub(name: 'item', level: Log4r::DEBUG, data: 'log message', tracer: ['one', 'two'])
+    event = stub(fullname: 'item', level: Log4r::DEBUG, data: 'log message', tracer: %w(one two))
 
     expected = {
         'component' => 'item',
         'hostname' => Socket.gethostname,
         'level' => 'DEBUG',
         'message' => 'log message',
-        'trace' => ['one', 'two'],
+        'trace' => %w(one two),
         'pid' => $$
     }
 
@@ -54,14 +54,14 @@ class TestHashFormatter < Test::Unit::TestCase
   end
 
   def test_format_object
-    event = stub(name: 'item', level: Log4r::INFO, data: [1, 2, 3, 4, 5], tracer: ['one', 'two'])
+    event = stub(fullname: 'item', level: Log4r::INFO, data: [1, 2, 3, 4, 5], tracer: %w(one two))
 
     expected = {
         'component' => 'item',
         'hostname' => Socket.gethostname,
         'level' => 'INFO',
         'message' => '[1, 2, 3, 4, 5]',
-        'trace' => ['one', 'two'],
+        'trace' => %w(one two),
         'pid' => $$
     }
 
@@ -74,7 +74,7 @@ class TestHashFormatter < Test::Unit::TestCase
   def test_format_enhanced_exception
     e = RuntimeError.new 'Failed!'
     ee = Armagh::Logging::EnhancedException.new('details', e)
-    event = stub(name: 'item', level: Log4r::WARN, data: ee, tracer: ['one', 'two'])
+    event = stub(fullname: 'item', level: Log4r::WARN, data: ee, tracer: %w(one two))
 
     expected = {
         'component' => 'item',
@@ -86,7 +86,7 @@ class TestHashFormatter < Test::Unit::TestCase
             'message' => 'Failed!',
             'trace' => nil
         },
-        'trace' => ['one', 'two'],
+        'trace' => %w(one two),
         'pid' => $$
     }
 
@@ -98,7 +98,7 @@ class TestHashFormatter < Test::Unit::TestCase
 
   def test_format_exception
     e = RuntimeError.new 'Failed!'
-    event = stub(name: 'item', level: Log4r::WARN, data: e, tracer: ['one', 'two'])
+    event = stub(fullname: 'item', level: Log4r::WARN, data: e, tracer: %w(one two))
 
     expected = {
         'component' => 'item',
@@ -109,7 +109,7 @@ class TestHashFormatter < Test::Unit::TestCase
             'message' => 'Failed!',
             'trace' => nil
         },
-        'trace' => ['one', 'two'],
+        'trace' => %w(one two),
         'pid' => $$
     }
 
@@ -137,7 +137,7 @@ class TestHashFormatter < Test::Unit::TestCase
     end
 
     assert_not_nil exception
-    event = stub(name: 'item', level: Log4r::WARN, data: exception, tracer: nil)
+    event = stub(fullname: 'item', level: Log4r::WARN, data: exception, tracer: nil)
 
     expected = {
         'component' => 'item',

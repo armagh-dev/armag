@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing
+    Armagh::Document.get_for_processing('test_agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -113,7 +113,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing
+    Armagh::Document.get_for_processing('test_agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -183,7 +183,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::READY)
+    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::READY, 'test-agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -197,7 +197,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
+    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED, 'test-agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']

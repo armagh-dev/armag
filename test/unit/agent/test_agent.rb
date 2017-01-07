@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,17 +72,18 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock = mock('backoff')
     @current_doc_mock = mock('current_doc')
     @running = true
-    @default_agent = prep_an_agent('default', {})
+    @default_agent = prep_an_agent('default', {}, 'default')
     @state_coll = mock
     Armagh::Connection.stubs(:config).returns(@state_coll)
   end
 
-  def prep_an_agent(config_name, config_values)
+  def prep_an_agent(config_name, config_values, id)
     agent_config = Armagh::Agent.create_configuration(@config_store, config_name, config_values)
     agent = Armagh::Agent.new(agent_config, @workflow)
     agent.instance_variable_set(:@backoff, @backoff_mock)
     agent.instance_variable_set(:@current_doc, @current_doc_mock)
     agent.instance_variable_set(:@running, @running)
+    agent.instance_variable_set(:@uuid, id)
     agent
   end
 
@@ -132,7 +133,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_with_config
     @logger.expects(:level=).with(Log4r::ERROR).at_least_once
-    agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}})
+    agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
     agent_status = mock
 
@@ -174,6 +175,7 @@ class TestAgent < Test::Unit::TestCase
     client_uri = Armagh::IPC::DRB_CLIENT_URI % @default_agent.uuid
     socket_file = client_uri.sub("drbunix://", '')
 
+    FileUtils.rm socket_file
     FileUtils.touch socket_file
     assert_false(File.socket?(socket_file))
     Thread.new { @default_agent.start }
@@ -840,7 +842,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(new_docspec, action_doc.docspec)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     executed_block = false
     @default_agent.edit_document(id, old_docspec) do |doc|
@@ -887,7 +889,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:save).returns nil
 
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
     Armagh::Document.expects(:from_action_document).returns doc
 
     executed_block = false
@@ -921,7 +923,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -953,7 +955,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(docspec, action_doc.docspec)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     @default_agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -978,7 +980,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1007,7 +1009,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1025,7 +1027,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1047,7 +1049,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:save).returns
 
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
     Armagh::Document.expects(:from_action_document).returns doc
 
     @default_agent.edit_document(id, docspec) do |doc|
@@ -1062,7 +1064,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1080,7 +1082,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1125,7 +1127,7 @@ class TestAgent < Test::Unit::TestCase
     message = 'test message'
     logger_name = 'test_logger'
     logger = mock('logger')
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     logger.expects(:debug).with(message)
     @default_agent.log_debug(logger_name, message)
   end
@@ -1133,7 +1135,7 @@ class TestAgent < Test::Unit::TestCase
   def test_log_debug_block
     logger_name = 'test_logger'
     logger = FakeBlockLogger.new
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger).yields(nil)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger).yields(nil)
     block_called = false
     @default_agent.log_debug(logger_name) { block_called = true }
     assert_true block_called
@@ -1144,7 +1146,7 @@ class TestAgent < Test::Unit::TestCase
     message = 'test message'
     logger_name = 'test_logger'
     logger = mock('logger')
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     logger.expects(:info).with(message)
     @default_agent.log_info(logger_name, message)
   end
@@ -1152,7 +1154,7 @@ class TestAgent < Test::Unit::TestCase
   def test_log_info_block
     logger_name = 'test_logger'
     logger = FakeBlockLogger.new
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger).yields(nil)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger).yields(nil)
     block_called = false
     @default_agent.log_info(logger_name) { block_called = true }
     assert_true block_called
@@ -1164,7 +1166,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     message = 'message'
     logger = mock
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_ops_error).with(action_name, message)
     logger.expects(:ops_error).with(message)
     @default_agent.notify_ops(logger_name, action_name, message)
@@ -1175,7 +1177,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     message = 'message'
     logger = mock
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_dev_error).with(action_name, message)
     logger.expects(:dev_error).with(message)
     @default_agent.notify_dev(logger_name, action_name, message)
@@ -1186,7 +1188,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     error = RuntimeError.new('error')
     logger = mock
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_ops_error).with(action_name, error)
     Armagh::Logging.expects(:ops_error_exception).with(logger, error, 'Notify Ops')
     @default_agent.notify_ops(logger_name, action_name, error)
@@ -1197,7 +1199,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     error = RuntimeError.new('error')
     logger = mock
-    Log4r::Logger.expects(:[]).with(logger_name).returns(logger)
+    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_dev_error).with(action_name, error)
     Armagh::Logging.expects(:dev_error_exception).with(logger, error, 'Notify Dev')
     @default_agent.notify_dev(logger_name, action_name, error)
@@ -1206,7 +1208,7 @@ class TestAgent < Test::Unit::TestCase
   def test_get_logger
     logger_name = 'test_logger'
     logger = mock('logger')
-    Armagh::Logging.expects(:set_logger).with(logger_name).returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     assert_equal logger, @default_agent.get_logger(logger_name)
   end
 

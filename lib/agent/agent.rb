@@ -1,4 +1,4 @@
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ module Armagh
     def edit_document(document_id, docspec)
       raise Documents::Errors::DocumentError, "Cannot edit document '#{document_id}'.  It is the same document that was passed into the action." if document_id == @current_doc.document_id
       if block_given?
-        Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @logger) do |doc|
+        Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @uuid, @logger) do |doc|
           edit_or_create(document_id, docspec, doc) do |doc|
             yield doc
           end
@@ -127,7 +127,7 @@ module Armagh
     end
 
     def log_debug(logger_name, msg = nil)
-      logger = Logging.set_logger(logger_name)
+      logger = get_logger(logger_name)
       if block_given?
         logger.debug { yield }
       else
@@ -136,7 +136,7 @@ module Armagh
     end
 
     def log_info(logger_name, msg = nil)
-      logger = Logging.set_logger(logger_name)
+      logger = get_logger(logger_name)
       if block_given?
         logger.info { yield }
       else
@@ -146,18 +146,18 @@ module Armagh
 
     def notify_ops(logger_name, action_name, error)
       @current_doc.add_ops_error(action_name, error)
-      logger = Logging.set_logger(logger_name)
+      logger = get_logger(logger_name)
       error.is_a?(Exception) ? Logging.ops_error_exception(logger, error, 'Notify Ops') : logger.ops_error(error)
     end
 
     def notify_dev(logger_name, action_name, error)
       @current_doc.add_dev_error(action_name, error)
-      logger = Logging.set_logger(logger_name)
+      logger = get_logger(logger_name)
       error.is_a?(Exception) ? Logging.dev_error_exception(logger, error, 'Notify Dev') : logger.dev_error(error)
     end
 
     def get_logger(logger_name)
-      Logging.set_logger(logger_name)
+      Logging.set_logger logger_name
     end
 
     def archive(logger_name, action_name, file_path, archive_data)
@@ -250,7 +250,7 @@ module Armagh
 
 
     private def execute
-      @current_doc = Document.get_for_processing
+      @current_doc = Document.get_for_processing(@uuid)
 
       if @current_doc
         @backoff.reset

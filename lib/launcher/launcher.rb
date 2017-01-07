@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 #
-# Copyright 2016 Noragh Analytics, Inc.
+# Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -186,25 +186,24 @@ module Armagh
     end
 
     def recover_dead_agents
-      dead_agents = []
+      num_dead_agents = 0
       @agents.each do |pid, agent|
         wait_pid, status = Process.waitpid2(pid, Process::WNOHANG)
         if wait_pid
           @logger.error "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
-          dead_agents << agent
+          num_dead_agents += 1
           agent_id = @agents[pid].uuid
           @agents.delete(pid)
           @agent_status.remove_agent(agent_id)
+          Document.force_unlock(agent_id)
         end
       end
 
-      dead_agents.each do |agent|
-        start_agent_in_process(agent)
-      end
+      launch_agents(num_dead_agents)
     end
 
-    def start_agent_in_process(agent=nil)
-      agent ||= Agent.new( @agent_config, @workflow )
+    def start_agent_in_process
+      agent = Agent.new( @agent_config, @workflow )
 
       pid = Process.fork do
         Process.setproctitle("armagh-#{agent.uuid}")
