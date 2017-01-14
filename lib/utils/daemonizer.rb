@@ -94,7 +94,7 @@ module Armagh
         if current && running?(current)
           Process.kill(:INT, current)
           sleep 0.1 while running? current
-          puts "Stopped PID #{current}"
+          puts "Stopped #{@app_name} PID #{current}"
         else
           puts "#{@app_name} was not running"
         end
@@ -113,6 +113,7 @@ module Armagh
             puts "#{@app_name} is running as PID #{current}"
           else
             puts "#{@app_name} terminated unexpectedly"
+            remove_lock
           end
         else
           puts "#{@app_name} is not running"

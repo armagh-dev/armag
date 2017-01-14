@@ -32,8 +32,8 @@ module Armagh
       # @param min_interval [Numeric]
       # @param multiplier [Numeric]
       # @param randomization_factor [Numeric]
-      def initialize(max_backoff = 500, min_interval = 1, multiplier = 1.75, randomization_factor= 0.3)
-        max_elapsed = max_backoff/(1 + randomization_factor)
+      def initialize(max_backoff = 30, min_interval = 1, multiplier = 1.4, randomization_factor = 0.25)
+        max_elapsed = max_backoff/(1 + randomization_factor) + 1
 
         @exponential_backoff = ExponentialBackoff.new(min_interval, max_elapsed)
         @exponential_backoff.multiplier = multiplier
@@ -46,7 +46,7 @@ module Armagh
       #
       # @return the amount of time for the backoff.
       def backoff
-        sleep_time = @exponential_backoff.next_interval
+        sleep_time = next_interval
         @logger.debug "Backing off for #{sleep_time} seconds" if @logger
 
         sleep sleep_time
@@ -61,7 +61,7 @@ module Armagh
       # @yield  the condition that is checked for interrupt (if true, interrupt)
       # @return the amount of time for the backoff.  If interrupted, this is the planned backoff time
       def interruptible_backoff
-        sleep_time = @exponential_backoff.next_interval
+        sleep_time = next_interval
         @logger.debug "Backing off for #{sleep_time} seconds" if @logger
 
         InterruptibleSleep::interruptible_sleep(sleep_time) { yield }
@@ -72,6 +72,10 @@ module Armagh
       # Reset the backoff interval
       def reset
         @exponential_backoff.clear
+      end
+
+      def next_interval
+        @exponential_backoff.next_interval.round
       end
     end
   end

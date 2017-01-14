@@ -27,7 +27,7 @@ require 'test/unit'
 class TestProcessingBackoff < Test::Unit::TestCase
 
   def setup
-    @max_time = 500
+    @max_time = 60
     @processing_backoff = Armagh::Utils::ProcessingBackoff.new(@max_time)
   end
 
@@ -38,19 +38,19 @@ class TestProcessingBackoff < Test::Unit::TestCase
     end
 
     backoffs.each do |backoff|
-      assert_true backoff < @max_time
+      assert_true backoff <= @max_time
     end
 
-    assert_equal(3, backoffs.uniq.length)
+    assert_equal(3, backoffs.length)
   end
 
   def test_interruptable_backoff
     interrupt_time = 0.1
     backoff_time = 0
 
-    until backoff_time > 2
+    until backoff_time >2
       start = Time.now
-      backoff_time = @processing_backoff.interruptible_backoff { Time.now > start + interrupt_time}
+      backoff_time = @processing_backoff.interruptible_backoff { Time.now > start + interrupt_time }
       elapsed = Time.now - start
     end
 
@@ -58,21 +58,9 @@ class TestProcessingBackoff < Test::Unit::TestCase
   end
 
   def test_reset
-    no_reset_times = []
-    5.times do
-      no_reset_times << @processing_backoff.interruptible_backoff {true}
-    end
-    max_no_reset = no_reset_times.max
-
+    max_reset = 0
+    100.times { max_reset = [@processing_backoff.interruptible_backoff { true }, max_reset].max }
     @processing_backoff.reset
-
-    reset_times = []
-    5.times do
-      reset_times << @processing_backoff.interruptible_backoff{true}
-      @processing_backoff.reset
-    end
-    max_reset = reset_times.max
-    assert_true(max_no_reset > 2)
-    assert_true(max_reset < 2)
+    assert_true max_reset > @processing_backoff.interruptible_backoff { true }
   end
 end

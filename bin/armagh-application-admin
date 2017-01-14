@@ -73,7 +73,7 @@ get '/status.json' do
   begin
     status = api.get_status
   rescue => e
-    return[ 200, { 'error_detail' => e.message }.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
   return[ 200, status.to_json ]
 end
@@ -86,7 +86,7 @@ post '/launcher.json' do
     new_config = api.create_launcher_configuration( { 'launcher' => config_hash } )
   rescue => e
     api.logger.error( "in application_admin post /launcher.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 500, { 'error_detail' => e.message }.to_json ]
+    return [ 500, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
   return [ 200, new_config.to_json ]
 end
@@ -102,7 +102,7 @@ post '/action.json' do
     result = api.create_action_configuration( config_hash )
   rescue => e
     api.logger.error( "in application_admin post /action.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, { 'error_detail' => e.message }.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
   return [ 200, "success".to_json ]
 end
@@ -119,9 +119,8 @@ post '/actions/activate.json' do
     
     api.activate_actions( params )
   rescue => e
-    error_response = { 'error_detail' => e.message, :backtrace => e.backtrace.join("\n")}
     api.logger.error( "in application_admin post /actions/activate.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, error_response.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
   return [ 200, "success".to_json ]
 end
@@ -155,7 +154,7 @@ get '/documents.json' do
     
   rescue => e
     api.logger.error( "in application_admin get /documents.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, { 'error_detail' => e.message }.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
 end
 
@@ -173,7 +172,7 @@ get '/document.json' do
     
   rescue => e
     api.logger.error( "in application_admin get /document.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, { 'error_detail' => e.message }.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
 end
 
@@ -183,6 +182,6 @@ get '/documents/failures.json' do
     return [200, doc_list.to_json]
   rescue => e
     api.logger.error( "in application_admin get /documents/failures.json: #{ e.message }" )
-    return [ 200, { 'error_detail' => e.message }.to_json ]
+    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
   end
 end
