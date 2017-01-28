@@ -1,7 +1,26 @@
 #!/usr/bin/env ruby
+
+# Copyright 2017 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 require 'sinatra'
 require 'thin'
 require 'json'
+require 'log4r'
 
 require_relative '../lib/environment.rb'
 Armagh::Environment.init
@@ -10,6 +29,8 @@ require_relative '../lib/admin/resource/api.rb'
 require_relative '../lib/admin/resource/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
 require_relative '../lib/logging'
+
+require_relative '../lib/utils/rest_helper'
 
 Process.setproctitle(File.basename(__FILE__))
 
@@ -22,27 +43,33 @@ Process.setproctitle(File.basename(__FILE__))
 include Armagh
 
 api = Admin::Resource::API.instance
+rest_helper = Utils::RestHelper.new(api.logger)
 
 configure do
-  
-  set :environment, (ENV[ 'ARMAGH_ENV' ] || 'development').to_sym
+
+  if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
+    set :environment, :production
+  else
+    set :environment, :development
+    set :show_exceptions, :after_handler
+  end
+
   set :bind,   api.ip
   set :port,   api.port
   set :server, "thin"
   set :root,   api.root_directory
   set :run,    true
-
   class << settings
-  
+
     def server_settings
-      
+
       api = Admin::Resource::API.instance
-    
+
       settings = { :backend => Admin::Resource::ThinBackend }
       if api.using_ssl?
         settings.merge!( {
-          :private_key_file => api.key_filepath,           
-          :cert_chain_file  => api.cert_filepath, 
+          :private_key_file => api.key_filepath,
+          :cert_chain_file  => api.cert_filepath,
           :verify_peer      => api.verify_peer
         })
       end
@@ -53,34 +80,38 @@ end # end configure
 
 enable :sessions, :logging
 
+set :session_secret, 'arm-l&bjq&7em+r)4a%#$3zzig0*=_#gnm57))*1*010_m(kn-u#$e'
+
 use Rack::CommonLogger, api.logger
-use Rack::Auth::Basic, "Armagh Resource Admin" do |username, password|
- api.authenticate_and_authorize username, password
+
+use Rack::Auth::Basic, 'Armagh Resource Admin' do |username, password|
+  api.authenticate_and_authorize username, password
 end # use Rack::Auth::Basic
 
- 
 helpers do
-  
-  def route_after_success( format, message, html_redirect_to )
+end
+
+
+helpers do
+  def route_after_success(format, message, html_redirect_to, helper)
     case format
-    when 'json'
-      return [ 200, { :message => message }.to_json ]
-    when 'html'
-      session[ 'message' ] = error_detail
-      redirect to( html_redirect_to )
+      when 'json'
+        helper.respond_success(message)
+      when 'html'
+        session['message'] = message
+        redirect to(html_redirect_to)
     end
   end
-  
-  def route_after_error( format, error_detail, html_redirect_to )
+
+  def route_after_error(format, error, html_redirect_to, helper)
     case format
-    when 'json'
-      return [ 500, { :error_detail => error_detail }.to_json ]
-    when 'html'
-      session[ 'message' ] = error_detail
-      redirect to( html_redirect_to )
+      when 'json'
+        helper.respond_exception(error, 'ERROR')
+      when 'html'
+        session['message'] = error.message
+        redirect to(html_redirect_to)
     end
   end
-  
 end
 
 #------------------------------------------------------------------------------------------------
@@ -95,43 +126,51 @@ end
 #
 #------------------------------------------------------------------------------------------------
 get '/noop.?:format?' do
-  
-  @message = session.delete 'message'
-  
-  case params[ 'format' ]
-  when 'json'
-    return [ 200, { result: 'way to go!'}.to_json ]
-  when 'html'
-    erb "/views-subdir/page.html".to_sym #.erb
+  begin
+    message = session.delete 'message'
+
+    case params['format']
+      when 'json'
+        return [200, {result: 'way to go!'}.to_json]
+      when 'html'
+        erb '/views-subdir/page.html'.to_sym #.erb
+    end
+  rescue => e
+    rest_helper.respond_exception(e, 'Noop Failure')
   end
 end
 
 post '/noop.?:format?' do
-  
-  obj_params = params[ 'form_object' ]
+  obj_params = params['form_object']
   begin
-    do_something( obj_params )
+    do_something(obj_params)
+    route_after_success(params['format'], 'You did something right!', '/noop', rest_helper)
   rescue => e
-    return route_after_error( params[ 'format' ], e.message, '/some/url' )
+    route_after_error(params['format'], e, '/some/url', rest_helper)
   end
-  return route_after_success( params[ 'format' ], "You did something right!", '/noop')
 end
 
 post '/implode.json' do
-  
-  confirmed = params[ 'confirmed' ]
-  if confirmed == "1"
-    begin
-      imploded = api.implode( true )
-      if imploded
-        return[ 200, { result: 'Implosion complete' }.to_json ]
-      else
-        return[ 500, { result: 'Implosion failed unexpectedly, with no errors raised' }.to_json ]
+  request_body = request.body.read
+
+  begin
+    implode_request = JSON.parse(request_body)
+    confirmed = implode_request['confirmed']
+
+    if confirmed.is_a? TrueClass
+      begin
+        if api.implode(confirmed)
+          rest_helper.respond_success({'result' => 'Implosion complete'})
+        else
+          rest_helper.respond_error('Implosion failed unexpectedly, with no errors raised')
+        end
+      rescue => e
+        rest_helper.respond_exception(e, "Error from POST to /implode.json with body: #{request.body}")
       end
-    rescue => e
-      return[ 500, { error_detail: e.message }.to_json ]
+    else
+      rest_helper.respond_error('No implosion.  You must post data {"confirmed": true}')
     end
-  else
-    return[ 200, { result: "No implosion.  You must post data confirmed=1"}.to_json]
+  rescue => e
+    rest_helper.respond_exception(e, 'Unable to implode')
   end
 end

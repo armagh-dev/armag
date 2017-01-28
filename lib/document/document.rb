@@ -135,7 +135,6 @@ module Armagh
     end
 
     def self.find_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
-      
       options = {}
       ts_options = {}
       ts_options[ '$gte' ] = begin_ts if begin_ts
@@ -145,7 +144,7 @@ module Armagh
       skip = start_index || 0
       limit = max_returns || 20
       
-      collection( doc_type, 'published' ).find( options ).projection( { '_id' => 0, 'document_id' => 1, 'type' => 1, 'title' => 1, 'document_timestamp' => 1 } ).sort( 'document_timestamp' => -1 ).skip( skip ).limit( limit )
+      collection(doc_type, Documents::DocState::PUBLISHED).find(options).sort( 'document_timestamp' => -1 ).skip( skip ).limit( limit )
     end
 
     def self.find(document_id, type, state, raw: false)
@@ -314,7 +313,7 @@ module Armagh
     end
 
     def published_timestamp
-      @db_doc['published_timestamp']
+      @db_doc['published_timestamp']&.utc
     end
 
     def published_timestamp=(ts)
@@ -338,7 +337,7 @@ module Armagh
     end
 
     def document_timestamp
-      @db_doc['document_timestamp']
+      @db_doc['document_timestamp']&.utc
     end
 
     def document_timestamp=(document_timestamp)
@@ -387,11 +386,11 @@ module Armagh
     end
 
     def updated_timestamp
-      @db_doc['updated_timestamp']
+      @db_doc['updated_timestamp']&.utc
     end
 
     def created_timestamp
-      @db_doc['created_timestamp']
+      @db_doc['created_timestamp']&.utc
     end
 
     def created_timestamp=(ts)

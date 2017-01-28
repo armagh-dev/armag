@@ -1,3 +1,20 @@
+# Copyright 2017 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 require 'singleton'
 
 require_relative '../../logging'
@@ -36,9 +53,6 @@ module Armagh
       
         def initialize
           @logger = Logging.set_logger('Armagh::ApplicationAdminAPI')
-          def @logger.<<( message )
-            info( message )
-          end
 
           begin
             config  = Configuration::FileBasedConfiguration.load( self.class.to_s )
@@ -77,16 +91,12 @@ module Armagh
         end
         
         def create_launcher_configuration( params )
-          
-          @logger.debug( 'lib/admin/application/api create_launcher_configuration' )
-          @logger.debug( "...with params #{ params.inspect }")
           begin
-            Launcher.create_configuration( Connection.config, Launcher.config_name, params, maintain_history: true )
+            Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
             config = get_launcher_configuration( {} )
-            @logger.debug( "...succcessfully configured #{ config.inspect }")
             config[ '__message' ] = 'Configuration successful.'
           rescue => e
-            @logger.debug( "...exception raised: #{ e.class.name }: #{ e.message }")
+            Logging.dev_error_exception(@logger, e, 'Error creating launcher configuration')
             config = params
             config[ '__message' ] = e.message
           end
@@ -102,10 +112,6 @@ module Armagh
         end
         
         def create_action_configuration( configuration_hash )
-          
-          @logger.debug( 'lib/admin/application/api create_action_configuration' )
-          @logger.debug( "... with configuration_hash #{ configuration_hash.inspect }")
-          
           action_class_name = configuration_hash[ 'action_class_name' ]
       
           workflow = Actions::Workflow.new( @logger, Connection.config )
@@ -114,7 +120,6 @@ module Armagh
         end
         
         def update_action_configuration( configuration_hash )
-          
           action_class_name = configuration_hash[ 'action_class_name' ]
           
           workflow = Actions::Workflow.new( @logger, Connection.config )
@@ -133,7 +138,7 @@ module Armagh
         end
         
         def get_document( doc_id, doc_type )
-          Document.find( doc_id, doc_type, 'published', raw: true )
+          Document.find( doc_id, doc_type, Documents::DocState::PUBLISHED, raw: true )
         end
 
         def get_failed_documents

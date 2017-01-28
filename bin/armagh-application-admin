@@ -1,4 +1,22 @@
 #!/usr/bin/env ruby
+
+# Copyright 2017 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 require 'sinatra'
 require 'thin'
 require 'json'
@@ -12,6 +30,8 @@ require_relative '../lib/admin/application/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
 require_relative '../lib/logging'
 
+require_relative '../lib/utils/rest_helper'
+
 Process.setproctitle(File.basename(__FILE__))
 
 #------------------------------------------------------------------------------------------------
@@ -23,31 +43,33 @@ Process.setproctitle(File.basename(__FILE__))
 include Armagh
 
 api = Admin::Application::API.instance
+rest_helper = Utils::RestHelper.new(api.logger)
 
 configure do
-  
+
   if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
     set :environment, :production
   else
     set :environment, :development
     set :show_exceptions, :after_handler
   end
+
   set :bind,   api.ip
   set :port,   api.port
   set :server, "thin"
   set :root,   api.root_directory
   set :run,    true
   class << settings
-  
+
     def server_settings
-      
+
       api = Admin::Application::API.instance
-    
+
       settings = { :backend => Admin::Application::ThinBackend }
       if api.using_ssl?
         settings.merge!( {
-          :private_key_file => api.key_filepath,           
-          :cert_chain_file  => api.cert_filepath, 
+          :private_key_file => api.key_filepath,
+          :cert_chain_file  => api.cert_filepath,
           :verify_peer      => api.verify_peer
         })
       end
@@ -58,130 +80,127 @@ end # end configure
 
 enable :sessions, :logging
 
+set :session_secret, 'arm-866w(c@n$f2pv+8sgg7&y_i#c+6!-d(u&f*dec7sp!ju*a%9*a'
+
 use Rack::CommonLogger, api.logger
-use Rack::Auth::Basic, "Armagh Admin" do |username, password|
- api.authenticate_and_authorize username, password
+
+use Rack::Auth::Basic, 'Armagh Admin' do |username, password|
+  api.authenticate_and_authorize username, password
 end # use Rack::Auth::Basic
 
- 
 helpers do
 end
 
 get '/status.json' do
-
   status = []
   begin
     status = api.get_status
+    rest_helper.respond_success(status)
   rescue => e
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, 'Error from GET /status.json')
   end
-  return[ 200, status.to_json ]
 end
 
 post '/launcher.json' do
-  
+  request_body = request.body.read
   begin
-    new_config = {}
-    config_hash = eval( params[ 'launcher' ] )
-    new_config = api.create_launcher_configuration( { 'launcher' => config_hash } )
+    api.logger.debug{"armagh-application-admin post launcher.json with: #{request_body}"}
+
+    request_hash = JSON.parse(request_body)
+    raise ArgumentError, "Request must be a hash.  Was a #{request_hash.class}." unless request_hash.is_a? Hash
+
+    new_config = api.create_launcher_configuration(request_hash)
+    rest_helper.respond_success(new_config)
   rescue => e
-    api.logger.error( "in application_admin post /launcher.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 500, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, "Error from POST to /launcher.json with body: #{request_body}")
   end
-  return [ 200, new_config.to_json ]
+end
+
+post '/agent.json' do
+  # TODO Agent configuration
 end
 
 post '/action.json' do
-  
+  request_body = request.body.read
   begin
-    api.logger.debug( 'armagh-application-admin post action.json...')
-    api.logger.debug( "... with params: #{ params.inspect }")
-    new_config = {}
-    config_hash = eval( params[ 'action' ])    
-    raise ArgumentError, "must include params[ 'action' ] => hash in call. params is: #{ params.inspect }" unless config_hash.is_a?( Hash )
-    result = api.create_action_configuration( config_hash )
+    api.logger.debug{"armagh-application-admin post action.json with: #{request_body}"}
+
+    request_hash = JSON.parse(request_body)
+    raise ArgumentError, "Request must be a hash.  Was a #{request_hash.class}." unless request_hash.is_a? Hash
+
+    api.create_action_configuration(request_hash)
+    rest_helper.respond_success('success')
   rescue => e
-    api.logger.error( "in application_admin post /action.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, "Error from POST to /action.json with body: #{request_body}")
   end
-  return [ 200, "success".to_json ]
 end
 
 get '/actions.json' do
-  #TODO implement
+  #TODO implement list of actions
 end
 
 post '/actions/activate.json' do
-  
+  request_body = request.body.read
   begin
-    api.logger.debug( 'armagh-application-admin post actions/activate.json...')
-    api.logger.debug( "... with params: #{ params.inspect }")
-    
-    api.activate_actions( params )
+    api.logger.debug{"armagh-application-admin post actions/activate.json with: #{request_body}"}
+
+    actions = JSON.parse(request_body)
+    raise ArgumentError, "Request must be a hash.  Was a #{actions.class}." unless actions.is_a? Hash
+
+    api.activate_actions(actions)
+    rest_helper.respond_success('success')
   rescue => e
-    api.logger.error( "in application_admin post /actions/activate.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, "Error from POST to /actions/activate.json with body: #{request_body}")
   end
-  return [ 200, "success".to_json ]
 end
 
 get '/documents/counts.json' do
-  
   counts = []
   begin
     counts = api.get_document_counts
-    return [200, counts.to_json]
+    rest_helper.respond_success(counts)
   rescue => e
-    return [ 200, { 'error_detail' => e.message }.to_json ]
+    rest_helper.respond_exception(e, 'Error from GET /documents/counts.json')
   end
 end
 
 get '/documents.json' do
-  
   begin
-    
-    api.logger.debug( "armagh-applications-admin get documents" )
-    api.logger.debug( "... with params #{ params.inspect }")
-    
+    api.logger.debug("armagh-applications-admin get documents with params: #{params}")
+
     doc_type = params[ 'doc_type' ]
     begin_ts = Time.parse( params[ 'begin_ts' ] ) if params.include? 'begin_ts'
     end_ts   = Time.parse( params[ 'end_ts' ] ) if params.include? 'end_ts'
     start_index = params[ 'start_index' ].to_i if params.include? 'start_index'
     max_returns = params[ 'max_returns' ].to_i if params.include? 'max_returns'
-  
+
     doc_list = api.get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
-    return [ 200, doc_list.to_json ]
-    
+
+    rest_helper.respond_success(doc_list)
   rescue => e
-    api.logger.error( "in application_admin get /documents.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, 'Error from GET /documents.json')
   end
 end
 
 get '/document.json' do
-  
   begin
-    
-    api.logger.debug( "armagh-application-admin get document" )
-    api.logger.debug( "... with params #{ params.inspect }" )
-    
-    doc_id = params[ 'document_id' ]
-    doc_type = params[ 'type' ]
-    doc = api.get_document( doc_id, doc_type )
-    return [ 200, doc.to_json ]
-    
+    api.logger.debug("armagh-application-admin get document with params: #{params}")
+
+    doc_id = params['document_id']
+    doc_type = params['type']
+
+    doc = api.get_document(doc_id, doc_type)
+    rest_helper.respond_success(doc)
   rescue => e
-    api.logger.error( "in application_admin get /document.json with params #{ params.inspect }: #{ e.message }" )
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, 'Error from GET /document.json')
   end
 end
 
 get '/documents/failures.json' do
   begin
     doc_list = api.get_failed_documents
-    return [200, doc_list.to_json]
+    rest_helper.respond_success(doc_list)
   rescue => e
-    api.logger.error( "in application_admin get /documents/failures.json: #{ e.message }" )
-    return [ 200, JSON.pretty_generate({'error_detail' => {'class' => e.class, 'message' => e.message , 'backtrace' => e.backtrace}}) ]
+    rest_helper.respond_exception(e, 'Error from GET /documents/failures.json')
   end
 end

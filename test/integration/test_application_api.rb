@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+ENV['RACK_ENV'] = 'test'
 
 require_relative '../helpers/coverage_helper'
 
@@ -25,8 +26,13 @@ require_relative '../helpers/mongo_support'
 require_relative '../../lib/connection'
 require_relative '../../lib/launcher/launcher'
 require_relative '../../lib/admin/application/api'
+
 require 'test/unit'
 require 'mocha/test_unit'
+
+require 'rack/test'
+
+require 'fileutils'
 
 require 'mongo'
 
@@ -40,12 +46,17 @@ end
 
 class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
+  def app
+    Sinatra::Application
+  end
+
   def self.startup
     puts 'Starting Mongo'
-    Singleton.__init__(Armagh::Connection::MongoConnection)
     MongoSupport.instance.start_mongo
     Armagh::Connection::MongoConnection.instance.connection.database.collections.each{ |col| col.drop }
     Armagh::Connection::MongoAdminConnection.instance.connection.database.collections.each{ |col| col.drop }
+    load File.expand_path '../../../bin/armagh-application-admin', __FILE__
+    include Rack::Test::Methods
   end
 
   def self.shutdown
@@ -65,10 +76,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @logger.stubs(:debug)
     @api = Armagh::Admin::Application::API.instance
 
+    authorize 'any', 'secret'
   end
 
   def test_get_status
-    
     launcher_fake_status = {
       '_id'          => 'host.example.com',
       'versions'     => { 'thing' => 1 },
@@ -76,11 +87,65 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       'status'       => 'peachy',
       'agents'       => [ 'we are all cool' ]
     }
+
+    get '/status.json' do
+      assert last_response.ok?
+      assert_empty JSON.parse(last_response.body)
+    end
     
     Armagh::Connection.status.insert_one( launcher_fake_status )
     
-    assert_equal [launcher_fake_status], @api.get_status
+    get '/status.json' do
+      assert last_response.ok?
+      assert_equal [launcher_fake_status], JSON.parse(last_response.body)
+    end
+  end
 
+  def test_get_status_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_status).raises(e)
+
+    get '/status.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_create_launcher
+    test_config = {
+      'num_agents' => '1',
+      'update_frequency' => '60',
+      'checkin_frequency' => '60',
+      'log_level' => 'debug'
+    }
+
+    post '/launcher.json', test_config.to_json do
+      response_hash = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_equal test_config, response_hash.dig('values', 'launcher')
+      assert_equal('Armagh::Launcher', response_hash['type'])
+    end
+  end
+
+  def test_create_launcher_error
+    test_config = {
+      'num_agents' => '1',
+      'update_frequency' => '60',
+      'checkin_frequency' => '60',
+      'log_level' => 'debug'
+    }
+
+    e = RuntimeError.new('Bad')
+    @api.expects(:create_launcher_configuration).raises(e)
+
+    post '/launcher.json', test_config.to_json do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
   end
   
   def test_get_document_counts
@@ -101,10 +166,12 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
     
     counts_in_db = {}
-    assert_nothing_raised do 
-      counts_in_db = @api.get_document_counts
+
+    get '/documents/counts.json' do
+      assert last_response.ok?
+      counts_in_db = JSON.parse(last_response.body)
     end
-    
+
     assert_equal(  {
       "documents" => {
         "a:ready" => 20,
@@ -117,6 +184,18 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       "documents.d" => { "d:published"=>101 },
       "documents.e" => { "e:published"=>102 } 
       }, counts_in_db )
+  end
+
+  def test_get_document_counts_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_document_counts).raises(e)
+
+    get '/documents/counts.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
   end
   
   def test_create_action_configuration_good
@@ -131,19 +210,22 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     workflow = Armagh::Actions::Workflow.new( @logger, Armagh::Connection.config )
     
     action = nil
+
+    post '/action.json', test_config.to_json do
+      assert last_response.ok?
+      assert_equal 'success', JSON.parse(last_response.body)
+    end
+
     assert_nothing_raised do
-      @api.create_action_configuration( test_config )
       workflow.refresh
       action = workflow.instantiate_action( 'my_fred_action', self, @logger, nil )
     end
     
     assert action.is_a?( Armagh::StandardActions::TIAATestCollect )
     assert_equal 42, action.config.params.p1
-    
   end
-  
-  def test_create_action_configuration_bad_duplicate_name 
 
+  def test_create_action_configuration_bad_duplicate_name
     test_config = { 
       'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
@@ -151,30 +233,33 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
     
-    action = nil
-    assert_nothing_raised do
-      @api.create_action_configuration( test_config )
+    post '/action.json', test_config.to_json do
+      assert last_response.ok?
+      assert_equal 'success', JSON.parse(last_response.body)
     end
-    
-    e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( test_config )
+
+    post '/action.json', test_config.to_json do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal('Armagh::Actions::ConfigurationError', response_hash.dig('error_detail', 'class'))
+      assert_equal('Action named my_fred_action already exists.', response_hash.dig('error_detail', 'message'))
     end
-    assert_equal "Action named my_fred_action already exists.", e.message
-  end  
+  end
     
   def test_create_action_configuration_bad_config 
-
-    test_config = { 
+    test_config = {
       'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
-    
-    action = nil
-    e = assert_raises( Armagh::Actions::ConfigurationError ) do
-      @api.create_action_configuration( test_config )
-    end
 
+    post '/action.json', test_config.to_json do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal('Armagh::Actions::ConfigurationError', response_hash.dig('error_detail', 'class'))
+      assert_equal('Unable to create configuration Armagh::StandardActions::TIAATestCollect my_fred_action: collect schedule: type validation failed: value cannot be nil', response_hash.dig('error_detail', 'message'))
+    end
+    
     #TODO - figure out where's best to return the validation param set
   end  
 
@@ -199,8 +284,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     assert action.is_a?( Armagh::StandardActions::TIAATestCollect )
     assert_equal 42, action.config.params.p1
 
-    test_config[ 'params' ] = { 'p1' => 100 }    
-    
+    test_config[ 'params' ] = { 'p1' => 100 }
+
     action2 = nil
     assert_nothing_raised do
       @api.update_action_configuration( test_config )
@@ -209,6 +294,120 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
     
     assert_equal 100, action2.config.params.p1
+  end
+
+  def test_activate_action
+    test_action_config = {
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
+      'action' => { 'name' => 'my_fred_action' },
+      'collect' => { 'schedule' => '0 * * * *', 'archive' => false},
+      'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
+    }
+
+    test_config = {
+      'Armagh::StandardActions::TIAATestCollect' => 'my_fred_action'
+    }
+
+    post '/action.json', test_action_config.to_json do
+      assert last_response.ok?
+      assert_equal 'success', JSON.parse(last_response.body)
+    end
+
+    post '/actions/activate.json', test_config.to_json do
+      assert last_response.ok?
+      assert_equal 'success', JSON.parse(last_response.body)
+    end
+  end
+
+  def test_activate_action_security
+    test_config = {
+      'raise "KABOOM"' => 'my_fred_action'
+    }
+
+    post '/actions/activate.json', test_config.to_json do
+      response_hash = JSON.parse(last_response.body)
+      assert_not_equal('KABOOM', response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_activate_action_error
+    e = RuntimeError.new('Bad')
+
+    @api.expects(:activate_actions).raises(e)
+    test_config = {
+      'Armagh::StandardActions::TIAATestCollect' => 'my_fred_action'
+    }
+
+    post '/actions/activate.json', test_config.to_json do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_get_documents
+    type = 'TestType'
+    get '/documents.json', {doc_type: type} do
+      assert last_response.ok?
+      assert_empty JSON.parse(last_response.body)
+    end
+
+    doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
+                                  pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
+                                  collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
+
+    get '/documents.json', {doc_type: type} do
+      assert last_response.ok?
+      found_docs = JSON.parse(last_response.body)
+      assert_kind_of Array, found_docs
+      assert_equal 1, found_docs.length
+      assert_equal doc.document_id, found_docs.first['document_id']
+      assert_equal doc.title, found_docs.first['title']
+    end
+  end
+
+  def test_get_documents_error
+    e = RuntimeError.new('Bad')
+
+    @api.expects(:get_documents).raises(e)
+    get '/documents.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_get_document
+    get '/document.json' do
+      assert last_response.ok?
+      assert_nil JSON.parse(last_response.body)
+    end
+
+    doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+                                  pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
+                                  collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
+    doc.save
+
+    get '/document.json', {type: doc.type, document_id: doc.document_id} do
+      assert last_response.ok?
+      found_doc = JSON.parse(last_response.body)
+      assert_equal doc.document_id, found_doc['document_id']
+      assert_equal doc.title, found_doc['title']
+    end
+  end
+
+  def test_get_document_error
+    e = RuntimeError.new('Bad')
+
+    @api.expects(:get_document).raises(e)
+    get '/document.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
   end
 
   def test_document_failures
@@ -221,12 +420,30 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       doc.save
     end
 
-    failed_docs = @api.get_failed_documents
+    failed_docs = nil
+
+    get '/documents/failures.json' do
+      assert last_response.ok?
+      failed_docs = JSON.parse(last_response.body)
+    end
+
     assert_equal(count, failed_docs.length)
 
     ids = failed_docs.collect{|d| d['document_id']}
     count.times do |i|
       assert_include(ids, "id_#{i}")
+    end
+  end
+
+  def test_document_failures_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_failed_documents).raises(e)
+
+    get '/documents/failures.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
     end
   end
 end

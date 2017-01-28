@@ -83,7 +83,7 @@ class TestDaemonizerIntegration < Test::Unit::TestCase
     pid = File.read(@pid_file).strip
     ARGV.replace ['stop']
     Armagh::Utils::Daemonizer.run(@script, app_name: @app_name, work_dir: @work_dir)
-    assert_includes(@stdout.string, "Stopped PID #{pid}")
+    assert_includes(@stdout.string, "Stopped #{@app_name} PID #{pid}")
   end
 
   def test_stop_not_running
@@ -101,7 +101,7 @@ class TestDaemonizerIntegration < Test::Unit::TestCase
     Armagh::Utils::Daemonizer.run(@script, app_name: @app_name, work_dir: @work_dir)
     new_pid = File.read(@pid_file).strip
 
-    assert_includes(@stdout.string, "Stopped PID #{old_pid}")
+    assert_includes(@stdout.string, "Stopped #{@app_name} PID #{old_pid}")
     assert_includes(@stdout.string, "Started #{@app_name} as PID #{new_pid}")
   end
 

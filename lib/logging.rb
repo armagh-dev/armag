@@ -28,6 +28,13 @@ require_relative 'logging/enhanced_exception'
 require_relative 'logging/hash_formatter'
 require_relative 'logging/mongo_outputter'
 
+# Required for Sinatra/Rack
+class Log4r::Logger
+  def <<(message)
+    info(message)
+  end
+end
+
 module Armagh
   module Logging
 

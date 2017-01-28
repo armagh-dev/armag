@@ -173,7 +173,7 @@ module Armagh
         candidate_action_configs << candidate_config
         
         begin
-          warnings, new_input_docspecs, new_output_docspecs = Workflow.validate_and_return_warnings_inputs_outputs( candidate_action_configs )
+          Workflow.validate_and_return_warnings_inputs_outputs( candidate_action_configs )
         rescue => e
           raise( ConfigurationError, e.message )
         end
@@ -183,10 +183,9 @@ module Armagh
       end
       
       def activate_actions( actions )
-        
         actions.each do |action_class_name, action_name|
           @logger.debug "activating #{ action_class_name }: #{action_name}"
-          raw_config = eval( action_class_name ).find_configuration( @config_store, action_name, raw: true )
+          raw_config = Object.const_get( action_class_name ).find_configuration( @config_store, action_name, raw: true )
           config = raw_config[ 'values' ]
           config[ 'action' ][ 'active' ] = true
           update_action( action_class_name, config )
