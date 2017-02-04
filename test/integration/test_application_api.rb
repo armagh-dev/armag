@@ -304,9 +304,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       'output' => { 'doctype' => [ 'my_fred_doc', 'ready' ]}
     }
 
-    test_config = {
-      'Armagh::StandardActions::TIAATestCollect' => 'my_fred_action'
-    }
+    test_config = [['Armagh::StandardActions::TIAATestCollect', 'my_fred_action']]
 
     post '/action.json', test_action_config.to_json do
       assert last_response.ok?

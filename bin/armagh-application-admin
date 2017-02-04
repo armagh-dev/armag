@@ -145,7 +145,7 @@ post '/actions/activate.json' do
     api.logger.debug{"armagh-application-admin post actions/activate.json with: #{request_body}"}
 
     actions = JSON.parse(request_body)
-    raise ArgumentError, "Request must be a hash.  Was a #{actions.class}." unless actions.is_a? Hash
+    raise ArgumentError, "Request must be an Array.  Was a #{actions.class}." unless actions.is_a? Array
 
     api.activate_actions(actions)
     rest_helper.respond_success('success')
