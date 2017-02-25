@@ -35,11 +35,16 @@ require 'log4r'
 module Armagh
   module StandardActions
     class CollectTest < Armagh::Actions::Collect
+      define_output_docspec 'output_type', 'action description', default_type: 'OutputDocument', default_state: Armagh::Documents::DocState::READY
     end
-    class SplitTest < Armagh::Actions::Split; end
+    class SplitTest < Armagh::Actions::Split
+      define_output_docspec 'output_type', 'action description', default_type: 'OutputDocument', default_state: Armagh::Documents::DocState::READY
+    end
     class PublishTest < Armagh::Actions::Publish; end
     class ConsumeTest < Armagh::Actions::Consume; end
-    class DividerTest < Armagh::Actions::Divide; end
+    class DividerTest < Armagh::Actions::Divide
+      define_output_docspec 'output_type', 'action description', default_type: 'OutputDocument', default_state: Armagh::Documents::DocState::READY
+    end
     class UnknownAction < Armagh::Actions::Action; end
   end
 end
@@ -258,10 +263,10 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Actions::Collect.stubs(:report_validation_errors)
 
     action = setup_action(Armagh::StandardActions::CollectTest, {
-      'action' => {'name' => 'testc'},
+      'action'  => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => true},
-      'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'input'   => {'docspec' => '__COLLECT__testc:ready'},
+      'output'  => {'collected_doc' => 'dancollected:ready'}
     })
 
     action_name = action.config.action.name

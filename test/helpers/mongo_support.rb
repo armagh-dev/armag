@@ -27,6 +27,8 @@ class MongoSupport
   include Singleton
 
   DATABASE_NAME = 'armagh' unless defined? DATABASE_NAME
+  ADMIN_DATABASE_NAME = 'armagh_admin' unless defined? ADMIN_DATABASE_NAME
+
   HOST = '127.0.0.1' unless defined? HOST
   PORT = '27017' unless defined? PORT
 
@@ -34,13 +36,12 @@ class MongoSupport
 
   OUT_PATH = '/tmp/test_mongo.out' unless defined? OUT_PATH
 
-
-
   def initialize
     @mongod_exec = `which mongod`.strip
     @mongo_exec = `which mongo`.strip
     @mongo_pid = nil
     @client = nil
+    @admin_client = nil
 
     @hostname = Socket.gethostname
 
@@ -65,8 +66,20 @@ class MongoSupport
     sleep 0.5 until Armagh::Connection.can_connect?
 
     @client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => DATABASE_NAME)
+    @admin_client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => ADMIN_DATABASE_NAME)
 
     @mongo_pid
+  end
+
+  def stop_mongo
+    return if @mongo_pid.nil?
+
+    Process.kill(:SIGTERM, @mongo_pid)
+    Process.wait(@mongo_pid)
+
+    @client = nil
+    @admin_client = nil
+    @mongo_pid = nil
   end
 
   def running?
@@ -115,17 +128,10 @@ class MongoSupport
     @client[collection].find('_id' => id).find_one_and_update('$set' => values)
   end
 
-  def stop_mongo
-    return if @mongo_pid.nil?
-
-    Process.kill(:SIGTERM, @mongo_pid)
-    Process.wait(@mongo_pid)
-    @client = nil
-    @mongo_pid = nil
-  end
-
   def clean_database
     `mongo #{DATABASE_NAME} --eval "db.dropDatabase();"`
+    sleep 1
+    `mongo #{ADMIN_DATABASE_NAME} --eval "db.dropDatabase();"`
     sleep 1
   end
 

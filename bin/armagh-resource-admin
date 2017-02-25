@@ -149,28 +149,3 @@ post '/noop.?:format?' do
     route_after_error(params['format'], e, '/some/url', rest_helper)
   end
 end
-
-post '/implode.json' do
-  request_body = request.body.read
-
-  begin
-    implode_request = JSON.parse(request_body)
-    confirmed = implode_request['confirmed']
-
-    if confirmed.is_a? TrueClass
-      begin
-        if api.implode(confirmed)
-          rest_helper.respond_success({'result' => 'Implosion complete'})
-        else
-          rest_helper.respond_error('Implosion failed unexpectedly, with no errors raised')
-        end
-      rescue => e
-        rest_helper.respond_exception(e, "Error from POST to /implode.json with body: #{request.body}")
-      end
-    else
-      rest_helper.respond_error('No implosion.  You must post data {"confirmed": true}')
-    end
-  rescue => e
-    rest_helper.respond_exception(e, 'Unable to implode')
-  end
-end

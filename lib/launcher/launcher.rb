@@ -70,6 +70,24 @@ module Armagh
       [ Connection.ip, launcher_name ].join("_")
     end
 
+    def Launcher.get_versions(logger, action_versions)
+      versions = {
+        'armagh'  => VERSION,
+        'actions' => {}
+      }
+
+      versions[ 'actions' ] = action_versions
+      defined_actions = Actions.defined_actions
+
+      if defined_actions.any?
+        logger.debug "Available actions are: #{defined_actions}"
+      else
+        logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
+      end
+
+      versions
+    end
+
     def initialize( launcher_name = 'default' )
       @logger = Logging.set_logger('Armagh::Application::Launcher')
 
@@ -91,7 +109,9 @@ module Armagh
       @logger.any "Using Launcher Config: #{launcher_config_name}"
       Logging.set_level(@logger, @config.launcher.log_level)
 
-      @versions = get_versions
+      action_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
+
+      @versions = self.class.get_versions(@logger, action_versions)
       Document.version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
         Document.version[ package ] = version
@@ -107,7 +127,7 @@ module Armagh
         @workflow = Actions::Workflow.new( @logger, Connection.config )
         @logger.any 'workflow init successful'
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
-        @logger.any 'workflow init failed'
+        @logger.any 'Workflow initialization failed, because at least one configuration in the database has an error. Review current workflow settings in the admin GUI to fix the problem.'
         @logger.dev_error WorkflowConfigError
       end
       
@@ -259,27 +279,6 @@ module Armagh
       else
         @logger.debug 'No configuration updates to apply.'
       end
-    end
-
-    def get_versions
- 
-     versions = {
-        'armagh'  => VERSION,
-        'actions' => {}
-      }
-      gem_manager = Actions::GemManager.new( @logger )
-      action_versions = gem_manager.activate_installed_gems
-      versions[ 'actions' ] = action_versions
-  
-      defined_actions = Actions.defined_actions
-
-      if defined_actions.any?
-        @logger.debug "Available actions are: #{defined_actions}"
-      else
-        @logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
-      end
-
-      versions
     end
 
     def run

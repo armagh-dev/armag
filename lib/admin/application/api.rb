@@ -64,13 +64,12 @@ module Armagh
           @config = DEFAULTS.merge config
           @config.delete 'key_filepath' unless File.exists? @config[ 'key_filepath' ]
           @config.delete 'cert_filepath' unless File.exists? @config[ 'cert_filepath' ]
-          
+
           @config.each do |k,v|
             instance_variable_set( "@#{k}", v )
           end
-          
-          gem_manager = Armagh::Actions::GemManager.new( @logger )
-          gem_manager.activate_installed_gems
+
+          @gem_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
         end
       
         def using_ssl?
@@ -143,6 +142,10 @@ module Armagh
 
         def get_failed_documents
           Document.failures(raw: true)
+        end
+
+        def get_version
+          Launcher.get_versions(@logger, @gem_versions)
         end
       end         
     end

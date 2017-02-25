@@ -204,3 +204,12 @@ get '/documents/failures.json' do
     rest_helper.respond_exception(e, 'Error from GET /documents/failures.json')
   end
 end
+
+get '/version.json' do
+  begin
+    version = api.get_version
+    rest_helper.respond_success(version)
+  rescue => e
+    rest_helper.respond_exception(e, 'Error from GET /version.json')
+  end
+end

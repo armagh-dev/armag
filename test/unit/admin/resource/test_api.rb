@@ -33,37 +33,4 @@ class TestResourceApplicationAPI < Test::Unit::TestCase
     @logger = mock
     @api = Armagh::Admin::Resource::API.instance
   end
-  
-  
-  def test_implode_with_confirmation
-    
-    dropper = mock
-    dropper.expects( :drop ).at_least_once
-    
-    Armagh::Connection.expects( :all_document_collections ).returns( [] )
-    [ :documents, 
-      :collection_history,
-      :failures,
-      :config, 
-      :users, 
-      :status, 
-      :log, 
-      :resource_config, 
-      :resource_log 
-    ].each do |coll|
-      Armagh::Connection.expects( coll ).returns( dropper )
-    end
-    Armagh::Connection.expects( :setup_indexes )
-    
-    assert_nothing_raised { 
-      assert_true @api.implode( :confirm )
-    }
-  end
-  
-  def test_implode_no_confirmation
-    
-    assert_nothing_raised {
-      assert_false @api.implode( nil )
-    }
-  end
 end

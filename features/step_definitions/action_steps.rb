@@ -22,7 +22,7 @@ end
 
 def clean_string(str)
   str.gsub!(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/, '[UUID]')
-  str.gsub!(/[a-z0-9]{26}/, '[ID]')
+  str.gsub!(/[a-z0-9]{#{Armagh::Support::Random::RANDOM_ID_LENGTH}}/, '[ID]')
 end
 
 def recent_timestamp

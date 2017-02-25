@@ -28,21 +28,20 @@ class TestGemManager < Test::Unit::TestCase
   
   def setup
     @logger = mock
-    Gem.expects( :try_activate ).with( 'armagh/standard_actions' ).returns( true )
-    Gem.expects( :try_activate ).with( 'armagh/custom_actions' ).returns( false )
-    
+    @cloned_gem_manager = Armagh::Actions::GemManager.clone
   end
   
   def teardown
   end
   
   def test_activate_installed_gems
-    
-    @logger.expects(:info).with("Using standard: #{Armagh::StandardActions::VERSION}")
-    @logger.expects(:ops_warn).with( "CustomActions gem is not deployed. These actions won't be available.")
-    
-    gem_manager = Armagh::Actions::GemManager.new( @logger ) 
-    action_versions = gem_manager.activate_installed_gems
-    assert_equal({'standard' => Armagh::StandardActions::VERSION }, action_versions )
+    Gem.expects(:try_activate).with('armagh/standard_actions').returns(true).at_least_once
+    Gem.expects(:try_activate).with('armagh/custom_actions').returns(false).at_least_once
+
+    @logger.expects(:info).with { |s| s.start_with? 'Using standard:' }
+    @logger.expects(:ops_warn).with("CustomActions gem is not deployed. These actions won't be available.")
+
+    action_versions = @cloned_gem_manager.instance.activate_installed_gems(@logger)
+    assert_equal({'standard' => Armagh::StandardActions::VERSION}, action_versions)
   end
 end

@@ -20,6 +20,7 @@ require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration.rb'
 require_relative './cluster_server.rb'
 require_relative '../../connection'
+require_relative '../../actions/gem_manager'
 
 module Armagh
   module Admin
@@ -35,8 +36,6 @@ module Armagh
                       :verify_peer,
                       :cluster_design_filepath,
                       :logger
-      
-        #LOG_LOCATION = '/var/log/armagh/resource_admin_api.log'
       
         DEFAULTS = {
           'ip'             => '127.0.0.1',
@@ -62,7 +61,8 @@ module Armagh
           @config.each do |k,v|
             instance_variable_set "@#{k}", v
           end
-          
+
+          @gem_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
         end
       
         def using_ssl?
@@ -80,27 +80,6 @@ module Armagh
           
         def report_profile
           ClusterServer.new( '127.0.0.1', @logger ).report_profile
-        end
-        
-        def implode( confirmation )
-          if confirmation
-            Connection.all_document_collections.each do |doc_coll|
-              doc_coll.drop
-            end
-            Connection.collection_history.drop
-            Connection.config.drop
-            Connection.documents.drop
-            Connection.failures.drop
-            Connection.users.drop
-            Connection.status.drop
-            Connection.log.drop
-            Connection.resource_config.drop
-            Connection.resource_log.drop
-            Connection.setup_indexes
-            return true
-          else
-            return false 
-          end
         end
       end
     end

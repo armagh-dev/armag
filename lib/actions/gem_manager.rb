@@ -16,37 +16,39 @@
 # limitations under the License.
 #
 #
+require 'bundler/setup'
 
+require 'singleton'
 
 module Armagh
   module Actions
       
     class GemManager
-      
-      def initialize( logger )
-        @logger = logger
+      include Singleton
+
+      def initialize
+        @action_versions = {}
       end
-      
-      def activate_installed_gems
-        
-        action_versions = {}
+
+      def activate_installed_gems(logger)
+        return @action_versions unless @action_versions.empty?
         [ 'standard_actions', 'custom_actions' ].each do |action_module_path|
           action_module_name = action_module_path.gsub(/(?:^|_)([a-z])/) {$1.upcase}
           if Gem.try_activate "armagh/#{ action_module_path }"
-            loaded_module_name, loaded_module_version = load_gem( action_module_name, action_module_path )
-            action_versions[ loaded_module_name ] = loaded_module_version
+            loaded_module_name, loaded_module_version = load_gem( action_module_name, action_module_path, logger )
+            @action_versions[ loaded_module_name ] = loaded_module_version
           else
-            @logger.ops_warn "#{ action_module_name } gem is not deployed. These actions won't be available."
+            logger.ops_warn "#{ action_module_name } gem is not deployed. These actions won't be available."
           end
         end
-        action_versions
+        @action_versions
       end
       
-      def load_gem( action_module_name, action_module_path )
+      def load_gem( action_module_name, action_module_path, logger )
         require "armagh/#{ action_module_path }"
         action_module = Armagh.const_get( action_module_name )
         loaded = [ action_module::NAME, action_module::VERSION ]
-        @logger.info "Using #{ loaded.join(": ")}"
+        logger.info "Using #{ loaded.join(": ")}"
         loaded
       end
      
