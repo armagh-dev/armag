@@ -147,6 +147,27 @@ module Armagh
         def get_version
           Launcher.get_versions(@logger, @gem_versions)
         end
+
+        def get_action_configs
+          workflow = Actions::Workflow.new(@logger, Connection.config)
+          actions = workflow.get_all_actions
+
+          actions.collect do |a|
+            h = a.serialize
+            h['values'].merge('action_class_name' => h['type'])
+          end
+        end
+
+        def get_action_config(action_name)
+          workflow = Actions::Workflow.new(@logger, Connection.config)
+          action = workflow.get_action(action_name)
+          if action
+            h = action.serialize
+            h['values'].merge('action_class_name' => h['type'])
+          else
+            nil
+          end
+        end
       end         
     end
   end

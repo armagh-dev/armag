@@ -71,6 +71,7 @@ end
 
 When(/^I run armagh as a daemon$/) do
   LauncherSupport.start_launcher_daemon
+  sleep 3
 end
 
 Then(/^armagh should run in the background$/) do

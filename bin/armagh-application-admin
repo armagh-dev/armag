@@ -135,8 +135,34 @@ post '/action.json' do
   end
 end
 
+
+get '/action.json' do
+  api.logger.debug("armagh-applications-admin get action with params: #{params}")
+  name = params['name']
+
+  if name.nil? || name.empty?
+    return rest_helper.respond_error("Request must include a non-empty parameter 'name'")
+  end
+
+  begin
+    action_config = api.get_action_config(name)
+    if action_config
+      rest_helper.respond_success(action_config)
+    else
+      rest_helper.respond_error("No action named '#{name}' was found.")
+    end
+  rescue => e
+    rest_helper.respond_exception(e, "Error from GET to /actions.json with parameters #{params}.")
+  end
+end
+
 get '/actions.json' do
-  #TODO implement list of actions
+  begin
+    action_configs = api.get_action_configs
+    rest_helper.respond_success(action_configs)
+  rescue => e
+    rest_helper.respond_exception(e, 'Error from GET to /actions.json')
+  end
 end
 
 post '/actions/activate.json' do

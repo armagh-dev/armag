@@ -136,8 +136,8 @@ Feature: Actions Execution
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "__COLLECT__archive_collector" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 20 seconds
+    Then I should see an agent with a status of "idle" within 20 seconds
     And I should see 1 "CollectedDocument" documents in the "documents" collection
     And I should see 1 "IntermediateDocument" documents in the "documents" collection
     And I should see 0 "__COLLECT__archive_collector" documents in the "documents" collection

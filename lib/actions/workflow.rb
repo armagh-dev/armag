@@ -135,8 +135,24 @@ module Armagh
         action_names
       end
 
-      def instantiate_divider( docspec, caller, logger, state_collection )
+      def get_action(action_name)
+        all_actions = get_all_actions
+        all_actions.each do |a|
+          return a if a.action.name == action_name
+        end
+        nil
+      end
 
+      def get_all_actions
+        actions = []
+        found_actions = Action.find_all_configurations( @config_store, include_descendants: true )
+        found_actions.each do |_class, action|
+          actions << action
+        end
+        actions
+      end
+
+      def instantiate_divider( docspec, caller, logger, state_collection )
         divider_action_name = get_action_names_for_docspec( docspec )
                                 .find{ |action_name| @action_configs_by_name[ action_name ].__type < Divide }
         instantiate_action( divider_action_name, caller, logger, state_collection ) if divider_action_name

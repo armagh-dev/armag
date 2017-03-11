@@ -52,14 +52,11 @@ module Armagh
     end
 
     class TWTestDivide < Actions::Divide
-      
-      define_output_docspec 'divided', 'divided documents'
-      
       def self.make_config_values( action_name:, input_doctype:, divided_doctype:, active: true )
         {
           'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
-          'output' => { 'divided' => Armagh::Documents::DocSpec.new( divided_doctype, DS_READY ) }
+          'output' => { 'docspec' => Armagh::Documents::DocSpec.new( divided_doctype, DS_READY ) }
         }
       end   
     end
@@ -276,5 +273,20 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal [ 'collect_freddocs_from_source' ], new_workflow.collect_actions.collect{ |c| c.action.name }
     assert_equal [ 'consume_a_freddoc_1' ], workflow.get_action_names_for_docspec( Armagh::Documents::DocSpec.new( 'a_freddoc', 'published' ))
   end
-    
+
+  def test_get_action
+    workflow = do_add_configs
+    assert_nil workflow.get_action('doesnt exist')
+
+    expected_action = @test_action_setup['Armagh::StandardActions::TWTestPublish'].first
+
+    retrieved_action = workflow.get_action(expected_action[:action_name]).action
+    assert_equal(expected_action[:action_name], retrieved_action.name)
+  end
+
+  def test_get_all_actions
+    workflow = do_add_configs
+    all_actions = workflow.get_all_actions
+    assert_equal 8, all_actions.length
+  end
 end

@@ -34,8 +34,6 @@ require 'rack/test'
 
 require 'fileutils'
 
-require 'sinatra'
-
 require 'mongo'
 
 module Armagh
@@ -446,6 +444,112 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response = JSON.parse(last_response.body)
       assert_equal Armagh::VERSION, response['armagh']
       assert_equal Armagh::StandardActions::VERSION, response.dig('actions', 'standard')
+    end
+  end
+
+  def test_get_action
+    test_config1 = {
+      'collect' => {'schedule' => '0 * * * *', 'archive' => 'false'},
+      'action' => {'name' => 'a1', 'active' => 'true'},
+      'input' => {'docspec' => '__COLLECT__a1:ready'},
+      'output' => {'output_type' => 'OutputDocument:ready'},
+      'params' => {'p1' => '42'},
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect'
+    }
+
+    test_config2 = {
+      'collect' => {'schedule' => '0 * * * *', 'archive' => 'false'},
+      'action' => {'name' => 'a2', 'active' => 'false'},
+      'input' => {'docspec' => '__COLLECT__a2:ready'},
+      'output' => {'output_type' => 'OutputDocument:ready'},
+      'params' => {'p1' => '42'},
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect'}
+
+    post '/action.json', test_config1.to_json do
+      assert last_response.ok?
+    end
+
+    post '/action.json', test_config2.to_json do
+      assert last_response.ok?
+    end
+
+    get '/action.json', params={'name' => 'a2'} do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+      assert_equal(test_config2, response)
+    end
+  end
+
+  def test_get_action_no_name
+    get '/action.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal({'error_detail' =>{'message' => "Request must include a non-empty parameter 'name'"}}, response_hash)
+    end
+  end
+
+  def test_get_action_none
+    get '/action.json', params={'name' => 'does_not_exist'} do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal({'error_detail' =>{'message' => "No action named 'does_not_exist' was found."}}, response_hash)
+    end
+  end
+
+  def test_get_action_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_action_config).raises(e)
+
+    get '/action.json', params={'name' => 'whatever'} do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_get_actions
+    test_config1 = {
+      'collect' => {'schedule' => '0 * * * *', 'archive' => 'false'},
+      'action' => {'name' => 'a1', 'active' => 'true'},
+      'input' => {'docspec' => '__COLLECT__a1:ready'},
+      'output' => {'output_type' => 'OutputDocument:ready'},
+      'params' => {'p1' => '42'},
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect'
+    }
+
+    test_config2 = {
+      'collect' => {'schedule' => '0 * * * *', 'archive' => 'false'},
+      'action' => {'name' => 'a2', 'active' => 'false'},
+      'input' => {'docspec' => '__COLLECT__a2:ready'},
+      'output' => {'output_type' => 'OutputDocument:ready'},
+      'params' => {'p1' => '42'},
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect'}
+
+    post '/action.json', test_config1.to_json do
+      assert last_response.ok?
+    end
+
+    post '/action.json', test_config2.to_json do
+      assert last_response.ok?
+    end
+
+    get '/actions.json' do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+      assert_equal([test_config1, test_config2], response)
+    end
+  end
+
+  def test_get_actions_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_action_configs).raises(e)
+
+    get '/actions.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
     end
   end
 end

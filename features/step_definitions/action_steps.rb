@@ -22,7 +22,9 @@ end
 
 def clean_string(str)
   str.gsub!(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/, '[UUID]')
-  str.gsub!(/[a-z0-9]{#{Armagh::Support::Random::RANDOM_ID_LENGTH}}/, '[ID]')
+  str.gsub!(/-[a-zA-Z0-9]{#{Armagh::Support::Random::RANDOM_ID_LENGTH-5},#{Armagh::Support::Random::RANDOM_ID_LENGTH}}/, '-[ID]')
+  str.gsub!(/\/[a-zA-Z0-9]{#{Armagh::Support::Random::RANDOM_ID_LENGTH-5},#{Armagh::Support::Random::RANDOM_ID_LENGTH}}/, '/[ID]')
+  str
 end
 
 def recent_timestamp
@@ -43,6 +45,7 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
       doc_id = doc['_id']
       doc_problems[doc_id] = {}
       found_matching_doc = true
+
       doc_info.each do |key, value|
 
         # This is a potential match

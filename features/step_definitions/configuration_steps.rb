@@ -38,7 +38,7 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
 
       Armagh::CustomActions::TestDivider.create_configuration(Armagh::Connection.config, 'test_divider', {
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
       })
 
       Armagh::CustomActions::TestSplitter.create_configuration(Armagh::Connection.config, 'test_split', {
@@ -144,7 +144,7 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
 
       Armagh::CustomActions::TestDivider.create_configuration(Armagh::Connection.config, 'test_divider', {
         'input' => {'docspec' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
       })
 
       Armagh::CustomActions::TestSplitter.create_configuration(Armagh::Connection.config, 'test_split', {

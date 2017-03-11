@@ -43,7 +43,6 @@ module Armagh
     class PublishTest < Armagh::Actions::Publish; end
     class ConsumeTest < Armagh::Actions::Consume; end
     class DividerTest < Armagh::Actions::Divide
-      define_output_docspec 'output_type', 'action description', default_type: 'OutputDocument', default_state: Armagh::Documents::DocState::READY
     end
     class UnknownAction < Armagh::Actions::Action; end
   end
@@ -519,9 +518,14 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_divider
-
     input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
-    divider = setup_action(Armagh::StandardActions::DividerTest, {'input' => {'docspec' => input_docspec}})
+    output_docspec = Armagh::Documents::DocSpec.new('DocumentDividedType', Armagh::Documents::DocState::READY)
+
+    divider = setup_action(Armagh::StandardActions::DividerTest, {
+      'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
+
+    })
     action_name = divider.config.action.name
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
