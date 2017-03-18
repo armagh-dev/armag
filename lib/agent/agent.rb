@@ -358,7 +358,7 @@ module Armagh
           end
 
           doc.published_timestamp = timestamp
-          doc.state = Documents::DocState::PUBLISHED unless doc.error?
+          doc.state = action.config.output.docspec.state unless doc.error?
           doc.add_pending_actions(@workflow.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
