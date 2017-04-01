@@ -30,15 +30,13 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 class UTAction < Armagh::Actions::Collect
-  define_output_docspec 'collected', 'collected documents'
-
   def self.make_test_config(store:, action_name:, collected_doctype:)
     create_configuration(store, action_name, {
       'action' => {'name' => action_name, 'active' => true},
       'collect' => {'schedule' => '* * * * *', 'archive' => false},
       'input' => {},
       'output' => {
-        'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+        'docspec' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
       }
     })
   end
@@ -49,7 +47,7 @@ class UTAction < Armagh::Actions::Collect
       'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
       'input' => {},
       'output' => {
-        'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+        'docspec' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
       }
     })
   end
@@ -131,13 +129,13 @@ class TestCollectionTrigger < Test::Unit::TestCase
   def test_trigger_updated_workflow
     Armagh::Document.expects(:create_trigger_document).never
 
-    @config = UTAction.make_long_test_config(store: @config_store, action_name: 'update', collected_doctype: 'type')
+    @config = UTAction.make_long_test_config(store: @config_store, action_name: 'update1', collected_doctype: 'type')
     @workflow.stubs(:collect_actions).returns([@config])
     @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 20, 35))
     @trigger.start
     sleep RUN_SLEEP
 
-    @config = UTAction.make_test_config(store: @config_store, action_name: 'update', collected_doctype: 'type')
+    @config = UTAction.make_test_config(store: @config_store, action_name: 'update2', collected_doctype: 'type')
     @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 23, 35))
     @workflow.stubs(:last_timestamp).returns(Time.now)
     sleep RUN_SLEEP

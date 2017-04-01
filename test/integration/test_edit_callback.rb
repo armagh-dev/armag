@@ -36,14 +36,12 @@ require 'armagh/actions'
 module Armagh
   module StandardActions
     class TestSplitter < Actions::Split
-      define_output_docspec 'test_document', 'desc'
-      
       attr_accessor :doc_id
       attr_accessor :doc_was_new
       attr_reader :doc_class
 
       def split(_trigger)
-        edit(@doc_id, 'test_document') do |doc|
+        edit(@doc_id) do |doc|
           @doc_class = doc.class
           doc.metadata['field'] = true
           doc.content = {'DRAFT CONTENT' => true}
@@ -85,7 +83,7 @@ class TestEditCallback < Test::Unit::TestCase
       'Armagh::StandardActions::TestSplitter', 
       { 'action' => { 'name' => 'test_splitter' },
         'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( 'intype', 'ready' )},
-        'output' => { 'test_document' => Armagh::Documents::DocSpec.new( @output_type, @output_state )}
+        'output' => { 'docspec' => Armagh::Documents::DocSpec.new( @output_type, @output_state )}
       }
     ) 
     agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )

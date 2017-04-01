@@ -931,7 +931,7 @@ Feature: Actions Execution
     And the logs should contain 1 "Triggering test_collect collection"
     And the logs should contain "Test Collect Running"
     And the logs should not contain "ERROR"
-    Then armagh's workflow config is "test_actions"
+    Then armagh's workflow config is "long_collect"
     And I wait 65 seconds
     Then the logs should contain 1 "Triggering test_collect collection"
     And the logs should not contain "ERROR"

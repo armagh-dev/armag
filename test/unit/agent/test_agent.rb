@@ -192,7 +192,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -225,7 +225,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -265,7 +265,7 @@ class TestAgent < Test::Unit::TestCase
       'action'  => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => true},
       'input'   => {'docspec' => '__COLLECT__testc:ready'},
-      'output'  => {'collected_doc' => 'dancollected:ready'}
+      'output'  => {'docspec' => 'dancollected:ready'}
     })
 
     action_name = action.config.action.name
@@ -296,7 +296,11 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_split_action
     input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
-    action = setup_action(Armagh::StandardActions::SplitTest, {'input' => {'docspec' => input_docspec}})
+    output_docspec = Armagh::Documents::DocSpec.new('OutputDocumentType', Armagh::Documents::DocState::READY)
+    action = setup_action(Armagh::StandardActions::SplitTest, {
+      'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
+    })
     action_name = action.config.action.name
 
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
@@ -480,7 +484,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_consume_action
-    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
     action = setup_action(Armagh::StandardActions::ConsumeTest, {'input' => {'docspec' => input_docspec}})
     action_name = action.config.action.name
 
@@ -547,7 +551,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -580,7 +584,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
 
@@ -615,7 +619,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
@@ -1264,7 +1268,7 @@ class TestAgent < Test::Unit::TestCase
       'action' => {'name' => 'testc'},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
-      'output' => {'collected_doc' => 'dancollected:ready'}
+      'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)

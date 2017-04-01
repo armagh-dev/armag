@@ -37,15 +37,13 @@ require 'mongo'
 module Armagh
   module StandardActions
     class CollectActionForTest < Actions::Collect
-      define_output_docspec 'collected', 'collected documents'
-
       def self.make_test_config(store:, action_name:, collected_doctype:)
         create_configuration(store, action_name, {
           'action' => {'name' => action_name, 'active' => true},
           'collect' => {'schedule' => '* * * * *', 'archive' => false},
           'input' => {},
           'output' => {
-            'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+            'docspec' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
           }
         })
       end
@@ -56,20 +54,18 @@ module Armagh
           'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
           'input' => {},
           'output' => {
-            'collected' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
+            'docspec' => Armagh::Documents::DocSpec.new(collected_doctype, Armagh::Documents::DocState::READY),
           }
         })
       end
     end
 
     class SplitActionForTest < Actions::Split
-      define_output_docspec 'output', 'single instance'
-
       def self.make_test_config( store:, action_name:, input_doctype:, output_doctype: )
         create_configuration( store, action_name, {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, Armagh::Documents::DocState::READY ) },
-          'output' => { 'output'  => Armagh::Documents::DocSpec.new( output_doctype, Armagh::Documents::DocState::READY )}
+          'output' => { 'docspec'  => Armagh::Documents::DocSpec.new( output_doctype, Armagh::Documents::DocState::READY )}
         })
       end
     end
@@ -156,7 +152,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     @collection_trigger.start
 
     sleep 62
-    Armagh::StandardActions::CollectActionForTest.make_test_config(store: @config_store, action_name: 'change_collect', collected_doctype: 'collect_type')
+    Armagh::StandardActions::CollectActionForTest.make_test_config(store: @config_store, action_name: 'change_collect2', collected_doctype: 'collect_type')
     @workflow.refresh
     sleep 1
 

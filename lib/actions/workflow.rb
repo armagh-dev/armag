@@ -49,6 +49,7 @@ module Armagh
       end
 
       def refresh(force = false)
+
         configs_with_classes_in_db = Action.find_all_configurations( @config_store, include_descendants: true )
         configs_in_db = configs_with_classes_in_db.collect{ |_class, config| config if config.action.active }.compact
         ts_in_db = nil
@@ -163,10 +164,10 @@ module Armagh
         candidate_action_name = candidate_configuration_values&.dig( 'action', 'name' )
         raise( ConfigurationError, "Action named #{ candidate_action_name } already exists.") if @action_configs_by_name[ candidate_action_name ]
         
-        update_action( action_class_name, candidate_configuration_values )
+        update_action( action_class_name, candidate_configuration_values, creating: true )
       end
       
-      def update_action( action_class_name, candidate_configuration_values )
+      def update_action( action_class_name, candidate_configuration_values, creating: false )
           
         candidate_action_name = candidate_configuration_values&.dig( 'action', 'name' )
         raise ConfigurationError, "Configuration must include an action name" unless candidate_action_name
@@ -180,7 +181,13 @@ module Armagh
 
         candidate_config = nil
         begin
-          candidate_config = action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values )
+          if creating
+            candidate_config = action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values )
+          else
+            candidate_config = action_class.find_configuration( @config_store, candidate_action_name )
+            candidate_config.update_replace( candidate_configuration_values )
+          end
+
         rescue Configh::ConfigInitError => e
           raise ConfigurationError, e.message
         end
@@ -194,7 +201,7 @@ module Armagh
           raise( ConfigurationError, e.message )
         end
         
-        action_class.create_configuration( @config_store, candidate_action_name, candidate_configuration_values ) 
+ #       candidate_config.update_replace( candidate_configuration_values )
         refresh(true)
       end
       

@@ -89,10 +89,15 @@ module Armagh
           Connection.status.find().to_a
         end
         
-        def create_launcher_configuration( params )
+        def create_or_update_launcher_configuration( params )
           begin
-            Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
-            config = get_launcher_configuration( {} )
+            current_config = get_launcher_configuration( {} )
+            if current_config
+              current_config.update_replace( { 'launcher' => params })
+            else
+              Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
+              end
+            config = get_launcher_configuration( {} )  # weak test, but short lived.
             config[ '__message' ] = 'Configuration successful.'
           rescue => e
             Logging.dev_error_exception(@logger, e, 'Error creating launcher configuration')

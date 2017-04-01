@@ -109,7 +109,7 @@ post '/launcher.json' do
     request_hash = JSON.parse(request_body)
     raise ArgumentError, "Request must be a hash.  Was a #{request_hash.class}." unless request_hash.is_a? Hash
 
-    new_config = api.create_launcher_configuration(request_hash)
+    new_config = api.create_or_update_launcher_configuration(request_hash)
     rest_helper.respond_success(new_config)
   rescue => e
     rest_helper.respond_exception(e, "Error from POST to /launcher.json with body: #{request_body}")

@@ -30,7 +30,6 @@ require 'mocha/test_unit'
 module Armagh
   module StandardActions
     class TATestCollect < Actions::Collect
-      define_output_docspec 'collected_document', 'Docs collected from source'
       define_parameter name: 'host', type: 'populated_string', required: true, default: 'fredhost', description: 'desc'
     end
   end
@@ -38,6 +37,7 @@ end
 
 class TestAdminApplicationAPI < Test::Unit::TestCase
   include ArmaghTest
+  
 
   def setup
     @logger = mock_logger
@@ -48,7 +48,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @base_values_hash = {
       'action_class_name' => 'Armagh::StandardActions::TATestCollect',
 
-      'output' => {'collected_document' => Armagh::Documents::DocSpec.new('dansdoc', Armagh::Documents::DocState::READY)},
+      'output' => {'docspec' => Armagh::Documents::DocSpec.new('dansdoc', Armagh::Documents::DocState::READY)},
       'collect' => {'schedule' => '0 * * * *', 'archive' => false}
     }
   end
@@ -59,19 +59,19 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
        'action_class_name' => 'Armagh::StandardActions::TATestCollect',
        'collect' => {'archive' => 'false', 'schedule' => '0 * * * *'},
        'input' => {'docspec' => '__COLLECT__action_0:ready'},
-       'output' => {'collected_document' => 'dansdoc:ready'},
+       'output' => {'docspec' => 'dansdoc:ready'},
        'ta_test_collect' => {'host' => 'somehost'}},
       {'action' => {'active' => 'true', 'name' => 'action_1'},
        'action_class_name' => 'Armagh::StandardActions::TATestCollect',
        'collect' => {'archive' => 'false', 'schedule' => '0 * * * *'},
        'input' => {'docspec' => '__COLLECT__action_1:ready'},
-       'output' => {'collected_document' => 'dansdoc:ready'},
+       'output' => {'docspec' => 'dansdoc:ready'},
        'ta_test_collect' => {'host' => 'somehost'}},
       {'action' => {'active' => 'true', 'name' => 'action_2'},
        'action_class_name' => 'Armagh::StandardActions::TATestCollect',
        'collect' => {'archive' => 'false', 'schedule' => '0 * * * *'},
        'input' => {'docspec' => '__COLLECT__action_2:ready'},
-       'output' => {'collected_document' => 'dansdoc:ready'},
+       'output' => {'docspec' => 'dansdoc:ready'},
        'ta_test_collect' => {'host' => 'somehost'}},
     ]
   end
@@ -84,7 +84,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
         'action_class_name' => 'Armagh::StandardActions::TATestCollect',
         'action' => {'name' => "action_#{count}"},
         'ta_test_collect' => {'host' => 'somehost'},
-        'output' => {'collected_document' => Armagh::Documents::DocSpec.new('dansdoc', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('dansdoc', Armagh::Documents::DocState::READY)},
         'collect' => {'schedule' => '0 * * * *', 'archive' => false}
       }
 

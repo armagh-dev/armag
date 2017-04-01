@@ -33,7 +33,6 @@ module Armagh
     
     class TWTestCollect < Actions::Collect
 
-      define_output_docspec 'collected_a', 'collected documents of first type'
       define_output_docspec 'collected_b', 'collected documents of second type'
       
       define_parameter name:'count', required: true, type: 'integer', default: 6, description: 'desc'
@@ -44,7 +43,7 @@ module Armagh
           'collect' => { 'schedule' => '0 * * * *', 'archive' => false },
           'input'  => {},
           'output' => {
-            'collected_a' => Armagh::Documents::DocSpec.new( collected_a_doctype, DS_READY ),
+            'docspec' => Armagh::Documents::DocSpec.new( collected_a_doctype, DS_READY ),
             'collected_b' => Armagh::Documents::DocSpec.new( collected_b_doctype, DS_READY )
           }
         }
@@ -62,14 +61,12 @@ module Armagh
     end
     
     class TWTestSplit < Actions::Split
-      
-      define_output_docspec 'single', 'single instance'
-      
+
       def self.make_config_values( action_name:, input_doctype:, single_doctype:, active: true )
         {
           'action' => { 'name' => action_name, 'active' => active },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_READY ) },
-          'output' => { 'single'  => Armagh::Documents::DocSpec.new( single_doctype, DS_READY )}
+          'output' => { 'docspec'  => Armagh::Documents::DocSpec.new( single_doctype, DS_READY )}
         }
       end   
     end
@@ -178,7 +175,7 @@ class TestWorkflow < Test::Unit::TestCase
     }
     @test_action_setup.each do |action_class_name, setup_values_list|
       setup_values_list.each do |setup_values|
-        assert_nothing_raised do 
+        assert_nothing_raised do
           method_args = setup_values.merge( active: active )
           c = workflow.create_action( action_class_name, eval(action_class_name).make_config_values( method_args ))
         end
@@ -188,7 +185,6 @@ class TestWorkflow < Test::Unit::TestCase
   end
   
   def test_add_configs
-    
     workflow = do_add_configs
     assert_equal [ 'consume_a_freddoc_1', 'consume_a_freddoc_2'], workflow.get_action_names_for_docspec( Armagh::Documents::DocSpec.new( 'a_freddoc', 'published' ))
   end  
