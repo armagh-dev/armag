@@ -101,7 +101,7 @@ module Armagh
       launcher_config_name = [ bind_ip, launcher_name ].join('_')
       
       begin
-        @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, :maintain_history => true )
+        @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, maintain_history: true )
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
         @logger.dev_error LauncherConfigError
       end
@@ -118,7 +118,7 @@ module Armagh
       end
       
       begin
-        @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, :maintain_history => true )
+        @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, maintain_history: true )
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
         @logger.dev_error AgentConfigError
       end
@@ -258,6 +258,8 @@ module Armagh
     end
 
     def refresh_config
+      @logger.debug 'Checking for updating configuration'
+
       # Explicitly call them all out to refresh all if there any any to refresh
       config = @config.refresh
       agent_config = @agent_config.refresh

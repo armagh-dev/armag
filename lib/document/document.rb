@@ -73,6 +73,7 @@ module Armagh
     end
 
     def self.create_trigger_document(state:, type:, pending_actions:)
+      now = Time.now
       doc = Document.new
       doc.document_id = Armagh::Support::Random.random_id
       doc.type = type
@@ -80,8 +81,11 @@ module Armagh
       doc.add_pending_actions pending_actions
       doc.metadata = {}
       doc.content = {}
-      doc.created_timestamp = Time.now
+      doc.created_timestamp = now
+      doc.updated_timestamp = now
 
+
+      # Not using create because we want to not allow an insertion if one already exists
       Connection.documents.update_one(
         {'type' => type, 'state' => state},
         {'$setOnInsert': doc.db_doc},
@@ -387,6 +391,10 @@ module Armagh
 
     def updated_timestamp
       @db_doc['updated_timestamp']&.utc
+    end
+
+    def updated_timestamp=(ts)
+      @db_doc['updated_timestamp'] = ts
     end
 
     def created_timestamp

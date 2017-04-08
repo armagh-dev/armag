@@ -269,11 +269,13 @@ module Armagh
             begin
               exec_id = @current_doc.document_id || @current_doc.internal_id
               @logger.debug "Executing #{name} on document '#{exec_id}'."
+              start = Time.now
               Dir.mktmpdir do |tmp_dir|
                 Dir.chdir(tmp_dir) do
                   execute_action(current_action, @current_doc)
                 end
               end
+              @logger.debug "Execution of #{name} on document '#{exec_id}' completed in #{Time.now-start} seconds."
             rescue Documents::Errors::DocumentSizeError => e
               Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}' on '#{@current_doc.document_id}'")
               @current_doc.add_ops_error(name, e)

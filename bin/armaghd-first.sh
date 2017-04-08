@@ -25,8 +25,8 @@ case $op in
     ${bin_path}/armagh-mongod stop
     ;;
   restart)
-    $0 stop
-    $0 start
+    $0 stop ${bin_path}
+    $0 start ${bin_path}
     ;;
   stat|status)
     echo -e "\n--------------------------------------------------------"

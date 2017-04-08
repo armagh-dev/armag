@@ -88,16 +88,16 @@ module Armagh
         def get_status
           Connection.status.find().to_a
         end
-        
+
         def create_or_update_launcher_configuration( params )
           begin
-            current_config = get_launcher_configuration( {} )
+            current_config = get_launcher_configuration
             if current_config
               current_config.update_replace( { 'launcher' => params })
             else
               Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
-              end
-            config = get_launcher_configuration( {} )  # weak test, but short lived.
+            end
+            config = get_launcher_configuration.serialize  # weak test, but short lived.
             config[ '__message' ] = 'Configuration successful.'
           rescue => e
             Logging.dev_error_exception(@logger, e, 'Error creating launcher configuration')
@@ -107,8 +107,8 @@ module Armagh
           return config
         end
         
-        def get_launcher_configuration( params )
-          Launcher.find_configuration( Connection.config, Launcher.config_name )&.serialize
+        def get_launcher_configuration
+          Launcher.find_configuration( Connection.config, Launcher.config_name )
         end
         
         def get_document_counts    

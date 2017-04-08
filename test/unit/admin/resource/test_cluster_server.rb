@@ -40,7 +40,7 @@ class TestClusterServer < Test::Unit::TestCase
     assert_kind_of Numeric, profile[ 'ram' ]
     assert_kind_of Numeric, profile[ 'swap' ]
     assert_match /(Darwin|Linux)/, profile[ 'os' ], 'is not a recognized OS'
-    assert_match /^ruby 2.3/i, profile[ 'ruby_v' ]
+    assert_match /^ruby 2\./i, profile[ 'ruby_v' ]
     assert_includes profile, 'armagh_v'
     assert_equal profile['disks'].keys.sort, %w(base index journal log)
 

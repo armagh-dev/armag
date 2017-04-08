@@ -49,7 +49,7 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 
-  spec.required_ruby_version = '~> 2.3'
+  spec.required_ruby_version = '~> 2.4'
 
   # Caution: Since this is actually packaged as a gem, these just verify the required versions are installed.  The versions
   #            used at runtime may differ unless a version is explicitly set before the require.

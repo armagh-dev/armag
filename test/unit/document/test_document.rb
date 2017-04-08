@@ -373,6 +373,11 @@ class TestDocument < Test::Unit::TestCase
     assert_not_equal(t, doc.created_timestamp)
     doc.created_timestamp = t
     assert_equal(doc.created_timestamp, t)
+
+    update = t + 100
+    assert_not_equal(update, doc.created_timestamp)
+    doc.updated_timestamp = update
+    assert_equal(doc.updated_timestamp, update)
   end
 
   def test_collection_task_ids
