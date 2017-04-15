@@ -21,8 +21,9 @@ require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../launcher/launcher'
 require_relative '../../actions/workflow'
-require_relative '../../document/document'
+require_relative '../../models/document'
 require_relative '../../actions/gem_manager'
+require_relative '../../utils/collection_trigger'
 
 
 module Armagh
@@ -112,7 +113,7 @@ module Armagh
         end
         
         def get_document_counts    
-          Document.count_working_by_doctype
+          Models::Document.count_working_by_doctype
         end
         
         def create_action_configuration( configuration_hash )
@@ -136,17 +137,17 @@ module Armagh
         end
           
         def get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
-          Document
+          Models::Document
             .find_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
             .to_a
         end
         
         def get_document( doc_id, doc_type )
-          Document.find( doc_id, doc_type, Documents::DocState::PUBLISHED, raw: true )
+          Models::Document.find( doc_id, doc_type, Documents::DocState::PUBLISHED, raw: true )
         end
 
         def get_failed_documents
-          Document.failures(raw: true)
+          Models::Document.failures(raw: true)
         end
 
         def get_version
@@ -171,6 +172,23 @@ module Armagh
             h['values'].merge('action_class_name' => h['type'])
           else
             nil
+          end
+        end
+
+        def trigger_collect(action_name)
+          workflow = Actions::Workflow.new(@logger, Connection.config)
+          action_config = workflow.get_action(action_name)
+          if action_config
+            action_class = action_config.__type
+            if action_class < Actions::Collect
+              trigger = Utils::CollectionTrigger.new(workflow)
+              trigger.trigger_individual_collection(action_config)
+              true
+            else
+              false
+            end
+          else
+            false
           end
         end
       end         

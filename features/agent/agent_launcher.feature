@@ -33,5 +33,6 @@ Feature: Agent Launcher
     Given armagh isn't already running
     And mongo isn't running
     When I run armagh
+    And I wait 5 seconds
     Then armagh should have exited
     And the logs should contain "Unable to establish connection to the MongoConnection database configured in '.+'.  The database does not appear to be running."

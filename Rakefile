@@ -40,7 +40,7 @@ Rake::TestTask.new(:integration) do |t|
 end
 
 task :clean do
-  rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage))
+  rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage failure_logs))
 end
 
 Cucumber::Rake::Task.new

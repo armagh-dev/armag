@@ -27,6 +27,7 @@ Feature: Launcher Configuration
     When armagh's "launcher" config is
       | num_agents | 2 |
     And I run armagh
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the number of running agents equals 2
 
   Scenario: Launch default agents
@@ -35,6 +36,7 @@ Feature: Launcher Configuration
     And mongo is clean
     When armagh doesn't have a "launcher" config
     And I run armagh
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the number of running agents equals 1
 
   Scenario: Change number of agents
@@ -45,11 +47,16 @@ Feature: Launcher Configuration
       | num_agents        | 2 |
       | checkin_frequency | 1 |
     And I run armagh
+    Then I should see an agent with a status of "idle" within 30 seconds
     And the number of running agents equals 2
     When armagh's "launcher" config is
       | num_agents        | 4 |
       | checkin_frequency | 1 |
-    And I wait 5 seconds
+    And I wait until there are agents with the statuses
+      | idle |
+      | idle |
+      | idle |
+      | idle |
     Then the number of running agents equals 4
 
   Scenario: Handle agents that die
@@ -59,7 +66,9 @@ Feature: Launcher Configuration
     When armagh's "launcher" config is
       | num_agents | 3 |
     And I run armagh
+    Then I should see an agent with a status of "idle" within 30 seconds
     And an agent is killed
+    And I wait 3 seconds
     Then a new agent shall launch to take its place
 
   Scenario: Initial log level
@@ -73,7 +82,7 @@ Feature: Launcher Configuration
     And armagh's "agent" config is
       | log_level | error |
     And I run armagh
-    And I wait 1 second
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the logs should contain "DEBUG"
 
   Scenario: Default log level
@@ -86,7 +95,7 @@ Feature: Launcher Configuration
     And armagh's "agent" config is
       | log_level | error |
     And I run armagh
-    And I wait 1 second
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the logs should contain "INFO"
     But the logs should not contain "DEBUG"
 
@@ -101,7 +110,7 @@ Feature: Launcher Configuration
     And armagh's "agent" config is
       | log_level | error |
     And I run armagh
-    And I wait 1 second
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
@@ -110,7 +119,7 @@ Feature: Launcher Configuration
       | log_level         | info |
       | checkin_frequency | 1    |
     When the logs are emptied
-    And I wait 3 seconds
+    And I wait 5 seconds
     Then the logs should not contain "DEBUG"
     But the logs should contain "INFO"
 
@@ -120,11 +129,11 @@ Feature: Launcher Configuration
     And mongo is clean
     And the logs are emptied
     When armagh's "action" config is
-      | iteration         | 1 |
+      | iteration | 1 |
     And I run armagh
-    And I wait 3 seconds
+    Then I should see an agent with a status of "idle" within 30 seconds
     When the logs are emptied
     When armagh's "action" config is
-      | iteration         | 2 |
+      | iteration | 2 |
     And I wait 61 seconds
     Then the logs should contain "Configuration change detected"

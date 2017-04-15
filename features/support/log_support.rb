@@ -23,9 +23,16 @@ Armagh::Logging.init_log_env
 module LogSupport
 
   LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh' unless defined? LOG_DIR
+  FAILURE_LOGS = File.join(Dir.pwd, 'failure_logs') unless defined? FAILURE_LOGS
 
   def self.each_log
     Dir.glob(File.join(LOG_DIR, '*.log')).each do |log_file|
+      yield log_file
+    end
+  end
+
+  def self.each_failure_log
+    Dir.glob(File.join(FAILURE_LOGS, '**', '*')).each do |log_file|
       yield log_file
     end
   end
@@ -38,6 +45,10 @@ module LogSupport
     FileUtils.mkdir_p  LOG_DIR
     raise "Invalid permissions on #{LOG_DIR}" unless File.readable?(LOG_DIR) && File.writable?(LOG_DIR)
     each_log{|log| File.delete(log)}
+  end
+
+  def self.delete_failure_logs
+    FileUtils.rm_rf FAILURE_LOGS
   end
 
   def self.count(string)

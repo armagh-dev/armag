@@ -16,6 +16,7 @@
 #
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/integration_helper'
 
 require_relative '../../lib/environment'
 Armagh::Environment.init
@@ -74,17 +75,6 @@ end
 
 class TestCollectTriggerIntegration < Test::Unit::TestCase
   include ArmaghTest
-
-  def self.startup
-    puts 'Starting Mongo'
-    Singleton.__init__(Armagh::Connection::MongoConnection)
-    MongoSupport.instance.start_mongo
-  end
-
-  def self.shutdown
-    puts 'Stopping Mongo'
-    MongoSupport.instance.stop_mongo
-  end
 
   def setup
     @logger = mock_logger

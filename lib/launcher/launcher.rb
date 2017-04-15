@@ -35,6 +35,7 @@ require_relative '../agent/agent'
 require_relative '../agent/agent_status'
 require_relative '../actions/workflow'
 require_relative '../actions/gem_manager'
+require_relative '../models/document'
 require_relative '../utils/collection_trigger'
 require_relative '../connection'
 require_relative '../ipc'
@@ -112,9 +113,9 @@ module Armagh
       action_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
 
       @versions = self.class.get_versions(@logger, action_versions)
-      Document.version['armagh'] = @versions[ 'armagh' ]
+      Models::Document.version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
-        Document.version[ package ] = version
+        Models::Document.version[ package ] = version
       end
       
       begin
@@ -215,7 +216,7 @@ module Armagh
           agent_id = @agents[pid].uuid
           @agents.delete(pid)
           @agent_status.remove_agent(agent_id)
-          Document.force_unlock(agent_id)
+          Models::Document.force_unlock(agent_id)
         end
       end
 

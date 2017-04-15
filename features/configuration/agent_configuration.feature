@@ -31,8 +31,8 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | log_level | debug |
     And I run armagh
-    And I wait 1 second
-    Then the logs should contain "DEBUG"
+    Then I should see an agent with a status of "idle" within 30 seconds
+    And the logs should contain "DEBUG"
 
   Scenario: Default log level
     Given armagh isn't already running
@@ -43,7 +43,7 @@ Feature: Agent Configuration
       | log_level         | error |
       | checkin_frequency | 1     |
     And I run armagh
-    And I wait 1 second
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the logs should contain "INFO"
     But the logs should not contain "DEBUG"
 
@@ -58,7 +58,7 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | log_level | warn |
     And I run armagh
-    And I wait 1 second
+    Then I should see an agent with a status of "idle" within 30 seconds
     Then the logs should contain "WARN"
     But the logs should not contain "INFO"
     And the logs should not contain "DEBUG"
@@ -69,6 +69,6 @@ Feature: Agent Configuration
     And armagh's "agent" config is
       | log_level | info |
     When the logs are emptied
-    And I wait 3 seconds
+    And I wait 10 seconds
     Then the logs should not contain "DEBUG"
     But the logs should contain "INFO"

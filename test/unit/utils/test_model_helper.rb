@@ -16,13 +16,13 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/document/document'
-require_relative '../../../lib/utils/document_helper'
+require_relative '../../../lib/models/document'
+require_relative '../../../lib/utils/model_helper'
 
 require 'test/unit'
 require 'mocha/test_unit'
 
-class TestDocumentHelper < Test::Unit::TestCase
+class TestModelHelper < Test::Unit::TestCase
 
   def setup
     @content = {
@@ -52,10 +52,9 @@ class TestDocumentHelper < Test::Unit::TestCase
         '  inside  '
       ]
     }
-    @doc = mock('document')
 
-    Armagh::Document.any_instance.stubs(:save)
-    @doc = Armagh::Document.create(type: 'type',
+    Armagh::Models::Document.any_instance.stubs(:save)
+    @doc = Armagh::Models::Document.create(type: 'type',
                                    content: @content,
                                    metadata: @metadata,
                                    pending_actions: [],
@@ -112,14 +111,14 @@ class TestDocumentHelper < Test::Unit::TestCase
       }
     }
     
-    Armagh::Utils::DocumentHelper.clean_document(@doc)
+    Armagh::Utils::ModelHelper.clean_model(@doc)
     assert_equal(expected, @doc.db_doc)
   end
 
 
   def test_clean_document_empty
     @doc.db_doc.clear
-    Armagh::Utils::DocumentHelper.clean_document(@doc)
+    Armagh::Utils::ModelHelper.clean_model(@doc)
     assert_equal({}, @doc.db_doc)
   end
 end

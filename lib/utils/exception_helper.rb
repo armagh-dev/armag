@@ -18,13 +18,15 @@
 module Armagh
   module Utils
     class ExceptionHelper
-      def self.exception_to_hash(exception)
+      def self.exception_to_hash(exception, timestamp: true)
         hash = {
             'class' => exception.class.to_s,
             'message' => exception.message,
-            'trace' => exception.backtrace
+            'trace' => exception.backtrace,
         }
-        hash['cause'] = exception_to_hash(exception.cause) if exception.cause
+
+        hash['timestamp'] = Time.now.utc if timestamp
+        hash['cause'] = exception_to_hash(exception.cause, timestamp: false) if exception.cause
         hash
       end
 

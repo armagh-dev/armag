@@ -34,16 +34,16 @@ module Log4r
           'hostname' => @hostname,
           'pid' => $$,
           'level' => Log4r::LNAMES[event.level],
-          'timestamp' => Time.now
+          'timestamp' => Time.now.utc
       }
 
       log_msg['trace'] = event.tracer if event.tracer
 
       if event.data.is_a? Armagh::Logging::EnhancedException
         log_msg['message'] = "#{event.data.additional_details}"
-        log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash event.data.exception
+        log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash(event.data.exception, timestamp: false)
       elsif event.data.is_a? Exception
-        log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash event.data
+        log_msg['exception'] = Armagh::Utils::ExceptionHelper.exception_to_hash(event.data, timestamp: false)
       else
         log_msg['message'] = "#{event.data}"
       end

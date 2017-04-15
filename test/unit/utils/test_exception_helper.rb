@@ -42,7 +42,10 @@ class TestExceptionHelper < Test::Unit::TestCase
         'trace' => backtrace
     }
 
-    assert_equal(expected, Armagh::Utils::ExceptionHelper.exception_to_hash(exception))
+    actual = Armagh::Utils::ExceptionHelper.exception_to_hash(exception)
+    assert_in_delta(Time.now, actual['timestamp'], 1)
+    actual.delete('timestamp')
+    assert_equal(expected, actual)
   end
 
   def test_exception_to_hash_nested
@@ -84,9 +87,16 @@ class TestExceptionHelper < Test::Unit::TestCase
       end
     rescue => e
       e.set_backtrace backtrace
-      assert_equal(expected, Armagh::Utils::ExceptionHelper.exception_to_hash(e))
+
+      actual = Armagh::Utils::ExceptionHelper.exception_to_hash(exception)
+      assert_in_delta(Time.now, actual['timestamp'], 1)
+      actual.delete('timestamp')
+      assert_equal(expected, actual)
+
       executed = true
     end
+
+
 
     assert_true executed, 'Nested exception block never executed'
   end

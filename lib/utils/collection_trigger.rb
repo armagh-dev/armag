@@ -21,7 +21,7 @@ require 'armagh/support/cron'
 
 require_relative 'interruptible_sleep'
 require_relative '../logging'
-require_relative '../../lib/document/document'
+require_relative '../../lib/models/document'
 require_relative '../ipc'
 require_relative '../actions/workflow'
 require_relative '../agent/agent_status'
@@ -60,7 +60,7 @@ module Armagh
         @logger.debug "Triggering #{config.action.name} collection"
         docspec = config.input.docspec
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
-        Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
+        Models::Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
       rescue => e
         Logging.ops_error_exception(@logger, e, 'Document insertion failed.')
       end
@@ -91,10 +91,14 @@ module Armagh
       private def trigger_actions
         @workflow.collect_actions.each do |config|
           next unless config.action.active
+
           now = Time.now
           name = config.action.name
           @seen_actions << name
           schedule = config.collect.schedule
+          
+          next unless schedule
+
           @last_run[name] ||= now
           next_run = Armagh::Support::Cron.next_execution_time(schedule, @last_run[name])
           if now >= next_run

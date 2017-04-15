@@ -95,6 +95,5 @@ module LauncherSupport
         Process.waitpid(pid)
       rescue Errno::ECHILD; end
     end
-    sleep 1
   end
 end

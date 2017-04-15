@@ -16,6 +16,7 @@
 #
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/integration_helper'
 
 require_relative '../../lib/environment'
 Armagh::Environment.init
@@ -23,7 +24,7 @@ Armagh::Environment.init
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/connection'
-require_relative '../../lib/document/document'
+require_relative '../../lib/models/document'
 require_relative '../../lib/agent/agent'
 
 require 'test/unit'
@@ -32,18 +33,6 @@ require 'mocha/test_unit'
 require 'mongo'
 
 class TestIndexing < Test::Unit::TestCase
-
-  def self.startup
-    puts 'Starting Mongo'
-    Singleton.__init__(Armagh::Connection::MongoConnection)
-    MongoSupport.instance.start_mongo
-    MongoSupport.instance.clean_database
-  end
-
-  def self.shutdown
-    puts 'Stopping Mongo'
-    MongoSupport.instance.stop_mongo
-  end
 
   def setup
     MongoSupport.instance.clean_database
@@ -62,7 +51,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def create_document(id, type = 'TestDocument', state = Armagh::Documents::DocState::READY)
-    Armagh::Document.create(type: type,
+    Armagh::Models::Document.create(type: type,
                             content: {},
                             metadata: {},
                             pending_actions: ['action'],
@@ -76,7 +65,6 @@ class TestIndexing < Test::Unit::TestCase
 
     Armagh::Agent.create_configuration(Armagh::Connection.config, 'default', {})
 
-    #logger = stub(:ops_warn)
     index_stats = get_index_stats(Armagh::Connection.config, 'types')
     initial_ops = index_stats['accesses']['ops']
 
@@ -99,7 +87,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing('test_agent')
+    Armagh::Models::Document.get_for_processing('test_agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -113,7 +101,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing('test_agent')
+    Armagh::Models::Document.get_for_processing('test_agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -127,7 +115,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find('id', 'TestDocument', Armagh::Documents::DocState::READY)
+    Armagh::Models::Document.find('id', 'TestDocument', Armagh::Documents::DocState::READY)
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -141,7 +129,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
+    Armagh::Models::Document.find('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -155,7 +143,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.exists?('id', 'TestDocument', Armagh::Documents::DocState::READY)
+    Armagh::Models::Document.exists?('id', 'TestDocument', Armagh::Documents::DocState::READY)
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -169,7 +157,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.exists?('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
+    Armagh::Models::Document.exists?('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -183,7 +171,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::READY, 'test-agent')
+    Armagh::Models::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::READY, 'test-agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -197,7 +185,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED, 'test-agent')
+    Armagh::Models::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED, 'test-agent')
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']

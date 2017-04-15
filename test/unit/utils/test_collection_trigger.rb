@@ -98,19 +98,19 @@ class TestCollectionTrigger < Test::Unit::TestCase
 
   def test_expired_run
     @trigger.instance_variable_get(:@last_run)['name'] = Time.at(0)
-    Armagh::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
+    Armagh::Models::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
     @trigger.start
     sleep RUN_SLEEP
     @trigger.stop
   end
 
   def test_trigger_individual_collection
-    Armagh::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
+    Armagh::Models::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
     @trigger.trigger_individual_collection(@config)
   end
 
   def test_trigger_individual_collection_error
-    Armagh::Document.expects(:create_trigger_document).raises(RuntimeError.new('nope'))
+    Armagh::Models::Document.expects(:create_trigger_document).raises(RuntimeError.new('nope'))
     Armagh::Logging.expects(:ops_error_exception)
     @trigger.trigger_individual_collection(@config)
   end
@@ -118,7 +118,7 @@ class TestCollectionTrigger < Test::Unit::TestCase
   def test_unseen
     @trigger.instance_variable_set(:@last_run, {'name' => Time.at(0).utc, 'old' => Time.at(0).utc})
 
-    Armagh::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
+    Armagh::Models::Document.expects(:create_trigger_document).with(:state => Armagh::Documents::DocState::READY, :type => '__COLLECT__name', :pending_actions => @actions)
     @trigger.start
     sleep RUN_SLEEP
     @trigger.stop
@@ -127,7 +127,7 @@ class TestCollectionTrigger < Test::Unit::TestCase
   end
 
   def test_trigger_updated_workflow
-    Armagh::Document.expects(:create_trigger_document).never
+    Armagh::Models::Document.expects(:create_trigger_document).never
 
     @config = UTAction.make_long_test_config(store: @config_store, action_name: 'update1', collected_doctype: 'type')
     @workflow.stubs(:collect_actions).returns([@config])

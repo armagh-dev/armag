@@ -20,6 +20,10 @@ def replace_trace(hash)
   hash['cause'] = 'placeholder' if hash['cause']
 end
 
+def replace_ts(hash)
+  hash['timestamp'] = 'placeholder'
+end
+
 def clean_string(str)
   str.gsub!(/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/, '[UUID]')
   str.gsub!(/-[a-zA-Z0-9]{#{Armagh::Support::Random::RANDOM_ID_LENGTH-5},#{Armagh::Support::Random::RANDOM_ID_LENGTH}}/, '-[ID]')
@@ -55,9 +59,13 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
           expected.collect do |_k, v|
             if v.is_a? Hash
               replace_trace v
+              replace_ts v
             elsif v.is_a? Array
               v.each do |i|
-                replace_trace(i) if i.is_a? Hash
+                if i.is_a? Hash
+                  replace_trace i
+                  replace_ts i
+                end
               end
             end
           end
@@ -65,11 +73,13 @@ When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type,
           doc[key].collect do |_k, v|
             if v.is_a? Hash
               replace_trace v
+              replace_ts v
               v.values.each {|vv| clean_string(vv) if vv.is_a? String}
             elsif v.is_a? Array
               v.each do |i|
                 if i.is_a? Hash
                   replace_trace(i)
+                  replace_ts i
                   i.values.each do |val|
                     clean_string(val) if val.is_a? String
                     if val.is_a? Array

@@ -17,6 +17,7 @@
 ENV['RACK_ENV'] = 'test'
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/integration_helper'
 
 require_relative '../../lib/environment'
 Armagh::Environment.init
@@ -53,15 +54,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def self.startup
-    puts 'Starting Mongo'
-    MongoSupport.instance.start_mongo
     load File.expand_path '../../../bin/armagh-application-admin', __FILE__
     include Rack::Test::Methods
-  end
-
-  def self.shutdown
-    puts 'Stopping Mongo'
-    MongoSupport.instance.stop_mongo
   end
 
   def setup
@@ -150,14 +144,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     ('a'..'e').each_with_index do |type,type_i|
       (20+type_i).times do |i|
-        Armagh::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
+        Armagh::Models::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
         pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "#{type}-#{i}",
         collection_task_ids: [ '123' ], document_timestamp: Time.now )
       end
     end
     ('c'..'e').each_with_index do |type,type_i|
       (100+type_i).times do |i|
-        Armagh::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
+        Armagh::Models::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
         pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: "#{type}-p-#{i}",
         collection_task_ids: [ '123' ], document_timestamp: Time.now )
       end
@@ -248,14 +242,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     test_config = {
       'action_class_name' => 'Armagh::StandardActions::TIAATestCollect',
       'action' => { 'name' => 'my_fred_action' },
-      'output' => { 'docspec' => 'my_fred_doc:ready'}
+      'output' => { 'docspec_no' => 'my_fred_doc:ready'}
     }
 
     post '/action.json', test_config.to_json do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal('Armagh::Actions::ConfigurationError', response_hash.dig('error_detail', 'class'))
-      assert_equal('Unable to create configuration Armagh::StandardActions::TIAATestCollect my_fred_action: collect schedule: type validation failed: value cannot be nil', response_hash.dig('error_detail', 'message'))
+      assert_equal('Unable to create configuration Armagh::StandardActions::TIAATestCollect my_fred_action: output docspec: type validation failed: value cannot be nil', response_hash.dig('error_detail', 'message'))
     end
 
     #TODO - figure out where's best to return the validation param set
@@ -340,16 +334,16 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_documents
     type = 'TestType'
-    get '/documents.json', {doc_type: type} do
+    get '/documents.json', {type: type} do
       assert last_response.ok?
       assert_empty JSON.parse(last_response.body)
     end
 
-    doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Models::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
 
-    get '/documents.json', {doc_type: type} do
+    get '/documents.json', {type: type} do
       assert last_response.ok?
       found_docs = JSON.parse(last_response.body)
       assert_kind_of Array, found_docs
@@ -363,7 +357,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     e = RuntimeError.new('Bad')
 
     @api.expects(:get_documents).raises(e)
-    get '/documents.json' do
+    get '/documents.json', {type: 'type'} do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
@@ -373,16 +367,17 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_document
     get '/document.json' do
-      assert last_response.ok?
-      assert_nil JSON.parse(last_response.body)
+      assert last_response.server_error?
+      response =  JSON.parse(last_response.body)
+      assert_equal('Missing parameter: id', response.dig('error_detail', 'message'))
     end
 
-    doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Models::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
     doc.save
 
-    get '/document.json', {type: doc.type, document_id: doc.document_id} do
+    get '/document.json', {type: doc.type, id: doc.document_id} do
       assert last_response.ok?
       found_doc = JSON.parse(last_response.body)
       assert_equal doc.document_id, found_doc['document_id']
@@ -394,7 +389,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     e = RuntimeError.new('Bad')
 
     @api.expects(:get_document).raises(e)
-    get '/document.json' do
+    get '/document.json', {type: 'type', id: 'id'} do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
@@ -405,7 +400,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_document_failures
     count = 10
     count.times do |i|
-      doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+      doc = Armagh::Models::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
                               pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "id_#{i}",
                               collection_task_ids: [ '123' ], document_timestamp: Time.now )
       doc.add_dev_error('test_action', 'details')
@@ -474,7 +469,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert last_response.ok?
     end
 
-    get '/action.json', params={'name' => 'a2'} do
+    get '/action.json', {name: 'a2'} do
       assert last_response.ok?
       response = JSON.parse(last_response.body)
       assert_equal(test_config2, response)
@@ -485,12 +480,12 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     get '/action.json' do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
-      assert_equal({'error_detail' =>{'message' => "Request must include a non-empty parameter 'name'"}}, response_hash)
+      assert_equal({'error_detail' =>{'message' => 'Missing parameter: name'}}, response_hash)
     end
   end
 
   def test_get_action_none
-    get '/action.json', params={'name' => 'does_not_exist'} do
+    get '/action.json', {name: 'does_not_exist'} do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal({'error_detail' =>{'message' => "No action named 'does_not_exist' was found."}}, response_hash)
@@ -551,6 +546,56 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response_hash = JSON.parse(last_response.body)
       assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
       assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_trigger_collect
+    test_config = {
+      'collect' => {'archive' => 'false'},
+      'action' => {'name' => 'test_collect', 'active' => 'true'},
+      'input' => {'docspec' => '__COLLECT__a1:ready'},
+      'output' => {'docspec' => 'OutputDocument:ready'},
+      'params' => {'p1' => '42'},
+      'action_class_name' => 'Armagh::StandardActions::TIAATestCollect'
+    }
+
+    post '/action.json', test_config.to_json do
+      assert last_response.ok?
+    end
+
+    get '/actions/trigger_collect.json', {name: 'test_collect'} do
+      assert last_response.ok?
+      assert_equal 'success', JSON.parse(last_response.body)
+    end
+  end
+
+  def test_trigger_collect_bad_action
+    get '/actions/trigger_collect.json', {name: 'not_real'} do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      message = response_hash.dig('error_detail', 'message')
+      assert_equal('Unable to trigger collect for not_real.  Make sure the action exists and is a collect action.', message)
+    end
+  end
+
+  def test_trigger_collect_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:trigger_collect).raises(e)
+
+    get '/actions/trigger_collect.json', {name: 'not_real'} do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal(e.class.to_s, response_hash.dig('error_detail', 'class'))
+      assert_equal(e.message, response_hash.dig('error_detail', 'message'))
+    end
+  end
+
+  def test_trigger_collect_no_name
+    get '/actions/trigger_collect.json' do
+      assert last_response.server_error?
+      response_hash = JSON.parse(last_response.body)
+      puts response_hash
+      assert_equal 'Missing parameter: name', response_hash.dig('error_detail', 'message')
     end
   end
 end

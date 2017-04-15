@@ -130,18 +130,14 @@ class MongoSupport
 
   def clean_database
     `mongo #{DATABASE_NAME} --eval "db.dropDatabase();"`
-    sleep 1
     `mongo #{ADMIN_DATABASE_NAME} --eval "db.dropDatabase();"`
-    sleep 1
   end
 
   def initiate_replica_set
     `mongo --eval "rs.initiate();"`
-    sleep 1
   end
 
   def clean_replica_set
     `mongo local --eval "db.dropDatabase();"`
-    sleep 1
   end
 end

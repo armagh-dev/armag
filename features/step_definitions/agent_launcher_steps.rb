@@ -35,7 +35,6 @@ When(/^I run armagh$/) do
   @spawn_pid = launch_details[:pid]
   @stderr_pipe = launch_details[:stderr]
   @stdout_pipe = launch_details[:stdout]
-  sleep 3
 end
 
 Then(/^armagh should have exited$/) do
@@ -60,7 +59,6 @@ When(/^an agent is killed/) do
   @original_agents = LauncherSupport.get_agent_processes
   @agent_to_kill = @original_agents.last.pid
   Process.kill(:SIGKILL, @agent_to_kill)
-  sleep 3
 end
 
 Then(/^a new agent shall launch to take its place$/) do

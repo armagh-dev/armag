@@ -17,10 +17,10 @@
 
 module Armagh
   module Utils
-    class DocumentHelper
-      def self.clean_document(doc)
-        clean_hash(doc.db_doc)
-        remove_root_nils(doc.db_doc)
+    class ModelHelper
+      def self.clean_model(model)
+        clean_hash(model.db_doc)
+        remove_root_nils(model.db_doc)
       end
 
       private_class_method def self.remove_root_nils(hash)

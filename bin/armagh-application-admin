@@ -140,9 +140,7 @@ get '/action.json' do
   api.logger.debug("armagh-applications-admin get action with params: #{params}")
   name = params['name']
 
-  if name.nil? || name.empty?
-    return rest_helper.respond_error("Request must include a non-empty parameter 'name'")
-  end
+  return rest_helper.respond_error('Missing parameter: name') if name.nil? || name.empty?
 
   begin
     action_config = api.get_action_config(name)
@@ -180,6 +178,22 @@ post '/actions/activate.json' do
   end
 end
 
+get '/actions/trigger_collect.json' do
+  begin
+    action_name = params['name']
+
+    return rest_helper.respond_error 'Missing parameter: name' if action_name.nil? || action_name.empty?
+
+    if api.trigger_collect(action_name)
+      rest_helper.respond_success('success')
+    else
+      rest_helper.respond_error("Unable to trigger collect for #{action_name}.  Make sure the action exists and is a collect action.")
+    end
+  rescue => e
+    rest_helper.respond_exception(e, 'Error from GET /actions/trigger_collect.json')
+  end
+end
+
 get '/documents/counts.json' do
   counts = []
   begin
@@ -194,7 +208,9 @@ get '/documents.json' do
   begin
     api.logger.debug("armagh-applications-admin get documents with params: #{params}")
 
-    doc_type = params[ 'doc_type' ]
+    doc_type = params['type']
+    return rest_helper.respond_error 'Missing parameter: type' if doc_type.nil? || doc_type.empty?
+
     begin_ts = Time.parse( params[ 'begin_ts' ] ) if params.include? 'begin_ts'
     end_ts   = Time.parse( params[ 'end_ts' ] ) if params.include? 'end_ts'
     start_index = params[ 'start_index' ].to_i if params.include? 'start_index'
@@ -212,8 +228,11 @@ get '/document.json' do
   begin
     api.logger.debug("armagh-application-admin get document with params: #{params}")
 
-    doc_id = params['document_id']
+    doc_id = params['id']
     doc_type = params['type']
+
+    return rest_helper.respond_error 'Missing parameter: id' if doc_id.nil? || doc_id.empty?
+    return rest_helper.respond_error 'Missing parameter: type' if doc_type.nil? || doc_type.empty?
 
     doc = api.get_document(doc_id, doc_type)
     rest_helper.respond_success(doc)

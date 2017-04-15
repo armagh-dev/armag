@@ -16,6 +16,7 @@
 #
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/integration_helper'
 
 require_relative '../../lib/environment'
 Armagh::Environment.init
@@ -23,7 +24,6 @@ Armagh::Environment.init
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/connection'
-require_relative '../../lib/document/document'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -32,23 +32,6 @@ require 'mongo'
 require 'socket'
 
 class TestMongoIntegration < Test::Unit::TestCase
-
-  def self.startup
-    puts 'Starting Mongo'
-    Singleton.__init__(Armagh::Connection::MongoConnection)
-    MongoSupport.instance.start_mongo
-  end
-
-  def self.shutdown
-    puts 'Stopping Mongo'
-    MongoSupport.instance.clean_replica_set
-    MongoSupport.instance.stop_mongo
-  end
-
-  def setup
-    MongoSupport.instance.clean_database
-    MongoSupport.instance.clean_replica_set
-  end
 
   def test_mongo_connection
     result = Armagh::Connection.documents.insert_one( { _id: 'test1', content: 'stuff' })

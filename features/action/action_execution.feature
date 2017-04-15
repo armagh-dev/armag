@@ -27,8 +27,7 @@ Feature: Actions Execution
       | num_agents        | 4 |
       | checkin_frequency | 1 |
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
       | idle |
       | idle |
@@ -46,12 +45,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
       | document_id         | nil                                                      |
       | pending_actions     | []                                                       |
@@ -107,12 +105,10 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "non_collector"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "__COLLECT__non_collector" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    And I wait 10 seconds
     Then I should see 0 "__COLLECT__non_collector" documents in the "collection_history" collection
     And I should see 0 "__COLLECT__non_collector" documents in the "documents" collection
     And I should see 0 "NonDocument" documents in the "documents" collection
@@ -132,12 +128,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "archive_collector"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "__COLLECT__archive_collector" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
-    Then I should see an agent with a status of "running" within 20 seconds
-    Then I should see an agent with a status of "idle" within 20 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And I should see 1 "CollectedDocument" documents in the "documents" collection
     And I should see 1 "IntermediateDocument" documents in the "documents" collection
     And I should see 0 "__COLLECT__archive_collector" documents in the "documents" collection
@@ -159,12 +154,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "id_collector"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
       | document_id         | 'collected_id'                                           |
       | pending_actions     | []                                                       |
@@ -194,12 +188,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "SplitDocument" with a "ready" state, document_id "123", content "{'doesnt_matter' => true}", metadata "{'doesnt_matter' => true}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "SplitOutputDocument" in "documents" with the following
       | document_id     | 'split_1'                                                    |
       | metadata        | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
@@ -240,12 +233,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id         | '123'                         |
       | pending_actions     | []                            |
@@ -277,13 +269,14 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
-    And I wait 3 seconds
+    And I wait until there are agents with the statuses
+      | idle |
     And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new metadata'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id     | '123'                                                                       |
       | pending_actions | []                                                                          |
@@ -312,12 +305,13 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "id_publisher"
     And I run armagh
-    And I wait 3 seconds
+    And I wait until there are agents with the statuses
+      | idle |
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id         | 'published_id'                |
       | pending_actions     | []                            |
@@ -349,12 +343,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "test_actions"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "ConsumeDocument" with a "published" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id     | 'consume_1'                                                  |
       | metadata        | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
@@ -400,24 +393,23 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "unimplemented_splitter"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "UnimplementedSplitterInputDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    And I wait 10 seconds
     Then I should see 0 "UnimplementedSplitterInputDocument" documents in the "documents" collection
     Then I should see a "UnimplementedSplitterInputDocument" in "failures" with the following
-      | document_id     | '123'                                                                                                                                                                                    |
-      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                              |
-      | pending_actions | []                                                                                                                                                                                       |
-      | dev_errors      | {'unimplemented_splitter' => [{'class' => 'Armagh::Actions::Errors::ActionMethodNotImplemented', 'message' => 'Split actions must overwrite the split method.', 'trace' => 'anything'}]} |
-      | ops_errors      | {}                                                                                                                                                                                       |
-      | content         | {'text' => 'incoming content'}                                                                                                                                                           |
-      | state           | 'ready'                                                                                                                                                                                  |
-      | locked          | false                                                                                                                                                                                    |
-      | error           | true                                                                                                                                                                                     |
-      | pending_work    | nil                                                                                                                                                                                      |
-      | version         | APP_VERSION                                                                                                                                                                              |
+      | document_id     | '123'                                                                                                                                                                                                               |
+      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                         |
+      | pending_actions | []                                                                                                                                                                                                                  |
+      | dev_errors      | {'unimplemented_splitter' => [{'class' => 'Armagh::Actions::Errors::ActionMethodNotImplemented', 'message' => 'Split actions must overwrite the split method.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
+      | ops_errors      | {}                                                                                                                                                                                                                  |
+      | content         | {'text' => 'incoming content'}                                                                                                                                                                                      |
+      | state           | 'ready'                                                                                                                                                                                                             |
+      | locked          | false                                                                                                                                                                                                               |
+      | error           | true                                                                                                                                                                                                                |
+      | pending_work    | nil                                                                                                                                                                                                                 |
+      | version         | APP_VERSION                                                                                                                                                                                                         |
     And the logs should contain "ERROR"
 
   Scenario: Have a document to work on with an action that fails in the middle
@@ -432,13 +424,13 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "bad_publisher"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "BadPublisherDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
-    Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
-    Then I should see a "BadPublisherDocument" in "failures" with the following
+    Then I should see an agent with a status of "running" within 60 seconds
+    And I should see an agent with a status of "idle" within 60 seconds
+    And I should see 0 "BadPublisherDocument" documents in the "documents" collection
+    And I should see a "BadPublisherDocument" in "failures" with the following
       | document_id     | '123'                                                                                                        |
       | metadata        | {'meta' => 'incoming meta'}                                                                                  |
       | pending_actions | []                                                                                                           |
@@ -464,11 +456,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "bad_consumer"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "BadConsumerDocument" with a "published" state, document_id "123", content "{'content' => 'published content'}", metadata "{'meta' => 'published metadata'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    And I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "BadConsumerDocument" documents in the "failures" collection
     Then I should see a "BadConsumerDocument" in "documents.BadConsumerDocument" with the following
       | document_id     | '123'                                                                                                       |
@@ -496,11 +488,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "too_large_collector"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "__COLLECT__too_large_collector" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "TooLargeCollectorOutputDocument" documents in the "documents" collection
     Then I should see a "__COLLECT__too_large_collector" in "failures" with the following
       | document_id     | 'incoming'                                                                                                                                                                                                                                    |
@@ -528,11 +520,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "too_large_splitter"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "TooLargeInputDocType" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "TooLargeSplitterOutputDocument" documents in the "documents" collection
     Then I should see a "TooLargeInputDocType" in "failures" with the following
       | document_id  | 'incoming'                                                                                                                                                                                                                                               |
@@ -559,24 +551,24 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "edit_current_splitter"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "EditCurrentInputDocType" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "EditCurrentSplitterOutputDocument" documents in the "documents" collection
     Then I should see a "EditCurrentInputDocType" in "failures" with the following
-      | document_id     | 'incoming'                                                                                                                                                                                                                 |
-      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                |
-      | pending_actions | []                                                                                                                                                                                                                         |
-      | dev_errors      | {'edit_current_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentError', 'message' => 'Cannot edit document \'incoming\'.  It is the same document that was passed into the action.', 'trace' => 'anything'}]} |
-      | ops_errors      | {}                                                                                                                                                                                                                         |
-      | content         | {'text' => 'incoming content'}                                                                                                                                                                                             |
-      | state           | 'ready'                                                                                                                                                                                                                    |
-      | locked          | false                                                                                                                                                                                                                      |
-      | error           | true                                                                                                                                                                                                                       |
-      | pending_work    | nil                                                                                                                                                                                                                        |
-      | version         | APP_VERSION                                                                                                                                                                                                                |
+      | document_id     | 'incoming'                                                                                                                                                                                                                                            |
+      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                           |
+      | pending_actions | []                                                                                                                                                                                                                                                    |
+      | dev_errors      | {'edit_current_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentError', 'message' => 'Cannot edit document \'incoming\'.  It is the same document that was passed into the action.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
+      | ops_errors      | {}                                                                                                                                                                                                                                                    |
+      | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                        |
+      | state           | 'ready'                                                                                                                                                                                                                                               |
+      | locked          | false                                                                                                                                                                                                                                                 |
+      | error           | true                                                                                                                                                                                                                                                  |
+      | pending_work    | nil                                                                                                                                                                                                                                                   |
+      | version         | APP_VERSION                                                                                                                                                                                                                                           |
     And the logs should contain "ERROR"
 
   Scenario: Have a splitter that has an error during document update
@@ -591,12 +583,12 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "update_error_splitter"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "UpdateErrorSplitterOutputDocument" with a "working" state, document_id "update_id", content "{'existing_content'=>'some content'}", metadata "{'existing_metadata'=>'some meta'}"
     And I insert 1 "UpdateErrorInputDocType" with a "ready" state, document_id "incoming", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 1 "UpdateErrorSplitterOutputDocument" documents in the "documents" collection
     And I should see a "UpdateErrorInputDocType" in "failures" with the following
       | document_id     | 'incoming'                                                                                                |
@@ -635,11 +627,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "notify_dev"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "NotifyDevDocType" with a "ready" state, document_id "id", content "{'existing_content'=>'some content'}", metadata "{'existing_metadata'=>'some meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And I should see a "NotifyDevDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
@@ -667,11 +659,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "notify_ops"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "NotifyOpsDocType" with a "ready" state, document_id "id", content "{'existing_content'=>'some content'}", metadata "{'existing_metadata'=>'some meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And I should see a "NotifyOpsDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
@@ -699,12 +691,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "change_id_publisher"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "old_id", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id         | 'new_id'                      |
@@ -737,13 +728,14 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "change_id_publisher"
     And I run armagh
-    And I wait 3 seconds
+    And I wait until there are agents with the statuses
+      | idle |
     And I insert 1 "PublishDocument" with a "published" state, document_id "new_id", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
     Then the valid reported status should contain agents with statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "old_id", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
-    Then I should see an agent with a status of "running" within 10 seconds
-    Then I should see an agent with a status of "idle" within 10 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id         | 'new_id'                                                                    |
@@ -777,12 +769,14 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "full_workflow"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
       | idle |
     When I insert 1 "__COLLECT__test_collect" with a "ready" state, document_id "collect_id", content "{'doesnt_matter' => true}", metadata "{}"
-    And I wait 30 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    And I wait until there are agents with the statuses
+      | idle |
+      | idle |
     Then the logs should contain "Test Collect Running"
     And the logs should contain "Test Divider Running"
     And the logs should contain "Test Split Running"
@@ -878,9 +872,12 @@ Feature: Actions Execution
     Then  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id | '123'         |
       | version     | 'old_version' |
-    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
     And I run armagh
-    And I wait 3 seconds
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
+    And I should see an agent with a status of "running" within 60 seconds
+    And I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id | '123'       |
       | version     | APP_VERSION |
@@ -907,7 +904,8 @@ Feature: Actions Execution
       | collection_task_ids | ['collect_2'] |
       | archive_files       | ['archive_2'] |
     And I run armagh
-    And I wait 3 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id         | '123'                      |
       | collection_task_ids | ['collect_1', 'collect_2'] |
@@ -927,6 +925,8 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "minute_collect"
     When I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
     Then I should see an agent with a status of "running" within 119 seconds
     And the logs should contain 1 "Triggering test_collect collection"
     And the logs should contain "Test Collect Running"
@@ -936,7 +936,7 @@ Feature: Actions Execution
     Then the logs should contain 1 "Triggering test_collect collection"
     And the logs should not contain "ERROR"
 
-  Scenario: Have a with a publisher and consumer where the publisher fails and the consumer never runs
+  Scenario: Have a publisher and consumer where the publisher fails and the consumer never runs
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
@@ -948,11 +948,11 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "publisher_notify_good_consumer"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "BadPublisherDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
-    And I wait 7 seconds
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
     And I should see 0 "ConsumeOutputDocument" documents in the "documents" collection
     And I should see a "BadPublisherDocument" in "failures" with the following
@@ -982,13 +982,12 @@ Feature: Actions Execution
       | log_level | debug |
     And armagh's workflow config is "long_publisher"
     And I run armagh
-    And I wait 3 seconds
-    Then the valid reported status should contain agents with statuses
+    And I wait until there are agents with the statuses
       | idle |
     When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
     Then I should see an agent with a status of "running" within 119 seconds
     When an agent is killed
-    And I wait 5 seconds
+    And I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "PublishDocument" documents in the "documents" collection
     Then I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following

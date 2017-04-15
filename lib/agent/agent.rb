@@ -26,7 +26,7 @@ require 'armagh/documents'
 require 'armagh/support/random'
 
 require_relative '../logging'
-require_relative '../document/document'
+require_relative '../models/document'
 require_relative '../ipc'
 require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
@@ -90,7 +90,7 @@ module Armagh
       collection_task_ids.concat @collection_task_ids if @collection_task_ids
       archive_files = []
       archive_files.concat @archive_files if @archive_files
-      Document.create(type: docspec.type,
+      Models::Document.create(type: docspec.type,
                       content: action_doc.content,
                       metadata: action_doc.metadata,
                       pending_actions: pending_actions,
@@ -111,7 +111,7 @@ module Armagh
     def edit_document(document_id, docspec)
       raise Documents::Errors::DocumentError, "Cannot edit document '#{document_id}'.  It is the same document that was passed into the action." if document_id == @current_doc.document_id
       if block_given?
-        Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @uuid, @logger) do |doc|
+        Models::Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @uuid, @logger) do |doc|
           edit_or_create(document_id, docspec, doc) do |doc|
             yield doc
           end
@@ -122,7 +122,7 @@ module Armagh
     end
 
     def get_existing_published_document(action_doc)
-      doc = Document.find(action_doc.document_id, action_doc.docspec.type, Documents::DocState::PUBLISHED)
+      doc = Models::Document.find(action_doc.document_id, action_doc.docspec.type, Documents::DocState::PUBLISHED)
       doc ? doc.to_published_document : nil
     end
 
@@ -171,7 +171,7 @@ module Armagh
     end
 
     private def edit_or_create(document_id, docspec, doc)
-      if doc.is_a? Document
+      if doc.is_a? Models::Document
         action_doc = doc.to_action_document
         initial_docspec = action_doc.docspec
 
@@ -214,7 +214,7 @@ module Armagh
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
-        new_doc = Document.from_action_document(action_doc, pending_actions)
+        new_doc = Models::Document.from_action_document(action_doc, pending_actions)
         new_doc.collection_task_ids.concat @collection_task_ids if @collection_task_ids
         new_doc.archive_files.concat @archive_files if @archive_files
         new_doc.internal_id = doc
@@ -250,7 +250,7 @@ module Armagh
 
 
     private def execute
-      @current_doc = Document.get_for_processing(@uuid)
+      @current_doc = Models::Document.get_for_processing(@uuid)
 
       if @current_doc
         @backoff.reset

@@ -24,16 +24,40 @@ Then(/^I should see an agent with a status of "([^"]*)" within (\d+) seconds*$/)
   end_time = Time.now + seconds.to_i
   found_status = false
 
-  until ((Time.now > end_time) || found_status)
-    sleep 0.1
+  until (Time.now > end_time) || found_status
     db_status = MongoSupport.instance.get_status
     if db_status
       agent_status = db_status['agents']
       found_status = agent_status.collect{|_a,s| s['status']}.include? status
     end
+    sleep 0.1
   end
 
   assert_true(found_status, "No agents were seen with a status of #{status}")
+end
+
+Then(/^I wait until there are agents with the statuses$/) do |table|
+  end_time = Time.now + 15 # time limit (seconds)
+  matched_statuses = false
+
+  expected_agent_statuses = table.raw.flatten.sort
+  expected_agent_statuses = expected_agent_statuses.delete_if {|e| e == 'nil'}.sort
+
+  until (Time.now > end_time) || matched_statuses
+    status = MongoSupport.instance.get_status
+    if status
+      agents = status['agents']
+      seen_statuses = []
+      agents.each do |_id, details|
+        seen_statuses << details['status']
+      end
+      seen_statuses.sort!
+      matched_statuses = seen_statuses == expected_agent_statuses
+    end
+    sleep 0.1
+  end
+
+  assert_equal(expected_agent_statuses, seen_statuses, 'Agents were not seen with the expected statuses')
 end
 
 

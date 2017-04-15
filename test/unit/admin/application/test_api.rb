@@ -35,9 +35,15 @@ module Armagh
   end
 end
 
+module Armagh
+  module StandardActions
+    class TATestPublish < Actions::Publish
+    end
+  end
+end
+
 class TestAdminApplicationAPI < Test::Unit::TestCase
   include ArmaghTest
-  
 
   def setup
     @logger = mock_logger
@@ -187,5 +193,29 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_get_action_config_none
     assert_nil(@api.get_action_config('no_action'))
+  end
+
+  def test_trigger_collect
+    collection_trigger = mock('collection trigger')
+    collection_trigger.expects(:trigger_individual_collection).with(kind_of(Configh::Configuration))
+    Armagh::Utils::CollectionTrigger.expects(:new).returns(collection_trigger)
+    name = add_valid_actions(1).first.dig('action', 'name')
+    assert_true @api.trigger_collect(name)
+  end
+
+  def test_trigger_collect_none
+    assert_false@api.trigger_collect('no_action')
+  end
+
+  def test_trigger_collect_not_collect
+    config = {
+      'action_class_name' => 'Armagh::StandardActions::TATestPublish',
+      'action' => {'name' => 'testpublish'},
+      'input' => {'docspec' => Armagh::Documents::DocSpec.new('doc1', Armagh::Documents::DocState::READY)},
+      'output' => {'docspec' => Armagh::Documents::DocSpec.new('doc1', Armagh::Documents::DocState::PUBLISHED)},
+    }
+
+    @api.create_action_configuration config
+    assert_false @api.trigger_collect('testpublish')
   end
 end

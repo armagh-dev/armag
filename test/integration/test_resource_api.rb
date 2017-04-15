@@ -17,6 +17,7 @@
 ENV['RACK_ENV'] = 'test'
 
 require_relative '../helpers/coverage_helper'
+require_relative '../helpers/integration_helper'
 
 require_relative '../../lib/environment'
 Armagh::Environment.init
@@ -39,15 +40,8 @@ class TestIntegrationResourceAPI < Test::Unit::TestCase
   end
 
   def self.startup
-    puts 'Starting Mongo'
-    MongoSupport.instance.start_mongo
     load File.expand_path '../../../bin/armagh-resource-admin', __FILE__
     include Rack::Test::Methods
-  end
-
-  def self.shutdown
-    puts 'Stopping Mongo'
-    MongoSupport.instance.stop_mongo
   end
 
   def setup
