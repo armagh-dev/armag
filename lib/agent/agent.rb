@@ -26,7 +26,7 @@ require 'armagh/documents'
 require 'armagh/support/random'
 
 require_relative '../logging'
-require_relative '../models/document'
+require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
@@ -90,7 +90,7 @@ module Armagh
       collection_task_ids.concat @collection_task_ids if @collection_task_ids
       archive_files = []
       archive_files.concat @archive_files if @archive_files
-      Models::Document.create(type: docspec.type,
+      Document.create(type: docspec.type,
                       content: action_doc.content,
                       metadata: action_doc.metadata,
                       pending_actions: pending_actions,
@@ -106,12 +106,16 @@ module Armagh
                       new: true,
                       logger: @logger)
       @num_creates += 1
+    rescue Connection::DocumentUniquenessError => e
+      raise Documents::Errors::DocumentUniquenessError.new(e.message)
+    rescue Connection::DocumentSizeError => e
+      raise Documents::Errors::DocumentSizeError.new(e.message)
     end
 
     def edit_document(document_id, docspec)
       raise Documents::Errors::DocumentError, "Cannot edit document '#{document_id}'.  It is the same document that was passed into the action." if document_id == @current_doc.document_id
       if block_given?
-        Models::Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @uuid, @logger) do |doc|
+        Document.modify_or_create(document_id, docspec.type, docspec.state, @running, @uuid, @logger) do |doc|
           edit_or_create(document_id, docspec, doc) do |doc|
             yield doc
           end
@@ -119,10 +123,14 @@ module Armagh
       else
         @logger.dev_warn "edit_document called for document '#{document_id}' but no block was given.  Ignoring."
       end
+    rescue Connection::DocumentUniquenessError => e
+      raise Documents::Errors::DocumentUniquenessError.new(e.message)
+    rescue Connection::DocumentSizeError => e
+      raise Documents::Errors::DocumentSizeError.new(e.message)
     end
 
     def get_existing_published_document(action_doc)
-      doc = Models::Document.find(action_doc.document_id, action_doc.docspec.type, Documents::DocState::PUBLISHED)
+      doc = Document.find(action_doc.document_id, action_doc.docspec.type, Documents::DocState::PUBLISHED)
       doc ? doc.to_published_document : nil
     end
 
@@ -164,14 +172,14 @@ module Armagh
       archive_file = @archiver.archive_file(file_path, archive_data)
       @archives_for_collect << archive_file
       @archive_files = [archive_file]
-    rescue Errors::ArchiveError => e
+    rescue Utils::Archiver::ArchiveError => e
       notify_dev(logger_name, action_name, e)
     rescue Support::SFTP::SFTPError => e
       notify_ops(logger_name, action_name, e)
     end
 
     private def edit_or_create(document_id, docspec, doc)
-      if doc.is_a? Models::Document
+      if doc.is_a? Document
         action_doc = doc.to_action_document
         initial_docspec = action_doc.docspec
 
@@ -214,7 +222,7 @@ module Armagh
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
-        new_doc = Models::Document.from_action_document(action_doc, pending_actions)
+        new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.collection_task_ids.concat @collection_task_ids if @collection_task_ids
         new_doc.archive_files.concat @archive_files if @archive_files
         new_doc.internal_id = doc
@@ -250,7 +258,7 @@ module Armagh
 
 
     private def execute
-      @current_doc = Models::Document.get_for_processing(@uuid)
+      @current_doc = Document.get_for_processing(@uuid)
 
       if @current_doc
         @backoff.reset

@@ -16,31 +16,32 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-
-require_relative '../../../lib/models/model'
+require_relative '../../../lib/connection/db_doc'
 
 require 'test/unit'
 require 'mocha/test_unit'
 
-class ModelTest < Armagh::Models::Model
+class ModelTest < Armagh::Connection::DBDoc
   def self.build
     new({'a' => 1})
   end
 end
 
-class ModelTest2 < Armagh::Models::Model
+class ModelTest2 < Armagh::Connection::DBDoc
   def self.build
     new({'a' => 2})
   end
 end
 
-class TestModel < Test::Unit::TestCase
+class TestDBDoc < Test::Unit::TestCase
   def setup
     @collection = mock 'collection'
     @collection_error = ArgumentError.new('No collection specified.  Make sure <model>.default_collection is defined.')
 
     @values = {'value' => 'v'}
     @qualifier = {'qualifier' => 'q'}
+
+    @model_test = ModelTest.build
   end
 
   def test_new
@@ -48,11 +49,10 @@ class TestModel < Test::Unit::TestCase
   end
 
   def test_db_doc
-    test = ModelTest.build
-    assert_equal({'a' => 1}, test.db_doc)
-    assert_equal({'a' => 1}.to_json,test.to_json)
+    assert_equal({'a' => 1}, @model_test.db_doc)
+    assert_equal({'a' => 1}.to_json,@model_test.to_json)
 
-    assert_not_equal(test.db_doc, ModelTest2.build.db_doc)
+    assert_not_equal(@model_test.db_doc, ModelTest2.build.db_doc)
   end
 
   def test_create
@@ -109,5 +109,25 @@ class TestModel < Test::Unit::TestCase
 
     @collection.expects(:delete_one).with(@qualifier)
     ModelTest.db_delete(@qualifier, @collection)
+  end
+
+  def test_timestamps
+    assert_nil @model_test.updated_timestamp
+    assert_nil @model_test.created_timestamp
+
+    @model_test.mark_timestamp
+    initial_timestamp = @model_test.created_timestamp
+    assert_equal(initial_timestamp, @model_test.updated_timestamp)
+    sleep 0.1
+    @model_test.mark_timestamp
+    assert_equal(initial_timestamp, @model_test.created_timestamp)
+    assert_true @model_test.updated_timestamp > initial_timestamp
+  end
+
+  def test_internal_id
+    id = '123'
+    assert_nil @model_test.internal_id
+    @model_test.internal_id = id
+    assert_equal id, @model_test.internal_id
   end
 end

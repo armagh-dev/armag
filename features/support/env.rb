@@ -32,11 +32,13 @@ require 'fileutils'
 
 require 'test/unit/assertions'
 
+require 'colored'
+
 FileUtils.mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
 
 
 def quiet_raise(msg)
-  raise RuntimeError, msg, []
+  raise RuntimeError, msg.red, []
 end
 
 APP_VERSION = {'armagh' => Armagh::VERSION}

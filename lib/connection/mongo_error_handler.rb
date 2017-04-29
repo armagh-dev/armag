@@ -18,11 +18,13 @@
 require 'mongo/error'
 require 'armagh/documents/errors'
 
+require_relative '../connection'
+
 module Armagh
   module Connection
-    def self.convert_mongo_exception(e, id = nil)
+    def self.convert_mongo_exception(e, id: nil, type_class: nil)
       if id
-        document_string = "Document '#{id}'"
+        document_string = "#{type_class.name.split('::').last} #{id}"
         unexpected_msg = "An unexpected connection error occurred from #{document_string}: #{e.message}."
       else
         document_string = 'Document'
@@ -30,15 +32,15 @@ module Armagh
       end
       case e
         when Mongo::Error::MaxBSONSize
-          Documents::Errors::DocumentSizeError.new("#{document_string} is too large.  Consider using a divider or splitter to break up the document.")
+          DocumentSizeError.new("#{document_string} is too large.  Consider using a divider or splitter to break up the document.")
         when Mongo::Error::OperationFailure
           if e.message =~ /^E11000/
-            Documents::Errors::DocumentUniquenessError.new("Unable to create #{document_string}.  This document already exists.")
+            DocumentUniquenessError.new("Unable to create #{document_string}.  This document already exists.")
           else
-            Errors::ConnectionError.new(unexpected_msg)
+            ConnectionError.new(unexpected_msg)
           end
         when Mongo::Error
-          Errors::ConnectionError.new(unexpected_msg)
+          ConnectionError.new(unexpected_msg)
         else
           e
       end

@@ -144,14 +144,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     ('a'..'e').each_with_index do |type,type_i|
       (20+type_i).times do |i|
-        Armagh::Models::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
+        Armagh::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
         pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "#{type}-#{i}",
         collection_task_ids: [ '123' ], document_timestamp: Time.now )
       end
     end
     ('c'..'e').each_with_index do |type,type_i|
       (100+type_i).times do |i|
-        Armagh::Models::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
+        Armagh::Document.create( type: type, content: { 'text' => 'bogusness' }, metadata: {},
         pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: "#{type}-p-#{i}",
         collection_task_ids: [ '123' ], document_timestamp: Time.now )
       end
@@ -339,7 +339,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert_empty JSON.parse(last_response.body)
     end
 
-    doc = Armagh::Models::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
 
@@ -372,7 +372,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert_equal('Missing parameter: id', response.dig('error_detail', 'message'))
     end
 
-    doc = Armagh::Models::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
     doc.save
@@ -400,7 +400,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_document_failures
     count = 10
     count.times do |i|
-      doc = Armagh::Models::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+      doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
                               pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "id_#{i}",
                               collection_task_ids: [ '123' ], document_timestamp: Time.now )
       doc.add_dev_error('test_action', 'details')

@@ -72,6 +72,23 @@ class TestConnection < Test::Unit::TestCase
     assert_equal documents, all_collections.first, 'documents is expected to be first'
   end
 
+  def test_published_document_collection
+    indexes = mock('indexes')
+    indexes.stubs(:create_one)
+    documents = stub(name: 'documents', indexes: indexes)
+    sometype1 = stub(name: 'documents.SomeType1', indexes: indexes)
+    sometype2 = stub(name: 'documents.SomeType2', indexes: indexes)
+    unrelated = stub(name: 'unrelated', indexes: indexes)
+
+    @connection.expects(:collections).returns([documents, sometype1, sometype2, unrelated])
+
+    all_published_collections = Armagh::Connection.all_published_collections
+    assert_not_include all_published_collections, documents
+    assert_include all_published_collections, sometype1
+    assert_include all_published_collections, sometype2
+    assert_not_include all_published_collections, unrelated
+  end
+
   def test_documents
     @connection.expects(:[]).with('documents')
     Armagh::Connection.stubs(:index_doc_collection).once
@@ -187,12 +204,20 @@ class TestConnection < Test::Unit::TestCase
 
   def test_setup_indexes
     config_indexes = mock
+    users_indexes = mock
+    groups_indexes = mock
     doc_indexes = mock
     config = stub(indexes: config_indexes)
+    users = stub(indexes: users_indexes)
+    groups = stub(indexes: groups_indexes)
     @connection.stubs(:[]).with('config').returns(config)
+    @connection.stubs(:[]).with('users').returns(users)
+    @connection.stubs(:[]).with('groups').returns(groups)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
+    users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'username'})
+    groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     doc_indexes.expects(:create_one).twice
 
     Armagh::Connection.setup_indexes
@@ -206,7 +231,7 @@ class TestConnection < Test::Unit::TestCase
     @connection.stubs(:[]).with('config').returns(config)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
     config_indexes.expects(:create_one).raises(e)
-    assert_raise(Armagh::Errors::IndexError){Armagh::Connection.setup_indexes}
+    assert_raise(Armagh::Connection::IndexError){Armagh::Connection.setup_indexes}
   end
 
   def test_index_doc_collection
@@ -236,6 +261,6 @@ class TestConnection < Test::Unit::TestCase
     collection = mock
     collection.stubs(:name).returns('test_name')
     collection.stubs(:indexes).returns(indexes)
-    assert_raise(Armagh::Errors::IndexError){Armagh::Connection.index_doc_collection(collection)}
+    assert_raise(Armagh::Connection::IndexError){Armagh::Connection.index_doc_collection(collection)}
   end
 end

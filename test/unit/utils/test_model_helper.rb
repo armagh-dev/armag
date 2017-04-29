@@ -16,7 +16,7 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/models/document'
+require_relative '../../../lib/document/document'
 require_relative '../../../lib/utils/model_helper'
 
 require 'test/unit'
@@ -53,8 +53,8 @@ class TestModelHelper < Test::Unit::TestCase
       ]
     }
 
-    Armagh::Models::Document.any_instance.stubs(:save)
-    @doc = Armagh::Models::Document.create(type: 'type',
+    Armagh::Document.any_instance.stubs(:save)
+    @doc = Armagh::Document.create(type: 'type',
                                    content: @content,
                                    metadata: @metadata,
                                    pending_actions: [],

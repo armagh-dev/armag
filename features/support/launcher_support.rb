@@ -28,18 +28,17 @@ module LauncherSupport
     DAEMON = File.join(File.dirname(__FILE__), '..', '..', 'bin', DAEMON_NAME)
     DAEMON_DIR = '/tmp/armagh'
   end
-  
+
   def self.start_launcher_daemon
     raise "Unable to write to #{DAEMON_DIR}" unless File.writable? DAEMON_DIR
     system "#{DAEMON} start > /dev/null"
     sleep 1
   end
-  
+
   def self.stop_launcher_daemon
-    system "#{DAEMON} stop > /dev/null"
-    sleep 4
+    `#{DAEMON} stop > /dev/null`
   end
-  
+
   def self.launch_launcher
     rout, wout = IO.pipe
     rerr, werr = IO.pipe
@@ -72,17 +71,17 @@ module LauncherSupport
     processes = []
     Sys::ProcTable.ps do |process|
       if process.comm == 'ruby' &&  process.cmdline &&
-          (process.cmdline.include?(EXEC_NAME) || (process.cmdline.include?(DAEMON_NAME)))
+        (process.cmdline.include?(EXEC_NAME) || (process.cmdline.include?(DAEMON_NAME)))
         processes << process
       end
     end
     processes
   end
-  
+
   def self.get_daemon_status
     `#{DAEMON} status`
   end
-  
+
   def self.kill_launcher_processes
     LauncherSupport.stop_launcher_daemon
     processes = LauncherSupport.get_launcher_processes

@@ -15,13 +15,14 @@
 # limitations under the License.
 #
 
-require_relative '../errors'
 require 'armagh/documents/source'
 require 'armagh/support/sftp'
 
 module Armagh
   module Utils
     class Archiver
+      class ArchiveError < StandardError; end
+
       MAX_ARCHIVES_PER_DIR = 5_000
 
       def initialize(logger)
@@ -43,7 +44,7 @@ module Armagh
       end
 
       def archive_file(file_path, archive_data)
-        raise Errors::ArchiveError, 'Unable to archive file when outside of an archive context.' unless @sftp
+        raise ArchiveError, 'Unable to archive file when outside of an archive context.' unless @sftp
         update_archive_dir
 
         meta_json = archive_data.to_json

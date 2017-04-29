@@ -16,12 +16,10 @@
 #
 
 module Armagh
-  module Errors
-    class ConfigurationError  < StandardError; end
-    class ConnectionError < StandardError; end
-    class DocumentMarkError < StandardError; end
-    class EncodingError < StandardError; end
-    class IndexError < StandardError; end
-    class ArchiveError < StandardError; end
+  module Authentication
+    module Directory
+      LDAP = 'ldap'.freeze
+      INTERNAL = 'internal'.freeze
+    end
   end
 end

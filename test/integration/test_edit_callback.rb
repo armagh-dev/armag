@@ -27,7 +27,7 @@ require_relative '../../lib/logging'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
 require_relative '../../lib/actions/workflow'
-require_relative '../../lib/models/document'
+require_relative '../../lib/document/document'
 
 require 'test/unit'
 
@@ -61,7 +61,6 @@ class TestEditCallback < Test::Unit::TestCase
   end
 
   def setup
-    MongoSupport.instance.start_mongo unless MongoSupport.instance.running?
     MongoSupport.instance.clean_database
     @logger = Armagh::Logging.set_logger('Test::Logger')
 
@@ -91,7 +90,7 @@ class TestEditCallback < Test::Unit::TestCase
 
   def test_edit_new
     @splitter.doc_id = 'non_existing_doc_id'
-    assert_nil Armagh::Models::Document.find(@splitter.doc_id, @output_type, @output_state)
+    assert_nil Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
                                                        content: {},
                                                        metadata: {},
@@ -105,7 +104,7 @@ class TestEditCallback < Test::Unit::TestCase
     assert_equal(Armagh::Documents::ActionDocument, @splitter.doc_class)
     assert_true(@splitter.doc_was_new)
 
-    doc = Armagh::Models::Document.find(@splitter.doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)
@@ -117,8 +116,8 @@ class TestEditCallback < Test::Unit::TestCase
 
   def test_edit_existing
     doc_id = 'existing_doc_id'
-    assert_nil Armagh::Models::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Models::Document.create(type: @output_type,
+    assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
+    Armagh::Document.create(type: @output_type,
                             content:{'content' => 123},
                             metadata: {'draft_meta' => 'bananas'},
                             pending_actions: [],
@@ -126,7 +125,7 @@ class TestEditCallback < Test::Unit::TestCase
                             document_id: doc_id,
                             collection_task_ids: [],
                             document_timestamp: nil)
-    doc = Armagh::Models::Document.find(doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find(doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_false doc.locked?
 
@@ -141,7 +140,7 @@ class TestEditCallback < Test::Unit::TestCase
                                                        copyright: nil, new: true)
     @splitter.split(action_doc)
 
-    doc = Armagh::Models::Document.find(@splitter.doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)

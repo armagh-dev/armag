@@ -24,22 +24,22 @@ require 'mocha/test_unit'
 class TestMongoErrorHandler < Test::Unit::TestCase
   def test_convert_size
     e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'))
-    assert_kind_of(Armagh::Documents::Errors::DocumentSizeError, e)
+    assert_kind_of(Armagh::Connection::DocumentSizeError, e)
   end
 
   def test_convert_unique
     e = Armagh::Connection.convert_mongo_exception(Mongo::Error::OperationFailure.new('E11000: something'))
-    assert_kind_of(Armagh::Documents::Errors::DocumentUniquenessError, e)
+    assert_kind_of(Armagh::Connection::DocumentUniquenessError, e)
   end
 
   def test_convert_other_operation
     e = Armagh::Connection.convert_mongo_exception(Mongo::Error::OperationFailure.new('E11999: something'))
-    assert_kind_of(Armagh::Errors::ConnectionError, e)
+    assert_kind_of(Armagh::Connection::ConnectionError, e)
   end
 
   def test_convert_mongo_error
     e = Armagh::Connection.convert_mongo_exception(Mongo::Error.new('mongo error'))
-    assert_kind_of(Armagh::Errors::ConnectionError, e)
+    assert_kind_of(Armagh::Connection::ConnectionError, e)
   end
 
   def test_convert_other_error
@@ -48,7 +48,7 @@ class TestMongoErrorHandler < Test::Unit::TestCase
   end
 
   def test_convert_with_id
-    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'), 'document_id')
-    assert_include(e.message, 'document_id')
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'), id: 'document_id', type_class: self.class)
+    assert_equal 'TestMongoErrorHandler document_id is too large.  Consider using a divider or splitter to break up the document.', e.message
   end
 end

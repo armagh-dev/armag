@@ -22,7 +22,6 @@ require 'singleton'
 require 'base64'
 
 require_relative '../logging'
-require_relative '../errors'
 require_relative '../configuration/file_based_configuration.rb'
 
 module Armagh
@@ -39,14 +38,14 @@ module Armagh
         config_keys = config.keys
         required = %w(ip port str db)
         unless ( config_keys & required ).length == required.length
-          raise Errors::ConnectionError, "Insufficient connection info for db connection. Ensure armagh_env.json contains Armagh::Connection::MongoConnection[ #{ (required - config_keys).join(', ')}]."
+          raise ConnectionError, "Insufficient connection info for db connection. Ensure armagh_env.json contains Armagh::Connection::MongoConnection[ #{ (required - config_keys).join(', ')}]."
         end
         begin
           conn_uri = "mongodb://#{Base64.decode64( config['str'] ).strip}@#{config['ip']}:#{config['port']}/#{config['db']}"
           @connection = Mongo::Client.new( conn_uri )
           @ip = config['ip']
         rescue
-          raise Errors::ConnectionError, 'Unable to establish database connection.'
+          raise ConnectionError, 'Unable to establish database connection.'
         end
       end
     end

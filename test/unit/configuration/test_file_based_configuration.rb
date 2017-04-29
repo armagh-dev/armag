@@ -60,7 +60,7 @@ class TestFileBasedConfiguration < Test::Unit::TestCase
 
   def test_filepath_doesnt_exist
     File.stubs(:file?).returns false
-    e = assert_raise(Armagh::Errors::ConfigurationError) {FileBasedConfiguration.filepath}
+    e = assert_raise(Armagh::Configuration::ConfigurationError) {FileBasedConfiguration.filepath}
     assert_equal "Can't find the armagh_env.json file in #{FileBasedConfiguration::CONFIG_DIRS.join(', ')}", e.message
   end
 
@@ -72,13 +72,13 @@ class TestFileBasedConfiguration < Test::Unit::TestCase
   end
 
   def test_load_bad_key
-    e = assert_raise(Armagh::Errors::ConfigurationError) {FileBasedConfiguration.load('INVALID')}
+    e = assert_raise(Armagh::Configuration::ConfigurationError) {FileBasedConfiguration.load('INVALID')}
     assert_equal "Configuration file #{FileBasedConfiguration.filepath} does not contain 'INVALID'.", e.message
   end
 
   def test_load_bad_config
     Oj.stubs(:load).raises(RuntimeError.new)
-    e = assert_raise(Armagh::Errors::ConfigurationError) {FileBasedConfiguration.load('INVALID')}
+    e = assert_raise(Armagh::Configuration::ConfigurationError) {FileBasedConfiguration.load('INVALID')}
     assert_equal "Configuration file #{FileBasedConfiguration.filepath} could not be parsed.", e.message
   end
 end

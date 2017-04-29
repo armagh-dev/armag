@@ -25,6 +25,9 @@
 require_relative 'configuration/file_based_configuration'
 require_relative 'logging'
 
+require_relative 'authentication/user'
+require_relative 'authentication/group'
+
 module Armagh
   module Environment
     

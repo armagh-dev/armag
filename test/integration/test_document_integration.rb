@@ -24,7 +24,7 @@ Armagh::Environment.init
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/connection'
-require_relative '../../lib/models/document'
+require_relative '../../lib/document/document'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -41,7 +41,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
 
   def test_document_get_for_processing_order
     4.times do |count|
-      Armagh::Models::Document.create(type: 'TestDocument',
+      Armagh::Document.create(type: 'TestDocument',
                               content: {},
                               metadata: {},
                               pending_actions: ['action'],
@@ -52,7 +52,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
       sleep 1
     end
 
-    Armagh::Models::Document.create(type: 'PublishedTestDocument',
+    Armagh::Document.create(type: 'PublishedTestDocument',
                             content: {},
                             metadata: {},
                             pending_actions: ['action'],
@@ -62,31 +62,31 @@ class TestDocumentIntegration < Test::Unit::TestCase
                             document_timestamp: nil)
 
     # Make doc_3 more recently updated
-    Armagh::Models::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
+    Armagh::Document.modify_or_create('doc_3', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
       doc.content['modified'] = true
     end
 
     # Make doc_1 most recently updated
-    Armagh::Models::Document.modify_or_create('doc_1', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
+    Armagh::Document.modify_or_create('doc_1', 'TestDocument', Armagh::Documents::DocState::READY, true, 'test-agent') do |doc|
       doc.content['modified'] = true
     end
 
     # Expected order (based on last update and published first) - published_document, doc_0, doc_2, doc_3, doc_1
-    d = Armagh::Models::Document.get_for_processing('test-agent1')
+    d = Armagh::Document.get_for_processing('test-agent1')
     assert_equal('doc_0', d.document_id)
     assert_equal('test-agent1', d.locked_by)
     assert_true(d.locked?)
 
-    assert_equal('doc_2', Armagh::Models::Document.get_for_processing('test-agent2').document_id)
-    assert_equal('doc_3', Armagh::Models::Document.get_for_processing('test-agent3').document_id)
-    assert_equal('doc_1', Armagh::Models::Document.get_for_processing('test-agent4').document_id)
-    assert_equal('published_document', Armagh::Models::Document.get_for_processing('test-agent5').document_id)
+    assert_equal('doc_2', Armagh::Document.get_for_processing('test-agent2').document_id)
+    assert_equal('doc_3', Armagh::Document.get_for_processing('test-agent3').document_id)
+    assert_equal('doc_1', Armagh::Document.get_for_processing('test-agent4').document_id)
+    assert_equal('published_document', Armagh::Document.get_for_processing('test-agent5').document_id)
   end
 
   def test_document_too_large
     content = {'field' => 'a'*100_000_000}
-    assert_raise(Armagh::Documents::Errors::DocumentSizeError) do
-      Armagh::Models::Document.create(type: 'TestDocument',
+    assert_raise(Armagh::Connection::DocumentSizeError) do
+      Armagh::Document.create(type: 'TestDocument',
                               content: content,
                               metadata: {},
                               pending_actions: ['action'],
@@ -98,7 +98,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
   end
 
   def test_create_duplicate
-    Armagh::Models::Document.create(type: 'TestDocument',
+    Armagh::Document.create(type: 'TestDocument',
                             content: {},
                             metadata: {},
                             pending_actions: ['action'],
@@ -108,8 +108,8 @@ class TestDocumentIntegration < Test::Unit::TestCase
                             collection_task_ids: [],
                             document_timestamp: nil)
 
-    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError) do
-      Armagh::Models::Document.create(type: 'TestDocument',
+    assert_raise(Armagh::Connection::DocumentUniquenessError) do
+      Armagh::Document.create(type: 'TestDocument',
                               content: {},
                               metadata: {},
                               pending_actions: ['action'],
@@ -124,7 +124,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
   def test_document_force_unlock
     agent_id = 'test-agent-id'
     id = 'doc_test'
-    Armagh::Models::Document.create(type: 'TestDocument',
+    Armagh::Document.create(type: 'TestDocument',
                             content: {},
                             metadata: {},
                             pending_actions: ['action'],
@@ -134,22 +134,22 @@ class TestDocumentIntegration < Test::Unit::TestCase
                             document_timestamp: nil)
     sleep 1
 
-    doc = Armagh::Models::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
     assert_false doc.locked?
     assert_nil doc.locked_by
 
-    Armagh::Models::Document.get_for_processing(agent_id)
+    Armagh::Document.get_for_processing(agent_id)
 
-    doc = Armagh::Models::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
     assert_true doc.locked?
     assert_equal(agent_id, doc.locked_by)
 
-    Armagh::Models::Document.force_unlock(agent_id)
+    Armagh::Document.force_unlock(agent_id)
 
-    doc = Armagh::Models::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
+    doc = Armagh::Document.find(id, 'TestDocument', Armagh::Documents::DocState::READY)
     assert_false doc.locked?
     assert_nil doc.locked_by
 
-    assert_nothing_raised {Armagh::Models::Document.force_unlock('not an existing id')}
+    assert_nothing_raised {Armagh::Document.force_unlock('not an existing id')}
   end
 end

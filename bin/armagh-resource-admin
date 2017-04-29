@@ -45,6 +45,9 @@ include Armagh
 api = Admin::Resource::API.instance
 rest_helper = Utils::RestHelper.new(api.logger)
 
+Authentication::User.setup_default_users
+Authentication::Group.setup_default_groups
+
 configure do
 
   if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'

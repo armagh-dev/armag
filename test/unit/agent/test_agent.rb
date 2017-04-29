@@ -24,7 +24,7 @@ require_relative '../../../lib/agent/agent'
 require_relative '../../helpers/mock_logger'
 require_relative '../../../lib/agent/agent_status'
 require_relative '../../../lib/ipc'
-require_relative '../../../lib/models/document'
+require_relative '../../../lib/document/document'
 require_relative '../../../lib/logging'
 require_relative '../../../lib/connection'
 
@@ -200,7 +200,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -235,7 +235,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -274,7 +274,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -323,7 +323,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -362,7 +362,7 @@ class TestAgent < Test::Unit::TestCase
                :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
@@ -448,7 +448,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow.expects(:get_action_names_for_docspec).returns(pending_actions)
 
@@ -509,7 +509,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -534,7 +534,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(divider).at_least_once
 
     @default_agent.expects(:report_status).with(doc, divider).at_least_once
@@ -559,7 +559,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
@@ -592,7 +592,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
@@ -626,7 +626,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.stubs(:document_id).returns('doc_id')
@@ -654,7 +654,7 @@ class TestAgent < Test::Unit::TestCase
   def test_run_with_work_no_action_exists
     action_name = 'action_name'
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name])
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     doc.expects(:add_ops_error).at_least_once
     doc.stubs(:error?).returns(false)
     @backoff_mock.expects(:reset).at_least_once
@@ -673,7 +673,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_no_work
-    Armagh::Models::Document.expects(:get_for_processing).returns(nil).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(nil).at_least_once
 
     @default_agent.expects(:report_status).with(nil, nil).at_least_once
     @backoff_mock.expects(:interruptible_backoff).at_least_once
@@ -699,7 +699,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
 
     @logger.expects(:dev_error).with("#{action} is not an action.")
 
@@ -716,7 +716,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_unexpected_error
     exception = RuntimeError.new 'Exception'
-    Armagh::Models::Document.expects(:get_for_processing).raises(exception)
+    Armagh::Document.expects(:get_for_processing).raises(exception)
 
     Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
@@ -781,7 +781,7 @@ class TestAgent < Test::Unit::TestCase
     @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
 
     @default_agent.instance_variable_set(:'@current_action', action)
-    Armagh::Models::Document.expects(:create).with(type: 'DocumentType',
+    Armagh::Document.expects(:create).with(type: 'DocumentType',
                                            content: 'content',
                                            metadata: 'metadata',
                                            pending_actions: [],
@@ -825,9 +825,43 @@ class TestAgent < Test::Unit::TestCase
     assert_equal("Cannot create document 'id'.  It is the same document that was passed into the action.", e.message)
   end
 
+  def test_create_document_uniqueness
+    source = mock
+    @current_doc_mock.expects(:document_id).returns('current_id')
+    @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
+    initial_error = Armagh::Connection::DocumentUniquenessError.new('message')
+
+    Armagh::Document.expects(:create).raises(initial_error)
+
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: 'content', metadata: 'metadata',
+                                                       docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: source,
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
+
+    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError.new(initial_error.message)){@default_agent.create_document action_doc}
+  end
+
+  def test_create_document_too_large
+    source = mock
+    @current_doc_mock.expects(:document_id).returns('current_id')
+    @workflow.expects(:get_action_names_for_docspec).returns([]).at_least_once
+    initial_error = Armagh::Connection::DocumentSizeError.new('message')
+
+    Armagh::Document.expects(:create).raises(initial_error)
+
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: 'content', metadata: 'metadata',
+                                                       docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: source,
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
+
+    assert_raise(Armagh::Documents::Errors::DocumentSizeError.new(initial_error.message)){@default_agent.create_document action_doc}
+  end
+
   def test_edit_document
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Models::Document).returns(true)
+    doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -855,7 +889,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(new_docspec, action_doc.docspec)
       true
     end
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     executed_block = false
     @default_agent.edit_document(id, old_docspec) do |doc|
@@ -902,8 +936,8 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:save).returns nil
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
-    Armagh::Models::Document.expects(:from_action_document).returns doc
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    Armagh::Document.expects(:from_action_document).returns doc
 
     executed_block = false
     @default_agent.edit_document(id, docspec) do |doc|
@@ -920,7 +954,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_type
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Models::Document).returns(true)
+    doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -936,7 +970,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -949,7 +983,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_same_state
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Models::Document).returns(true)
+    doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -968,7 +1002,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(docspec, action_doc.docspec)
       true
     end
-    Armagh::Models::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     @default_agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -977,7 +1011,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_w_p
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Models::Document).returns(true)
+    doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -993,7 +1027,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1006,7 +1040,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_r_w
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Models::Document).returns(true)
+    doc.expects(:is_a?).with(Armagh::Document).returns(true)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -1022,7 +1056,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1040,7 +1074,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1062,8 +1096,8 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:save).returns
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
-    Armagh::Models::Document.expects(:from_action_document).returns doc
+    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    Armagh::Document.expects(:from_action_document).returns doc
 
     @default_agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -1077,7 +1111,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1095,7 +1129,7 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Models::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1104,6 +1138,36 @@ class TestAgent < Test::Unit::TestCase
     end
 
     assert_equal("Document 'id' state can only be changed from working to ready.", e.message)
+  end
+
+  def test_edit_document_uniqueness
+    @current_doc_mock.expects(:document_id).returns('current_id')
+
+    initial_error = Armagh::Connection::DocumentUniquenessError.new('message')
+    docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:modify_or_create).raises(initial_error)
+
+    assert_raise(Armagh::Documents::Errors::DocumentUniquenessError.new(initial_error.message)) do
+      @default_agent.edit_document('id', docspec) do |doc|
+        doc.metadata['something'] = 'value'
+      end
+    end
+  end
+
+  def test_edit_document_too_large
+    @current_doc_mock.expects(:document_id).returns('current_id')
+
+    initial_error = Armagh::Connection::DocumentSizeError.new('message')
+    docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+
+    Armagh::Document.expects(:modify_or_create).raises(initial_error)
+
+    assert_raise(Armagh::Documents::Errors::DocumentSizeError.new(initial_error.message)) do
+      @default_agent.edit_document('id', docspec) do |doc|
+        doc.metadata['something'] = 'value'
+      end
+    end
   end
 
   def test_get_existing_published_document
@@ -1119,7 +1183,7 @@ class TestAgent < Test::Unit::TestCase
     pub_action_doc = mock
     doc.expects(:to_published_document).returns(pub_action_doc)
 
-    Armagh::Models::Document.expects(:find).returns(doc)
+    Armagh::Document.expects(:find).returns(doc)
     assert_equal(pub_action_doc, @default_agent.get_existing_published_document(action_doc))
   end
 
@@ -1132,7 +1196,7 @@ class TestAgent < Test::Unit::TestCase
                                                        title: nil,
                                                        copyright: nil,
                                                        document_timestamp: nil)
-    Armagh::Models::Document.expects(:find).returns(nil)
+    Armagh::Document.expects(:find).returns(nil)
     assert_nil @default_agent.get_existing_published_document(action_doc)
   end
 
@@ -1241,7 +1305,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'test_action'
     file_path = 'file'
     archive_data = {'something' => 'details'}
-    error = Armagh::Errors::ArchiveError.new('archive_error')
+    error = Armagh::Utils::Archiver::ArchiveError.new('archive_error')
     archiver = @default_agent.instance_variable_get(:@archiver)
     archiver.expects(:archive_file).with(file_path, archive_data).raises(error)
     @default_agent.expects(:notify_dev).with(logger_name, action_name, error)
@@ -1278,7 +1342,7 @@ class TestAgent < Test::Unit::TestCase
                :dev_errors => [], :ops_errors => [], :error? => false
     )
 
-    Armagh::Models::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow.expects(:instantiate_action).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:add_ops_error)

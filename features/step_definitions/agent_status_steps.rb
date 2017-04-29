@@ -30,7 +30,7 @@ Then(/^I should see an agent with a status of "([^"]*)" within (\d+) seconds*$/)
       agent_status = db_status['agents']
       found_status = agent_status.collect{|_a,s| s['status']}.include? status
     end
-    sleep 0.1
+    sleep 0.25
   end
 
   assert_true(found_status, "No agents were seen with a status of #{status}")

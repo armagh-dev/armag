@@ -22,22 +22,19 @@ require_relative '../../lib/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
-
 require_relative '../../lib/connection'
-
-require_relative '../../lib/models/model'
 
 require 'mocha/test_unit'
 
 require 'mongo'
 
-class Model1 < Armagh::Models::Model
+class Model1 < Armagh::Connection::DBDoc
   def self.default_collection
     Armagh::Connection::MongoConnection.instance.connection['c1']
   end
 end
 
-class Model2 < Armagh::Models::Model
+class Model2 < Armagh::Connection::DBDoc
   def self.default_collection
     Armagh::Connection::MongoConnection.instance.connection['c2']
   end

@@ -16,8 +16,8 @@
 #
 
 module Armagh
-  module Models
-    class Model
+  module Connection
+    class DBDoc
       def self.default_collection
         nil
       end
@@ -28,8 +28,38 @@ module Armagh
         protected :new
       end
 
-      def initialize(image)
+      def initialize(image = {})
         @db_doc = image
+      end
+
+      def internal_id
+        @db_doc['_id']
+      end
+
+      def internal_id=(id)
+        @db_doc['_id'] = id
+      end
+
+      def mark_timestamp
+        now = Time.now
+        self.updated_timestamp = now
+        self.created_timestamp ||= now
+      end
+
+      def updated_timestamp
+        @db_doc['updated_timestamp']&.utc
+      end
+
+      def updated_timestamp=(ts)
+        @db_doc['updated_timestamp'] = ts
+      end
+
+      def created_timestamp
+        @db_doc['created_timestamp']&.utc
+      end
+
+      def created_timestamp=(ts)
+        @db_doc['created_timestamp'] = ts
       end
 
       def self.db_create(values, collection = self.default_collection)

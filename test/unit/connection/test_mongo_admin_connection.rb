@@ -43,14 +43,14 @@ class TestMongoAdminConnection < Test::Unit::TestCase
   def test_mongo_connection_no_config
     @config = {}
     Armagh::Configuration::FileBasedConfiguration.stubs(:load).returns(@config)
-    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
+    e = assert_raise(Armagh::Connection::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
     assert_equal('Insufficient connection info for admin connection. Ensure armagh_env.json contains Armagh::Connection::MongoAdminConnection[ ip, port, str, db].', e.message)
   end
 
   def test_mongo_connection_db_err
     root_error = RuntimeError.new('Connection Failure')
     Mongo::Client.stubs(:new).raises(root_error)
-    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
+    e = assert_raise(Armagh::Connection::ConnectionError) {Class.new(Armagh::Connection::MongoAdminConnection).instance.connection}
     assert_equal('Unable to establish admin database connection.', e.message)
     assert_equal(root_error, e.cause)
   end

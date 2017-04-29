@@ -10,3 +10,4 @@ doc
 *.gem
 tags
 .bundle
+failure_logs

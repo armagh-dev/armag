@@ -35,7 +35,7 @@ require_relative '../agent/agent'
 require_relative '../agent/agent_status'
 require_relative '../actions/workflow'
 require_relative '../actions/gem_manager'
-require_relative '../models/document'
+require_relative '../document/document'
 require_relative '../utils/collection_trigger'
 require_relative '../connection'
 require_relative '../ipc'
@@ -106,6 +106,9 @@ module Armagh
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
         @logger.dev_error LauncherConfigError
       end
+
+      Armagh::Authentication::User.setup_default_users
+      Armagh::Authentication::Group.setup_default_groups
       
       @logger.any "Using Launcher Config: #{launcher_config_name}"
       Logging.set_level(@logger, @config.launcher.log_level)
@@ -113,9 +116,9 @@ module Armagh
       action_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
 
       @versions = self.class.get_versions(@logger, action_versions)
-      Models::Document.version['armagh'] = @versions[ 'armagh' ]
+      Document.version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
-        Models::Document.version[ package ] = version
+        Document.version[ package ] = version
       end
       
       begin
@@ -138,6 +141,7 @@ module Armagh
       @hostname = Socket.gethostname
       @agents = {}
       @running = false
+      @shutdown = false
     rescue => e
       Logging.dev_error_exception(@logger, e, 'Error initializing launcher')
       exit 1
@@ -216,7 +220,7 @@ module Armagh
           agent_id = @agents[pid].uuid
           @agents.delete(pid)
           @agent_status.remove_agent(agent_id)
-          Models::Document.force_unlock(agent_id)
+          Document.force_unlock(agent_id)
         end
       end
 
@@ -254,6 +258,7 @@ module Armagh
     def shutdown(signal)
       Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }.join
       @running = false
+      @shutdown = true
       @collection_trigger.stop
       Thread.new{kill_all_agents(signal)}.join
     end
@@ -306,7 +311,8 @@ module Armagh
         @running = true
         checkin('running')
 
-        while @running do
+        # Check running and shutdown in case a shutdown was initiated before the run
+        while @running && !@shutdown do
           if @last_checkin.nil? || @last_checkin < Time.now - @config.launcher.checkin_frequency
             reconcile_agents
             refresh_config

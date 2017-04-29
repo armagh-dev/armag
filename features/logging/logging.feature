@@ -28,7 +28,7 @@ Feature: Logging Support
     And armagh's "agent" config is
       | log_level | debug |
     And I run armagh
-    And I wait 3 seconds
+    And I wait 15 seconds
     Then the logs should contain "DEBUG"
     And the logs should contain "INFO"
     And the logs should contain "ANY"

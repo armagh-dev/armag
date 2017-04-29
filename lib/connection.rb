@@ -17,7 +17,7 @@
 
 require 'set'
 
-require_relative 'errors'
+require_relative 'connection/db_doc'
 require_relative 'connection/mongo_error_handler'
 require_relative 'connection/mongo_connection'
 require_relative 'connection/mongo_admin_connection'
@@ -26,18 +26,29 @@ require_relative 'utils/network_helper'
 module Armagh
   module Connection
 
+    class ConnectionError < StandardError; end
+    class IndexError < ConnectionError; end
+    class DocumentSizeError < ConnectionError; end
+    class DocumentUniquenessError < ConnectionError; end
+
     def self.published_collection?(collection)
       collection.name =~ /^documents\./
     end
 
     def self.all_document_collections
-      doc_collections = [documents]
+      collections = all_published_collections
+      collections.unshift documents
+      collections
+    end
+
+    def self.all_published_collections
+      published_collections = []
 
       MongoConnection.instance.connection.collections.each do |collection|
-        doc_collections << collection if published_collection?(collection)
+        published_collections << collection if published_collection?(collection)
       end
 
-      doc_collections
+      published_collections
     end
 
     def self.documents(type_name = nil)
@@ -61,6 +72,10 @@ module Armagh
 
     def self.users
       MongoConnection.instance.connection['users']
+    end
+
+    def self.groups
+      MongoConnection.instance.connection['groups']
     end
 
     def self.status
@@ -124,10 +139,13 @@ module Armagh
 
     def self.setup_indexes
       config.indexes.create_one({'type' => 1, 'name' => 1, 'timestamp' => -1}, unique: true, name: 'types')
+      users.indexes.create_one({'username' => 1}, unique: true, name: 'username')
+      groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
+
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e
       e = Connection.convert_mongo_exception(e)
-      raise Errors::IndexError, "Unable to create indexes: #{e.message}"
+      raise IndexError, "Unable to create indexes: #{e.message}"
     end
 
     def self.index_doc_collection(collection)
@@ -157,7 +175,7 @@ module Armagh
                                       'locked' => false
                                     })
     rescue => e
-      raise Errors::IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
+      raise IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
     end
   end
 end

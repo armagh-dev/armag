@@ -16,7 +16,6 @@
 #
 
 require_relative '../logging'
-require_relative '../errors'
 
 require 'socket'
 require 'resolv'

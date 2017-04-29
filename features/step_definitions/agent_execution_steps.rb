@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/models/document'
+require_relative '../../lib/document/document'
 require_relative '../../lib/actions/workflow'
 require_relative '../../lib/logging'
 
@@ -29,10 +29,10 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   content = content.nil? ? {} : eval(content)
   meta = meta.nil? ? {} : eval(meta)
 
-  Armagh::Models::Document.version.merge! APP_VERSION
+  Armagh::Document.version.merge! APP_VERSION
 
   count.to_i.times do
-    Armagh::Models::Document.create(type: doc_type, content: content, metadata: meta,
+    Armagh::Document.create(type: doc_type, content: content, metadata: meta,
                             pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
   end
 end

@@ -41,14 +41,14 @@ class TestMongoConnection < Test::Unit::TestCase
   def test_mongo_connection_no_config
     @config.clear
     Armagh::Configuration::FileBasedConfiguration.stubs(:load).returns(@config)
-    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
+    e = assert_raise(Armagh::Connection::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
     assert_equal('Insufficient connection info for db connection. Ensure armagh_env.json contains Armagh::Connection::MongoConnection[ ip, port, str, db].', e.message)
   end
 
   def test_mongo_connection_db_err
     root_error = RuntimeError.new('Connection Failure')
     Mongo::Client.stubs(:new).raises(root_error)
-    e = assert_raise(Armagh::Errors::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
+    e = assert_raise(Armagh::Connection::ConnectionError) {Class.new(Armagh::Connection::MongoConnection).instance.connection}
     assert_equal('Unable to establish database connection.', e.message)
     assert_equal(root_error, e.cause)
   end

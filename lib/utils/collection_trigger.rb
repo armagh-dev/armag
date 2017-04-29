@@ -21,7 +21,7 @@ require 'armagh/support/cron'
 
 require_relative 'interruptible_sleep'
 require_relative '../logging'
-require_relative '../../lib/models/document'
+require_relative '../../lib/document/document'
 require_relative '../ipc'
 require_relative '../actions/workflow'
 require_relative '../agent/agent_status'
@@ -60,13 +60,13 @@ module Armagh
         @logger.debug "Triggering #{config.action.name} collection"
         docspec = config.input.docspec
         pending_actions = @workflow.get_action_names_for_docspec(docspec)
-        Models::Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
+        Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
       rescue => e
         Logging.ops_error_exception(@logger, e, 'Document insertion failed.')
       end
 
       private def run
-        @logger.debug 'Starting Collection trigger'
+        @logger.debug 'Starting collection trigger.'
         @running = true
         while @running
           begin
@@ -104,9 +104,9 @@ module Armagh
           if now >= next_run
             trigger_individual_collection(config)
             @last_run[name] = now
-            @logger.debug("Collection #{name} scheduled to run at #{Armagh::Support::Cron.next_execution_time(schedule, now)}")
+            @logger.debug("Collection #{name} scheduled to run at #{Armagh::Support::Cron.next_execution_time(schedule, now)}.")
           elsif now == @last_run[name]
-            @logger.debug("Collection #{name} scheduled to run at #{next_run}")
+            @logger.debug("Collection #{name} scheduled to run at #{next_run}.")
           end
         end
       end

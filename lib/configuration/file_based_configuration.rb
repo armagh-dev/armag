@@ -17,10 +17,11 @@
 
 require 'oj'
 require 'fileutils'
-require_relative '../errors'
 
 module Armagh
   module Configuration
+    class ConfigurationError < StandardError; end
+
     module FileBasedConfiguration
 
       CONFIG_DIRS = [ '/etc/armagh', File.join( __dir__, '..') ].collect{|p| File.absolute_path(p)}
@@ -30,7 +31,7 @@ module Armagh
           fp = File.join( dir, 'armagh_env.json' )
           return fp if File.file?( fp )
         end
-        raise Errors::ConfigurationError, "Can't find the armagh_env.json file in #{CONFIG_DIRS.join(', ')}"
+        raise ConfigurationError, "Can't find the armagh_env.json file in #{CONFIG_DIRS.join(', ')}"
       end
 
       def self.load(key)
@@ -41,12 +42,12 @@ module Armagh
           if app_config.has_key? key
             config = app_config[key]
           else
-            raise Errors::ConfigurationError, "Configuration file #{config_fp} does not contain '#{key}'."
+            raise ConfigurationError, "Configuration file #{config_fp} does not contain '#{key}'."
           end
-        rescue Errors::ConfigurationError
+        rescue ConfigurationError
           raise
         rescue
-          raise Errors::ConfigurationError, "Configuration file #{ config_fp } could not be parsed."
+          raise ConfigurationError, "Configuration file #{ config_fp } could not be parsed."
         end
         config
       end

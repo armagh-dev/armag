@@ -110,7 +110,7 @@ class TestArchiver < Test::Unit::TestCase
   end
 
   def test_archive_file_no_context
-    error = Armagh::Errors::ArchiveError.new('Unable to archive file when outside of an archive context.')
+    error = Armagh::Utils::Archiver::ArchiveError.new('Unable to archive file when outside of an archive context.')
     assert_raise(error){@archiver.archive_file('path', {})}
   end
 end

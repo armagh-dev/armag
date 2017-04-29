@@ -15,13 +15,12 @@
 # limitations under the License.
 #
 
-require_relative 'models/model'
-require_relative 'models/document'
-require_relative 'models/group'
-require_relative 'models/user'
+require_relative 'authentication/directory'
+require_relative 'authentication/group'
+require_relative 'authentication/role'
+require_relative 'authentication/user'
 
 module Armagh
-  module Models
-
+  module Authentication
   end
 end

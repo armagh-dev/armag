@@ -90,7 +90,7 @@ Feature: Actions Execution
       | pending_work    | nil                       |
       | version         | APP_VERSION               |
     And the logs should contain "Test Collect Running"
-    And the logs should contain "Test Divider Running"
+    And the logs should contain "Test Divide Running"
     And the logs should not contain "ERROR"
 
   Scenario: Have a document for a collector that collects nothing
@@ -395,10 +395,10 @@ Feature: Actions Execution
     And I run armagh
     And I wait until there are agents with the statuses
       | idle |
-    When I insert 1 "UnimplementedSplitterInputDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    When I insert 1 "UnimplementedSplitInputDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
     And I wait 10 seconds
-    Then I should see 0 "UnimplementedSplitterInputDocument" documents in the "documents" collection
-    Then I should see a "UnimplementedSplitterInputDocument" in "failures" with the following
+    Then I should see 0 "UnimplementedSplitInputDocument" documents in the "documents" collection
+    Then I should see a "UnimplementedSplitInputDocument" in "failures" with the following
       | document_id     | '123'                                                                                                                                                                                                               |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                         |
       | pending_actions | []                                                                                                                                                                                                                  |
@@ -426,11 +426,11 @@ Feature: Actions Execution
     And I run armagh
     And I wait until there are agents with the statuses
       | idle |
-    When I insert 1 "BadPublisherDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    When I insert 1 "BadPublishDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
     Then I should see an agent with a status of "running" within 60 seconds
     And I should see an agent with a status of "idle" within 60 seconds
-    And I should see 0 "BadPublisherDocument" documents in the "documents" collection
-    And I should see a "BadPublisherDocument" in "failures" with the following
+    And I should see 0 "BadPublishDocument" documents in the "documents" collection
+    And I should see a "BadPublishDocument" in "failures" with the following
       | document_id     | '123'                                                                                                        |
       | metadata        | {'meta' => 'incoming meta'}                                                                                  |
       | pending_actions | []                                                                                                           |
@@ -458,11 +458,11 @@ Feature: Actions Execution
     And I run armagh
     And I wait until there are agents with the statuses
       | idle |
-    When I insert 1 "BadConsumerDocument" with a "published" state, document_id "123", content "{'content' => 'published content'}", metadata "{'meta' => 'published metadata'}"
+    When I insert 1 "BadConsumeDocument" with a "published" state, document_id "123", content "{'content' => 'published content'}", metadata "{'meta' => 'published metadata'}"
     Then I should see an agent with a status of "running" within 60 seconds
     And I should see an agent with a status of "idle" within 60 seconds
-    Then I should see 0 "BadConsumerDocument" documents in the "failures" collection
-    Then I should see a "BadConsumerDocument" in "documents.BadConsumerDocument" with the following
+    Then I should see 0 "BadConsumeDocument" documents in the "failures" collection
+    Then I should see a "BadConsumeDocument" in "documents.BadConsumeDocument" with the following
       | document_id     | '123'                                                                                                       |
       | metadata        | {'meta' => 'published metadata'}                                                                            |
       | pending_actions | []                                                                                                          |
@@ -530,7 +530,7 @@ Feature: Actions Execution
       | document_id  | 'incoming'                                                                                                                                                                                                                                               |
       | metadata     | {'meta' => 'incoming meta'}                                                                                                                                                                                                                              |
       | dev_errors   | {}                                                                                                                                                                                                                                                       |
-      | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document 'split_123' is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document split_123 is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
       | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                           |
       | state        | 'ready'                                                                                                                                                                                                                                                  |
       | locked       | false                                                                                                                                                                                                                                                    |
@@ -778,7 +778,7 @@ Feature: Actions Execution
       | idle |
       | idle |
     Then the logs should contain "Test Collect Running"
-    And the logs should contain "Test Divider Running"
+    And the logs should contain "Test Divide Running"
     And the logs should contain "Test Split Running"
     And the logs should contain "Test Publish Running"
     And the logs should contain "Test Consume Running"
@@ -950,12 +950,12 @@ Feature: Actions Execution
     And I run armagh
     And I wait until there are agents with the statuses
       | idle |
-    When I insert 1 "BadPublisherDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    When I insert 1 "BadPublishDocument" with a "ready" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
-    Then I should see 0 "BadPublisherDocument" documents in the "documents" collection
+    Then I should see 0 "BadPublishDocument" documents in the "documents" collection
     And I should see 0 "ConsumeOutputDocument" documents in the "documents" collection
-    And I should see a "BadPublisherDocument" in "failures" with the following
+    And I should see a "BadPublishDocument" in "failures" with the following
       | document_id  | '123'                                                             |
       | metadata     | {'meta' => 'incoming meta'}                                       |
       | dev_errors   | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |

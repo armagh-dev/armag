@@ -124,6 +124,11 @@ class MongoSupport
     @client[collection].find
   end
 
+  def create_collection(name)
+    @client[name].create
+    @client[name]
+  end
+
   def update_document(collection, id, values)
     @client[collection].find('_id' => id).find_one_and_update('$set' => values)
   end
