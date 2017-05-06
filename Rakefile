@@ -23,7 +23,7 @@ require 'fileutils'
 
 desc 'Run tests'
 
-task :ci => [:clean, :yard]
+task :ci => [:clean, :check_licenses, :yard]
 task :ci_vm => [:ci, :test, :integration, :cucumber]
 task :default => [:ci_vm]
 
@@ -41,6 +41,10 @@ end
 
 task :clean do
   rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage failure_logs))
+end
+
+task :check_licenses do
+  sh "bundle exec license_finder --quiet --decisions_file licensing/approvals.yml"
 end
 
 Cucumber::Rake::Task.new

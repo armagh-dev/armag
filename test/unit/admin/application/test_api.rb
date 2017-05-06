@@ -118,9 +118,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
                                             'action' => {'name' => 'fred_the_action'},
                                             'ta_test_collect' => {'host' => 'somehost'}
                                           })
-    assert_nothing_raised do
+#    assert_nothing_raised do
       @api.create_action_configuration(values_hash)
-    end
+ #   end
     assert_equal ['fred_the_action'], Armagh::Actions::Action.find_all_configurations(@config_store, :include_descendants => true).collect { |klass, config| config.action.name }
 
     e = assert_raises(Armagh::Actions::ConfigurationError) do

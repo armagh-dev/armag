@@ -35,7 +35,7 @@ module Armagh
 
       define_output_docspec 'collected_b', 'collected documents of second type'
       
-      define_parameter name:'count', required: true, type: 'integer', default: 6, description: 'desc'
+      define_parameter name:'count', required: true, type: 'integer', default: 6, description: 'desc', group: 'testcollect'
       
       def self.make_config_values( action_name:, collected_a_doctype:, collected_b_doctype:, active: true )
         {
@@ -215,8 +215,8 @@ class TestWorkflow < Test::Unit::TestCase
       collected_a_doctype: 'a_freddoc',
       collected_b_doctype: 'b_freddocs_aggr_big'
     )
-    new_config[ 'twtestcollect' ] ||= {}
-    new_config[ 'twtestcollect' ][ 'count' ] = 19
+    new_config[ 'testcollect' ] ||= {}
+    new_config[ 'testcollect' ][ 'count' ] = 19
  
     workflow.update_action( 
       'Armagh::StandardActions::TWTestCollect',

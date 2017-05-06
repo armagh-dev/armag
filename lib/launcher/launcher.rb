@@ -306,12 +306,12 @@ module Armagh
 
         apply_config
 
-        @collection_trigger.start
+        if !@shutdown
+          @collection_trigger.start
+          @running = true
+          checkin('running')
+        end
 
-        @running = true
-        checkin('running')
-
-        # Check running and shutdown in case a shutdown was initiated before the run
         while @running && !@shutdown do
           if @last_checkin.nil? || @last_checkin < Time.now - @config.launcher.checkin_frequency
             reconcile_agents

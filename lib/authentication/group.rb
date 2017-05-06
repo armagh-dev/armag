@@ -20,6 +20,7 @@ require_relative 'role'
 require_relative 'user'
 
 require_relative '../connection'
+require_relative '../utils/db_doc_helper'
 
 module Armagh
   module Authentication
@@ -142,6 +143,8 @@ module Armagh
 
       def save
         self.mark_timestamp
+
+        Armagh::Utils::DBDocHelper.clean_model(self)
 
         if internal_id
           self.class.db_replace({'_id' => internal_id}, @db_doc)

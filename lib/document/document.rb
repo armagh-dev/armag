@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/utils/model_helper'
+require_relative '../../lib/utils/db_doc_helper'
 require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative '../connection'
@@ -496,7 +496,7 @@ module Armagh
       end
 
       @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
-      Armagh::Utils::ModelHelper.clean_model(self)
+      Armagh::Utils::DBDocHelper.clean_model(self)
 
       delete_orig = false
 

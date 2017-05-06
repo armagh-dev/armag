@@ -235,7 +235,12 @@ module Armagh
         execute
       end
 
-      @client.stop_service if @client
+      if @client
+        @logger.debug 'Stopping internal communication client'
+        @client.stop_service
+        @logger.debug 'Internal communication client stopped'
+      end
+
       DRb.thread.join
       @logger.info 'Terminated'
     rescue => e

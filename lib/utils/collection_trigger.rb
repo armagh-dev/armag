@@ -78,6 +78,8 @@ module Armagh
           end
           InterruptibleSleep.interruptible_sleep(1) { !@running }
         end
+
+        Thread.new {@logger.info 'Collection Trigger Stopped'}.join
       end
 
       private def reset_last_run

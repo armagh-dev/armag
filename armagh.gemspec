@@ -62,6 +62,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'oj', '~> 2.14'
   spec.add_runtime_dependency 'log4r', '~> 1.1'
   spec.add_runtime_dependency 'argon2', '~> 1.1'
+  spec.add_dependency 'mongo', '~> 2.4'
 
   spec.add_development_dependency 'rake', '~> 11.0'
   spec.add_development_dependency 'noragh-gem-tasks'
@@ -75,5 +76,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'fakefs', '~> 0.8'
   spec.add_development_dependency 'armagh_test-custom_actions', '< 2.0'
   spec.add_development_dependency 'rack-test', '~> 0.6'
+  spec.add_development_dependency 'license_finder', '~> 3.0'
   spec.add_development_dependency 'colored', '~> 1.2'
 end

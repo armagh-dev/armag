@@ -17,7 +17,7 @@
 
 module Armagh
   module Utils
-    class ModelHelper
+    class DBDocHelper
       def self.clean_model(model)
         clean_hash(model.db_doc)
         remove_root_nils(model.db_doc)

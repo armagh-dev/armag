@@ -249,7 +249,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal('Armagh::Actions::ConfigurationError', response_hash.dig('error_detail', 'class'))
-      assert_equal('Unable to create configuration Armagh::StandardActions::TIAATestCollect my_fred_action: output docspec: type validation failed: value cannot be nil', response_hash.dig('error_detail', 'message'))
+      assert_equal('Unable to create configuration Armagh::StandardActions::TIAATestCollect my_fred_action: output docspec: type validation failed: value cannot be nil,output docspec_no: Configuration provided for parameter that does not exist', response_hash.dig('error_detail', 'message'))
     end
 
     #TODO - figure out where's best to return the validation param set
