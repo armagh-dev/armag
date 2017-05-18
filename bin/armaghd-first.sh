@@ -16,11 +16,13 @@ case $op in
     ${bin_path}/armagh-mongod start
     ${bin_path}/armagh-resource-admind start
     ${bin_path}/armagh-application-admind start
+    ${bin_path}/armagh-application-admin-guid start
     ${bin_path}/armagh-agentsd start
     ;;
   stop)
     ${bin_path}/armagh-agentsd stop
     ${bin_path}/armagh-application-admind stop
+    ${bin_path}/armagh-application-admin-guid stop
     ${bin_path}/armagh-resource-admind stop
     ${bin_path}/armagh-mongod stop
     ;;
@@ -34,6 +36,7 @@ case $op in
     ${bin_path}/armagh-mongod status
     ${bin_path}/armagh-resource-admind status
     ${bin_path}/armagh-application-admind status
+    ${bin_path}/armagh-application-admin-guid status
     ${bin_path}/armagh-agentsd status
     echo -e "--------------------------------------------------------\n"
     ;;

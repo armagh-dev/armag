@@ -1,0 +1,26 @@
+<div class="uk-container-center uk-width-1-4 uk-margin-large-top uk-panel uk-panel-box uk-panel-box-secondary">
+  <form name="login" method="post" class="uk-form">
+    <fieldset>
+      <legend>Login</legend>
+      <div class="uk-form-row">
+        <div class="uk-form-icon">
+          <i class="uk-icon-user"></i>
+          <input name="username" type="text" placeholder="Username">
+        </div>
+      </div>
+      <div class="uk-form-row">
+        <div class="uk-form-icon">
+          <i class="uk-icon-key"></i>
+          <input name="password" type="password" placeholder="Password">
+        </div>
+      </div>
+      <div class="uk-form-row uk-text-right">
+        <button class="uk-button">Login</button>
+      </div>
+    </fieldset>
+  </form>
+</div>
+
+<script type="text/javascript">
+  document.forms["login"].elements["username"].focus();
+</script>

@@ -1,0 +1,127 @@
+{{= partial :header, data: {title: 'Status', subtitle: "#{@data.size} server#{@data.size == 1 ? '' : 's'}"} }}
+
+<table class="uk-table uk-table-hover uk-table-condensed">
+  <thead>
+    <tr class="uk-text-small">
+      <th>Hostname</th>
+      <th>Status</th>
+      <th>Agents</th>
+      <th>Last Update</th>
+      <th>Versions</th>
+    </tr>
+  </thead>
+    {{ @data&.each do |host| }}
+      {{ uuid = SecureRandom.uuid }}
+      <tr>
+        <td>
+          <a href="javascript:" onclick="toggle_agents('{{= uuid }}')">
+            <i id="icon-{{= uuid }}" class="uk-icon-caret-{{= host['agents'] ? 'down' : 'right' }}"></i>
+            {{= host['_id'] }}
+          </a>
+        </td>
+        <td>{{= host['status'] }}</td>
+        <td>{{= host['agents']&.keys&.size.to_i }}</td>
+        <td>{{= host['last_update'] }}</td>
+        <td>
+          armagh: {{= host.dig('versions', 'armagh') }}
+          {{ host.dig('versions', 'actions')&.each do |package, version| }}
+            <span class="uk-margin-left">
+              {{= package }}: {{= version }}
+            </span>
+          {{ end }}
+        </td>
+      </tr>
+      {{ if host['agents'] }}
+        <tr id="{{= uuid }}">
+          <td colspan="5">
+            <table class="uk-table uk-table-condensed uk-margin-left uk-text-small">
+              <thead>
+                <tr style="font-style: italic;">
+                  <td>Agent</td>
+                  <td>Status</td>
+                  <td>Idle Since</td>
+                  <td>Last Update</td>
+                </tr>
+              </thead>
+              <tbody>
+                {{ host['agents']&.each do |guid, fields| }}
+                  <tr>
+                    <td style="border-style: none;">
+                      <i class="uk-icon-user-secret"></i>
+                      {{= guid }}
+                    </td>
+                    <td style="border-style: none;">{{= fields['status'] }}</td>
+                    <td style="border-style: none;">{{= fields['idle_since'] }}</td>
+                    <td style="border-style: none;">{{= fields['last_update'] }}</td>
+                  </tr>
+                {{ end }}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      {{ else }}
+        <tr id="{{= uuid }}" style="display: none;">
+          <td colspan="5">
+            <span class="uk-text-small uk-text-muted uk-margin uk-margin-left">
+              No agents are running
+            </span>
+          </td>
+        </tr>
+      {{ end }}
+    {{ end }}
+  <tbody>
+  </tbody>
+</table>
+
+<div class="uk-grid">
+  <div class="uk-width-1-2">
+
+    <a class="uk-button" href="">
+      <span class="uk-icon-justify uk-icon-refresh"></span>
+      Refresh
+    </a>
+
+  </div>
+  <div class="uk-width-1-2 uk-text-right">
+
+    <form name="shutdown" method="post">
+      <button class="uk-button uk-button-small" onclick="restart_armagh()" disabled>
+        <i class="uk-icon-repeat"></i>
+        Restart
+      </button>
+
+      <a href="javascript:" class="uk-button uk-button-small uk-margin-small-left" onclick="shutdown_armagh()">
+        <span class="uk-icon-justify uk-icon-power-off"></span>
+        Shut Down
+      </a>
+    </form>
+
+  </div>
+</div>
+
+<script>
+  function toggle_agents(id) {
+    var row = $("#" + id)
+    var ico = $("#icon-" + id)
+    if (row.is(":visible")) {
+      row.hide()
+      ico.attr("class", "uk-icon-caret-right")
+    } else {
+      row.show()
+      ico.attr("class", "uk-icon-caret-down")
+    }
+  }
+
+  function restart_armagh() {
+    UIkit.modal.confirm('Restart Armagh services now?', function() {
+      /* TODO: implement api */
+    })
+  }
+
+  function shutdown_armagh() {
+    UIkit.modal.confirm('Stop Armagh services now?', function() {
+      UIkit.modal.blockUI('Attempting to stop services...')
+      shutdown.submit()
+    })
+  }
+</script>

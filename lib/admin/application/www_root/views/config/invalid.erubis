@@ -1,0 +1,31 @@
+<div class="uk-alert uk-alert-warning">
+  <i class="uk-icon-thumb-tack"></i>
+  Please review each config below and repair as necessary.  There may be more errors once these are fixed.
+</div>
+
+{{= partial :header, data: {title:    'Invalid Configs Detected',
+                            subtitle: "#{@data[:configs].size} found"} }}
+
+<table class="uk-table uk-table-striped uk-table-hover uk-table-condensed">
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Type</th>
+      <th>Timestamp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{ @data[:configs]&.each do |action, config| }}
+      <tr title="{{== config }}" style="{{= @data[:reviewed] == action ? 'background-color: #E6F9FF;' :  '' }}">
+        <td>
+          <a href="/config/{{== config.dig('values', 'action', 'workflow') || '(Default)' }}/edit/{{== action }}?broken=true">
+          <i class="uk-icon-exclamation"></i>
+          {{= action }}
+          </a>
+        </td>
+        <td>{{== config['type'] }}</td>
+        <td>{{== Time.parse(config['timestamp']) }}</td>
+      </tr>
+    {{ end }}
+  </tbody>
+</table>

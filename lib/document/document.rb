@@ -119,16 +119,30 @@ module Armagh
       doc
     end
 
-    def self.count_working_by_doctype
+    def self.count_incomplete_by_doctype( pub_type_names = nil )
+
+
+      pub_types = pub_type_names ?
+          pub_type_names.collect{ |pt| Connection.documents(pt) } :
+          Connection.all_document_collections.select{ |c| Connection.published_collection?(c) }
       counts = {}
-      Connection.all_document_collections.each do |doc_coll|
-        counts[doc_coll.name] = {}
-        doc_coll.aggregate([
-                             {'$group' => {'_id' => {'type' => '$type', 'state' => '$state'},
-                                           'count' => {'$sum' => 1}}}
-                           ]).to_a.each do |h|
-          docspec_brief = "#{h['_id']['type']}:#{h['_id']['state']}"
-          counts[doc_coll.name][docspec_brief] = h['count']
+      queries = [
+          { doc_colls: [ Connection.documents ], filter: nil },
+          { doc_colls: [ Connection.failures ],  filter: nil },  #TODO filter out acknowledged failures
+          { doc_colls: pub_types, filter: { 'pending_work' => true }}
+      ]
+
+      group_by_doctype_clause = {'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}
+      queries.each do |query_params|
+        query_params[:doc_colls].each do |doc_coll|
+          counts[ doc_coll.name ] = {}
+          match_clause = query_params[:filter] ? { '$match' => query_params[:filter] } : nil
+          pipeline = [ match_clause, group_by_doctype_clause ].compact
+          counts_by_type_in_coll = doc_coll.aggregate( pipeline ).to_a
+          counts_by_type_in_coll.each do |count_detail|
+            docspec_brief = "#{count_detail['_id']['type']}:#{count_detail['_id']['state']}"
+            counts[doc_coll.name][docspec_brief] = count_detail['count']
+          end
         end
       end
       counts

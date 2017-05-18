@@ -26,7 +26,7 @@ require_relative '../helpers/mongo_support'
 require_relative '../../lib/logging'
 require_relative '../../lib/connection'
 require_relative '../../lib/agent/agent'
-require_relative '../../lib/actions/workflow'
+require_relative '../../lib/actions/workflow_set'
 require_relative '../../lib/document/document'
 
 require 'test/unit'
@@ -68,18 +68,20 @@ class TestEditCallback < Test::Unit::TestCase
     @output_state = Armagh::Documents::DocState::WORKING
 
     config_store = []
-    workflow = Armagh::Actions::Workflow.new( @logger, config_store )
-    workflow.create_action( 
+    workflow_set = Armagh::Actions::WorkflowSet.for_agent( config_store )
+    wf = workflow_set.create_workflow( {'workflow' => { 'name' => 'test_wf'}})
+    wf.create_action_config(
       'Armagh::StandardActions::TestSplitter', 
       { 'action' => { 'name' => 'test_splitter' },
         'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( 'intype', 'ready' )},
         'output' => { 'docspec' => Armagh::Documents::DocSpec.new( @output_type, @output_state )}
       }
-    ) 
+    )
+    wf.run
     agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )
-    agent = Armagh::Agent.new( agent_config, workflow )
+    agent = Armagh::Agent.new( agent_config, workflow_set )
 
-    @splitter = workflow.instantiate_action( 'test_splitter', agent, @logger, nil )
+    @splitter = workflow_set.instantiate_action_named( 'test_splitter', agent, @logger, nil )
 
     doc = TestDocument.new
     doc.document_id = 'some other id'

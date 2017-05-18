@@ -1,0 +1,284 @@
+<script type="text/javascript" src="/ui/js/components/pagination.min.js"></script>
+
+{{= partial :header, data: {title: 'Logs', subtitle: "Showing #{@data[:logs].size} entries (#{@data[:skip] + 1} through #{@data[:skip] + @data[:logs].size}) out of #{@data[:count]} total"} }}
+
+{{ columns = %w(timestamp component level message hostname pid) }}
+
+<div class="uk-overflow-container" style="min-height:500px;">
+  <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap">
+
+    <caption>
+      <div>
+        {{ unless @data[:filter].to_s.gsub(/\x19/, '').empty? }}
+          <button class="uk-button uk-button-mini uk-margin-right" onclick="clear_filter()" style="width:50px;">
+            Clear
+            <i class="uk-icon-filter"></i>
+          </button>
+        {{ end }}
+        {{ @data[:filter]&.split("\x19")&.each do |column| }}
+          {{ column, value = column.split("\x11") }}
+          {{ next unless value }}
+          {{= column }}: <a href="javascript:" onclick="filter('{{= column }}', '{{= value }}')">{{= value }}</a>
+          <button class="uk-button uk-button-mini uk-margin-right" onclick="filter('{{= column }}', '', true)"><i class="uk-icon-close"></i></button>
+        {{ end }}
+      </div>
+      <div class="uk-margin-small-top">
+        {{ unless @data[:hide].to_s.gsub(/\x19/, '').empty? }}
+          <button class="uk-button uk-button-mini uk-margin-right" onclick="show_hidden()" style="width:50px;">Unhide</button>
+        {{ end }}
+        {{ @data[:hide]&.split("\x19")&.each do |column| }}
+          {{ next if column.empty? }}
+          {{ columns.delete column }}
+          {{= column }}: hidden
+          <button class="uk-button uk-button-mini uk-margin-right" onclick="hide('{{= column }}', true)"><i class="uk-icon-close"></i></button>
+        {{ end }}
+      </div>
+    </caption>
+
+    <thead>
+      {{ columns.each do |column| }}
+        <th>
+          {{= column.capitalize }}
+          <div class="uk-button-dropdown" data-uk-dropdown>
+            <button class="uk-button uk-button-mini" onclick="sort('{{= column }}')">
+              {{
+                dir = ''
+                if @data[:sort_col] == column
+                  dir += @data[:sort_dir] == 1 ? '-asc' : '-desc'
+                  dir += ' uk-text-primary'
+                end
+              }}
+              <i class="uk-icon-sort{{= dir }}"></i>
+            </button>
+            <div class="uk-dropdown uk-dropdown-small uk-text-small" style="font-weight: normal;">
+              <ul class="uk-nav uk-nav-dropdown">
+                <li>
+                  <a href="javascript:" onclick="sort('{{= column }}', 1)">
+                    <i class="uk-icon-sort-alpha-asc uk-margin-small-right"></i>
+                    Sort Ascending
+                  </a>
+                </li>
+                <li>
+                  <a href="javascript:" onclick="sort('{{= column }}', -1)">
+                    <i class="uk-icon-sort-alpha-desc uk-margin-small-right"></i>
+                    Sort Descending
+                  </a>
+                </li>
+                <li>
+                  <a href="javascript:" onclick="filter('{{= column }}')">
+                    <i class="uk-icon-filter uk-margin-small-right"></i>
+                    Filter
+                  </a>
+                </li>
+
+                {{ @data[:distinct][column]&.each do |distinct| }}
+                  <li>
+                    <a href="javascript:" onclick="filter_add('{{= column }}', '{{== distinct }}')">
+                      {{== distinct }}
+                    </a>
+                  </li>
+                {{ end }}
+
+                <li class="uk-nav-divider"></li>
+                <li>
+                  <a href="javascript:" onclick="hide('{{= column }}')">
+                    <i class="uk-icon-eye-slash uk-margin-small-right"></i>
+                    Hide
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </th>
+      {{ end }}
+    </thead>
+
+    <tbody>
+      {{ @data[:logs]&.each_with_index do |log, index| }}
+        {{ uuid = SecureRandom.uuid }}
+        <tr>
+          {{ columns.each do |column| }}
+            <td title="{{== log[column] }}">
+              {{ if column == 'message' && log['exception'] }}
+                <a href="javascript:" onclick="{{= log['exception'] ? "toggle_exception('#{uuid}')" : ''}}">
+                  <i id="icon-{{= uuid }}" class="uk-icon-caret-right"></i>
+              {{ end }}
+              {{== case column
+                   when 'timestamp'
+                     log[column].to_s.sub(/\ UTC$/, '')
+                   when 'component'
+                     split = log[column].split('::')
+                     split.size == 4 ? split[2] : split.last
+                   else
+                     log[column]
+                   end }}
+              {{ if column == 'message' && log['exception'] }}
+                </a>
+              {{ end }}
+            </td>
+          {{ end }}
+        </tr>
+        {{ if log['exception'] }}
+          <tr id="{{= uuid }}" style="display: none;">
+            <td colspan="99" style="white-space: normal;">
+              <div class="uk-margin-left uk-margin-bottom">
+
+                {{= partial :logs_exception, data: log['exception'] }}
+
+              </div>
+            </td>
+          </tr>
+        {{ end }}
+      {{ end }}
+    </tbody>
+
+  </table>
+</div>
+
+<div class="uk-grid uk-margin-top">
+  <div class="uk-width-1-5">
+    <a class="uk-button" href="">
+      <i class="uk-icon-refresh"></i>
+      Refresh
+    </a>
+  </div>
+  <div class="uk-width-3-5 uk-text-center">
+    <ul class="uk-pagination" data-uk-pagination="{items:{{= @data[:count] }}, itemsOnPage:{{= @data[:limit] }}, currentPage:{{= @data[:page] - 1 }}, displayedPages:5}"></ul>
+  </div>
+  <div class="uk-width-1-5 uk-text-right uk-form uk-form-horizontal">
+    <select onchange="$('input[name=&quot;limit&quot;]').val(this.value); submit()">
+      {{ [20, 50, 100, 500, 1000].each do |i| }}
+        {{ selected = @data[:limit] == i ? 'selected' : '' }}
+        <option value="{{= i }}" {{= selected }}>{{= i }} per page</option>
+      {{ end }}
+    </select>
+  </div>
+</div>
+
+<form id="form">
+  <input name="page" type="hidden" value="{{= @data[:page] }}">
+  <input name="limit" type="hidden" value="{{= @data[:limit] }}">
+  <input name="sort_col" type="hidden" value="{{= @data[:sort_col] }}">
+  <input name="sort_dir" type="hidden" value="{{= @data[:sort_dir] }}">
+  <input name="filter" type="hidden" value="{{= @data[:filter] }}">
+  <input name="hide" type="hidden" value="{{= @data[:hide] }}">
+</form>
+
+<script>
+  $('[data-uk-pagination]').on('select.uk.pagination', function(e, pageIndex){
+    $("input[name='page']").val(pageIndex + 1)
+    submit()
+  })
+
+  function toggle_exception(id) {
+    var row = $("#" + id)
+    var ico = $("#icon-" + id)
+    if (row.is(":visible")) {
+      row.hide()
+      ico.attr("class", "uk-icon-caret-right")
+    } else {
+      row.show()
+      ico.attr("class", "uk-icon-caret-down")
+    }
+  }
+
+  function submit() {
+    $("#form").submit()
+  }
+
+  function sort(column, force_dir = 0) {
+    var col = $("input[name='sort_col']")
+    var dir = $("input[name='sort_dir']")
+
+    col.val(column)
+
+    if (force_dir != 0) {
+      dir.val(force_dir)
+      submit()
+      return
+    }
+
+    if (col.val() != column) {
+      dir.val("")
+    }
+
+    if (dir.val() == "" || dir.val() == "-1") {
+      dir.val("1")
+    } else {
+      dir.val("-1")
+    }
+
+    submit()
+  }
+
+  function filter(column, value = "", remove = false) {
+    var fil = $("input[name='filter']")
+    var pat = "(?:^|\x19)" + column + "\x11.*?(?:\x19|$)"
+
+    if (remove) {
+      fil.val(fil.val().replace(new RegExp(pat), "\x19"))
+      submit()
+      return
+    }
+
+    var prompt = "Filter <strong class='uk-text-primary'>" + column + "</strong>:"
+    if (column == 'message') {
+      prompt += " <span style='font-style: italic;'>(will also filter any exceptions and causes including error class)</span>"
+    }
+
+    value = UIkit.modal.prompt(prompt, value, function(new_value) {
+      filter_add(column, new_value)
+    })
+  }
+
+  function filter_add(column, value) {
+    var fil = $("input[name='filter']")
+    var pat = "(?:^|\x19)" + column + "\x11.*?(?:\x19|$)"
+
+    if (new RegExp(pat).exec(fil.val())) {
+      fil.val(fil.val().replace(new RegExp(pat), "\x19" + column + "\x11" + value + "\x19"))
+    } else {
+      fil.val(fil.val() + column + "\x11" + value + "\x19")
+    }
+
+    submit()
+  }
+
+  function filter_cell(column, cell) {
+    var value = $(cell).html().trim()
+
+    if (column == 'timestamp') {
+      var match = value.match(/^\d{4}-\d{2}-\d{2}/)
+      if (match) {
+        value = match[0]
+      } else {
+        return
+      }
+    }
+
+    filter(column, value)
+  }
+
+  function hide(column, remove = false) {
+    var hid = $("input[name='hide']")
+    if (remove) {
+      var pat = "(?:^|\x19)" + column + "(?:\x19|$)"
+      hid.val(hid.val().replace(new RegExp(pat), "\x19"))
+    } else {
+      hid.val(hid.val() + column + "\x19")
+    }
+    submit()
+  }
+
+  function clear_filter() {
+    var fil = $("input[name='filter']")
+    fil.val("")
+    submit()
+  }
+
+  function show_hidden() {
+    var hid = $("input[name='hide']")
+    hid.val("")
+    submit()
+  }
+</script>

@@ -71,10 +71,10 @@ configure do
       settings = { :backend => Admin::Application::ThinBackend }
       if api.using_ssl?
         settings.merge!( {
-          :private_key_file => api.key_filepath,
-          :cert_chain_file  => api.cert_filepath,
-          :verify_peer      => api.verify_peer
-        })
+                             :private_key_file => api.key_filepath,
+                             :cert_chain_file  => api.cert_filepath,
+                             :verify_peer      => api.verify_peer
+                         })
       end
       settings
     end
@@ -91,173 +91,200 @@ use Rack::Auth::Basic, 'Armagh Admin' do |username, password|
   api.authenticate_and_authorize username, password
 end # use Rack::Auth::Basic
 
+#------------------------------------------------------------------------------------------------
+#
+# REST API
+#
+#------------------------------------------------------------------------------------------------
+
 helpers do
 end
 
 get '/status.json' do
-  status = []
-  begin
-    status = api.get_status
-    rest_helper.respond_success(status)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /status.json')
+  rest_helper.handle_request( 'get status', request ) do |fields|
+    api.get_status
   end
 end
 
+#------------------------------
+#
+# launcher
+#
+#------------------------------
 post '/launcher.json' do
-  request_body = request.body.read
-  begin
-    api.logger.debug{"armagh-application-admin post launcher.json with: #{request_body}"}
-
-    request_hash = JSON.parse(request_body)
-    raise ArgumentError, "Request must be a hash.  Was a #{request_hash.class}." unless request_hash.is_a? Hash
-
-    new_config = api.create_or_update_launcher_configuration(request_hash)
-    rest_helper.respond_success(new_config)
-  rescue => e
-    rest_helper.respond_exception(e, "Error from POST to /launcher.json with body: #{request_body}")
+  rest_helper.handle_request('get launcher', request ) do |fields|
+    api.create_or_update_launcher_configuration(fields)
   end
 end
+
+#------------------------------
+#
+# agent
+#
+#------------------------------
 
 post '/agent.json' do
   # TODO Agent configuration
 end
 
-post '/action.json' do
-  request_body = request.body.read
-  begin
-    api.logger.debug{"armagh-application-admin post action.json with: #{request_body}"}
+#------------------------------
+#
+# workflow
+#
+#------------------------------
 
-    request_hash = JSON.parse(request_body)
-    raise ArgumentError, "Request must be a hash.  Was a #{request_hash.class}." unless request_hash.is_a? Hash
-
-    api.create_action_configuration(request_hash)
-    rest_helper.respond_success('success')
-  rescue => e
-    rest_helper.respond_exception(e, "Error from POST to /action.json with body: #{request_body}")
+# list of workflows with status
+get '/workflows.json' do
+  rest_helper.handle_request('get workflows', request) do |fields|
+    api.get_workflows
   end
 end
 
-
-get '/action.json' do
-  api.logger.debug("armagh-applications-admin get action with params: #{params}")
-  name = params['name']
-
-  return rest_helper.respond_error('Missing parameter: name') if name.nil? || name.empty?
-
-  begin
-    action_config = api.get_action_config(name)
-    if action_config
-      rest_helper.respond_success(action_config)
-    else
-      rest_helper.respond_error("No action named '#{name}' was found.")
-    end
-  rescue => e
-    rest_helper.respond_exception(e, "Error from GET to /actions.json with parameters #{params}.")
+# create new workflow
+get '/workflow/:workflow_name/new.json' do
+  rest_helper.handle_request('get workflow/NAME/new', request) do |fields|
+    workflow = api.create_workflow({'workflow' => {'name' => params['workflow_name']}})
+    workflow.name
   end
 end
 
-get '/actions.json' do
-  begin
-    action_configs = api.get_action_configs
-    rest_helper.respond_success(action_configs)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET to /actions.json')
+# status for existing workflow
+get '/workflow/:workflow_name/status.json' do
+  rest_helper.handle_request('get workflow/NAME/status', request ) do |fields|
+    api.get_workflow_status(params['workflow_name'])
   end
 end
 
-post '/actions/activate.json' do
-  request_body = request.body.read
-  begin
-    api.logger.debug{"armagh-application-admin post actions/activate.json with: #{request_body}"}
-
-    actions = JSON.parse(request_body)
-    raise ArgumentError, "Request must be an Array.  Was a #{actions.class}." unless actions.is_a? Array
-
-    api.activate_actions(actions)
-    rest_helper.respond_success('success')
-  rescue => e
-    rest_helper.respond_exception(e, "Error from POST to /actions/activate.json with body: #{request_body}")
+# update workflow: run
+get '/workflow/:workflow_name/run.json' do
+  rest_helper.handle_request('get workflow/NAME/run', request) do |fields|
+    api.run_workflow(params['workflow_name'])
   end
 end
 
+# update workflow: finish
+get '/workflow/:workflow_name/finish.json' do
+  rest_helper.handle_request('get workflow/NAME/finish', request) do |fields|
+    api.finish_workflow(params['workflow_name'])
+  end
+end
+
+# update workflow: stop
+get '/workflow/:workflow_name/stop.json' do
+  rest_helper.handle_request('get workflow/NAME/stop', request) do |fields|
+    api.stop_workflow(params['workflow_name'])
+  end
+end
+
+#------------------------------
+#
+# workflow actions
+#
+#------------------------------
+
+# list of defined action classes
+get '/actions/defined.json' do
+  rest_helper.handle_request('get actions/defined', request) do |fields|
+    api.get_defined_actions
+  end
+end
+
+# Trigger a collect
 get '/actions/trigger_collect.json' do
-  begin
-    action_name = params['name']
-
-    return rest_helper.respond_error 'Missing parameter: name' if action_name.nil? || action_name.empty?
-
-    if api.trigger_collect(action_name)
-      rest_helper.respond_success('success')
-    else
-      rest_helper.respond_error("Unable to trigger collect for #{action_name}.  Make sure the action exists and is a collect action.")
-    end
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /actions/trigger_collect.json')
+  rest_helper.handle_request('get actions/trigger_collect', request) do |fields|
+    api.trigger_collect(params['name'])
   end
 end
 
-get '/documents/counts.json' do
-  counts = []
-  begin
-    counts = api.get_document_counts
-    rest_helper.respond_success(counts)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /documents/counts.json')
+# list of workflow actions with status
+get '/workflow/:workflow_name/actions.json' do
+  rest_helper.handle_request('get workflow/NAME/actions', request) do |fields|
+    api.get_workflow_actions(params['workflow_name'])
   end
 end
+
+# status for existing workflow action
+get '/workflow/:workflow_name/action/:action_name/status.json' do
+  rest_helper.handle_request('get workflow/NAME/action/NAME/status', request) do |fields|
+    api.get_workflow_action_status(params['workflow_name'], params['action_name'])
+  end
+end
+
+# edit form for new workflow action
+get '/workflow/:workflow_name/action/config.json' do
+  rest_helper.handle_request('get workflow/NAME/action/config', request) do |fields|
+    api.new_workflow_action_config(params['workflow_name'],fields['type'] )
+  end
+end
+
+# edit form for existing workflow action
+get '/workflow/:workflow_name/action/:action_name/description.json' do
+  rest_helper.handle_request('workflow/NAME/action/NAME/description', request) do |fields|
+    api.get_workflow_action_description(params['workflow_name'], params['action_name'])
+  end
+end
+
+get '/workflow/:workflow_name/action/:action_name/config.json' do
+  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+    api.get_workflow_action_config(params['workflow_name'], params['action_name'])
+  end
+end
+
+# submit params to create workflow action
+post '/workflow/:workflow_name/action/config.json' do
+  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+    type = fields.delete 'type'
+    api.create_workflow_action_config(params['workflow_name'], type, fields)
+  end
+end
+
+# submit params to change existing action config
+post '/workflow/:workflow_name/action/:action_name/config.json' do
+  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+    api.update_workflow_action_config(params['workflow_name'], params['action_name'], fields )
+  end
+end
+
+#---------------------
+#
+# documents
+#
+#---------------------
 
 get '/documents.json' do
-  begin
-    api.logger.debug("armagh-applications-admin get documents with params: #{params}")
-
+  rest_helper.handle_request('get documents', request) do |_fields|
     doc_type = params['type']
-    return rest_helper.respond_error 'Missing parameter: type' if doc_type.nil? || doc_type.empty?
+    return rest_helper.respond_client_error(request, 'Missing parameter: type') if doc_type.nil? || doc_type.empty?
 
-    begin_ts = Time.parse( params[ 'begin_ts' ] ) if params.include? 'begin_ts'
-    end_ts   = Time.parse( params[ 'end_ts' ] ) if params.include? 'end_ts'
-    start_index = params[ 'start_index' ].to_i if params.include? 'start_index'
-    max_returns = params[ 'max_returns' ].to_i if params.include? 'max_returns'
+    begin_ts = Time.parse(params['begin_ts']) if params.include? 'begin_ts'
+    end_ts = Time.parse(params['end_ts']) if params.include? 'end_ts'
+    start_index = params['start_index'].to_i if params.include? 'start_index'
+    max_returns = params['max_returns'].to_i if params.include? 'max_returns'
 
-    doc_list = api.get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
-
-    rest_helper.respond_success(doc_list)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /documents.json')
+    api.get_documents(doc_type, begin_ts, end_ts, start_index, max_returns)
   end
 end
 
 get '/document.json' do
-  begin
-    api.logger.debug("armagh-application-admin get document with params: #{params}")
-
+  rest_helper.handle_request('get document', request) do |_fields|
     doc_id = params['id']
     doc_type = params['type']
 
-    return rest_helper.respond_error 'Missing parameter: id' if doc_id.nil? || doc_id.empty?
-    return rest_helper.respond_error 'Missing parameter: type' if doc_type.nil? || doc_type.empty?
+    return rest_helper.respond_client_error(request, 'Missing parameter: id') if doc_id.nil? || doc_id.empty?
+    return rest_helper.respond_client_error(request, 'Missing parameter: type') if doc_type.nil? || doc_type.empty?
 
-    doc = api.get_document(doc_id, doc_type)
-    rest_helper.respond_success(doc)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /document.json')
+    api.get_document(doc_id, doc_type)
   end
 end
 
 get '/documents/failures.json' do
-  begin
-    doc_list = api.get_failed_documents
-    rest_helper.respond_success(doc_list)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /documents/failures.json')
+  rest_helper.handle_request('get documents/failures', request) do |_fields|
+    api.get_failed_documents
   end
 end
 
 get '/version.json' do
-  begin
-    version = api.get_version
-    rest_helper.respond_success(version)
-  rescue => e
-    rest_helper.respond_exception(e, 'Error from GET /version.json')
+  rest_helper.handle_request('get version', request) do |_fields|
+    api.get_version
   end
 end

@@ -1,0 +1,230 @@
+<div id="status-change-errors"></div>
+
+{{= partial :header, data: {title: 'Workflows', subtitle: "#{@data.size} defined"} }}
+
+<table class="uk-table uk-table-hover uk-table-condensed">
+  <thead>
+    <tr class="uk-text-small">
+      <th>Workflow</th>
+      <th>Working</th>
+      <th>Failed</th>
+      <th>Pending Consume</th>
+      <th>Published</th>
+      <th>
+        <label style="cursor: pointer;">
+          <input id="select-all" type="checkbox" onchange="select_all(this.checked)">
+          Status
+        </label>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {{ @data&.each do |workflow| }}
+      {{ uuid = SecureRandom.uuid }}
+      <tr>
+        <td>
+          <a href="/config/{{= workflow['name'] }}">
+            <i class="uk-icon-sitemap"></i>
+            {{= workflow['name'] }}
+          </a>
+        </td>
+        <td id="count-woreking-{{= uuid }}">{{= workflow['working_docs_count'] }}</td>
+        <td id="count-failed-{{= uuid }}">{{= workflow['failed_docs_count'] }}</td>
+        <td id="count-pending-{{= uuid }}">{{= workflow['published_pending_consume_docs_count'] }}</td>
+        <td id="count-docs-{{= uuid }}">{{= workflow['docs_count'] }}</td>
+        <td>
+          <input id="workflow-{{= uuid }}" type="hidden" value="{{= workflow['name'] }}">
+          <input id="active-status-{{= uuid }}" type="hidden" value="{{= workflow['run_mode'] }}">
+          <label style="cursor: pointer;">
+            <input id="select-workflow-{{= uuid }}" type="checkbox" onchange="select_workflow(this)">
+            <span id="status-icon-{{= uuid }}">
+              {{ case workflow['run_mode'] }}
+              {{ when 'run' }}
+                <i class="uk-icon-toggle-on"></i>
+                Running
+              {{ when 'finish' }}
+                <i class="uk-icon-spinner uk-icon-spin"></i>
+                Finishing
+              {{ when 'stop' }}
+                <i class="uk-icon-toggle-off"></i>
+                Stopped
+              {{ else }}
+                <i class="uk-icon-question-circle-o"></i>
+                Unknown
+              {{ end }}
+            </span>
+          </label>
+        </td>
+      </tr>
+    {{ end }}
+  </tbody>
+</table>
+
+<div class="uk-grid">
+  <div class="uk-width-1-3">
+    <a href="/config/new" class="uk-button">New Workflow</a>
+  </div>
+  <div class="uk-width-1-3 uk-text-center">
+    <a href="" class="uk-button">
+      <i class="uk-icon-refresh"></i>
+      Refresh
+    </a>
+  </div>
+  <div class="uk-width-1-3 uk-text-right">
+
+    <span id="activate-deactivate-hint" class="uk-text-muted">
+      <i class="uk-icon-thumb-tack"></i>
+      Select workflow(s) to (de)activate
+    </span>
+    <button id="activate" class="uk-button uk-button-success" style="display: none;" onclick="activate()">
+      Activate
+    </button>
+    <button id="deactivate" class="uk-button uk-button-danger" style="display: none;" onclick="deactivate()">
+      Deactivate
+    </button>
+
+  </div>
+</div>
+
+<script>
+  $(document).ready(function() {
+    update_toggle_buttons()
+  })
+
+  function select_all(checked) {
+    var chks = $("input[id^='select-workflow']")
+    chks.each(function(_index, chk) {
+      $(chk).prop('checked', checked)
+      var id = $(chk).prop('id').replace(/select-workflow-/, '')
+      $("#toggle-status-" + id).prop('disabled', checked)
+    })
+    update_toggle_buttons()
+  }
+
+  function select_workflow(chk) {
+    $(chk).prop('checked', chk.checked)
+    var id = $(chk).prop('id').replace(/select-workflow-/, '')
+    $("#toggle-status-" + id).prop('disabled', chk.checked)
+    if (chk.checked != $("#select-all").checked) {
+      $("#select-all").prop('checked', false)
+    }
+    update_toggle_buttons()
+  }
+
+  function update_toggle_buttons() {
+    var any_checked  = false,
+        any_active   = false,
+        any_inactive = false
+
+    var cks = $("input[id^='select-workflow']:checked")
+    cks.each(function(_index, chk) {
+      var id = $(chk).prop('id').replace(/select-workflow-/, '')
+      any_checked    = true
+      if ($("#active-status-" + id).val() != "stop") {
+        any_active   = true
+      } else {
+        any_inactive = true
+      }
+    })
+
+
+    if (!any_checked) {
+      $("#activate").hide()
+      $("#deactivate").hide()
+      $("#activate-deactivate-hint").show()
+    } else if (any_active && any_inactive) {
+      $("#activate").show()
+      $("#deactivate").show()
+      $("#activate-deactivate-hint").hide()
+    } else if (any_active) {
+      $("#activate").hide()
+      $("#deactivate").show()
+      $("#activate-deactivate-hint").hide()
+    } else if (any_inactive) {
+      $("#deactivate").hide()
+      $("#activate").show()
+      $("#activate-deactivate-hint").hide()
+    }
+  }
+
+  function activate() {
+    toggle_selected_workflows()
+  }
+
+  function deactivate() {
+    UIkit.modal.confirm("Deactivate selected workflows?", function() {
+      toggle_selected_workflows(false)
+    })
+  }
+
+  function toggle_selected_workflows(activating = true) {
+    var status = ""
+    if (activating) {
+      status = "activate"
+    } else {
+      status = "deactivate"
+    }
+    var cks = $("input[id^='select-workflow']:checked")
+    localStorage['workflow-status-change'] = cks.length
+    cks.each(function(_index, chk) {
+      var id = $(chk).prop('id').replace(/select-workflow-/, '')
+      var wf = $("#workflow-" + id).val()
+
+      $.post({
+        url:     "/config/" + wf + "/" + status + "?id=" + id,
+        success: function(data) {
+          update_status_change(data)
+          localStorage['workflow-status-change'] -= 1
+          if (localStorage['workflow-status-change'] <= 0) {
+            localStorage.removeItem('workflow-status-change')
+            update_toggle_buttons()
+          }
+        },
+        error:   function(xhr, exception) {
+          localStorage['workflow-status-change'] -= 1
+          if (localStorage['workflow-status-change'] <= 0) {
+            localStorage.removeItem('workflow-status-change')
+            update_toggle_buttons()
+          }
+          $("#status-change-errors").html(
+            '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
+              '<a href="" class="uk-alert-close uk-close"></a>' +
+                '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
+                'Unable to change status for one or more workflows' +
+            '</div>'
+          )
+        }
+      })
+
+    })
+  }
+
+  function update_status_change(data) {
+    var data   = JSON.parse(data),
+        id     = data[0],
+        status = data[1],
+        data   = data[2]
+
+    $("#active-status-" + id).val(status)
+    var span = $("#status-icon-" + id)
+
+    switch(status) {
+      case 'run':
+        span.html('<i class="uk-icon-toggle-on"></i>' + "\nRunning")
+        break
+      case 'finish':
+        span.html('<i class="uk-icon-spinner uk-icon-spin"></i>' + "\nFinishing")
+        break
+      case 'stop':
+        span.html('<i class="uk-icon-toggle-off"></i>' + "\nStopped")
+        break
+      default:
+        span.html('<i class="question-circle-o"></i>' + "\nUnknown")
+    }
+
+    $("count-working-" + id).val(data["working_docs_count"])
+    $("count-failed-" + id).val(data["failed_docs_count"])
+    $("count-pending-" + id).val(data["published_pending_consume_docs_count"])
+    $("count-docs-" + id).val(data["docs_count"])
+  }
+</script>

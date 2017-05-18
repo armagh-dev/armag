@@ -846,4 +846,69 @@ class TestDocument < Test::Unit::TestCase
     }.to_json
     assert_equal(expected, @doc.to_json)
   end
+
+  def setup_count_incomplete_tests
+
+    docs_type1 = mock
+    docs_type2 = mock
+    failures = mock
+    %w{ docs_type1 docs_type2 }.each do |coll_mock|
+      Armagh::Connection.stubs( :documents ).with( coll_mock ).returns( eval(coll_mock))
+      eval(coll_mock).stubs( :name ).returns( coll_mock)
+      eval(coll_mock)
+          .stubs( :aggregate )
+          .with( [
+                     { '$match'=>{ 'pending_work' => true }},
+                     { '$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}
+                 ])
+          .returns( [{ '_id' => { 'type' => coll_mock, 'state' => 'published' }, 'count' => 4 }] )
+    end
+    @documents.stubs( :name ).returns( 'documents' )
+    @documents
+        .stubs( :aggregate )
+        .with( [{'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}])
+        .returns( [{ '_id' => { 'type' => 'pre_docs_type1', 'state' => 'ready' }, 'count' => 3 },
+                   { '_id' => { 'type' => 'pre_docs_type2', 'state' => 'ready' }, 'count' => 6 }] )
+    Armagh::Connection.stubs( :failures ).returns( failures )
+    failures.stubs( :name ).returns( 'failures' )
+    failures
+        .stubs( :aggregate )
+        .with( [{'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}])
+        .returns( [{ '_id' => { 'type' => 'failures', 'state' => 'ready' }, 'count' => 3 }] )
+    Armagh::Connection.stubs(:all_document_collections).returns( [ @documents, docs_type1, docs_type2])
+    Armagh::Connection.stubs( :published_collection?).with( @documents ).returns(false)
+    Armagh::Connection.stubs( :published_collection?).with( docs_type1 ).returns(true)
+    Armagh::Connection.stubs( :published_collection?).with( docs_type2 ).returns(true)
+
+  end
+
+  def test_count_incomplete_all
+    setup_count_incomplete_tests
+
+    counts = nil
+    assert_nothing_raised do
+      counts = Armagh::Document.count_incomplete_by_doctype
+    end
+    expected_counts =  {
+        'documents' => { 'pre_docs_type1:ready'=>3, 'pre_docs_type2:ready'=>6 },
+        'failures'  => {'failures:ready'=>3},
+        'docs_type1' => {'docs_type1:published'=>4},
+        'docs_type2'=>{'docs_type2:published'=>4} }
+    assert_equal expected_counts, counts
+  end
+
+  def test_count_incomplete_selected
+    setup_count_incomplete_tests
+
+    counts = nil
+    assert_nothing_raised do
+      counts = Armagh::Document.count_incomplete_by_doctype( ['docs_type1'])
+    end
+    expected_counts =  {
+        'documents' => { 'pre_docs_type1:ready'=>3, 'pre_docs_type2:ready'=>6 },
+        'failures'  => {'failures:ready'=>3},
+        'docs_type1' => {'docs_type1:published'=>4} }
+    assert_equal expected_counts, counts
+
+  end
 end

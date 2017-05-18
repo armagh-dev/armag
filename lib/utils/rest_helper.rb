@@ -26,19 +26,54 @@ module Armagh
         @logger = logger
       end
 
-      def respond_exception(exception, details)
-        Logging.dev_error_exception(@logger, exception, details)
-        [500, JSON.pretty_generate({'error_detail' => {'class' => exception.class, 'message' => exception.message}})]
+      def handle_request( endpoint, request )
+        begin
+          params = parse_request( endpoint, request )
+          successful_result = yield params
+          respond_success( successful_result )
+        rescue Armagh::Admin::Application::APIClientError => e
+          respond_client_error( request, e.message, e.markup )
+        rescue => e
+          respond_server_exception( request, e )
+        end
       end
 
-      def respond_error(message)
-        @logger.dev_error "Failed request: #{message}"
-        [500, JSON.pretty_generate({'error_detail' => {'message' => message}})]
+      def parse_request( endpoint, request )
+        @logger.debug( "Handling request routed to #{endpoint}: #{request.inspect}")
+        body = request.post? ? request.body.read : Rack::Utils.unescape(request.query_string)
+
+
+        begin
+          request_hash = JSON.parse(body) unless body.nil? || body.empty?
+        rescue JSON::ParserError; end
+
+        request_hash ||= request.params unless request.params.empty?
+        request_hash ||= {}
+
+        respond_client_error( 'Request body must be a hash') unless request_hash.is_a?( Hash )
+        request_hash
+      rescue => e
+        respond_server_exception( request, e )
+      end
+
+      def respond_server_exception(request, exception)
+        Logging.dev_error_exception(@logger, exception, "handling_request #{request.inspect}")
+        [500, JSON.pretty_generate({'server_error_detail' => {'class' => exception.class, 'message' => exception.message}})]
+      end
+
+      def respond_server_error(request, message)
+        @logger.dev_error "Server error: #{message} when handling request #{request.inspect}"
+        [500, JSON.pretty_generate({'server_error_detail' => {'message' => message}})]
       end
 
       def respond_success(value)
         @logger.debug "Successful request.  Responding with: #{value}"
-        [200, value.to_json]
+        [200, JSON.pretty_generate( value ) ]
+      end
+
+      def respond_client_error(request, message = 'Unspecified error in request', markup = nil )
+        @logger.debug "Client error in request #{request}.  Responding with: #{message}: #{markup}"
+        [400, JSON.pretty_generate( { 'client_error_detail' => { 'message' => message, 'markup' => markup }})]
       end
     end
   end

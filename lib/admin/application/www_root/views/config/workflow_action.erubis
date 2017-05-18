@@ -1,0 +1,74 @@
+{{
+  def get_icon_from_supertype(supertype)
+    case supertype
+    when 'Collect'
+      'cloud-download'
+    when 'Divide'
+      'code-fork'
+    when 'Split'
+      'clone'
+    when 'Publish'
+      'book'
+    when 'Consume'
+      'cloud-upload'
+    end
+  end
+}}
+
+<div class="uk-text-muted uk-text-center uk-text-uppercase uk-text-small">
+  {{= @data[:supertypes].first }}
+</div>
+
+<hr />
+
+{{ actions   = @data[:actions].sort_by { |action| action['supertype'] } }}
+{{ available = @data[:supertypes].dup }}
+{{ actions.each do |action| }}
+  {{ supertype = action['supertype'].split('::').last }}
+  {{ next unless @data[:supertypes].include?(supertype) }}
+  {{ available.delete(supertype) }}
+
+  <a class="uk-panel uk-panel-hover uk-text-center uk-margin-top-remove" href="/config/{{= @data[:workflow] }}/edit/{{= action['name'] }}">
+
+    {{ modified = true if [@data[:created], @data[:updated]].include?(action['name']) }}
+
+    <div class="uk-margin-small-bottom">
+      <i class="uk-icon-{{= get_icon_from_supertype(supertype) }} uk-icon-small {{= modified ? 'uk-text-success' : '' }}"></i>
+    </div>
+
+    <div class="uk-text-bold {{= modified ? 'uk-text-success' : 'uk-text-primary' }}">
+      {{== action['name'] }}
+    </div>
+
+    <div class="uk-text-small uk-text-muted">
+      {{= action['type'].split('::').last }}
+    </div>
+
+    {{ unless supertype == 'Collect' }}
+      <div class="uk-text-small">
+        <i class="uk-icon-chevron-circle-right"></i>
+        {{== action['input_docspec'] }}
+      </div>
+    {{ end }}
+
+    <div class="uk-text-small">
+      {{ action['output_docspecs']&.each do |docspec| }}
+        {{== docspec }}
+        <i class="uk-icon-chevron-circle-right"></i>
+      {{ end }}
+    </div>
+
+  </a>
+
+{{ end }}
+
+{{ unless available.empty? }}
+  {{ available.each do |supertype| }}
+    <div class="uk-margin-small-bottom">
+      <a class="uk-panel uk-panel-hover uk-text-center uk-text-muted uk-margin-top-remove" href="javascript:" onclick="click_add_new_action_type(this)" url="/config/{{= @data[:workflow] }}/new?filter={{= supertype }}">
+        <i class="uk-icon-{{= get_icon_from_supertype(supertype) }} uk-icon-small uk-margin-small-right"></i>
+        New {{= supertype }} Action
+      </a>
+    </div>
+  {{ end }}
+{{ end }}

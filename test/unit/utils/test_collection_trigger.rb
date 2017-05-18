@@ -64,17 +64,17 @@ class TestCollectionTrigger < Test::Unit::TestCase
     @logger = mock_logger
     @logger.unstub(:dev_error)
     @logger.unstub(:ops_error)
-    @workflow = mock('workflow)')
-    @workflow.stubs(:config_store).returns(@config_store)
+    @workflow_set = mock('workflow_set')
+    @workflow_set.stubs(:config_store).returns(@config_store)
     @actions = ['one']
-    @workflow.stubs(:get_action_names_for_docspec).returns(@actions)
+    @workflow_set.stubs(:actions_names_handling_docspec).returns(@actions)
     @last_timestamp = Time.new(2010, 3, 5, 23, 32, 0)
-    @workflow.stubs(:last_timestamp).returns(@last_timestamp)
+    @workflow_set.stubs(:last_timestamp).returns(@last_timestamp)
     @config = UTAction.make_test_config(store: @config_store, action_name: 'name', collected_doctype: 'type')
-    @workflow.stubs(:collect_actions).returns([@config])
+    @workflow_set.stubs(:collect_action_configs).returns([@config])
 
     Armagh::Logging.expects(:set_logger).returns(@logger)
-    @trigger = Armagh::Utils::CollectionTrigger.new(@workflow)
+    @trigger = Armagh::Utils::CollectionTrigger.new(@workflow_set)
   end
 
   def test_start_stop_restart
@@ -130,14 +130,14 @@ class TestCollectionTrigger < Test::Unit::TestCase
     Armagh::Document.expects(:create_trigger_document).never
 
     @config = UTAction.make_long_test_config(store: @config_store, action_name: 'update1', collected_doctype: 'type')
-    @workflow.stubs(:collect_actions).returns([@config])
-    @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 20, 35))
+    @workflow_set.stubs(:collect_action_configs).returns([@config])
+    @workflow_set.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 20, 35))
     @trigger.start
     sleep RUN_SLEEP
 
     @config = UTAction.make_test_config(store: @config_store, action_name: 'update2', collected_doctype: 'type')
-    @workflow.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 23, 35))
-    @workflow.stubs(:last_timestamp).returns(Time.now)
+    @workflow_set.stubs(:last_timestamp).returns(Time.new(2010, 1, 5, 23, 35))
+    @workflow_set.stubs(:last_timestamp).returns(Time.now)
     sleep RUN_SLEEP
     @trigger.stop
   end

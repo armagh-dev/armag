@@ -152,4 +152,43 @@ class TestDocumentIntegration < Test::Unit::TestCase
 
     assert_nothing_raised {Armagh::Document.force_unlock('not an existing id')}
   end
+
+  def test_count_incomplete_all
+    n = 0
+    [
+      [ 'doc_type1', Armagh::Documents::DocState::READY,     nil, false, 4 ],
+      [ 'doc_type2', Armagh::Documents::DocState::READY,     nil, false, 5 ],
+      [ 'doc_type3', Armagh::Documents::DocState::READY,     nil, false, 6 ],
+      [ 'pub_type1', Armagh::Documents::DocState::PUBLISHED, nil, false, 5 ],
+      [ 'pub_type1', Armagh::Documents::DocState::PUBLISHED, ['act'], false, 3 ],
+      [ 'doc_type2', Armagh::Documents::DocState::READY, nil, true, 1 ]
+    ].each do |dtype, dstate, pending_actions, failed, number|
+
+      number.times do |i|
+        doc = Armagh::Document.create(
+          type: dtype,
+          content: {},
+          metadata: {},
+          pending_actions: pending_actions,
+          state: dstate,
+          document_id: "test_#{n}",
+          new: true,
+          collection_task_ids: [],
+          document_timestamp: nil)
+        n += 1
+        if failed
+          doc.add_dev_error( 'bad_action', 'error_msg_here')
+          doc.save
+        end
+      end
+    end
+
+    counts = Armagh::Document.count_incomplete_by_doctype
+    expected_counts = {
+        'documents' => { 'doc_type1:ready' => 4, 'doc_type2:ready' => 5, 'doc_type3:ready' => 6 },
+        'documents.pub_type1' => { 'pub_type1:published' => 3 },
+        'failures' => { 'doc_type2:ready' => 1}
+    }
+    assert_equal expected_counts, counts
+  end
 end

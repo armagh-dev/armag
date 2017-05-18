@@ -30,6 +30,7 @@ require_relative '../document/document'
 require_relative '../ipc'
 require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
+require_relative '../actions/workflow_set'
 
 
 module Armagh
@@ -41,15 +42,16 @@ module Armagh
 
     attr_reader :uuid
 
-    def initialize(agent_config, workflow)
+    def initialize(agent_config, workflow_set)
       @config = agent_config
-      @workflow = workflow
+      @workflow_set = workflow_set
 
       @uuid = "agent-#{SecureRandom.uuid}"
       @logger = Logging.set_logger("Armagh::Application::Agent::#{@uuid}")
       Logging.set_level(@logger, @config.agent.log_level)
 
       @running = false
+      @shutdown = false
 
       @backoff = Utils::ProcessingBackoff.new
       @backoff.logger = @logger
@@ -63,11 +65,14 @@ module Armagh
       connect_agent_status
 
       @logger.info 'Starting'
-      @running = true
-      run
+      unless @shutdown
+        @running = true
+        run
+      end
     end
 
     def stop
+      @shutdown = true
       if @running
         Thread.new { @logger.info 'Stopping Agent' }.join
         @running = false
@@ -78,14 +83,10 @@ module Armagh
       @running
     end
 
-    def instantiate_divider(docspec)
-      @workflow.instantiate_divider(docspec, self, @logger, Connection.config)
-    end
-
     def create_document(action_doc)
       docspec = action_doc.docspec
       raise Documents::Errors::DocumentError, "Cannot create document '#{action_doc.document_id}'.  It is the same document that was passed into the action." if action_doc.document_id == @current_doc.document_id
-      pending_actions = @workflow.get_action_names_for_docspec(docspec)
+      pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
       collection_task_ids = []
       collection_task_ids.concat @collection_task_ids if @collection_task_ids
       archive_files = []
@@ -178,6 +179,20 @@ module Armagh
       notify_ops(logger_name, action_name, e)
     end
 
+    def instantiate_divider(docspec)
+      begin
+        actions = @workflow_set.instantiate_actions_handling_docspec(docspec, self, @logger, Connection.config)
+      rescue Armagh::Actions::ActionInstantiationError => e
+        Logging.ops_error_exception(@logger, e, 'Unable to instantiate divide')
+        actions = []
+      end
+
+      actions.each do |action|
+       return action if action.is_a? Actions::Divide
+      end
+      nil
+    end
+
     private def edit_or_create(document_id, docspec, doc)
       if doc.is_a? Document
         action_doc = doc.to_action_document
@@ -197,7 +212,7 @@ module Armagh
         doc.archive_files.concat @archive_files if @archive_files
 
         unless initial_docspec == new_docspec
-          pending_actions = @workflow.get_action_names_for_docspec(new_docspec)
+          pending_actions = @workflow_set.actions_names_handling_docspec(new_docspec)
           doc.clear_pending_actions
           doc.add_pending_actions pending_actions
         end
@@ -221,7 +236,7 @@ module Armagh
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' type is not changeable while editing.  Only state is." unless docspec.type == new_docspec.type
         raise Documents::Errors::DocSpecError, "Document '#{document_id}' state can only be changed from #{Documents::DocState::WORKING} to #{Documents::DocState::READY}." unless ((docspec.state == new_docspec.state) || (docspec.state == Documents::DocState::WORKING && new_docspec.state == Documents::DocState::READY))
 
-        pending_actions = @workflow.get_action_names_for_docspec(docspec)
+        pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
         new_doc = Document.from_action_document(action_doc, pending_actions)
         new_doc.collection_task_ids.concat @collection_task_ids if @collection_task_ids
         new_doc.archive_files.concat @archive_files if @archive_files
@@ -231,7 +246,7 @@ module Armagh
     end
 
     private def run
-      while @running
+      while @running && !@shutdown
         execute
       end
 
@@ -241,6 +256,7 @@ module Armagh
         @logger.debug 'Internal communication client stopped'
       end
 
+      @logger.debug 'Waiting for DRB shutdown'
       DRb.thread.join
       @logger.info 'Terminated'
     rescue => e
@@ -273,9 +289,14 @@ module Armagh
             @logger.info("Skipping further actions on document '#{@current_doc.document_id}' since it has errors.")
             break
           end
-          current_action = @workflow.instantiate_action(name, self, @logger, Connection.config)
+          current_action = nil
 
-          @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined." unless current_action
+          begin
+            current_action = @workflow_set.instantiate_action_named(name, self, @logger, Connection.config)
+          rescue Armagh::Actions::ActionInstantiationError
+            @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined."
+          end
+
           report_status(@current_doc, current_action)
 
           if current_action
@@ -374,7 +395,7 @@ module Armagh
 
           doc.published_timestamp = timestamp
           doc.state = action.config.output.docspec.state unless doc.error?
-          doc.add_pending_actions(@workflow.get_action_names_for_docspec(Documents::DocSpec.new(doc.type, doc.state)))
+          doc.add_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
           @collection_task_ids = doc.collection_task_ids

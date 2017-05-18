@@ -1,0 +1,48 @@
+<div style="font-family: courier;">
+  {{ uuid = SecureRandom.uuid }}
+
+  <div class="uk-text-danger">
+    <i class="uk-icon-exclamation-triangle"></i>
+    {{== @data['message'] }}
+    <span class="uk-text-bold">
+      [{{== @data['class'] }}]
+    </span>
+  </div>
+
+  <div>
+    <a href="javascript:" onclick="toggle_trace('{{= uuid }}')">
+      <i id="icon-{{= uuid }}" class="uk-icon-caret-right"></i>
+      Trace [{{= @data['trace']&.size.to_i }}]
+    </a>
+    <div id="{{= uuid }}" class="uk-margin-left" style="display: none;">
+      {{ @data['trace']&.each_with_index do |trace, index| }}
+        <div>
+          <span class="uk-text-muted">
+            {{== index + 1 }}:
+          </span>
+          {{== trace}}
+        </div>
+      {{ end }}
+    </div>
+  </div>
+
+  {{ if @data['cause'] }}
+    <hr />
+    {{= partial :logs_exception, data: @data['cause'] }}
+  {{ end }}
+
+</div>
+
+<script>
+  function toggle_trace(id) {
+    var trace = $("#" + id)
+    var icon  = $("#icon-" + id)
+    if (trace.is(":visible")) {
+      trace.hide()
+      icon.attr("class", "uk-icon-caret-right")
+    } else {
+      trace.show()
+      icon.attr("class", "uk-icon-caret-down")
+    }
+  }
+</script>

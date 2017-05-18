@@ -12,11 +12,13 @@ case $op in
     ${bin_path}/armagh-mongod start
     ${bin_path}/armagh-resource-admind start
     ${bin_path}/armagh-application-admind start
+    ${bin_path}/armagh-application-admin-guid start
     ${bin_path}/armagh-agents-admind start
     ;;
   stop)
     ${bin_path}/armagh-agents-admind stop
     ${bin_path}/armagh-application-admind stop
+    ${bin_path}/armagh-application-admin-guid stop
     ${bin_path}/armagh-resource-admind stop
     ${bin_path}/armagh-mongod stop
     ;;
@@ -31,6 +33,8 @@ case $op in
     ${bin_path}/armagh-resource-admind status
     echo -e "\n\nARMAGH APPLICATION ADMIN API DAEMON STATUS"
     ${bin_path}/armagh-application-admind status
+    echo -e "\n\nARMAGH APPLICATION ADMIN GUI DAEMON STATUS"
+    ${bin_path}/armagh-application-admin-guid status
     echo -e "\n\nARMAGH AGENT DAEMON STATUS"
     ${bin_path}/armagh-agentsd status
     ;;

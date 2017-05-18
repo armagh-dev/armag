@@ -1,0 +1,699 @@
+<link rel="stylesheet" href="/ui/css/components/form-password.gradient.min.css" />
+<link rel="stylesheet" href="/ui/css/components/datepicker.gradient.min.css" />
+
+<script type="text/javascript" src="/ui/js/components/tooltip.min.js"></script>
+<script type="text/javascript" src="/ui/js/components/form-password.min.js"></script>
+<script type="text/javascript" src="/ui/js/components/datepicker.min.js"></script>
+
+{{
+  selected_action = @data[:type]
+  edit_action     = @data[:edit_action]
+  locked_fields   = %w(action-name action-active action-workflow)
+  locked_fields  -= %w(action-name) unless edit_action
+
+  %w(input output).each do |docspec|
+    next unless @data[:defined_parameters][docspec]
+
+    @data[:defined_parameters][docspec].map! do |param|
+      param[:group] = docspec
+      param
+    end
+
+    unless @data[:supertype] == 'Collect' && docspec == 'input'
+      @data[:defined_parameters]['action'] += @data[:defined_parameters][docspec]
+    end
+    @data[:defined_parameters].delete(docspec)
+  end
+}}
+
+{{= partial :header, data: {title:    edit_action ? @data[:action] : 'New Action',
+                            subtitle: [selected_action.split('::').last,
+                                       '<span class="uk-text-small uk-margin-left" title="Action Type">',
+                                         '<i class="uk-icon-cube"></i>',
+                                         @data[:supertype],
+                                       '</span>',
+                                       '<span class="uk-text-small uk-margin-left" title="Workflow">',
+                                         '<i class="uk-icon-sitemap"></i>',
+                                         @data[:workflow],
+                                       '</span>'].join(' ')} }}
+
+<ul class="uk-tab uk-margin-bottom" data-uk-tab="{connect:'#page'}">
+
+  {{ @data[:defined_parameters].each_key do |group| }}
+    {{
+      group_contains_error = false
+      @data[:defined_parameters][group].each do |param|
+        if param[:error]
+          group_contains_error = true
+          break
+        end
+      end
+    }}
+    <li><a>
+      {{ if group_contains_error }}
+        <span class="uk-text-danger">
+          <i class="uk-icon-exclamation-circle"></i>
+      {{ end }}
+
+      {{= proper_case(group) }}
+
+      {{ if group_contains_error }}
+        </span>
+      {{ end }}
+    </a></li>
+  {{ end }}
+
+  {{ if @data[:test_callbacks]&.any? }}
+    <li><a>
+      Test
+    </a></li>
+  {{ end }}
+
+</ul>
+
+<form id="autoform" method="post" class="uk-form uk-form-horizontal uk-container">
+  <fieldset>
+
+    <input name="type" type="hidden" value="{{= @data[:type] }}">
+
+    <ul id="page" class="uk-switcher uk-margin">
+
+      {{ @data[:defined_parameters].each do |group, params| }}
+
+        <li>
+          <dl class="uk-description-list-line">
+
+            {{ params.each do |param| }}
+
+              {{
+                param_id      = "#{param[:group] || group}-#{param[:name]}"
+                param_name    = proper_case(param[:name])
+                param_value   = param[:value] || param[:default]
+
+                if @data[:pending_values]
+                  param_value =
+                    if param_id[/^input|^output/]
+                      doctype  = @data.dig(:pending_values, "#{param_id}_type")
+                      docstate = @data.dig(:pending_values, "#{param_id}_state")
+                      "#{doctype}:#{docstate}"
+                    else
+                      @data.dig(:pending_values, param_id)
+                    end
+                end
+
+                param_prompt   = sanitize_string(param[:prompt])
+                param_disabled = locked_fields.include?(param_id) || @data[:broken] || @data[:locked] ? 'disabled readonly' : ''
+                param_tooltip  = param_disabled.empty? ? %Q(data-uk-tooltip="{animation:true}" title="#{sanitize_string(param_prompt)}") : ''
+                param_invalid  = param[:error] ? 'uk-form-danger' : nil
+              }}
+
+              <dt class="uk-margin-small-bottom">
+                <div class="uk-grid">
+                  <div class="uk-width-1-2">
+
+                    {{= param_name }}
+
+                    {{ if param[:group] }}
+                      <span> ({{= param[:group].capitalize }})</span>
+                    {{ end }}
+
+                  </div>
+                  <div class="uk-width-1-2 uk-text-small uk-text-muted">
+
+                    <i class="uk-icon-cube"></i>
+
+                    {{= proper_case(param[:type]) }}
+
+                    {{ if param[:required] && param_disabled.empty? }}
+                      <span class="uk-text-primary uk-margin-left">
+                        <i class="uk-icon-exclamation uk-text-small"></i>
+                        Required
+                      </span>
+                    {{ end }}
+
+                  </div>
+                </div>
+              </dt>
+              <dd>
+                <div class="uk-grid">
+                  <div class="uk-width-1-2">
+
+<!----------------------------------------------------------------------------------------------------
+  DOCSPEC
+----------------------------------------------------------------------------------------------------->
+                    {{ case param[:type] }}
+                    {{ when 'docspec' }}
+                      {{ value_type, value_state = param_value.to_s.split(':') }}
+                      <input name="{{= param_id }}_type" type="text" value="{{= value_type }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                      <select name="{{= param_id }}_state" class="{{= param_invalid }}" {{= param_disabled }}>
+                        {{ unless value_state }}
+                          <option value="">...</option>
+                        {{ end }}
+
+                        {{ param[:defined_states]&.each do |state| }}
+                          {{ selected = value_state == state ? 'selected' : '' }}
+                          <option value="{{= state }}" {{= selected }}>{{= proper_case(state) }}</option>
+                        {{ end }}
+                      </select>
+
+<!----------------------------------------------------------------------------------------------------
+  PASSWORD
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'encoded_string' }}
+                      <div class="uk-form-password uk-width-1-1">
+                        <input name="{{= param_id }}" type="password" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                        <a href="" class="uk-form-password-toggle" data-uk-form-password='{lblShow: "<i class=\"uk-icon-eye\"></i>", lblHide: "<i class=\"uk-icon-eye-slash\"></i>"}'>
+                          <i class="uk-icon-eye"></i>
+                        </a>
+                      </div>
+
+<!----------------------------------------------------------------------------------------------------
+  STRING
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'string', 'populated_string', 'symbol' }}
+                      {{
+                        unless param_disabled.empty?
+                          if param_id == 'action-workflow'
+                            param_value = @data[:workflow]
+                            if param_value == '(Default)'
+                              param_prompt = param_value
+                              param_value  = ''
+                            end
+                          end
+                        end
+                      }}
+                      {{ if param[:options] }}
+                        <select name="{{= param_id }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                          {{ unless param[:required] }}
+                            <option value="" {{= 'selected' if param_value.to_s.strip.empty? }}>...</option>
+                          {{ end }}
+                          {{ param[:options].each do |option| }}
+                            <option value="{{== option }}" {{= 'selected' if param_value.to_s == option.to_s }}>{{== option }}</option>
+                          {{ end }}
+                        </select>
+                      {{ else }}
+                        <input name="{{= param_id }}" type="text" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                      {{ end }}
+
+<!----------------------------------------------------------------------------------------------------
+  BOOLEAN
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'boolean' }}
+                      <input name="{{= param_id }}" type="hidden" value="{{= param_value }}">
+                      <input id="{{= param_id }}" type="checkbox" {{= param_value == 'true' ? 'checked' : '' }} onchange="toggle_boolean('{{= param_id }}', this.checked)" class="uk-form-large {{= param_invalid }}" style="height: 20px;" {{= param_disabled }} {{= param_tooltip }}>
+
+<!----------------------------------------------------------------------------------------------------
+  NUMERIC
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'integer', 'positive_integer', 'negative_integer', 'timestamp' }}
+                      <input name="{{= param_id }}" type="number" min="0" value="{{= param_value }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+
+<!----------------------------------------------------------------------------------------------------
+  DATE
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'date' }}
+                      <input name="{{= param_id }}" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" value="{{= param_value }} class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+
+<!----------------------------------------------------------------------------------------------------
+  LIST
+----------------------------------------------------------------------------------------------------->
+                    {{ when 'string_array', 'hash' }}
+                      {{ hash = param[:type] == 'hash' }}
+                      {{ if param_disabled.empty? }}
+                        <a href="#modal-list" data-uk-modal onclick="modal_list_setup('{{= param_id }}', '{{= param_name }}', '{{== param_prompt }}', {{= hash }})" {{= param_disabled }}>
+                      {{ end }}
+                        <select id="{{= param_id }}-list" size="3" class="uk-width-1-1 uk-text-small {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                          {{
+                            value = ''
+                            param_value =
+                              if [{}, [], nil].include?(param_value)
+                                []
+                              elsif param_value.is_a?(String)
+                                if hash
+                                  new_hash = {}
+                                  param_value.split("\x19").each do |pair|
+                                    k, v = pair.split("\x11")
+                                    new_hash[k] = v
+                                  end
+                                  new_hash
+                                else
+                                  param_value.split("\x19")
+                                end
+                              else
+                                param_value
+                              end
+                          }}
+                          {{ param_value.each do |item| }}
+                            {{ if hash }}
+                              <option>{{== item.first }}: {{== item.last }}</option>
+                              {{ value += "#{item.first}\x11#{item.last}\x19" }}
+                            {{ else }}
+                              <option>{{== item }}</option>
+                              {{ value += "#{item}\x19" }}
+                            {{ end }}
+                          {{ end }}
+                        </select>
+                      {{ if param_disabled.empty? }}
+                        </a>
+                      {{ end }}
+                      <input name="{{= param_id }}" type="hidden" value="{{= sanitize_string(value) }}">
+
+                    {{ else }}
+                      WARNING: <strong>{{= param[:type] }}</strong> is not supported yet
+
+                    {{ end }}
+
+                  </div>
+                  <div class="uk-width-1-2">
+
+                    {{ if param_invalid }}
+                      <div class="uk-text-danger">
+                        <i class="uk-icon-exclamation-circle"></i>
+                        {{== param[:error].capitalize }}
+                      </div>
+                    {{ end }}
+
+                    {{== param[:description] }}
+
+                  </div>
+                </div>
+              </dd>
+            {{ end }}
+          </dl>
+
+        </li>
+
+      {{ end }}
+
+      {{ @data[:test_callbacks]&.each_with_index do |callback, index| }}
+
+        {{ unless index.zero? }}
+          <li>
+            <hr>
+          </li>
+        {{ end }}
+
+        <li>
+          <div class="uk-grid">
+            <div class="uk-width-1-5">
+              <a href="/config/{{= @data[:workflow] }}/edit/{{= @data[:action] }}/test?idx={{= index }}" target="_blank" class="uk-button">
+                <i class="uk-icon-rocket"></i>
+                Run Test
+              </a>
+            </div>
+            <div class="uk-width-4-5">
+              <div>
+                <i class="uk-icon-cog"></i>
+                {{= callback.callback_class }}
+              </div>
+              <div>
+                <i class="uk-icon-code"></i>
+                {{= callback.callback_method }}
+              </div>
+            </div>
+          </div>
+        </li>
+
+      {{ end }}
+
+    </ul>
+
+    <hr class="uk-margin-top" />
+
+    <div class="uk-grid">
+      <div class="uk-width-1-3">
+        {{ if @data[:broken] || @data[:locked] }}
+          <span class="{{= @data[:broken] ? 'uk-text-danger' : 'uk-text-muted' }}">
+            <i class="uk-icon-thumb-tack"></i>
+            {{= @data[:broken] ? 'Invalid config detected' : 'Deactivate workflow to edit actions' }}
+          </span>
+        {{ end }}
+      </div>
+      <div class="uk-width-1-3 uk-text-center">
+        {{
+          back_url =
+            if @data[:broken]
+              "/config/invalid?reviewed=#{@data[:action]}"
+            elsif @data[:locked] || edit_action
+              "/config/#{@data[:workflow]}"
+            else
+              "/config/#{@data[:workflow]}/new?prev=#{selected_action}"
+            end
+        }}
+        <a href="{{= back_url }}" class="uk-button">Back</a>
+      </div>
+      <div class="uk-width-1-3 uk-text-right">
+        {{ if @data[:broken] }}
+          <a href="javascript:" class="uk-button uk-button-primary" onclick="submit()">Repair Config</a>
+        {{ elsif !@data[:locked] }}
+          {{ submit_caption = edit_action ? 'Update' : 'Create' }}
+          <a href="javascript:" class="uk-button uk-button-primary" onclick="submit()">{{= submit_caption }}</a>
+        {{ end }}
+      </div>
+    </div>
+  </fieldset>
+</form>
+
+<div id="modal-list" class="uk-modal">
+  <div class="uk-modal-dialog uk-form">
+    <div id="modal-list-title" class="uk-modal-header"></div>
+
+    <div class="uk-overflow-container">
+      <ul id="modal-list-items" class="uk-list"></ul>
+    </div>
+
+    <div class="uk-modal-footer">
+      <div class="uk-grid">
+        <div class="uk-width-2-3">
+          <a href="javascript:" class="uk-button" onclick="modal_list_add()" title="Add <Enter>">
+            <i class="uk-icon-plus"></i>
+          </a>
+          <a href="javascript:" class="uk-button" onclick="modal_list_remove()" title="Remove">
+            <i class="uk-icon-minus"></i>
+          </a>
+          <a href="javascript:" class="uk-button uk-margin-left" onclick="modal_list_move_up()" title="Move Up <Shift+Up>">
+            <i class="uk-icon-arrow-up"></i>
+          </a>
+          <a href="javascript:" class="uk-button" onclick="modal_list_move_down()" title="Move Down <Shift+Down>">
+            <i class="uk-icon-arrow-down"></i>
+          </a>
+          <a href="javascript:" class="uk-button uk-margin-left" onclick="modal_list_sort()" title="Sort Ascending">
+            <i class="uk-icon-sort-alpha-asc"></i>
+          </a>
+          <a href="javascript:" class="uk-button" onclick="modal_list_sort(true)" title="Sort Descending">
+            <i class="uk-icon-sort-alpha-desc"></i>
+          </a>
+          <a href="javascript:" class="uk-button uk-margin-left" onclick="modal_list_clear(true)" title="Empty">
+            <i class="uk-icon-trash"></i>
+          </a>
+        </div>
+        <div class="uk-width-1-3 uk-text-right">
+          <a href="javascript:" class="uk-button uk-modal-close" onclick="modal_list_close()">Cancel</a>
+          <a id="modal-list-submit" href="javascript:" class="uk-button uk-button-primary uk-modal-close uk-margin-small-left" onclick="modal_list_done()" title="Submit <Shift+Enter>">Done</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <input id="modal-list-id"     type="hidden">
+  <input id="modal-list-count"  type="hidden">
+  <input id="modal-list-row"    type="hidden">
+  <input id="modal-list-prompt" type="hidden">
+  <input id="modal-list-hash"   type="hidden">
+</div>
+
+<script>
+  $(document).ready(function() {
+    $("#autoform").on("keyup keypress", function(e) {
+      var keyCode = e.keyCode || e.which
+      if (keyCode === 13) {
+        e.preventDefault()
+        return false
+      }
+    })
+
+    window.setTimeout(function() {
+      $("#page li[class='uk-active']").find("input").first().focus()
+    }, 1)
+
+    $("[data-uk-tab]").on("show.uk.switcher", function(event, area){
+      window.setTimeout(function() {
+        $("#page li[class='uk-active']").find("input").first().focus()
+      }, 1)
+    })
+  })
+
+  function sanitize_string(value, quotes_only = false) {
+    var map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+      '/': '&#x2F;',
+      '`': '&#x60;',
+      '=': '&#x3D;'
+    }
+    var pattern = /[&<>"'`=\/]/g
+    if (quotes_only) { pattern = /["']/g }
+    return value.replace(pattern, function(s) { return map[s] })
+  }
+
+  function toggle_boolean(id, value) {
+    $("input[name='" + id + "']").val(value)
+  }
+
+  function modal_list_count(i = 0) {
+    var count = $("#modal-list-count").val()
+    if (count == "") { count = 0 } else { count = parseInt(count) }
+    count += i
+    $("#modal-list-count").val(count)
+    return count
+  }
+
+  function modal_list_select(id) {
+    var css  = "uk-text-primary"
+    var hash = $("#modal-list-hash").val() == "true"
+    $("#modal-list-row").val(id)
+    var count = parseInt($("#modal-list-count").val())
+    for (i = 1; i <= count; i++) {
+      $("#modal-list-input-" + i).removeClass(css)
+      if (hash) {
+        $("#modal-list-input-" + i + "-value").removeClass(css)
+      }
+    }
+    $("#" + id).addClass(css)
+    if (hash) {
+      $("#" + id + "-value").addClass(css)
+    }
+  }
+
+  function modal_list_onkey(me, e) {
+    var id    = $("#modal-list-row").val()
+    var shift = e.shiftKey
+    switch (e.keyCode) {
+      case 13: // enter
+        if (shift) {
+          $("#modal-list-submit").click()
+        } else {
+          if ($("#modal-list-hash").val() == "true") {
+            if (me.id.indexOf("-value") > -1) {
+              modal_list_add()
+            } else {
+              $("#" + id + "-value").focus()
+            }
+          } else {
+            modal_list_add()
+          }
+        }
+        break
+      case 38: // up
+        if (shift) {
+          modal_list_move_up()
+        } else {
+          $("#" + id).closest("li").prev().find("input").focus()
+        }
+        break
+      case 40: // down
+        if (shift) {
+          modal_list_move_down()
+        } else {
+          $("#" + id).closest("li").next().find("input").focus()
+        }
+        break
+    }
+  }
+
+  function modal_list_move_up() {
+    var id = $("#modal-list-row").val()
+    var li = $("#" + id).closest("li")
+    li.insertBefore(li.prev())
+    $("#" + id).focus()
+  }
+
+  function modal_list_move_down() {
+    var id = $("#modal-list-row").val()
+    var li = $("#" + id).closest("li")
+    li.insertAfter(li.next())
+    $("#" + id).focus()
+  }
+
+  function modal_list_remove() {
+    var id = $("#modal-list-row").val()
+    var li = $("#" + id).closest("li")
+
+    var target = li.next().find("input")
+    if (target.length > 0) {
+      target.focus()
+    } else {
+      target = "#last"
+    }
+
+    li.remove()
+
+    if (target == "#last") {
+      $("#modal-list-items").children("li").last().find("input").first().focus()
+    }
+
+    if ($("#modal-list-items").children().length == 0) {
+      modal_list_add()
+    }
+  }
+
+  function modal_list_sort(descending = false) {
+    var list = $("#modal-list-items")
+    $(list).children("li").sort(function(a, b) {
+      var a = $(a).find("input").first().val().toUpperCase()
+      var b = $(b).find("input").first().val().toUpperCase()
+      if (descending) {
+        return (a > b) ? -1 : (a < b) ? 1 : 0
+      } else {
+        return (a < b) ? -1 : (a > b) ? 1 : 0
+      }
+    }).appendTo(list)
+
+    var id = $("#modal-list-row").val()
+    $("#" + id).focus()
+  }
+
+  function modal_list_clear(add_new = false) {
+    $("#modal-list-items").empty()
+    $("#modal-list-count").val("")
+    $("#modal-list-row").val("")
+    if (add_new) {
+      modal_list_add()
+    }
+  }
+
+  function modal_list_close() {
+    var id = $("#modal-list-id").val()
+    $("#" + id).focus()
+  }
+
+  function modal_list_add(new_value = "") {
+    var prompt = $("#modal-list-prompt").val()
+    if ( !prompt ) { prompt = "value" }
+    var hash   = $("#modal-list-hash").val() == "true"
+    var index  = modal_list_count(1)
+    var input  = ""
+    var id     = "modal-list-input-" + index
+    var values = []
+
+    if (hash) {
+      if (new_value) {
+        values = new_value.split(":")
+      } else {
+        values = ["", ""]
+      }
+      input = '' +
+        '<div class="uk-grid">' +
+          '<div class="uk-width-1-5">' +
+            '<input ' +
+              'class="uk-width-1-1" ' +
+              'id="modal-list-input-' + index + '" ' +
+              'type="text" ' +
+              'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
+              'onkeydown="modal_list_onkey(this, event)" ' +
+              'value="' + sanitize_string(values[0]) + '" ' +
+            '>' +
+            '<span ' +
+              'class="uk-text-bold uk-text-muted uk-margin-small-left uk-margin-small-top" ' +
+              'style="position:absolute;" ' +
+              '> : </span>' +
+          '</div>' +
+          '<div class="uk-width-4-5">' +
+            '<input ' +
+              'class="uk-width-1-1" ' +
+              'id="modal-list-input-' + index + '-value" ' +
+              'type="text" ' +
+              'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
+              'onkeydown="modal_list_onkey(this, event)" ' +
+              'value="' + sanitize_string(values[1]) + '" ' +
+            '>' +
+          '</div>' +
+        '</div>'
+      prompt = ""
+    } else {
+      input = '' +
+        '<input ' +
+          'class="uk-width-1-1" ' +
+          'id="modal-list-input-' + index + '" ' +
+          'type="text" ' +
+          'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
+          'onkeydown="modal_list_onkey(this, event)" ' +
+          'value="' + sanitize_string(new_value) + '" ' +
+        '>'
+    }
+
+    $("#modal-list-items").append('<li>' + input + '</li>')
+    $("#modal-list-input-" + index).focus()
+  }
+
+  function modal_list_setup(id, param, prompt, hash = false) {
+    $("#modal-list-id").val(id)
+    $("#modal-list-prompt").val(prompt)
+    var type = ""
+    if (hash) {
+      $("#modal-list-hash").val("true")
+      type = "hash"
+    } else {
+      $("#modal-list-hash").val("false")
+      type = "list"
+    }
+    $("#modal-list-title").html(
+      'Edit ' + type + ' for parameter <span class="uk-text-primary uk-text-bold">' + param + '</span>.' +
+      '<br />' +
+      '<span class="uk-text-muted">' + prompt + '</span>'
+    )
+
+    modal_list_clear()
+
+    var c        = 0
+    var select   = $("#" + id + "-list")
+    var selected = ""
+    if (select.has("option").length > 0) {
+      select.find("option").each(function() {
+        modal_list_add($(this).val())
+        if (c == select.prop("selectedIndex")) {
+          selected = "modal-list-input-" + (c + 1)
+        }
+        c++
+      })
+      $("#" + selected).attr("autofocus", "true")
+      $("#" + selected).select()
+    } else {
+      modal_list_add()
+    }
+  }
+
+  function modal_list_done() {
+    var value  = ""
+    var field  = $("#modal-list-id").val()
+    var list   = $("#" + field + "-list")
+    list.empty()
+    var hash   = $("#modal-list-hash").val() == "true"
+    var items  = $("#modal-list-items li").each(function(index, li) {
+      var ref  = $(li).find("input")
+      var id   = $(ref).attr("id")
+      var item = $(ref).val()
+      if (item) {
+        if (hash) {
+          var key_val = $("#" + id + "-value").val()
+          value += item + "\x11" + key_val + "\x19"
+          item  += ": " + key_val
+        } else {
+          value += item + "\x19"
+        }
+        list.append("<option value='" + sanitize_string(item) + "'>" + sanitize_string(item) + "</option>")
+      }
+    })
+    $("input[name='" + field + "']").val(value)
+    modal_list_close()
+  }
+
+  function submit() {
+    $("input[name='action-name']").removeAttr("disabled")
+    $("select[name='action-active']").removeAttr("disabled")
+    $("input[name='action-workflow']").removeAttr("disabled")
+    $("#autoform").submit()
+  }
+</script>

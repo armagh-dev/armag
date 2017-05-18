@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<!--
+# Copyright {{= Time.now.year }} Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+-->
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Armagh Document Platform</title>
+    <link rel="stylesheet" href="/ui/css/armagh.css" />
+    <script type="text/javascript" src="/ui/js/jquery-3.1.1.min.js"></script>
+    <script type="text/javascript" src="/ui/js/uikit.min.js"></script>
+    {{= @head ? @head : '' }}
+  </head>
+  <body>
+
+    <div class="uk-container uk-container-center uk-margin-top uk-margin-large-bottom" style="min-height:65vh;">
+
+      <nav class="uk-navbar">
+        <ul class="uk-navbar-nav">
+          <li class="uk-margin-right" style="cursor: pointer; margin-left: 8px;" onclick="window.location='/'">
+            <div class="uk-navbar-nav-subtitle">
+              <span class="uk-text-bold">
+                <i class="uk-icon-th uk-text-primary"></i>
+                <span style="font-size: 15.5px;">Armagh</span>
+              </span>
+              <div class="uk-text-muted">
+                Noragh Analytics
+              </div>
+            </div>
+          </li>
+          <li class="{{= active_domain }}" title="Home">
+            <a href="/"><i class="uk-icon-home uk-icon-small"></i></a>
+          </li>
+          <li class="{{= active_domain(:status) }}" title="Status">
+            <a href="/status"><i class="uk-icon-eye uk-icon-small"></i></a>
+          </li>
+          <li class="{{= active_domain(:logs) }}" title="Logs">
+            <a href="/logs"><i class="uk-icon-terminal uk-icon-small"></i></a>
+          </li>
+          <li class="{{= active_domain(:config) }}" title="Workflows">
+            <a href="/config"><i class="uk-icon-sitemap uk-icon-small"></i></a>
+          </li>
+        </ul>
+        <div class="uk-navbar-content uk-navbar-flip uk-padding-remove">
+          <ul class="uk-navbar-nav">
+            <li>
+              {{ if authenticated? }}
+                <a href="/logout">
+                  <i class="uk-icon-user uk-icon-small"></i>
+                  <span class="uk-text-small">{{= user }}</span>
+                </a>
+              {{ end }}
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <br />
+
+      <div id="notices-and-alerts" class="uk-container uk-container-center uk-margin-large-bottom">
+        {{= partial :error, error: @error if @error }}
+        {{= partial :notice, notice: @notice if @notice }}
+        {{= partial :success, success: @success if @success }}
+        {{= partial @page, data: @data unless @page == :error }}
+      </div>
+
+    </div>
+
+    <div class="uk-block uk-block-secondary uk-container-center uk-text-small" style="border-top-style:solid; border-top-color:#777; border-top-width:3px;">
+      <p class="uk-text-center">
+        <img id="noragh-analytics-logo" src="/images/noragh_analytics.png" style="opacity:0.3;">
+      </p>
+      <p class="uk-text-center">
+        Copyright
+        <span class="uk-icon-justify uk-icon-copyright"></span> 
+        {{= Date.today.year }} 
+        <a href="http://www.noragh.com" target="_blank" class="uk-link-muted">Noragh Analytics, Inc.</a>
+      </p>
+
+      <hr class="uk-margin-large-top" style="border-color:#333;" />
+
+      <div class="uk-grid uk-container uk-container-center">
+        <div class="uk-width-1-2">
+
+          <p>
+            Licensed under the Apache License, Version 2.0 (the "License");<br />
+            you may not use this file except in compliance with the License.;<br />
+            You may obtain a copy of the License at;
+          </p>
+          <p class="uk-link-muted">
+            <a href="http://www.apache.org/licenses/LICENSE-2.0" target="_blank">http://www.apache.org/licenses/LICENSE-2.0</a>
+          </p>
+
+        </div>
+        <div class="uk-width-1-2">
+
+          <p>
+            Unless required by applicable law or agreed to in writing, software<br />
+            distributed under the License is distributed on an "AS IS" BASIS,<br />
+            WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either<br />
+            express or implied.
+          </p>
+          <p>
+            See the License for the specific language governing permissions and<br />
+            limitations under the License.
+          </p>
+
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

@@ -1,0 +1,35 @@
+{{= partial :header, data: {title: 'Dashboard'} }}
+
+<div class="uk-grid uk-margin-top">
+  <div class="uk-width-1-2">
+
+    <div class="uk-panel uk-panel-box uk-panel-box-secondary">
+      <div class="uk-text-primary">
+        <i class="uk-icon-clone"></i>
+        Document Counts
+      </div>
+      <dl class="uk-description-list-line">
+        {{ @data&.each do |key, value| }}
+          <dt>{{= key }}</dt>
+          <dd>
+            {{ if value.empty? }}
+              collected:pending (0)
+            {{ else }}
+              {{ value.each do |k, v| }}
+                {{= k}} ({{= v }})
+              {{ end }}
+            {{ end }}
+          </dd>
+        {{ end }}
+      </dl>
+    </div>
+
+  </div>
+  <div class="uk-width-1-2">
+
+    <div class="uk-panel uk-panel-box uk-panel-box-secondary uk-text-muted">
+      More content coming soon
+    </div>
+
+  </div>
+</div>

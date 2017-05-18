@@ -1,0 +1,101 @@
+{{= partial :header, data: {title:    'New Action',
+                            subtitle: "#{@data[:workflow]} Workflow"} }}
+
+<form method="post" class="uk-form uk-form-horizontal uk-container">
+  <fieldset>
+
+    <dl class="uk-description-list-line">
+      <dt class="uk-margin-small-bottom">
+
+        <div class="uk-grid">
+          <div class="uk-width-1-2">
+
+            Select {{= @data[:filter] }} Action
+
+          </div>
+          <div class="uk-width-1-2 uk-text-small uk-text-muted">
+
+            <i class="uk-icon-cube"></i>
+            {{= @data[:filter] ? @data[:filter] : 'Armagh' }} Action
+
+            <span class="uk-text-primary uk-margin-left">
+              <i class="uk-icon-exclamation uk-text-small"></i>
+              Required
+            </span>
+
+          <div>
+        </div>
+
+      </dt>
+      <dd>
+
+        <div class="uk-grid">
+          <div class="uk-width-1-2">
+
+            <select name="action" class="uk-text-large" onchange="$(this).find('[value=\'\']').remove(); $('#next').removeAttr('disabled')" autofocus="true">
+
+              {{ unless @data[:previous_action] }}
+                <option value="">...</option>
+              {{ end }}
+
+              {{ @data[:defined_actions].each_key do |type| }}
+                {{ next if @data[:filter] && type != @data[:filter] }}
+
+                {{ unless @data[:filter] }}
+                  <optgroup label="{{= type }}">
+                {{ end }}
+
+                  {{ @data[:defined_actions][type].each do |action| }}
+
+                    {{ selected = @data[:previous_action] == action ? 'selected' : '' }}
+                    <option value="{{= action }}" {{= selected }}>{{= action.split('::').last }}</option>
+
+                  {{ end }}
+
+                {{ unless @data[:filter] }}
+                  </optgroup>
+                {{ end }}
+
+              {{ end }}
+
+            </select>
+
+          </div>
+          <div class="uk-width-1-2">
+
+            Select a{{= @data[:filter] ? ' ' + @data[:filter] : 'n' }} Action to create a new config
+
+          </div>
+        </div>
+
+      </dd>
+    </dl>
+
+    <hr />
+
+    <div class="uk-grid">
+      <div class="uk-width-1-3">
+      </div>
+      <div class="uk-width-1-3 uk-text-center">
+        <a href="/config/{{= @data[:workflow] }}" class="uk-button">Back</a>
+      </div>
+      <div class="uk-width-1-3 uk-text-right">
+        {{ if @data[:active] }}
+          <span class="uk-text-danger">
+            Please deactivate workflow before adding new actions.
+          </span>
+        {{ else }}
+          {{ disabled = @data[:previous_action] ? '' : 'disabled' }}
+          <button id="next" type="submit" class="uk-button uk-button-primary" {{= disabled }}>Next</button>
+        {{ end }}
+      </div>
+    </div>
+
+  </fieldset>
+</form>
+
+<script>
+  if ($("select[name='action']").val()) {
+    $("#next").removeAttr('disabled')
+  }
+</script>

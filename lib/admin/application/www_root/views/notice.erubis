@@ -1,0 +1,5 @@
+<div class="uk-alert" data-uk-alert>
+  <a href="" class="uk-alert-close uk-close"></a>
+  <i class="uk-icon-info-circle uk-icon-small uk-margin-small-right"></i>
+  {{= sanitize_string(@notice) }}
+</div>

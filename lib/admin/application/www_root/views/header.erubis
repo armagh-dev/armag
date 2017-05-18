@@ -1,0 +1,13 @@
+<div class="uk-panel uk-panel-box uk-panel-box-primary uk-margin-bottom">
+
+  <span class="uk-text-large uk-text-bold">
+    {{= @data[:title] }}
+  </span>
+
+  {{ if @data[:subtitle] }}
+    <i class="uk-icon-angle-right uk-text-large"></i>
+    {{= @data[:subtitle] }}
+  {{ end }}
+
+</div>
+

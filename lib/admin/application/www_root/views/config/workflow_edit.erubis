@@ -1,0 +1,209 @@
+<script type="text/javascript" src="/ui/js/components/upload.min.js"></script>
+
+{{= partial :header, data: {title:    @data[:workflow],
+                            subtitle: 'Edit Workflow'} }}
+
+<div class="uk-grid uk-grid-divider" data-uk-grid-match>
+
+  <div class="uk-width-1-3">
+    {{= partial :config, :workflow_action, data: @data.merge(supertypes: %w[Collect Divide Split]) }}
+  </div>
+
+  <div class="uk-width-1-3">
+    {{= partial :config, :workflow_action, data: @data.merge(supertypes: %w[Publish]) }}
+  </div>
+
+  <div class="uk-width-1-3">
+    {{= partial :config, :workflow_action, data: @data.merge(supertypes: %w[Consume]) }}
+  </div>
+
+</div>
+
+<hr />
+
+<div class="uk-grid">
+  <div class="uk-width-2-5">
+    {{ disabled = @data[:active] ? 'disabled' : '' }}
+    <button id="new-action" onclick="window.location='/config/{{= @data[:workflow] }}/new'" class="uk-button" {{= disabled }}>New Action</button>
+    <button id="import-action" class="uk-button uk-margin-left" data-uk-modal="{target:'#import-modal'}" {{= disabled }}>Import</button>
+    <form method="get" action="/config/{{= @data[:workflow] }}/export" style="display: inline;">
+      <button id="export-workflow" class="uk-button uk-margin-small-left">Export</button>
+    </form>
+  </div>
+  <div class="uk-width-1-5 uk-text-center">
+    <a href="/config" class="uk-button">Back</a>
+  </div>
+  <div class="uk-width-2-5 uk-text-right">
+    {{ visible = @data[:active] ? '' : 'style="display: none;"' }}
+    <a id="activate-workflow" href="javascript:" class="uk-button" onclick="deactivate()" {{= visible }}>
+      <i class="uk-icon-toggle-on"></i>
+      Deactivate
+    </a>
+    {{ visible = @data[:active] ? 'style="display: none;"' : '' }}
+    <a id="deactivate-workflow" href="javascript:" class="uk-button" onclick="activate()" {{= visible }}>
+      <i class="uk-icon-toggle-off"></i>
+      Activate
+    </a>
+  </div>
+</div>
+
+<div id="import-modal" class="uk-modal">
+  <div class="uk-modal-dialog">
+    <button class="uk-modal-close uk-close"></button>
+    <div class="uk-modal-header">
+      <h3>Import</h3>
+    </div>
+    <div id="upload-drop" class="uk-placeholder uk-text-center">
+      <i class="uk-icon-cloud-upload uk-icon-medium uk-text-muted uk-margin-small-right"></i>
+      Drop one or more JSON action config files here or
+      <a class="uk-form-file">
+        select one
+        <input id="upload-select" type="file">
+      </a>
+    </div>
+    <div id="progressbar" class="uk-progress uk-hidden">
+      <div class="uk-progress-bar" style="width: 0%;">0%</div>
+    </div>
+    <div class="uk-modal-footer uk-text-right">
+      <button id="import-close" class="uk-button uk-modal-close">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  $(function() {
+    var progressbar = $("#progressbar"),
+        bar         = progressbar.find(".uk-progress-bar"),
+        settings    = {
+          action: "/config/{{= @data[:workflow] }}/import",
+          allow: "*.json",
+          single: false,
+          loadstart: function() {
+            bar.css("width", "0%").text("0%")
+            progressbar.removeClass("uk-hidden")
+          },
+          progress: function(percent) {
+            percent = Math.ceil(percent)
+            bar.css("width", percent + "%").text(percent + "%")
+          },
+          allcomplete: function(response) {
+            var pattern = /<div id="summary">[\s\S]+?<h2>([\s\S]+?)<\/h2>/,
+                match   = pattern.exec(response),
+                error   = match ? match[1] : ""
+            if (error) {
+              UIkit.modal.alert(
+                'Import failed, please check your JSON and try again.' +
+                '<div class="uk-text-danger uk-margin-top">' +
+                  '<i class="uk-icon-exclamation-triangle uk-margin-small-right"></i>' +
+                  error +
+                '</div>'
+              )
+            }
+            bar.css("width", "100%").text("100%")
+            setTimeout(function() {
+              progressbar.addClass("uk-hidden")
+            }, 250)
+            if (!error) {
+              UIkit.modal.alert(
+                'Import completed:' +
+                '<div class="uk-text-success uk-margin-top">' +
+                  JSON.parse(response).join("<br />") +
+                '</div>'
+              )
+              setTimeout('location.reload()', 2000)
+            }
+          },
+          error: function(error) {
+            UIkit.modal.alert("Import failed, please check your JSON and try again. " + error)
+          }
+        }
+
+    var select = UIkit.uploadSelect($("#upload-select"), settings),
+        drop   = UIkit.uploadDrop($("#upload-drop"), settings)
+  })
+
+  function click_add_new_action_type(link) {
+    var url = $(link).attr('url')
+    if ($("#new-action").attr("disabled")) {
+      UIkit.modal.alert("Please stop this workflow before adding new actions to it.")
+      return false
+    } else {
+      location.href = url
+    }
+  }
+
+  function activate() {
+    change_workflow_status('activate')
+  }
+
+  function deactivate() {
+    UIkit.modal.confirm("Deactivate workflow <strong>{{= @data[:workflow] }}</strong>?", function() {
+      change_workflow_status('deactivate')
+    })
+  }
+
+  function change_workflow_status(status_request) {
+    $.post({
+      url:     "/config/{{= @data[:workflow] }}/" + status_request,
+      success: function(data) {
+        var data   = JSON.parse(data)
+        var status = data[1]
+        switch (status) {
+          case 'run':
+            push_notification('success', 'Workflow <strong>{{= @data[:workflow] }}</strong> successfully activated.')
+            $("#activate-workflow").show()
+            $("#deactivate-workflow").hide()
+            $("#new-action").prop("disabled", true)
+            $("#import-action").prop("disabled", true)
+            break
+          case 'finish':
+            push_notification('success', 'Workflow <strong>{{= @data[:workflow] }}</strong> is finishing.')
+            $("#activate-workflow").show()
+            $("#deactivate-workflow").hide()
+            $("#new-action").prop("disabled", true)
+            $("#import-action").prop("disabled", true)
+            break
+          case 'stop':
+            push_notification('success', 'Workflow <strong>{{= @data[:workflow] }}</strong> successfully deactivated.')
+            $("#activate-workflow").hide()
+            $("#deactivate-workflow").show()
+            $("#new-action").prop("disabled", false)
+            $("#import-action").prop("disabled", false)
+            break
+          default:
+            push_notification('error', 'Workflow <strong>{{= @data[:workflow] }}</strong> returned an unknown status.')
+            $("#activate-workflow").hide()
+            $("#deactivate-workflow").hide()
+            $("#new-action").prop("disabled", true)
+        }
+      },
+      error:   function(err) {
+        push_notification('error', 'Failed to ' + status_request + ' workflow <strong>{{= @data[:workflow] }}</strong>.')
+      }
+    })
+  }
+
+  function push_notification(type, message) {
+    var css = ""
+    var ico = ""
+    if (type == "success") {
+      css = "uk-alert-success"
+      ico = "uk-icon-check-circle"
+    } else if (type == "error") {
+      css = "uk-alert-danger"
+      ico = "uk-icon-warning"
+    } else {
+      ico = "uk-icon-info-circle"
+    }
+
+    $("#workflow-status-change-notification").remove()
+
+    $("#notices-and-alerts").prepend(
+      '<div id="workflow-status-change-notification" class="uk-alert ' + css + '" data-uk-alert>' +
+        '<a href="" class="uk-alert-close uk-close"></a>' +
+        '<i class="' + ico + ' uk-icon-small uk-margin-small-right"></i>' +
+        message +
+      '</div>'
+    )
+  }
+</script>

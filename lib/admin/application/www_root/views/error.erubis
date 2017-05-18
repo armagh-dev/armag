@@ -1,0 +1,13 @@
+{{ errors = Array(@error) }}
+
+{{ errors.each_with_index do |error, index| }}
+
+  <div class="uk-alert uk-alert-danger" data-uk-alert>
+    <a href="" class="uk-alert-close uk-close"></a>
+    {{ if index.zero? }}
+      <i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>
+    {{ end }}
+    {{= error.capitalize }}
+  </div>
+
+{{ end }}

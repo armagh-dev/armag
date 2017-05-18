@@ -23,7 +23,7 @@ require_relative 'interruptible_sleep'
 require_relative '../logging'
 require_relative '../../lib/document/document'
 require_relative '../ipc'
-require_relative '../actions/workflow'
+require_relative '../actions/workflow_set'
 require_relative '../agent/agent_status'
 
 module Armagh
@@ -31,9 +31,8 @@ module Armagh
     class CollectionTrigger
       attr_reader :logger
 
-      def initialize(workflow)
-        @workflow = workflow
-        @last_timestamp = workflow.last_timestamp
+      def initialize(workflow_set)
+        @workflow_set = workflow_set
         @running = false
         @last_run = {}
         @seen_actions = []
@@ -59,7 +58,7 @@ module Armagh
       def trigger_individual_collection(config)
         @logger.debug "Triggering #{config.action.name} collection"
         docspec = config.input.docspec
-        pending_actions = @workflow.get_action_names_for_docspec(docspec)
+        pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
         Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
       rescue => e
         Logging.ops_error_exception(@logger, e, 'Document insertion failed.')
@@ -70,7 +69,6 @@ module Armagh
         @running = true
         while @running
           begin
-            reset_last_run
             trigger_actions
             remove_unseen_actions
           rescue => e
@@ -82,23 +80,15 @@ module Armagh
         Thread.new {@logger.info 'Collection Trigger Stopped'}.join
       end
 
-      private def reset_last_run
-        last_timestamp = @workflow.last_timestamp
-        unless last_timestamp == @last_timestamp
-          @last_run.clear
-          @last_timestamp = last_timestamp
-        end
-      end
-
       private def trigger_actions
-        @workflow.collect_actions.each do |config|
+        @workflow_set.collect_action_configs.each do |config|
           next unless config.action.active
 
           now = Time.now
           name = config.action.name
           @seen_actions << name
           schedule = config.collect.schedule
-          
+
           next unless schedule
 
           @last_run[name] ||= now

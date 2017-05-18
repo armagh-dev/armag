@@ -33,7 +33,7 @@ Armagh::Environment.init
 
 require_relative '../agent/agent'
 require_relative '../agent/agent_status'
-require_relative '../actions/workflow'
+require_relative '../actions/workflow_set'
 require_relative '../actions/gem_manager'
 require_relative '../document/document'
 require_relative '../utils/collection_trigger'
@@ -81,7 +81,7 @@ module Armagh
       defined_actions = Actions.defined_actions
 
       if defined_actions.any?
-        logger.debug "Available actions are: #{defined_actions}"
+        logger.debug "Available action classes are: #{defined_actions}"
       else
         logger.ops_warn 'No defined actions.  Please make sure Standard and/or Custom Actions are installed.'
       end
@@ -128,14 +128,14 @@ module Armagh
       end
       
       begin
-        @workflow = Actions::Workflow.new( @logger, Connection.config )
+        @workflow_set = Actions::WorkflowSet.for_agent( Connection.config )
         @logger.any 'workflow init successful'
-      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+      rescue Actions::WorkflowInitError, Actions::WorkflowActivationError  => e
         @logger.any 'Workflow initialization failed, because at least one configuration in the database has an error. Review current workflow settings in the admin GUI to fix the problem.'
         @logger.dev_error WorkflowConfigError
       end
       
-      @collection_trigger = Utils::CollectionTrigger.new(@workflow)
+      @collection_trigger = Utils::CollectionTrigger.new(@workflow_set)
       Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
 
       @hostname = Socket.gethostname
@@ -197,16 +197,24 @@ module Armagh
       sleep 1
     end
 
-    def kill_all_agents(signal = :SIGINT)
+    def kill_all_agents(signal = :INT)
       kill_agents(@agents.length, signal)
     end
 
-    def kill_agents(num_agents, signal = :SIGINT)
+    def kill_agents(num_agents, signal = :INT)
+      return if num_agents == 0
+      Thread.new{ @logger.any "Killing #{num_agents} agent(s)." }.join
       num_agents.times do
-        killed_pid = stop_agent(signal)
-        agent_id = @agents[killed_pid].uuid
-        @agents.delete killed_pid
+        pid = @agents.keys.first
+        Process.kill(signal, pid)
+        begin
+          pid = Process.wait
+        rescue Errno::ECHILD; end
+
+        agent_id = @agents[pid].uuid
+        @agents.delete pid
         @agent_status.remove_agent(agent_id)
+        Thread.new{ @logger.any "Killing #{agent_id}." }.join
       end
     end
 
@@ -228,7 +236,7 @@ module Armagh
     end
 
     def start_agent_in_process
-      agent = Agent.new( @agent_config, @workflow )
+      agent = Agent.new( @agent_config, @workflow_set )
 
       pid = Process.fork do
         Process.setproctitle("armagh-#{agent.uuid}")
@@ -236,7 +244,7 @@ module Armagh
           trap(signal) {agent.stop}
         end
         begin
-          agent.start
+          agent.start unless @shutdown
           @logger.info "Agent #{agent.uuid} terminated"
         rescue => e
           Logging.dev_error_exception(@logger, e, "Could not start agent #{agent.uuid}")
@@ -244,15 +252,6 @@ module Armagh
       end
 
       @agents[pid] = agent
-    end
-
-    def stop_agent(signal)
-      pid = @agents.keys.first
-      Process.kill(signal, pid)
-      begin
-        pid = Process.wait
-      rescue Errno::ECHILD; end
-      pid
     end
 
     def shutdown(signal)
@@ -269,16 +268,16 @@ module Armagh
       # Explicitly call them all out to refresh all if there any any to refresh
       config = @config.refresh
       agent_config = @agent_config.refresh
-      workflow = @workflow.refresh
+      workflow_set = @workflow_set.refresh
 
-      if config || agent_config || workflow
+      if config || agent_config || workflow_set
         @logger.any 'Configuration change detected.  Restarting agents...'
 
         @logger.debug {
           changed_configs = []
           changed_configs << 'launcher' if config
           changed_configs << 'agent' if agent_config
-          changed_configs << 'workflow' if workflow
+          changed_configs << 'workflow_set' if workflow_set
           "Triggered by configuration changes to #{changed_configs.join(', ')}"
         }
 
@@ -325,7 +324,7 @@ module Armagh
 
       rescue => e
         Logging.dev_error_exception(@logger, e, 'An unexpected error occurred.  Exiting.')
-        shutdown(:SIGINT)
+        shutdown(:INT)
         @exit_status = 1
       end
 

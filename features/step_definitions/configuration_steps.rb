@@ -26,190 +26,330 @@ require 'log4r'
 require 'time'
 
 When(/^armagh's workflow config is "([^"]*)"$/) do |config|
+  @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+  @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
+
   case config
     when 'test_actions'
-      Armagh::CustomActions::TestCollect.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
-        }
-      })
 
-      Armagh::CustomActions::TestDivide.create_configuration(Armagh::Connection.config, 'test_divider', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollect',
+          {
+              'action' => {'name' => 'test_collect'},
+              'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+              }
+          })
 
-      Armagh::CustomActions::TestSplit.create_configuration(Armagh::Connection.config, 'test_split', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('SplitDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('SplitOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestDivide',
+          {
+              'action' => {'name' => 'test_divider'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
 
-      Armagh::CustomActions::TestPublish.create_configuration(Armagh::Connection.config, 'test_publish', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestSplit',
+          {
+              'action' => {'name' => 'test_split'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('SplitDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('SplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
-      Armagh::CustomActions::TestConsume.create_configuration(Armagh::Connection.config, 'test_consume', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('ConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublish',
+          {
+              'action' => {'name' => 'test_publish'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
+
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestConsume',
+          {
+              'action' => {'name' => 'test_consume'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('ConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
+              'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'bad_publisher'
-      Armagh::CustomActions::TestBadPublish.create_configuration(Armagh::Connection.config, 'bad_publisher', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestBadPublish',
+          {
+              'action' => {'name' => 'bad_publisher'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
 
     when 'bad_consumer'
-      Armagh::CustomActions::TestBadConsume.create_configuration(Armagh::Connection.config, 'bad_consumer', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
-        'output' => {}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestBadConsume',
+          {
+              'action' => {'name' => 'bad_consumer'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
+              'output' => {}
+          }
+      )
 
     when 'unimplemented_splitter'
-      Armagh::CustomActions::TestUnimplementedSplit.create_configuration(Armagh::Connection.config, 'unimplemented_splitter', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('UnimplementedSplitInputDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('UnimplementedSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestUnimplementedSplit',
+          {
+              'action' => {'name' => 'unimplemented_splitter'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('UnimplementedSplitInputDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('UnimplementedSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'too_large_collector'
-      Armagh::CustomActions::TestTooLargeCollect.create_configuration(Armagh::Connection.config, 'too_large_collector', {
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeCollectOutputDocument', Armagh::Documents::DocState::WORKING)
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestTooLargeCollect',
+          {
+              'action' => {'name' => 'too_large_collector'},
+              'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeCollectOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'too_large_splitter'
-      Armagh::CustomActions::TestTooLargeSplit.create_configuration(Armagh::Connection.config, 'too_large_splitter', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeInputDocType', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestTooLargeSplit',
+          {
+              'action' => {'name' => 'too_large_splitter'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeInputDocType', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('TooLargeSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'edit_current_splitter'
-      Armagh::CustomActions::TestEditCurrentSplit.create_configuration(Armagh::Connection.config, 'edit_current_splitter', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('EditCurrentInputDocType', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('EditCurrentSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestEditCurrentSplit',
+          {
+              'action' => {'name' => 'edit_current_splitter'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('EditCurrentInputDocType', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('EditCurrentSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'update_error_splitter'
-      Armagh::CustomActions::TestUpdateErrorSplit.create_configuration(Armagh::Connection.config, 'update_error_splitter', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('UpdateErrorInputDocType', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('UpdateErrorSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestUpdateErrorSplit',
+          {
+              'action' => {'name' => 'update_error_splitter'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('UpdateErrorInputDocType', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('UpdateErrorSplitOutputDocument', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'notify_ops'
-      Armagh::CustomActions::TestSplitNotifyOps.create_configuration(Armagh::Connection.config, 'notify_ops', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyOpsDocType', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyOpsDocTypeOutput', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestSplitNotifyOps',
+          {
+              'action' => {'name' => 'notify_ops'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyOpsDocType', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyOpsDocTypeOutput', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'notify_dev'
-      Armagh::CustomActions::TestSplitNotifyDev.create_configuration(Armagh::Connection.config, 'notify_dev', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyDevDocType', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyDevDocTypeOutput', Armagh::Documents::DocState::WORKING)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestSplitNotifyDev',
+          {
+              'action' => {'name' => 'notify_dev'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyDevDocType', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('NotifyDevDocTypeOutput', Armagh::Documents::DocState::WORKING)}
+          }
+      )
 
     when 'change_id_publisher'
-      Armagh::CustomActions::TestChangeIdPublish.create_configuration(Armagh::Connection.config, 'change_id_publisher', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestChangeIdPublish',
+          {
+              'action' => {'name' => 'change_id_publisher'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
 
     when 'non_collector'
-      Armagh::CustomActions::TestNonCollect.create_configuration(Armagh::Connection.config, 'non_collector', {
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('NonDocument', Armagh::Documents::DocState::READY)
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestNonCollect',
+          {
+              'action' => {'name' => 'non_collector'},
+              'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('NonDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
 
     when 'archive_collector'
-      Armagh::CustomActions::TestCollect.create_configuration(Armagh::Connection.config, 'archive_collector', {
-        'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollect',
+          {
+              'action' => {'name' => 'archive_collector'},
+              'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+              }
+          }
+      )
 
     when 'full_workflow'
-      Armagh::CustomActions::TestCollect.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollect',
+          {
+              'action' => {'name' => 'test_collect'},
+              'collect' => {'archive' => true, 'schedule' => '0 0 1 1 0'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)
+              }
+          }
+      )
 
-      Armagh::CustomActions::TestDivide.create_configuration(Armagh::Connection.config, 'test_divider', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestDivide',
+          {
+              'action' => {'name' => 'test_divider'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('ToDivideDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
 
-      Armagh::CustomActions::TestSplit.create_configuration(Armagh::Connection.config, 'test_split', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestSplit',
+          {
+              'action' => {'name' => 'test_split'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('DivideCollectedDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)}
+          }
+      )
 
-      Armagh::CustomActions::TestPublish.create_configuration(Armagh::Connection.config, 'test_publish', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublish',
+          {
+              'action' => {'name' => 'test_publish'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
 
-      Armagh::CustomActions::TestConsume.create_configuration(Armagh::Connection.config, 'test_consume', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestConsume',
+          {
+              'action' => {'name' => 'test_consume'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('Document', Armagh::Documents::DocState::PUBLISHED)},
+              'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
 
     when 'minute_collect'
-      Armagh::CustomActions::TestCollect.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'collect' => {'archive' => false, 'schedule' => '* * * * *'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollect',
+          {
+              'action' => {'name' => 'test_collect'},
+              'collect' => {'archive' => false, 'schedule' => '* * * * *'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+              }
+          }
+      )
 
     when 'long_collect'
-      Armagh::CustomActions::TestCollect.force_update_configuration(Armagh::Connection.config, 'test_collect', {
-        'action' => {'name' => 'test_collect'},
-        'collect' => {'archive' => false, 'schedule' => '* * * * *'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-          'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
-        }
-      })
+      if @workflow.running?
+        @workflow.finish
+
+        retry_count = 0
+        begin
+          @workflow.stop
+        rescue Armagh::Actions::WorkflowActivationError
+          if retry_count < 3
+            sleep 30
+            retry
+          else
+            raise
+          end
+        end
+      end
+
+
+      @workflow.update_action_config(
+          'Armagh::CustomActions::TestCollect',
+          {
+              'action' => {'name' => 'test_collect'},
+              'collect' => {'archive' => false, 'schedule' => '1 1 1 1 1'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+              }
+          }
+      )
+
 
     when 'publisher_notify_good_consumer'
-      Armagh::CustomActions::TestPublishNotifyDev.create_configuration(Armagh::Connection.config, 'test_publisher_notify_dev', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
-      Armagh::CustomActions::TestConsume.create_configuration(Armagh::Connection.config, 'test_consume', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)},
-        'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublishNotifyDev',
+          {
+              'action' => {'name' => 'test_publisher_notify_dev'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
+
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestConsume',
+          {
+              'action' => {'name' => 'test_consume'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('BadPublishDocument', Armagh::Documents::DocState::PUBLISHED)},
+              'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
 
     when 'id_collector'
-      Armagh::CustomActions::TestCollectSetsID.create_configuration(Armagh::Connection.config, 'test_collect', {
-        'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
-        'output' => {
-          'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-        }
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollectSetsID',
+          {
+              'action' => {'name' => 'test_collect'},
+              'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+              }
+          }
+      )
+
     when 'id_publisher'
-      Armagh::CustomActions::TestPublishSetsID.create_configuration(Armagh::Connection.config, 'test_publish', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublishSetsID',
+          {
+              'action' => {'name' => 'test_publish'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
 
     when 'long_publisher'
-      Armagh::CustomActions::TestLongPublish.create_configuration(Armagh::Connection.config, 'test_long_publish', {
-        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-      })
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestLongPublish',
+          {
+              'action' => {'name' => 'test_long_publish'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
   end
+
+
+  @workflow.run
+  puts 'Running Workflow'
 end
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
@@ -226,12 +366,32 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     when 'agent'
       @agent_config = Armagh::Agent.force_update_configuration(Armagh::Connection.config, 'default', {'agent' => config})
     when 'action'
+      @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+      @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
+
       config.merge! ({
         'action' => {'name' => 'test-action', 'active' => true},
         'input' => {'docspec' => 'testdoc:ready'},
         'output' => {'docspec' => 'testdoc:published'},
       })
-      @action_config = Armagh::CustomActions::TestPublish.force_update_configuration(Armagh::Connection.config, 'test-action', config)
+
+      if @workflow.running?
+        @workflow.finish
+        retry_count = 0
+        begin
+          @workflow.stop
+        rescue Armagh::Actions::WorkflowActivationError
+          if retry_count < 3
+            sleep 30
+            retry
+          else
+            raise
+          end
+        end
+      end
+
+      @action_config = @workflow.update_action_config('Armagh::CustomActions::TestPublish', config)
+      @workflow.run
     else
       raise "Unknown config type #{config_type}"
   end

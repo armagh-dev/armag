@@ -38,8 +38,8 @@ require 'mongo'
 module Armagh
   module StandardActions
     class CollectActionForTest < Actions::Collect
-      def self.make_test_config(store:, action_name:, collected_doctype:)
-        create_configuration(store, action_name, {
+      def self.make_test_config(workflow:, action_name:, collected_doctype:)
+        workflow.create_action_config( self.name, {
           'action' => {'name' => action_name, 'active' => true},
           'collect' => {'schedule' => '* * * * *', 'archive' => false},
           'input' => {},
@@ -49,8 +49,8 @@ module Armagh
         })
       end
 
-      def self.make_long_test_config(store:, action_name:, collected_doctype:)
-        create_configuration(store, action_name, {
+      def self.make_long_test_config(workflow:, action_name:, collected_doctype:)
+        workflow.create_action_config(self.name, {
           'action' => {'name' => action_name, 'active' => true},
           'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
           'input' => {},
@@ -62,8 +62,8 @@ module Armagh
     end
 
     class SplitActionForTest < Actions::Split
-      def self.make_test_config( store:, action_name:, input_doctype:, output_doctype: )
-        create_configuration( store, action_name, {
+      def self.make_test_config( workflow:, action_name:, input_doctype:, output_doctype: )
+        workflow.create_action_config( self.name, {
           'action' => { 'name' => action_name, 'active' => true },
           'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, Armagh::Documents::DocState::READY ) },
           'output' => { 'docspec'  => Armagh::Documents::DocSpec.new( output_doctype, Armagh::Documents::DocState::READY )}
@@ -81,11 +81,13 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     MongoSupport.instance.clean_database
     @config_store = []
 
-    @collect_config = Armagh::StandardActions::CollectActionForTest.make_test_config(store: @config_store, action_name: 'collect_action', collected_doctype: 'collect_type')
-    Armagh::StandardActions::SplitActionForTest.make_test_config(store: @config_store, action_name: 'split_action', input_doctype: 'incoming_split', output_doctype: 'outgoing_split')
+    @workflow_set = Armagh::Actions::WorkflowSet.for_agent(@config_store)
+    @wf = @workflow_set.create_workflow( {'workflow' => { 'name' => 'wf'}})
+    @collect_config = Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'collect_action', collected_doctype: 'collect_type')
+    Armagh::StandardActions::SplitActionForTest.make_test_config(workflow: @wf, action_name: 'split_action', input_doctype: 'incoming_split', output_doctype: 'outgoing_split')
 
-    @workflow = Armagh::Actions::Workflow.new(@logger, @config_store)
-    @collection_trigger = Armagh::Utils::CollectionTrigger.new(@workflow)
+    @collection_trigger = Armagh::Utils::CollectionTrigger.new(@workflow_set)
+    @wf.run
   end
 
   def teardown
@@ -134,16 +136,22 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
 
   def test_collection_config_change
     MongoSupport.instance.clean_database
+    @wf.finish
+    @wf.stop
     @config_store.clear
 
-    Armagh::StandardActions::CollectActionForTest.make_long_test_config(store: @config_store, action_name: 'change_collect', collected_doctype: 'collect_type')
-    @workflow.refresh
+    Armagh::StandardActions::CollectActionForTest.make_long_test_config(workflow: @wf, action_name: 'change_collect', collected_doctype: 'collect_type')
+    @wf.run
+    @workflow_set.refresh
 
     @collection_trigger.start
 
     sleep 62
-    Armagh::StandardActions::CollectActionForTest.make_test_config(store: @config_store, action_name: 'change_collect2', collected_doctype: 'collect_type')
-    @workflow.refresh
+    @wf.finish
+    @wf.stop
+    Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'change_collect2', collected_doctype: 'collect_type')
+    @wf.run
+    @workflow_set.refresh
     sleep 1
 
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a

@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+#
+# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
+#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
+#
+
+require 'bundler/setup'
+require_relative '../lib/utils/daemonizer'
+
+file = File.join(__dir__, 'armagh-application-admin-gui')
+Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-application-admin-gui', work_dir: '/var/log/armagh')

@@ -45,6 +45,7 @@ Then(/^I wait until there are agents with the statuses$/) do |table|
 
   until (Time.now > end_time) || matched_statuses
     status = MongoSupport.instance.get_status
+
     if status
       agents = status['agents']
       seen_statuses = []

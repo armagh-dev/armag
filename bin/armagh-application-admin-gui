@@ -1,0 +1,353 @@
+#!/usr/bin/env ruby
+
+# Copyright 2017 Noragh Analytics, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied.
+#
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+require 'sinatra'
+require 'thin'
+
+require_relative '../lib/environment.rb'
+Armagh::Environment.init
+
+require 'armagh/support/templating'
+
+require_relative '../lib/admin/application/admin_gui.rb'
+
+Process.setproctitle(File.basename(__FILE__))
+
+gui = Armagh::Admin::Application::AdminGUI.instance
+
+include Armagh::Support::Templating
+
+enable :sessions, :logging
+
+configure do
+  if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
+    set :environment, :production
+  else
+    set :environment, :development
+    set :show_exceptions, :after_handler
+  end
+
+  set :bind,          gui.ip
+  set :port,          gui.port
+  set :server,        'thin'
+  set :root,          Proc.new { gui.root_directory }
+  set :public_folder, Proc.new { File.join(settings.root, 'public') }
+  set :views,         Proc.new { File.join(settings.root, 'views') }
+  set :run,           true
+end
+
+use Rack::CommonLogger, gui.logger
+
+helpers do
+  def render(*page, **context)
+    page.map! { |p| p.to_s }
+    page = File.join(page)
+    context[:page]   = page
+    context[:error]  = replace_new_line_with_br(context[:error])  if context[:error]
+    context[:notice] = replace_new_line_with_br(context[:notice]) if context[:notice]
+    render_template(File.join(settings.views, 'layout.erubis'), :html, context)
+  end
+
+  def partial(*page, **context)
+    page.map! { |p| p.to_s }
+    page = File.join(page)
+    render_partial(File.join(settings.views, "#{page}.erubis"), context)
+  end
+
+  def url_path(path)
+    url(path)
+  end
+
+  def active_domain(page_to_check = '')
+    request.path_info[/^\/#{page_to_check}(?:\/|\?|$)/] ? 'uk-active' : ''
+  end
+
+  def replace_new_line_with_br(content)
+    case content
+    when String
+      content.gsub(/\n/, '<br />')
+    when Array
+      Array(content).map { |value| value.gsub(/\n/, '<br />') }
+    else
+      raise "Unexpected content class provided to replace_new_line_with_br: #{content.class}"
+    end
+  end
+
+  def authenticated?
+    !user.nil?
+  end
+
+  def user
+    session['user']
+  end
+
+  def proper_case(value)
+    return '' if value.to_s.strip.empty?
+    value
+      .split('_')
+      .map { |word| word.capitalize }
+      .join(' ')
+  end
+
+  def sanitize_string(value)
+    return value unless value.is_a?(String)
+    value
+      .gsub(/&/, '&amp;')
+      .gsub(/</, '&lt;')
+      .gsub(/>/, '&gt;')
+      .gsub(/"/, '&quot;')
+      .gsub(/'/, '&#39;')
+      .gsub(/\//, '&#x2F;')
+      .gsub(/`/, '&#x60;')
+      .gsub(/=/, '&#x3D;')
+      .strip
+  end
+end
+
+not_found do
+  halt 404, render(:error, error: "404: <strong>#{request.path_info}</strong> does not exist" )
+end
+
+error Timeout::Error do
+  render :error, error: @on_error
+end
+
+error do |e|
+  render :error, error: e.message
+end
+
+before do
+  pass if request.path_info[/^\/login/]
+  redirect "/login?re=#{request.path_info}" unless session[:user]
+end
+
+#
+# login
+#
+
+get '/login' do
+  render :login
+end
+
+post '/login' do
+  username = params['username']
+  password = params['password']
+
+  if username.strip.empty? || password.strip.empty?
+    halt render(:login, error: 'Username and/or password cannot be blank')
+  else
+    gui.set_auth(username, password)
+    session['user'] = username
+    redirect params['re']
+  end
+end
+
+get '/logout' do
+  session['user'] = nil
+  redirect '/'
+end
+
+#
+# home
+#
+
+get '/' do
+  render :home
+end
+
+#
+# status
+#
+
+get '/status' do
+  render :status, data: gui.get_status
+end
+
+post '/status' do
+  # TODO: add restart and shutdown support
+  'not yet supported'
+  # result = `armaghd stop`
+  # if result[/does not exist|is not writable/]
+  #   halt render(:status, error: "Unable to determine Armagh status.\n\n#{result}")
+  # elsif result[/is not running/]
+  #   halt render(:status, notice: 'Armagh was successfully shut down.')
+  # end
+end
+
+#
+# logs
+#
+
+get '/logs' do
+  data = gui.get_logs(page:   params['page'],
+                            limit:  params['limit'],
+                            sort:  {params['sort_col']=>params['sort_dir']},
+                            filter: params['filter'],
+                            hide:   params['hide'])
+  errors = data[:errors]
+  data.delete(:errors)
+  render :logs, data: data, error: errors
+end
+
+#
+# workflow config
+#
+
+get '/config' do
+  render :config, :workflows, data: gui.get_workflows
+end
+
+get '/config/new' do
+  render :config, :workflow_new
+end
+
+post '/config/new' do
+  workflow = params['workflow']
+  halt render(:config, :workflow_new, error: 'Workflow name cannot be empty') if workflow.to_s.strip.empty?
+  status, response = gui.new_workflow(workflow)
+  if status == :ok
+    redirect "/config/#{workflow}"
+  else
+    data = {
+      value: workflow,
+      error: response['message']
+    }
+    halt render(:config, :workflow_new, data: data, error: response['message'])
+  end
+end
+
+get '/config/:workflow' do
+  workflow = params['workflow']
+  created  = params['created']
+  updated  = params['updated']
+  data     = {
+    workflow: workflow,
+    actions:  gui.get_workflow_actions(workflow),
+    active:   gui.workflow_active?(workflow),
+    created:  created,
+    updated:  updated
+  }
+  success = "Successfully #{created ? 'created' : 'updated'} action <strong>#{created ? created : updated}</strong>." if created || updated
+  render :config, :workflow_edit, data: data, success: success
+end
+
+get '/config/:workflow/new' do
+  workflow = params['workflow']
+  data = {
+    workflow:        workflow,
+    active:          gui.workflow_active?(workflow),
+    defined_actions: gui.get_defined_actions,
+    previous_action: params['prev'],
+    filter:          params['filter']
+  }
+  render :config, :action_new, data: data
+end
+
+post '/config/:workflow/new' do
+  redirect "/config/#{params['workflow']}/new/#{params['action']}"
+end
+
+post '/config/:workflow/import' do
+  gui.import_action_config(params)
+end
+
+get '/config/:workflow/export' do
+  workflow = params['workflow']
+  headers['Content-Type']        = 'application/json'
+  headers['Content-Disposition'] = "attachment;filename=#{workflow}.json"
+  gui.export_workflow_config(workflow)
+end
+
+post '/config/:workflow/:status_change' do
+  workflow = params['workflow']
+  if params['status_change'] == 'activate'
+    gui.activate_workflow(workflow)
+      .unshift(params['id'])
+      .to_json
+  else
+    gui.deactivate_workflow(workflow)
+      .unshift(params['id'])
+      .to_json
+  end
+end
+
+#
+# action config
+#
+
+get '/config/:workflow/new/:action' do
+  workflow = params['workflow']
+  action   = params['action']
+  config   = gui.get_defined_parameters(workflow, action)
+  data     = {
+    workflow:           workflow,
+    action:             action,
+    type:               config.delete(:type),
+    supertype:          config.delete(:supertype),
+    defined_parameters: config
+  }
+  render :config, :action_edit, data: data
+end
+
+post '/config/:workflow/new/:action' do
+  workflow = params['workflow']
+  result   = gui.create_action_config(params)
+  if result == :success
+    redirect "/config/#{workflow}?created=#{params['action-name']}"
+  else
+    render :config, :action_edit, data: result.first, error: result.last
+  end
+end
+
+get '/config/:workflow/edit/:action' do
+  workflow = params['workflow']
+  action   = params['action']
+  config   = gui.get_action_config(workflow, action)
+  data     = {
+    locked:             gui.workflow_active?(workflow),
+    workflow:           workflow,
+    action:             action,
+    type:               config.delete(:type),
+    supertype:          config.delete(:supertype),
+    edit_action:        true,
+    defined_parameters: config,
+    test_callbacks:     nil #gui.get_action_callbacks(klass) # TODO: implement callbacks
+  }
+  render :config, :action_edit, data: data
+end
+
+post '/config/:workflow/edit/:action' do
+  workflow = params['workflow']
+  action   = params['action']
+  result   = gui.update_action_config(params)
+  if result == :success
+    redirect "/config/#{workflow}?updated=#{action}"
+  else
+    render :config, :action_edit, data: result.first, error: result.last
+  end
+end
+
+get '/config/:workflow/edit/:action/test' do
+  workflow = params['workflow']
+  action   = params['action']
+  index    = params['idx'].to_i
+  raise "Test callback method attempted does not exist" unless index
+  error    = gui.test_action_callback(workflow, action, index)
+  sanitize_string(error)
+end

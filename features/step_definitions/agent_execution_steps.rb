@@ -16,15 +16,16 @@
 #
 
 require_relative '../../lib/document/document'
-require_relative '../../lib/actions/workflow'
+require_relative '../../lib/actions/workflow_set'
 require_relative '../../lib/logging'
 
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"$/) do |count, doc_type, state, document_id, content, meta|
   @logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')
-  @workflow ||= Armagh::Actions::Workflow.new(@logger, Armagh::Connection.config)
+  @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+  @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
 
   docspec = Armagh::Documents::DocSpec.new(doc_type, state)
-  pending_actions = @workflow.get_action_names_for_docspec(docspec)
+  pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
 
   content = content.nil? ? {} : eval(content)
   meta = meta.nil? ? {} : eval(meta)

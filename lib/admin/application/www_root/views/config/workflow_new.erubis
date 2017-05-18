@@ -1,0 +1,74 @@
+<div class="uk-panel uk-panel-box uk-panel-box-primary uk-margin-bottom">
+  <span class="uk-text-large uk-text-bold">
+
+    New Workflow
+
+  </span>
+</div>
+
+<form method="post" class="uk-form uk-form-horizontal uk-container">
+  <fieldset>
+
+    <dl class="uk-description-list-line">
+      <dt class="uk-margin-small-bottom">
+
+        <div class="uk-grid">
+          <div class="uk-width-1-2">
+
+            Workflow Name
+
+          </div>
+          <div class="uk-width-1-2 uk-text-small uk-text-muted">
+
+            <i class="uk-icon-cube"></i>
+            Populated String
+
+            <span class="uk-text-primary uk-margin-left">
+              <i class="uk-icon-exclamation uk-text-small"></i>
+              Required
+            </span>
+
+          <div>
+        </div>
+
+      </dt>
+      <dd>
+
+        <div class="uk-grid">
+          <div class="uk-width-1-2">
+
+            <input name="workflow" type="text" class="uk-text-large uk-width-1-1 {{= @data&.[](:error) ? 'uk-form-danger' : '' }}" value="{{= @data&.[](:value) }}" autofocus="true">
+
+          </div>
+          <div class="uk-width-1-2">
+
+            {{ if @data }}
+              <div class="uk-text-danger">
+                <i class="uk-icon-exclamation-circle"></i>
+                {{== @data&.[](:error) }}
+              </div>
+            {{ end }}
+
+            Unique name of the workflow you would like to create
+
+          </div>
+        </div>
+
+      </dd>
+    </dl>
+
+    <hr />
+
+    <div class="uk-grid">
+      <div class="uk-width-1-3">
+      </div>
+      <div class="uk-width-1-3 uk-text-center">
+        <a href="/config" class="uk-button">Back</a>
+      </div>
+      <div class="uk-width-1-3 uk-text-right">
+        <button id="next" type="submit" class="uk-button uk-button-primary">Create</button>
+      </div>
+    </div>
+
+  </fieldset>
+</form>

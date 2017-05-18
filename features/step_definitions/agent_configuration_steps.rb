@@ -31,5 +31,5 @@ end
 
 
 Then(/^the logs should contain (\d+) "([^"]*)"$/) do |count, string|
-  assert_not_equal(count, LogSupport.count(string))
+  assert_equal(count.to_i, LogSupport.count(string))
 end
