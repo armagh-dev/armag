@@ -219,15 +219,14 @@ end
 
 post '/config/new' do
   workflow = params['workflow']
+
   halt render(:config, :workflow_new, error: 'Workflow name cannot be empty') if workflow.to_s.strip.empty?
+
   status, response = gui.new_workflow(workflow)
   if status == :ok
     redirect "/config/#{workflow}"
   else
-    data = {
-      value: workflow,
-      error: response['message']
-    }
+    data = {value: workflow}
     halt render(:config, :workflow_new, data: data, error: response['message'])
   end
 end

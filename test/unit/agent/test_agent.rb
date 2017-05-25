@@ -78,7 +78,7 @@ class TestAgent < Test::Unit::TestCase
     @running = true
     @default_agent = prep_an_agent('default', {}, 'default')
     @state_coll = mock
-    Armagh::Connection.stubs(:config).returns(@state_coll)
+    Armagh::Connection.stubs(:action_state).returns(@state_coll)
   end
 
   def prep_an_agent(config_name, config_values, id)

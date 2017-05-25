@@ -766,7 +766,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
 
     get '/workflow/alice/action/collect_alicedocs_from_source/config.json' do
-      puts last_response.body
       assert last_response.ok?
       result = JSON.parse(last_response.body)
       expected_result = {

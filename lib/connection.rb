@@ -82,6 +82,10 @@ module Armagh
       MongoConnection.instance.connection['status']
     end
 
+    def self.action_state
+      MongoConnection.instance.connection['action_state']
+    end
+
     def self.log
       MongoConnection.instance.connection['log']
     end
@@ -139,6 +143,7 @@ module Armagh
 
     def self.setup_indexes
       config.indexes.create_one({'type' => 1, 'name' => 1, 'timestamp' => -1}, unique: true, name: 'types')
+      action_state.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       users.indexes.create_one({'username' => 1}, unique: true, name: 'username')
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
 

@@ -181,7 +181,7 @@ module Armagh
 
     def instantiate_divider(docspec)
       begin
-        actions = @workflow_set.instantiate_actions_handling_docspec(docspec, self, @logger, Connection.config)
+        actions = @workflow_set.instantiate_actions_handling_docspec(docspec, self, @logger, Connection.action_state)
       rescue Armagh::Actions::ActionInstantiationError => e
         Logging.ops_error_exception(@logger, e, 'Unable to instantiate divide')
         actions = []
@@ -292,7 +292,7 @@ module Armagh
           current_action = nil
 
           begin
-            current_action = @workflow_set.instantiate_action_named(name, self, @logger, Connection.config)
+            current_action = @workflow_set.instantiate_action_named(name, self, @logger, Connection.action_state)
           rescue Armagh::Actions::ActionInstantiationError
             @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined."
           end

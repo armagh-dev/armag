@@ -44,24 +44,25 @@ module Armagh
         def test_private_get_json_error
           response = mock('response')
           response.stubs(:status).returns(400)
+          response.stubs(:reason).returns('some reason')
           response.stubs(:body).returns({'client_error_detail'=>{'message'=>'some error'}}.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
           e = assert_raise AdminGUIHTTPError do
             @admin_gui.send(:get_json, 'error.url')
           end
-          expected = 'API HTTP get request to "error.url" failed with status 400 and message: some error'
-          assert_equal expected, e.message
+          assert_equal 'some error', e.message
         end
 
         def test_private_get_json_http_404
           response = mock('response')
           response.stubs(:status).returns(404)
+          response.stubs(:reason).returns('not found')
+          response.stubs(:body).returns('whatever')
           HTTPClient.any_instance.expects(:get).once.returns(response)
           e = assert_raise AdminGUIHTTPError do
             @admin_gui.send(:get_json, 'missing.url')
           end
-          expected = 'API HTTP get request to "missing.url" failed with status 404'
-          assert_equal expected, e.message
+          assert_equal 'API HTTP get request to http://127.0.0.1:4599/missing.url failed with status 404 not found', e.message
         end
 
         def test_private_get_json_with_status
@@ -99,26 +100,27 @@ module Armagh
         def test_private_post_json_http_404
           response = mock('response')
           response.stubs(:status).returns(404)
+          response.stubs(:reason).returns('not found')
+          response.stubs(:body).returns('body')
           HTTPClient.any_instance.expects(:post).once.returns(response)
-          e = assert_raise AdminGUIHTTPError do
-            @admin_gui.send(:post_json, 'missing.url')
-          end
-          expected = 'API HTTP post request to "missing.url" failed with status 404'
-          assert_equal expected, e.message
+          result = @admin_gui.send(:post_json, 'missing.url')
+          expected = {'message' => 'API HTTP post request to http://127.0.0.1:4599/missing.url failed with status 404 not found'}
+          assert_equal [:error, expected], result
         end
 
         def test_private_http_request_json_parse_error
           response = mock('response')
           response.stubs(:status).returns(200)
+          response.stubs(:reason).returns('ok')
           response.stubs(:body).returns('this is not json')
           http = mock('http')
           http.stubs(:set_auth)
           HTTPClient.any_instance.stubs(:new).returns(http)
           HTTPClient.any_instance.stubs(:get).returns(response)
-          e = assert_raise AdminGUIHTTPError do
-            @admin_gui.send(:get_json, 'fake.url')
-          end
-          assert_equal 'API HTTP get request to "fake.url" failed: response is not JSON', e.message
+          result = @admin_gui.send(:get_json, 'fake.url')
+          expected = {'message'=>
+            'API HTTP get request to http://127.0.0.1:4599/fake.url failed with status 200 ok'}
+          assert_equal expected, result
         end
 
         def test_set_auth
@@ -189,7 +191,7 @@ module Armagh
           response = {
             'run_mode' => 'run'
           }
-          @admin_gui.expects(:post_json).once.returns([:ok, response])
+          @admin_gui.expects(:get_json_with_status).once.returns([:ok, response])
           result = @admin_gui.activate_workflow('dummy')
           expected = ['run', response]
           assert_equal expected, result
@@ -199,14 +201,14 @@ module Armagh
           response = {
             'message' => 'some error'
           }
-          @admin_gui.expects(:post_json).once.returns([:error, response])
+          @admin_gui.expects(:get_json_with_status).once.returns([:error, response])
           result = @admin_gui.activate_workflow('dummy')
           expected = ['stop', "Unable to activate workflow dummy: #{response['message']}"]
           assert_equal expected, result
         end
 
         def test_activate_workflow_unexpected_error
-          @admin_gui.expects(:post_json).once.raises(RuntimeError, 'unexpected error')
+          @admin_gui.expects(:get_json_with_status).once.raises(RuntimeError, 'unexpected error')
           result = @admin_gui.activate_workflow('dummy')
           assert_equal ["stop", "Unable to activate workflow dummy: unexpected error"], result
         end
@@ -215,7 +217,7 @@ module Armagh
           response = {
             'run_mode' => 'stop'
           }
-          @admin_gui.expects(:post_json).once.returns([:ok, response])
+          @admin_gui.expects(:get_json_with_status).once.returns([:ok, response])
           result = @admin_gui.deactivate_workflow('dummy')
           expected = ['stop', response]
           assert_equal expected, result
@@ -225,7 +227,7 @@ module Armagh
           response = {
             'message' => 'some error'
           }
-          @admin_gui.expects(:post_json).once.returns([:error, response])
+          @admin_gui.expects(:get_json_with_status).once.returns([:error, response])
           result = @admin_gui.deactivate_workflow('dummy')
           expected = ['run', "Unable to deactivate workflow dummy: #{response['message']}"]
           assert_equal expected, result

@@ -169,28 +169,26 @@
     cks.each(function(_index, chk) {
       var id = $(chk).prop('id').replace(/select-workflow-/, '')
       var wf = $("#workflow-" + id).val()
+      var st = $("#active-status-" + id).val()
+
+      if ((activating && st != 'stop') || (!activating && st == 'stop')) {
+        update_request_status()
+        return
+      }
 
       $.post({
         url:     "/config/" + wf + "/" + status + "?id=" + id,
-        success: function(data) {
+        success: function(data, text) {
           update_status_change(data)
-          localStorage['workflow-status-change'] -= 1
-          if (localStorage['workflow-status-change'] <= 0) {
-            localStorage.removeItem('workflow-status-change')
-            update_toggle_buttons()
-          }
+          update_request_status()
         },
-        error:   function(xhr, exception) {
-          localStorage['workflow-status-change'] -= 1
-          if (localStorage['workflow-status-change'] <= 0) {
-            localStorage.removeItem('workflow-status-change')
-            update_toggle_buttons()
-          }
+        error:   function(request, status, error) {
+          update_request_status()
           $("#status-change-errors").html(
             '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
               '<a href="" class="uk-alert-close uk-close"></a>' +
                 '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
-                'Unable to change status for one or more workflows' +
+                'Unable to change status for one or more workflows: ' + error +
             '</div>'
           )
         }
@@ -199,11 +197,30 @@
     })
   }
 
+  function update_request_status() {
+    localStorage['workflow-status-change'] -= 1
+    if (localStorage['workflow-status-change'] <= 0) {
+      localStorage.removeItem('workflow-status-change')
+      update_toggle_buttons()
+    }
+  }
+
   function update_status_change(data) {
     var data   = JSON.parse(data),
         id     = data[0],
         status = data[1],
         data   = data[2]
+
+    if ($.type(data) === 'string' && data.match("^Unable")) {
+      $("#status-change-errors").html(
+        '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
+          '<a href="" class="uk-alert-close uk-close"></a>' +
+          '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
+          data +
+        '</div>'
+      )
+      return
+    }
 
     $("#active-status-" + id).val(status)
     var span = $("#status-icon-" + id)

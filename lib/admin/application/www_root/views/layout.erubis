@@ -74,9 +74,21 @@
       <br />
 
       <div id="notices-and-alerts" class="uk-container uk-container-center uk-margin-large-bottom">
-        {{= partial :error, error: @error if @error }}
-        {{= partial :notice, notice: @notice if @notice }}
-        {{= partial :success, success: @success if @success }}
+        {{ if @error }}
+          {{ @data ||= {} }}
+          {{ @data[:error] = @error }}
+          {{= partial :error, error: @error }}
+        {{ end }}
+        {{ if @notice }}
+          {{ @data ||= {} }}
+          {{ @data[:notice] = @notice }}
+          {{= partial :notice, notice: @notice }}
+        {{ end }}
+        {{ if @success }}
+          {{ @data ||= {} }}
+          {{ @data[:success] = @success }}
+          {{= partial :success, success: @success }}
+        {{ end }}
         {{= partial @page, data: @data unless @page == :error }}
       </div>
 

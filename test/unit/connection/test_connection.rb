@@ -204,18 +204,22 @@ class TestConnection < Test::Unit::TestCase
 
   def test_setup_indexes
     config_indexes = mock
+    action_state_indexes = mock
     users_indexes = mock
     groups_indexes = mock
     doc_indexes = mock
     config = stub(indexes: config_indexes)
+    action_state = stub(indexes: action_state_indexes)
     users = stub(indexes: users_indexes)
     groups = stub(indexes: groups_indexes)
     @connection.stubs(:[]).with('config').returns(config)
+    @connection.stubs(:[]).with('action_state').returns(action_state)
     @connection.stubs(:[]).with('users').returns(users)
     @connection.stubs(:[]).with('groups').returns(groups)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
+    action_state_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'username'})
     groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     doc_indexes.expects(:create_one).twice

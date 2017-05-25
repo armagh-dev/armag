@@ -78,32 +78,24 @@ module Armagh
         private def http_request(relative_url, method, data, get_with_status = false)
           relative_url.sub!(/^\//, '')
           relative_url.gsub!(/\ /, '%20')
-          url      = "http://#{@ip}:#{@api_port}/#{relative_url}"
-          if data.is_a?(JSON)
-            body = data.to_json
-            header = { 'ContentType' => 'application/json'}
-          else
-            body = data
-          end
+          url  = "http://#{@ip}:#{@api_port}/#{relative_url}"
+          body = data.is_a?(JSON) ? data : data.to_json
 
-          client   = HTTPClient.new
+          client = HTTPClient.new
           client.set_auth(url, @username, @password)
 
           response =
             if method == :get
               client.get(url, body)
             else
-              client.post(url, body: body, header: header)
+              client.post(url, body: body, header: {'ContentType' => 'application/json'})
             end
-
-          if response.status == 404
-            raise AdminGUIHTTPError, "API HTTP #{method} request to #{relative_url.inspect} failed with status #{response.status}"
-          end
 
           begin
             json = JSON.parse(response.body)
-          rescue
-            raise AdminGUIHTTPError, "API HTTP #{method} request to #{relative_url.inspect} failed: response is not JSON"
+          rescue JSON::ParserError
+            json = {'server_error_detail' => {'message' =>
+              "API HTTP #{method} request to #{url} failed with status #{response.status} #{response.reason}"}}
           end
           status = response.status == 200 ? :ok : :error
 
@@ -112,17 +104,18 @@ module Armagh
             json = json['server_error_detail'] if json.has_key?('server_error_detail')
           end
 
-          if method == :get
+          case method
+          when :get
             if get_with_status
               [status, json]
             else
               if status == :ok
                 json
               else
-                raise AdminGUIHTTPError, "API HTTP #{method} request to #{relative_url.inspect} failed with status #{response.status} and message: #{json['message']}"
+                raise AdminGUIHTTPError, json['message']
               end
             end
-          else
+          when :post
             [status, json]
           end
         end
@@ -168,7 +161,7 @@ module Armagh
         private def change_workflow_status(workflow, status_change)
           unchanged_status = status_change == :activate ? 'stop' : 'run'
           status, response =
-            post_json("/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
+            get_json_with_status("/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else
@@ -358,7 +351,7 @@ module Armagh
             if new_action
               post_json("/workflow/#{workflow}/action/config.json", new_config)
             else
-              post_json("/workflow/#{workflow}/action/#{action}/description.json", new_config)
+              post_json("/workflow/#{workflow}/action/#{action}/config.json", new_config)
             end
 
           if status == :ok && errors.empty?

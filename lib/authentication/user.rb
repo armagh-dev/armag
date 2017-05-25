@@ -37,7 +37,7 @@ module Armagh
       class PermanentError < UserError; end
 
       MAX_TRIES = 3 # TODO Make this configurable
-      DUMMY_USERNAME = '__dummy_users__'
+      DUMMY_USERNAME = '__dummy_user__'
       ADMIN_USERNAME = 'admin'
       DEFAULT_ADMIN_PASSWORD = 'armaghadmin'
 
