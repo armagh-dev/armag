@@ -31,10 +31,7 @@ When(/^armagh doesn't have a "([^"]*)" config$/) do |config_type|
 end
 
 When(/^I run armagh$/) do
-  launch_details = LauncherSupport.launch_launcher
-  @spawn_pid = launch_details[:pid]
-  @stderr_pipe = launch_details[:stderr]
-  @stdout_pipe = launch_details[:stdout]
+  @spawn_pid = LauncherSupport.launch_launcher
 end
 
 Then(/^armagh should have exited$/) do
@@ -43,12 +40,6 @@ end
 
 Then(/^armagh should be running$/) do
   assert_true LauncherSupport.running?(@spawn_pid)
-end
-
-Then(/^stderr should contain "([^"]*)"$/) do |message|
-  @stderr_pipe[:write].close
-  stderr = @stderr_pipe[:read].readlines.join("\n").strip
-  assert_not_nil stderr =~ /#{message}/, "Stderr does not contain '#{message}'."
 end
 
 Then(/^the number of running agents equals (\d+)$/) do |num_agents|

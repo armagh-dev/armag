@@ -40,14 +40,11 @@ module LauncherSupport
   end
 
   def self.launch_launcher
-    rout, wout = IO.pipe
-    rerr, werr = IO.pipe
-
-    pid = Process.spawn("#{EXEC}", :out => wout, :err => werr)
+    pid = Process.spawn("#{EXEC} 2>&1 > /dev/null")
     Process.detach(pid)
     sleep 1
 
-    {pid: pid, stdout: {read: rout, write: wout}, stderr: {read: rerr, write: werr}}
+    pid
   end
 
   def self.running?(pid)
@@ -84,15 +81,26 @@ module LauncherSupport
 
   def self.kill_launcher_processes
     LauncherSupport.stop_launcher_daemon
+
     processes = LauncherSupport.get_launcher_processes
     processes.each do |process|
       pid = process.pid
 
-      puts "Killing armagh running as PID #{pid}"
+      print "Killing armagh running as PID #{pid}"
       Process.kill(:SIGINT, pid)
-      begin
-        Process.waitpid(pid)
-      rescue Errno::ECHILD; end
+
+      running = true
+      until !running
+        begin
+          Process.kill(0, pid)
+          running = true
+          print '.'
+          sleep 1
+        rescue Errno::ESRCH
+          running = false
+        end
+      end
+      puts ''
     end
   end
 end

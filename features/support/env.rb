@@ -74,11 +74,12 @@ After do |scenario|
     FileUtils.mkdir_p log_dir
     FileUtils.cp_r(LogSupport::LOG_DIR, log_dir)
   end
+
+  puts 'Stopping Armagh'
+  LauncherSupport.kill_launcher_processes
 end
 
 After('@agent') do
-  puts 'Stopping Armagh'
-  LauncherSupport.kill_launcher_processes
 end
 
 at_exit do

@@ -206,15 +206,17 @@ module Armagh
       Thread.new{ @logger.any "Killing #{num_agents} agent(s)." }.join
       num_agents.times do
         pid = @agents.keys.first
+        next unless pid
+        agent_id = @agents[pid].uuid
+
+        Thread.new{ @logger.any "Killing #{agent_id}." }.join
         Process.kill(signal, pid)
         begin
           pid = Process.wait
         rescue Errno::ECHILD; end
 
-        agent_id = @agents[pid].uuid
         @agents.delete pid
         @agent_status.remove_agent(agent_id)
-        Thread.new{ @logger.any "Killing #{agent_id}." }.join
       end
     end
 
