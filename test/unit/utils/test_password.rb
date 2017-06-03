@@ -33,8 +33,14 @@ class TestPassword < Test::Unit::TestCase
     assert_false Armagh::Utils::Password.correct?('wrong', Armagh::Utils::Password.hash(password))
   end
 
+  def test_strength_not_string
+    assert_raise(Armagh::Utils::Password::PasswordError.new('Password must be a string.')) do
+      Armagh::Utils::Password.verify_strength(123)
+    end
+  end
+
   def test_strength_too_short
-    assert_raise(Armagh::Utils::Password::PasswordError, "Password must contain at least #{Armagh::Utils::Password::MIN_PWD_LENGTH} characters.") do
+    assert_raise(Armagh::Utils::Password::PasswordError.new("Password must contain at least #{Armagh::Utils::Password::MIN_PWD_LENGTH} characters.")) do
       Armagh::Utils::Password.verify_strength('a')
     end
   end

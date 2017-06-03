@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+require 'bson'
+
 require_relative 'directory'
 require_relative 'role'
 require_relative 'user'
@@ -28,6 +30,10 @@ module Armagh
 
       class GroupError < StandardError; end
       class PermanentError < GroupError; end
+      class NameError < GroupError; end
+      class DescriptionError < GroupError; end
+      class RoleError < GroupError; end
+      class UserError < GroupError; end
 
       def self.default_collection
         Connection.groups
@@ -57,13 +63,13 @@ module Armagh
       end
 
       private_class_method def self.setup_sa_group
-        group = setup_group 'Super Administrators', 'Full control over Armagh'
+        group = setup_group 'super_administrators', 'Full control over Armagh'
         Role::PREDEFINED_ROLES.each {|role| group.add_role role}
         group.save
       end
 
       private_class_method def self.setup_admin_group
-        group = setup_group 'Administrators', 'Modify behavior of Armagh'
+        group = setup_group 'administrators', 'Modify behavior of Armagh'
         group.add_role Role::APPLICATION_ADMIN
         group.add_role Role::USER_ADMIN
         group.add_role Role::USER_MANAGER
@@ -72,7 +78,7 @@ module Armagh
       end
 
       private_class_method def self.setup_user_admin_group
-        group = setup_group 'User Administrators', 'Add, delete, and modify users'
+        group = setup_group 'user_administrators', 'Add, delete, and modify users'
         group.add_role Role::USER_ADMIN
         group.add_role Role::USER_MANAGER
         group.add_role Role::USER
@@ -80,14 +86,14 @@ module Armagh
       end
 
       private_class_method def self.setup_user_management_group
-        group = setup_group 'User Managers', 'Reset user passwords and unlock users'
+        group = setup_group 'user_managers', 'Reset user passwords and unlock users'
         group.add_role Role::USER_MANAGER
         group.add_role Role::USER
         group.save
       end
 
       private_class_method def self.setup_user_group
-        group = setup_group 'Users', 'View documents'
+        group = setup_group 'users', 'View documents'
         group.add_role Role::USER
         group.save
       end
@@ -100,9 +106,24 @@ module Armagh
         new_group.directory = directory
         new_group.save
         new_group
+      rescue Connection::DocumentUniquenessError
+        raise NameError, "A group with name '#{name}' already exists."
+      end
+
+      def self.update(id:, name:, description:)
+        doc = find(id)
+
+        if doc
+          doc.name = name
+          doc.description = description
+          doc.save
+        end
+
+        doc
       end
 
       def self.find(id)
+        id = BSON::ObjectId.from_string(id.to_s)
         group = self.db_find_one({'_id' => id})
         group ? new(group) : nil
       rescue => e
@@ -116,11 +137,15 @@ module Armagh
         raise Connection.convert_mongo_exception(e, id: name, type_class: self.class)
       end
 
-      def self.find_all(ids)
-        ids = Array(ids)
-        groups = []
+      def self.find_all(ids = nil)
+        if ids
+          ids = Array(ids).collect{|id| BSON::ObjectId.from_string(id)}
+          db_groups = self.db_find({'_id' => {'$in' => ids}}).to_a.compact
+        else
+          db_groups = self.db_find({}).to_a.compact
+        end
 
-        db_groups = self.db_find({'_id' => {'$in' => ids}}).to_a.compact
+        groups = []
 
         db_groups.each do |db_group|
           groups << new(db_group)
@@ -144,7 +169,7 @@ module Armagh
       def save
         self.mark_timestamp
 
-        Armagh::Utils::DBDocHelper.clean_model(self)
+        Utils::DBDocHelper.clean_model(self)
 
         if internal_id
           self.class.db_replace({'_id' => internal_id}, @db_doc)
@@ -159,6 +184,7 @@ module Armagh
         raise PermanentError, 'Cannot delete a permanent account.' if permanent?
         users.each {|u| remove_user(u)}
         self.class.db_delete({'_id' => internal_id})
+        true
       rescue => e
         raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
       end
@@ -168,7 +194,10 @@ module Armagh
       end
 
       def name=(name)
-        @db_doc['name'] = name
+        raise NameError, 'Name must be a nonempty string.' unless name.is_a?(String) && !name.empty?
+        lowercase = name.downcase
+        raise NameError, 'Name can only contain alphabetic, numeric, and underscore characters.' if lowercase =~ /\W/
+        @db_doc['name'] = lowercase
       end
 
       def description
@@ -176,6 +205,7 @@ module Armagh
       end
 
       def description=(description)
+        raise DescriptionError, 'Description must be a nonempty string.' unless description.is_a?(String) && !description.empty?
         @db_doc['description'] = description
       end
 
@@ -196,11 +226,11 @@ module Armagh
       end
 
       def has_user?(user)
-        @db_doc['users'].include? user.internal_id
+        @db_doc['users'].include? user.internal_id.to_s
       end
 
       def add_user(user, reciprocate: true)
-        @db_doc['users'] << user.internal_id
+        @db_doc['users'] << user.internal_id.to_s
         if reciprocate
           user.join_group(self, reciprocate: false)
           user.save
@@ -208,11 +238,15 @@ module Armagh
       end
 
       def remove_user(user, reciprocate: true)
-        @db_doc['users'].delete user.internal_id
+        if has_user?(user)
+          @db_doc['users'].delete user.internal_id.to_s
 
-        if reciprocate
-          user.leave_group(self, reciprocate: false)
-          user.save
+          if reciprocate
+            user.leave_group(self, reciprocate: false)
+            user.save
+          end
+        else
+          raise UserError, "User '#{user.username}' is not a member of '#{name}'."
         end
       end
 
@@ -222,7 +256,11 @@ module Armagh
       end
 
       def remove_role(role)
-        @db_doc['roles'].delete role.key
+        if has_role? role
+          @db_doc['roles'].delete role.key
+        else
+          raise RoleError, "Group '#{name}' does not have a direct role of '#{role.key}'."
+        end
       end
 
       def remove_all_roles

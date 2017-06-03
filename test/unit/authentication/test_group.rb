@@ -15,10 +15,9 @@
 # limitations under the License.
 #
 
+require_relative '../../helpers/bson_support'
 require_relative '../../helpers/coverage_helper'
-
 require_relative '../../../lib/connection'
-
 require_relative '../../../lib/authentication/group'
 
 require 'test/unit'
@@ -61,11 +60,11 @@ class TestGroup < Test::Unit::TestCase
   end
 
   def test_setup_default_groups
-    assert_default_group 'Super Administrators'
-    assert_default_group 'Administrators'
-    assert_default_group 'User Administrators'
-    assert_default_group 'User Managers'
-    assert_default_group 'Users'
+    assert_default_group 'super_administrators'
+    assert_default_group 'administrators'
+    assert_default_group 'user_administrators'
+    assert_default_group 'user_managers'
+    assert_default_group 'users'
 
     Armagh::Authentication::Group.setup_default_groups
   end
@@ -75,13 +74,34 @@ class TestGroup < Test::Unit::TestCase
     assert_equal Armagh::Authentication::Directory::INTERNAL, group.directory
     assert_equal 'testgroup', group.name
     assert_equal 'description', group.description
+
+    Armagh::Authentication::Group.any_instance.expects(:save).raises(Armagh::Connection::DocumentUniquenessError.new('duplicate'))
+    assert_raise(Armagh::Authentication::Group::NameError) {
+      Armagh::Authentication::Group.create(name: 'testgroup', description: 'description')
+    }
+  end
+
+  def test_update
+    existing_group = mock('existing group')
+    existing_group.expects(:name=).with('existing_group')
+    existing_group.expects(:description=).with('description')
+    existing_group.expects(:save)
+    Armagh::Authentication::Group.expects(:find).with('id').returns(existing_group)
+
+    group = Armagh::Authentication::Group.update(id: 'id', name: 'existing_group', description: 'description')
+    assert_equal existing_group, group
+
+    Armagh::Authentication::Group.expects(:find).with('new_id').returns(nil)
+    assert_nil Armagh::Authentication::Group.update(id: 'new_id', name: 'new_group', description: 'description')
   end
 
   def test_find
-    Armagh::Authentication::Group.expects(:db_find_one).with(({'_id' => 'invalid'})).returns(nil)
-    Armagh::Authentication::Group.expects(:db_find_one).with(({'_id' => 'valid'})).returns({'name' => 'name'})
-    assert_nil Armagh::Authentication::Group.find('invalid')
-    valid = Armagh::Authentication::Group.find('valid')
+    good_id = BSONSupport.random_object_id
+    bad_id = BSONSupport.random_object_id
+    Armagh::Authentication::Group.expects(:db_find_one).with(({'_id' => bad_id})).returns(nil)
+    Armagh::Authentication::Group.expects(:db_find_one).with(({'_id' => good_id})).returns({'name' => 'name'})
+    assert_nil Armagh::Authentication::Group.find(bad_id)
+    valid = Armagh::Authentication::Group.find(good_id)
     assert_kind_of Armagh::Authentication::Group, valid
     assert_equal 'name', valid.name
   end
@@ -89,7 +109,7 @@ class TestGroup < Test::Unit::TestCase
   def test_find_error
     e = Mongo::Error.new('error')
     Armagh::Authentication::Group.expects(:db_find_one).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::Group.find('boom')}
+    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::Group.find(BSONSupport.random_object_id)}
   end
 
   def test_find_name
@@ -109,8 +129,19 @@ class TestGroup < Test::Unit::TestCase
 
   def test_find_all
     groups = [{'name' => 'group1'}, {'name' => 'group2'}]
-    Armagh::Authentication::Group.expects(:db_find).with({'_id' => {'$in' => %w(1 2 3 4 5)}}).returns(groups)
-    result = Armagh::Authentication::Group.find_all(%w(1 2 3 4 5))
+    Armagh::Authentication::Group.expects(:db_find).with({}).returns(groups)
+    result = Armagh::Authentication::Group.find_all
+    assert_kind_of Armagh::Authentication::Group, result.first
+    assert_kind_of Armagh::Authentication::Group, result.last
+    assert_equal 'group1', result.first.name
+    assert_equal 'group2', result.last.name
+  end
+
+  def test_find_all_subset
+    groups = [{'name' => 'group1'}, {'name' => 'group2'}]
+    ids = BSONSupport.random_object_ids 5
+    Armagh::Authentication::Group.expects(:db_find).with({'_id' => {'$in' => ids}}).returns(groups)
+    result = Armagh::Authentication::Group.find_all(ids)
     assert_kind_of Armagh::Authentication::Group, result.first
     assert_kind_of Armagh::Authentication::Group, result.last
     assert_equal 'group1', result.first.name
@@ -120,7 +151,8 @@ class TestGroup < Test::Unit::TestCase
   def test_find_all_error
     e = Mongo::Error.new('error')
     Armagh::Authentication::Group.expects(:db_find).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::Group.find_all(%w(1 2 3 4 5))}
+    ids = BSONSupport.random_object_ids 5
+    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::Group.find_all(ids)}
   end
 
   def test_save_new
@@ -204,9 +236,9 @@ class TestGroup < Test::Unit::TestCase
     group = create_group
     assert_empty group.users
 
-    user1 = stub({internal_id: '1', save: nil})
-    user2 = stub({internal_id: '2', save: nil})
-    user3 = stub({internal_id: '3', save: nil})
+    user1 = stub({internal_id: '1', save: nil, username: 'user1'})
+    user2 = stub({internal_id: '2', save: nil, username: 'user2'})
+    user3 = stub({internal_id: '3', save: nil, username: 'user3'})
 
     user1.expects(:join_group).with(group, reciprocate: false)
     user2.expects(:join_group).with(group, reciprocate: false)
@@ -227,6 +259,8 @@ class TestGroup < Test::Unit::TestCase
     assert_true group.has_user? user1
     assert_false group.has_user? user2
     assert_false group.has_user? user3
+
+    assert_raise(Armagh::Authentication::Group::UserError.new("User 'user2' is not a member of 'testgroup'.")){group.remove_user(user2)}
   end
 
   def test_roles
@@ -249,6 +283,8 @@ class TestGroup < Test::Unit::TestCase
     assert_equal [Armagh::Authentication::Role::APPLICATION_ADMIN, doc_role], group.roles
 
     group.remove_role doc_role
+
+    assert_raise(Armagh::Authentication::Group::RoleError.new("Group 'testgroup' does not have a direct role of 'some_doc'.")){group.remove_role doc_role}
 
     assert_false group.has_role? doc_role
     assert_equal [Armagh::Authentication::Role::APPLICATION_ADMIN], group.roles

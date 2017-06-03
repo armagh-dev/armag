@@ -63,6 +63,20 @@ module Armagh
         @key.hash
       end
 
+      def to_hash
+        {
+            'name' => @name,
+            'description' => @description,
+            'key' => @key,
+            'published_collection_role' => @published_collection_role
+        }
+
+      end
+
+      def to_json(options = {})
+        to_hash.to_json(options)
+      end
+
       def eql?(other)
         self == other
       end

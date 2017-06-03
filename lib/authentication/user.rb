@@ -25,6 +25,7 @@ require_relative '../utils/password'
 
 require 'armagh/support/random'
 require 'base64'
+require 'bson'
 
 module Armagh
   module Authentication
@@ -33,13 +34,19 @@ module Armagh
       class UserError < StandardError; end
       class AccountError < UserError; end
       class UsernameError < UserError; end
+      class NameError < UserError; end
+      class EmailError < UserError; end
       class DirectoryError < UserError; end
       class PermanentError < UserError; end
+      class RoleError < UserError; end
+      class GroupError < UserError; end
 
       MAX_TRIES = 3 # TODO Make this configurable
       DUMMY_USERNAME = '__dummy_user__'
       ADMIN_USERNAME = 'admin'
       DEFAULT_ADMIN_PASSWORD = 'armaghadmin'
+
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i
 
       def self.default_collection
         Connection.users
@@ -59,7 +66,7 @@ module Armagh
           @dummy_user = new
           @dummy_user.username = DUMMY_USERNAME
           @dummy_user.directory = Directory::INTERNAL
-          @dummy_user.password = Armagh::Support::Random.random_str(32)
+          @dummy_user.password = Support::Random.random_str(32)
           @dummy_user.db_doc['attempted_usernames'] = {}
           @dummy_user.save
         end
@@ -93,14 +100,32 @@ module Armagh
         return nil
       end
 
-      def self.create(username:, password:, directory: Directory::INTERNAL)
+      def self.create(username:, password:, name:, email:, directory: Directory::INTERNAL)
         # TODO When directory is LDAP, copy the details from the LDAP server into this  (ARM-213)
         new_user = new
         new_user.directory = directory
         new_user.username = username
+        new_user.name = name
+        new_user.email = email
         new_user.password = password if directory == Directory::INTERNAL
         new_user.save
         new_user
+      rescue Connection::DocumentUniquenessError
+        raise UsernameError, "A user with username '#{username}' already exists."
+      end
+
+      def self.update(id:, username:, password:, name:, email:)
+        doc = find(id)
+
+        if doc
+          doc.username = username
+          doc.password = password if password
+          doc.name = name
+          doc.email = email
+          doc.save
+        end
+
+        doc
       end
 
       def self.find_username(username)
@@ -112,17 +137,22 @@ module Armagh
       end
 
       def self.find(id)
+        id = BSON::ObjectId.from_string(id.to_s)
         user = self.db_find_one({'_id' => id})
         user ? new(user) : nil
       rescue => e
         raise Connection.convert_mongo_exception(e, id: id, type_class: self.class)
       end
 
-      def self.find_all(internal_ids)
-        ids = Array(internal_ids)
-        users = []
+      def self.find_all(internal_ids = nil)
+        if internal_ids
+          ids = Array(internal_ids).collect{|id| BSON::ObjectId.from_string(id)}
+          db_users = self.db_find({'_id' => {'$in' => ids}}).to_a.compact
+        else
+          db_users = self.db_find({}).to_a.compact
+        end
 
-        db_users = self.db_find({'_id' => {'$in' => ids}}).to_a.compact
+        users = []
 
         db_users.each do |db_user|
           users << new(db_user)
@@ -185,7 +215,7 @@ module Armagh
       def save(update_timestamps: true)
         self.mark_timestamp if update_timestamps
 
-        Armagh::Utils::DBDocHelper.clean_model(self)
+        Utils::DBDocHelper.clean_model(self)
 
         if internal_id
           self.class.db_replace({'_id' => internal_id}, @db_doc)
@@ -200,6 +230,7 @@ module Armagh
         raise PermanentError, 'Cannot delete a permanent account.' if permanent?
         groups.each {|g| leave_group(g)}
         self.class.db_delete({'_id' => internal_id})
+        true
       rescue => e
         raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
       end
@@ -209,6 +240,7 @@ module Armagh
       end
 
       def username=(username)
+        raise UsernameError, 'Username must be a nonempty string.' unless username.is_a?(String) && !username.empty?
         lowercase = username.downcase
         raise UsernameError, 'Username can only contain alphabetic, numeric, and underscore characters.' if lowercase =~ /\W/
         @db_doc['username'] = lowercase
@@ -245,6 +277,7 @@ module Armagh
       end
 
       def name=(name)
+        raise NameError, 'Name must be a nonempty string.' unless name.is_a?(String) && !name.empty?
         @db_doc['name'] = name
       end
 
@@ -253,6 +286,8 @@ module Armagh
       end
 
       def email=(email)
+        raise EmailError, 'Email must be a nonempty string.' unless email.is_a?(String) && !email.empty?
+        raise EmailError, 'Email format is invalid.'unless email =~ VALID_EMAIL_REGEX
         @db_doc['email'] = email
       end
 
@@ -335,7 +370,7 @@ module Armagh
       end
 
       def join_group(group, reciprocate: true)
-        @db_doc['groups'] << group.internal_id
+        @db_doc['groups'] << group.internal_id.to_s
         if reciprocate
           group.add_user(self, reciprocate: false)
           group.save
@@ -343,15 +378,19 @@ module Armagh
       end
 
       def leave_group(group, reciprocate: true)
-        @db_doc['groups'].delete group.internal_id
-        if reciprocate
-          group.remove_user(self, reciprocate: false)
-          group.save
+        if member_of?(group)
+          @db_doc['groups'].delete group.internal_id.to_s
+          if reciprocate
+            group.remove_user(self, reciprocate: false)
+            group.save
+          end
+        else
+          raise GroupError, "User '#{username}' is not a member of '#{group.name}'."
         end
       end
 
       def member_of?(group)
-        @db_doc['groups'].include? group.internal_id
+        @db_doc['groups'].include? group.internal_id.to_s
       end
 
       def roles
@@ -383,11 +422,22 @@ module Armagh
       end
 
       def remove_role(role)
-        @db_doc['roles'].delete role.key
+        if has_direct_role? role
+          @db_doc['roles'].delete role.key
+        else
+          raise RoleError, "User '#{username}' does not have a direct role of '#{role.key}'."
+        end
       end
 
       def remove_all_roles
         @db_doc['roles'].clear
+      end
+
+      def has_direct_role?(role)
+        roles.each do |r|
+          return true if role == r || (r == Role::USER && role.published_collection_role?)
+        end
+        false
       end
 
       def has_role?(role)
@@ -415,6 +465,21 @@ module Armagh
 
       def eql?(other)
         self == other
+      end
+
+      def to_hash
+        hash = super
+        hash['disabled'] = disabled?
+        hash['locked'] = locked?
+        hash['permanent'] = permanent?
+        hash
+      end
+
+      def to_json(options = {})
+        hash = to_hash
+        hash['_id'] = hash['_id'].to_s if hash['_id']
+        hash.delete('hashed_password')
+        hash.to_json(options)
       end
     end
   end

@@ -34,6 +34,7 @@ module Armagh
       end
 
       def self.verify_strength(password)
+        raise PasswordError, 'Password must be a string.' unless password.is_a? String
         raise PasswordError, "Password must contain at least #{MIN_PWD_LENGTH} characters." if password.length < MIN_PWD_LENGTH
         raise PasswordError, 'Password is a common password.' if common? password
         true

@@ -128,6 +128,18 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
                   })
   end
 
+  def test_check_params
+    params = {
+        'one' => 1,
+        'two' => 2,
+        'three' => 3
+    }
+    assert_true @api.check_params(params, 'one')
+    assert_true @api.check_params(params, %w(one two))
+    assert_true @api.check_params(params, %w(one two three))
+    assert_raise(Armagh::Admin::Application::APIClientError.new("A parameter named 'four' is missing but is required.")){@api.check_params(params, %w(one two three four))}
+  end
+
   def test_get_workflows
     good_alice_in_db
     good_fred_in_db
@@ -639,4 +651,393 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(RuntimeError.new('Unexpected action type: Hash')){@api.get_action_super(Hash)}
   end
 
+  def test_get_users
+    result = [1,2,3]
+    Armagh::Authentication::User.expects(:find_all).returns(result)
+    assert_equal(result, @api.get_users)
+
+    Armagh::Authentication::User.expects(:find_all).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_users}
+  end
+
+  def test_get_user
+    user = mock
+    Armagh::Authentication::User.expects(:find).with('id').returns(user)
+    assert_equal(user, @api.get_user('id'))
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.get_user('none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_user('error')}
+  end
+
+  def test_create_user
+    fields = {
+        'username' => 'username',
+        'password' => '12345',
+        'name' => 'name',
+        'email' => 'email'
+    }
+
+    Armagh::Authentication::User.expects(:create).with(
+        username: fields['username'],
+        password: fields['password'],
+        name: fields['name'],
+        email: fields['email']
+    )
+    @api.create_user(fields)
+
+    Armagh::Authentication::User.expects(:create).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.create_user(fields)}
+  end
+
+  def test_update_user
+    fields = {
+        'username' => 'username',
+        'password' => '12345',
+        'name' => 'name',
+        'email' => 'email'
+    }
+
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:update).with(
+        id: 'id',
+        username: fields['username'],
+        password: fields['password'],
+        name: fields['name'],
+        email: fields['email']
+    ).returns(user)
+    @api.update_user('id', fields)
+
+    Armagh::Authentication::User.expects(:update).returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID id not found.')){@api.update_user('id', fields)}
+
+    Armagh::Authentication::User.expects(:update).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.update_user('id', fields)}
+  end
+
+  def test_delete_user
+    user = mock
+    user.expects(:delete)
+    Armagh::Authentication::User.expects(:find).with('id').returns(user)
+    assert_true@api.delete_user('id')
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.delete_user('none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_user('error')}
+  end
+
+  def test_user_join_group
+    user = mock 'user'
+    group = mock 'group'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+
+    user.expects(:join_group).with(group)
+    user.expects(:save)
+    assert_true @api.user_join_group('user_id', 'group_id')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_join_group('none', 'group_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_join_group('user_id', 'none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_join_group('error', 'group_id')}
+  end
+
+  def test_user_leave_group
+    user = mock 'user'
+    group = mock 'group'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+
+    user.expects(:leave_group).with(group)
+    user.expects(:save)
+    assert_true @api.user_leave_group('user_id', 'group_id')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_leave_group('none', 'group_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_leave_group('user_id', 'none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_leave_group('error', 'group_id')}
+  end
+
+  def test_user_add_role
+    user = mock 'user'
+    role = mock 'role'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
+
+    user.expects(:add_role).with(role)
+    user.expects(:save)
+    assert_true @api.user_add_role('user_id', 'role_key')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_add_role('none', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_add_role('user_id', 'none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_add_role('error', 'role_key')}
+  end
+
+  def test_user_remove_role
+    user = mock 'user'
+    role = mock 'role'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
+
+    user.expects(:remove_role).with(role)
+    user.expects(:save)
+    assert_true @api.user_remove_role('user_id', 'role_key')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_remove_role('none', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_remove_role('user_id', 'none')}
+
+    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_remove_role('error', 'role_key')}
+  end
+
+  def test_user_reset_password
+    expected = 'NeWPaSsWoRd'
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+
+    user.expects(:reset_password).returns(expected)
+    assert_equal expected,@api.user_reset_password('user_id')
+
+    user.expects(:reset_password).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_reset_password('user_id')}
+  end
+
+  def test_user_lock
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+
+    user.expects(:lock).returns(true)
+    user.expects(:save)
+    assert_true @api.user_lock('user_id')
+
+    user.expects(:lock).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_lock('user_id')}
+  end
+
+  def test_user_unlock
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+
+    user.expects(:unlock).returns(true)
+    user.expects(:save)
+    assert_true @api.user_unlock('user_id')
+
+    user.expects(:unlock).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_unlock('user_id')}
+  end
+
+  def test_user_enable
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+
+    user.expects(:enable).returns(true)
+    user.expects(:save)
+    assert_true @api.user_enable('user_id')
+
+    user.expects(:enable).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_enable('user_id')}
+  end
+
+  def test_user_disable
+    user = mock('user')
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+
+    user.expects(:disable).returns(true)
+    user.expects(:save)
+    assert_true @api.user_disable('user_id')
+
+    user.expects(:disable).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_disable('user_id')}
+  end
+
+  def test_get_groups
+    result = [1,2,3,4]
+    Armagh::Authentication::Group.expects(:find_all).returns(result)
+    assert_equal result, @api.get_groups
+
+    Armagh::Authentication::Group.expects(:find_all).raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_groups}
+  end
+
+  def test_get_group
+    group = mock
+    Armagh::Authentication::Group.expects(:find).with('id').returns(group)
+    assert_equal(group, @api.get_group('id'))
+
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.get_group('none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_group('error')}
+  end
+
+  def test_create_group
+    fields = {
+        'name' => 'group_name',
+        'description' => 'description',
+    }
+    Armagh::Authentication::Group.expects(:create).with(
+        name: fields['name'],
+        description: fields['description']
+    )
+    @api.create_group(fields)
+
+    Armagh::Authentication::Group.expects(:create).raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.create_group(fields)}
+  end
+
+  def test_update_group
+    fields = {
+        'name' => 'group_name',
+        'description' => 'description',
+    }
+
+    group = mock
+
+    Armagh::Authentication::Group.expects(:update).with(
+        id: 'id',
+        name: fields['name'],
+        description: fields['description']
+    ).returns(group)
+
+    assert_equal group, @api.update_group('id', fields)
+
+    Armagh::Authentication::Group.expects(:update).returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID id not found.')){@api.update_group('id', fields)}
+
+    Armagh::Authentication::Group.expects(:update).raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.update_group('id', fields)}
+  end
+
+  def test_group_add_role
+    group = mock 'group'
+    role = mock 'role'
+
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).twice
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
+
+    group.expects(:add_role).with(role)
+    group.expects(:save)
+    assert_true @api.group_add_role('group_id', 'role_key')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_role('none', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_add_role('group_id', 'none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_role('error', 'role_key')}
+  end
+
+  def test_group_remove_role
+    group = mock 'group'
+    role = mock 'role'
+
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).twice
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
+
+    group.expects(:remove_role).with(role)
+    group.expects(:save)
+    assert_true @api.group_remove_role('group_id', 'role_key')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_role('none', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_remove_role('group_id', 'none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_role('error', 'role_key')}
+  end
+
+  def test_group_add_user
+    user = mock 'user'
+    group = mock 'group'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+
+    group.expects(:add_user).with(user)
+    group.expects(:save)
+    assert_true @api.group_add_user('group_id', 'user_id')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_user('none', 'user_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_add_user('group_id', 'none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_user('error', 'user_id')}
+  end
+
+  def test_group_remove_user
+    user = mock 'user'
+    group = mock 'group'
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+
+    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+
+    group.expects(:remove_user).with(user)
+    group.expects(:save)
+    assert_true @api.group_remove_user('group_id', 'user_id')
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_user('none', 'user_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_remove_user('group_id', 'none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_user('error', 'user_id')}
+  end
+
+  def test_delete_group
+    group = mock
+    group.expects(:delete)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    assert_true@api.delete_group('group_id')
+
+    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.delete_group('none')}
+
+    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_group('error')}
+  end
+
+  def test_get_roles
+    Armagh::Authentication::Role.expects(:all)
+    @api.get_roles
+  end
 end

@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+require 'facets/kernel/deep_copy'
+
 module Armagh
   module Connection
     class DBDoc
@@ -96,8 +98,14 @@ module Armagh
         collection.delete_one(qualifier)
       end
 
-      def to_json
-        @db_doc.to_json
+      def to_hash
+        @db_doc.deep_copy
+      end
+
+      def to_json(options = {})
+        hash = to_hash
+        hash['_id'] = hash['_id'].to_s if hash['_id']
+        hash.to_json(options)
       end
 
       def self.check_collection(collection)

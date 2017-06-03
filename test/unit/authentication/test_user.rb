@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/bson_support'
 require_relative '../../../lib/connection'
 require_relative '../../../lib/authentication/user'
 
@@ -56,7 +57,7 @@ class TestUser < Test::Unit::TestCase
 
   def create_user
     Armagh::Authentication::User.any_instance.stubs(:save)
-    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword')
+    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
     user
   end
 
@@ -78,17 +79,39 @@ class TestUser < Test::Unit::TestCase
   def test_create
     Armagh::Authentication::User.expects(:db_create).times(3)
 
-    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword')
+    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
     assert_not_empty user.hashed_password
     assert_equal Armagh::Authentication::Directory::INTERNAL, user.directory
 
-    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', directory: Armagh::Authentication::Directory::INTERNAL)
+    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com', directory: Armagh::Authentication::Directory::INTERNAL)
     assert_not_empty user.hashed_password
     assert_equal Armagh::Authentication::Directory::INTERNAL, user.directory
 
-    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', directory: Armagh::Authentication::Directory::LDAP)
+    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com', directory: Armagh::Authentication::Directory::LDAP)
     assert_equal Armagh::Authentication::Directory::LDAP, user.directory
     assert_raise(Armagh::Authentication::User::DirectoryError) {user.hashed_password}
+
+    Armagh::Authentication::User.any_instance.expects(:save).raises(Armagh::Connection::DocumentUniquenessError.new('not unique'))
+    assert_raise(Armagh::Authentication::User::UsernameError) {
+      Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com', directory: Armagh::Authentication::Directory::LDAP)
+    }
+  end
+
+  def test_update
+    existing_user = mock('existing user')
+    existing_user.expects(:username=).with('existing_user')
+    existing_user.expects(:password=).with('testpassword')
+    existing_user.expects(:name=).with('test user')
+    existing_user.expects(:email=).with('test@email.com')
+    existing_user.expects(:save)
+    Armagh::Authentication::User.expects(:find).with('id').returns(existing_user)
+
+    user = Armagh::Authentication::User.update(id: 'id', username: 'existing_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
+    assert_equal existing_user, user
+
+
+    Armagh::Authentication::User.expects(:find).with('new_id').returns(nil)
+    assert_nil Armagh::Authentication::User.update(id: 'new_id', username: 'new_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
   end
 
   def test_find_username
@@ -113,27 +136,47 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_find
+    id = BSONSupport.random_object_id
     result = {'username' => 'testuser'}
-    Armagh::Authentication::User.expects(:db_find_one).with({'_id' => 'id'}).returns(result)
-    user = Armagh::Authentication::User.find('id')
+    Armagh::Authentication::User.expects(:db_find_one).with({'_id' => id}).returns(result)
+    user = Armagh::Authentication::User.find(id)
     assert_equal('testuser', user.username)
   end
 
   def test_find_none
+    id = BSONSupport.random_object_id
     Armagh::Authentication::User.expects(:db_find_one).returns(nil)
-    assert_nil Armagh::Authentication::User.find('id')
+    assert_nil Armagh::Authentication::User.find(id)
   end
 
   def test_find_error
+    id = BSONSupport.random_object_id
     e = Mongo::Error.new('error')
     Armagh::Authentication::User.expects(:db_find_one).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find('id')}
+    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find(id)}
   end
 
   def test_find_all
     result = [{'username' => 'testuser1'}, nil, {'username' => 'testuser3'}, {'username' => 'testuser4'}, ]
-    Armagh::Authentication::User.expects(:db_find).with({'_id' => {'$in' => %w(id1 id2 id3 id4)}}).returns(result)
-    users = Armagh::Authentication::User.find_all(%w(id1 id2 id3 id4))
+    Armagh::Authentication::User.expects(:db_find).with({}).returns(result)
+    users = Armagh::Authentication::User.find_all
+    assert_equal 3, users.length
+
+    users.each do |user|
+      assert_kind_of Armagh::Authentication::User, user
+    end
+
+    assert_equal 'testuser1', users[0].username
+    assert_equal 'testuser3', users[1].username
+    assert_equal 'testuser4', users[2].username
+  end
+
+  def test_find_all_subset
+    ids = BSONSupport.random_object_ids(4)
+    result = [{'username' => 'testuser1'}, nil, {'username' => 'testuser3'}, {'username' => 'testuser4'}, ]
+    Armagh::Authentication::User.expects(:db_find).with({'_id' => {'$in' => ids}}).returns(result)
+
+    users = Armagh::Authentication::User.find_all(ids)
     assert_equal 3, users.length
 
     users.each do |user|
@@ -146,14 +189,18 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_find_all_none
+    ids = BSONSupport.random_object_ids(4)
     Armagh::Authentication::User.expects(:db_find).returns([])
-    assert_empty Armagh::Authentication::User.find_all(%w(id1 id2 id3 id4))
+    assert_empty Armagh::Authentication::User.find_all(ids)
   end
 
   def test_find_all_error
     e = Mongo::Error.new('error')
     Armagh::Authentication::User.expects(:db_find).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find_all(%w(id1 id2 id3 id4))}
+
+    ids = BSONSupport.random_object_ids 4
+
+    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find_all(ids)}
   end
 
   def test_class_authenticate
@@ -443,9 +490,11 @@ class TestUser < Test::Unit::TestCase
 
   def test_email
     user = create_user
-    email = 'string'
+    email = 'test@user.com'
     user.email = email
     assert_equal email, user.email
+
+    assert_raise(Armagh::Authentication::User::EmailError.new('Email format is invalid.')){user.email = 'invalid'}
   end
 
   def test_groups
@@ -453,12 +502,12 @@ class TestUser < Test::Unit::TestCase
     @connection.stubs(:[]).with('groups').returns(groups_collection)
 
     Armagh::Authentication::Group.any_instance.stubs(:save)
-    group1 = Armagh::Authentication::Group.create(name: 'group 1', description: 'test group')
-    group2 = Armagh::Authentication::Group.create(name: 'group 2', description: 'test group')
-    group3 = Armagh::Authentication::Group.create(name: 'group 3', description: 'test group')
-    group1.internal_id = 1
-    group2.internal_id = 2
-    group3.internal_id = 3
+    group1 = Armagh::Authentication::Group.create(name: 'group_1', description: 'test group')
+    group2 = Armagh::Authentication::Group.create(name: 'group_2', description: 'test group')
+    group3 = Armagh::Authentication::Group.create(name: 'group_3', description: 'test group')
+    group1.internal_id = 'id1'
+    group2.internal_id = 'id2'
+    group3.internal_id = 'id3'
     user = create_user
 
     group1.expects(:add_user).with(user, reciprocate: false)
@@ -479,10 +528,12 @@ class TestUser < Test::Unit::TestCase
     assert_true user.member_of? group2
     assert_true user.member_of? group3
 
-    assert_false user.member_of? Armagh::Authentication::Group.create(name: 'another group', description: 'test group')
+    assert_false user.member_of? Armagh::Authentication::Group.create(name: 'another_group', description: 'test group')
 
     group3.expects(:remove_user).with(user, reciprocate: false)
     user.leave_group group3
+
+    assert_raise(Armagh::Authentication::User::GroupError.new("User 'testuser' is not a member of 'group_3'.")){user.leave_group group3}
   end
 
   def test_roles
@@ -515,6 +566,8 @@ class TestUser < Test::Unit::TestCase
 
     user.remove_all_roles
     assert_empty user.roles
+
+    assert_raise(Armagh::Authentication::User::RoleError.new("User 'testuser' does not have a direct role of 'role_1'.")){user.remove_role(role1)}
   end
 
   def test_roles_of_groups
@@ -523,7 +576,7 @@ class TestUser < Test::Unit::TestCase
     user = create_user
 
     Armagh::Authentication::Group.any_instance.stubs(:save)
-    group = Armagh::Authentication::Group.create(name: 'group 1', description: 'test group')
+    group = Armagh::Authentication::Group.create(name: 'group_1', description: 'test group')
 
     group.stubs(:roles).returns [Armagh::Authentication::Role::USER_MANAGER]
 
@@ -558,5 +611,24 @@ class TestUser < Test::Unit::TestCase
     assert_true user1 == user2
     assert_true user1.eql? user2
     assert_equal user1.hash, user2.hash
+  end
+
+  def test_to_hash
+    user1 = create_user
+    hash = user1.db_doc.dup
+    hash['disabled'] = false
+    hash['locked'] = false
+    hash['permanent'] = false
+    assert_equal hash, user1.to_hash
+  end
+
+  def test_to_json
+    user1 = create_user
+    hash = user1.db_doc.dup
+    hash['disabled'] = false
+    hash['locked'] = false
+    hash['permanent'] = false
+    hash.delete('hashed_password')
+    assert_equal(hash.to_json, user1.to_json)
   end
 end

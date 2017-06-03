@@ -70,7 +70,7 @@ module Armagh
         end
       
         def authenticate_and_authorize user, password
-          # TODO - replace admin resource api authenticate_and_authorize with LDAP, verify resource admin privileges
+          # TODO - replace admin resource api authenticate_and_authorize with authentication, verify resource admin privileges
           true
         end
       

@@ -28,6 +28,7 @@ Armagh::Environment.init
 require_relative '../lib/admin/resource/api.rb'
 require_relative '../lib/admin/resource/thin_backend.rb'
 require_relative '../lib/configuration/file_based_configuration.rb'
+require_relative '../lib/connection'
 require_relative '../lib/logging'
 
 require_relative '../lib/utils/rest_helper'
@@ -41,6 +42,8 @@ Process.setproctitle(File.basename(__FILE__))
 #------------------------------------------------------------------------------------------------
 
 include Armagh
+
+Connection.setup_indexes
 
 api = Admin::Resource::API.instance
 rest_helper = Utils::RestHelper.new(api.logger)

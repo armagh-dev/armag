@@ -2,6 +2,19 @@
 
 import hudson.Util;
 
+def sendToSlack() {
+
+  def buildDuration = Util.getTimeSpanString(System.currentTimeMillis() - currentBuild.startTimeInMillis)
+  def color = 'good'
+
+  if(currentBuild.result != "SUCCESS") {
+    color = 'danger'
+  }
+
+  slackSend color: color, message: "${env.JOB_NAME} - #${env.BUILD_NUMBER} ${currentBuild.result} after ${buildDuration} (<${env.BUILD_URL}|Open>)"
+
+}
+
 try {
 
 currentBuild.result = "SUCCESS"
@@ -93,9 +106,7 @@ finally {
 
   println "********************\n** EXECUTING FINALLY BLOCK \n********************\n"
 
-  def buildDuration = Util.getTimeSpanString(System.currentTimeMillis() - currentBuild.startTimeInMillis)
-
-  slackSend message: "${env.JOB_NAME} - #${env.BUILD_NUMBER} ${currentBuild.result} after ${buildDuration} (<${env.BUILD_URL}|Open>)"
+  sendToSlack()
 
   // Remove older build
   properties([[$class: 'BuildDiscarderProperty', strategy: [$class: 'LogRotator', artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10']]]);

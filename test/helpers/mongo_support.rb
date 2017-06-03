@@ -145,4 +145,8 @@ class MongoSupport
   def clean_replica_set
     `mongo local --eval "db.dropDatabase();"`
   end
+
+  def setup_indexes
+    Armagh::Connection.setup_indexes
+  end
 end

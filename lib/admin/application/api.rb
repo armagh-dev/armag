@@ -26,6 +26,7 @@ require_relative '../../actions/workflow_set'
 require_relative '../../document/document'
 require_relative '../../actions/gem_manager'
 require_relative '../../utils/collection_trigger'
+require_relative '../../authentication'
 
 
 module Armagh
@@ -86,7 +87,15 @@ module Armagh
         end
 
         def authenticate_and_authorize(user, password)
-          # TODO - admin api, replace authenticate_and_authorize with LDAP call, verify admin privileges
+          # TODO - admin api, replace authenticate_and_authorize with authentication call, verify admin privileges
+          true
+        end
+
+        def check_params(params, required_params)
+          Array(required_params).each do |required|
+            raise APIClientError, "A parameter named '#{required}' is missing but is required." if params[required].nil?
+          end
+
           true
         end
 
@@ -252,11 +261,232 @@ module Armagh
           Launcher.get_versions(@logger, @gem_versions)
         end
 
+        def get_users
+          Authentication::User.find_all
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def get_user(id)
+          find_user id
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def create_user(fields)
+          Authentication::User.create(username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
+        rescue Authentication::User::UserError, Armagh::Utils::Password::PasswordError => e
+          raise APIClientError, e.message
+        end
+
+        def update_user(id, fields)
+          user = Authentication::User.update(id: id, username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
+          raise APIClientError.new("User with ID #{id} not found.") unless user
+          user
+        rescue Authentication::User::UserError, Armagh::Utils::Password::PasswordError => e
+          raise APIClientError, e.message
+        end
+
+        def delete_user(id)
+          user = find_user id
+          user.delete
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_join_group(user_id, group_id)
+          user = find_user user_id
+          group = find_group group_id
+
+          user.join_group group
+          user.save
+          true
+        rescue Authentication::User::UserError, Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def user_leave_group(user_id, group_id)
+          user = find_user user_id
+          group = find_group group_id
+
+          user.leave_group group
+          user.save
+          true
+        rescue Authentication::User::UserError, Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def user_add_role(user_id, role_key)
+          user = find_user user_id
+          role = find_role role_key
+
+          user.add_role role
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_remove_role(user_id, role_key)
+          user = find_user user_id
+          role = find_role role_key
+
+          user.remove_role(role)
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_reset_password(user_id)
+          user = find_user user_id
+          user.reset_password
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_lock(user_id)
+          user = find_user user_id
+          user.lock
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_unlock(user_id)
+          user = find_user user_id
+          user.unlock
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_enable(user_id)
+          user = find_user user_id
+          user.enable
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def user_disable(user_id)
+          user = find_user user_id
+          user.disable
+          user.save
+          true
+        rescue Authentication::User::UserError => e
+          raise APIClientError, e.message
+        end
+
+        def get_groups
+          Authentication::Group.find_all
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def get_group(id)
+          find_group id
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def create_group(fields)
+          Authentication::Group.create(name: fields['name'], description: fields['description'])
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def update_group(id, fields)
+          group = Authentication::Group.update(id: id, name: fields['name'], description: fields['description'])
+          raise APIClientError.new("Group with ID #{id} not found.") unless group
+          group
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def group_add_role(group_id, role_key)
+          group = find_group group_id
+          role = find_role role_key
+
+          group.add_role role
+          group.save
+          true
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def group_remove_role(group_id, role_key)
+          group = find_group group_id
+          role = find_role role_key
+
+          group.remove_role(role)
+          group.save
+          true
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def group_add_user(group_id, user_id)
+          user = find_user user_id
+          group = find_group group_id
+
+          group.add_user user
+          group.save
+          true
+        rescue Authentication::User::UserError, Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def group_remove_user(group_id, user_id)
+          user = find_user user_id
+          group = find_group group_id
+
+          group.remove_user user
+          group.save
+          true
+        rescue Authentication::User::UserError, Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def delete_group(id)
+          group = find_group id
+          group.delete
+          true
+        rescue Authentication::Group::GroupError => e
+          raise APIClientError, e.message
+        end
+
+        def get_roles
+          Authentication::Role.all
+        end
+
         def trigger_collect(action_name)
           workflow_set = Actions::WorkflowSet.for_admin(Connection.config)
           workflow_set.trigger_collect(action_name)
         rescue Armagh::Actions::TriggerCollectError => e
           raise APIClientError, e.message
+        end
+
+        private def find_user(user_id)
+          user = Authentication::User.find(user_id)
+          raise APIClientError.new("User with ID #{user_id} not found.") unless user
+          user
+        end
+
+        private def find_group(group_id)
+          group = Authentication::Group.find(group_id)
+          raise APIClientError.new("Group with ID #{group_id} not found.") unless group
+          group
+        end
+
+        private def find_role(role_key)
+          role = Authentication::Role.find(role_key)
+          raise APIClientError.new("Role '#{role_key}' not found.") unless role
+          role
         end
       end
     end

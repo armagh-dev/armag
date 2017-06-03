@@ -96,6 +96,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def setup
     MongoSupport.instance.clean_database
     MongoSupport.instance.clean_replica_set
+    Connection.setup_indexes
+
     @alice_workflow_config_values = {'workflow'=>{'name'=>'alice'}}
     @alice_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_divide( 'alice' )
 
@@ -942,11 +944,19 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 
+  def test_get_documents_missing_params
+    get '/documents.json', {} do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'type' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+  end
+
   def test_get_document
     get '/document.json' do
       assert last_response.client_error?
       response =  JSON.parse(last_response.body)
-      assert_equal('Missing parameter: id', response.dig('client_error_detail', 'message'))
+      assert_equal("A parameter named 'id' is missing but is required.", response.dig('client_error_detail', 'message'))
     end
 
     doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
@@ -971,6 +981,20 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response_hash = JSON.parse(last_response.body)
       assert_equal(e.class.to_s, response_hash.dig('server_error_detail', 'class'))
       assert_equal(e.message, response_hash.dig('server_error_detail', 'message'))
+    end
+  end
+
+  def test_get_document_missing_params
+    get '/document.json', {'id' => 'something'} do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'type' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get '/document.json', {'type' => 'something'} do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'id' is missing but is required.", response.dig('client_error_detail', 'message')
     end
   end
 
@@ -1058,4 +1082,565 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 
+  def test_users
+    Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
+    get '/users.json' do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+      assert_equal 1, response.length
+      result = response.first
+      assert_kind_of(String, result['_id'])
+      assert_equal('testuser',result['username'])
+      assert_equal('Test User',result['name'])
+      assert_equal('test@user.com',result['email'])
+      assert_equal(Armagh::Authentication::User.find_all.first.to_json, result.to_json)
+    end
+  end
+
+  def test_user
+    user_id = nil
+    user = {
+        'username' => 'testuser',
+        'password' => 'SomeSuperPassword',
+        'email' => 'user@users.com',
+        'name' => 'Test User'
+    }
+
+    # Create
+    post '/user/create.json', user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('Test User', response['name'])
+      assert_equal('user@users.com', response['email'])
+      assert_equal('testuser', response['username'])
+      user_id = response['_id']
+      assert_not_nil user_id
+    end
+
+    # Create duplicate
+    post '/user/create.json', user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A user with username 'testuser' already exists.", response.dig('client_error_detail', 'message')
+    end
+
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('Test User', response['name'])
+      assert_equal('user@users.com', response['email'])
+      assert_equal('testuser', response['username'])
+    end
+
+    # Update
+    user['name'] = 'Tester'
+    put "/user/#{user_id}.json", user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('Tester', response['name'])
+      assert_equal('user@users.com', response['email'])
+      assert_equal('testuser', response['username'])
+    end
+
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('Tester', response['name'])
+      assert_equal('user@users.com', response['email'])
+      assert_equal('testuser', response['username'])
+      assert_empty response['roles']
+    end
+
+    # Roles
+    get "/user/#{user_id}/add_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      response = JSON.parse(last_response.body)
+      assert_true response
+    end
+
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([Armagh::Authentication::Role::USER.key], response['roles'])
+    end
+
+    get "/user/#{user_id}/remove_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['roles']
+    end
+
+    get "/user/#{user_id}/remove_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("User 'testuser' does not have a direct role of 'doc_user'.", response.dig('client_error_detail', 'message'))
+    end
+
+    # bad name
+    put "/user/#{user_id}.json", user.merge({'name' => nil}).to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal('Name must be a nonempty string.', response.dig('client_error_detail', 'message'))
+    end
+
+    # bad email
+    put "/user/#{user_id}.json", user.merge({'email' => nil}).to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal('Email must be a nonempty string.', response.dig('client_error_detail', 'message'))
+    end
+
+    # users
+    get '/users.json' do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+
+      assert_equal 'testuser', user['username']
+    end
+
+    # Make sure user is unlocked
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_false response['locked']
+      assert_false response['disabled']
+    end
+
+    # Lock
+    get "/user/#{user_id}/lock.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    # Make sure user is locked
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response['locked']
+      assert_false response['disabled']
+    end
+
+    # Unlock
+    get "/user/#{user_id}/unlock.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    # Make sure user is unlocked & not enabled
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_false response['locked']
+      assert_false response['disabled']
+    end
+
+    # Disable
+    get "/user/#{user_id}/disable.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    # Make sure user is unlocked & not enabled
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_false response['locked']
+      assert_true response['disabled']
+    end
+
+    # Enable
+    get "/user/#{user_id}/enable.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    # Make sure user is unlocked & enabled
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_false response['locked']
+      assert_false response['disabled']
+    end
+
+    # Reset Password
+    get "/user/#{user_id}/reset_password.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_kind_of(String, response)
+      assert_true response.length >= Armagh::Utils::Password::MIN_PWD_LENGTH
+    end
+
+    # delete
+    delete("/user/#{user_id}.json") {
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    }
+
+    delete "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("User with ID #{user_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # Get - make sure it's gone
+    get "/user/#{user_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("User with ID #{user_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # update doesnt exist
+    put "/user/#{user_id}.json", user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("User with ID #{user_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # Missing params
+    get("/user/#{user_id}/join_group.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'group_id' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/user/#{user_id}/leave_group.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'group_id' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/user/#{user_id}/add_role.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'role_key' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/user/#{user_id}/remove_role.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'role_key' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+  end
+
+  def test_groups
+    Armagh::Authentication::Group.create(name: 'testgroup', description: 'Test Group')
+    get '/groups.json' do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+      assert_equal 1, response.length
+      result = response.first
+      assert_equal('testgroup',result['name'])
+      assert_equal('Test Group', result['description'])
+      assert_equal(Armagh::Authentication::Group.find_all.first.to_json, result.to_json)
+    end
+  end
+
+  def test_group
+    group_id = nil
+    group = {
+        'name' => 'testgroup',
+        'description' => 'Test Group'
+    }
+
+    # Create
+    post '/group/create.json', group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('testgroup', response['name'])
+      assert_equal('Test Group', response['description'])
+      group_id = response['_id']
+      assert_not_nil group_id
+    end
+
+    # Create duplicate
+    post '/group/create.json', group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A group with name 'testgroup' already exists.", response.dig('client_error_detail', 'message')
+    end
+
+    get "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('testgroup', response['name'])
+      assert_equal('Test Group', response['description'])
+    end
+
+    # Update
+    group['description'] = 'New Description'
+    put "/group/#{group_id}.json", group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('New Description', response['description'])
+      assert_equal('testgroup', response['name'])
+    end
+
+    get "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal('New Description', response['description'])
+      assert_equal('testgroup', response['name'])
+      assert_empty response['roles']
+    end
+
+    # Roles
+    get "/group/#{group_id}/add_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([Armagh::Authentication::Role::USER.key], response['roles'])
+    end
+
+    get "/group/#{group_id}/remove_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['roles']
+    end
+
+    get "/group/#{group_id}/remove_role.json", {'role_key' => Armagh::Authentication::Role::USER.key} do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("Group 'testgroup' does not have a direct role of 'doc_user'.", response.dig('client_error_detail', 'message'))
+    end
+
+    # bad description
+    put "/group/#{group_id}.json", group.merge({'description' => nil}).to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal('Description must be a nonempty string.', response.dig('client_error_detail', 'message'))
+    end
+
+    # groups
+    get '/groups.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      group =  response.first
+      assert_equal 'testgroup', group['name']
+    end
+
+    # delete
+    delete "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    delete "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("Group with ID #{group_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # Get - make sure it's gone
+    get "/group/#{group_id}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("Group with ID #{group_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # update doesnt exist
+    put "/group/#{group_id}.json", group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal("Group with ID #{group_id} not found.", response.dig('client_error_detail', 'message'))
+    end
+
+    # Missing params
+    get("/group/#{group_id}/add_user.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'user_id' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/group/#{group_id}/remove_user.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'user_id' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/group/#{group_id}/add_role.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'role_key' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+
+    get("/group/#{group_id}/remove_role.json", {}) do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?, response.to_s
+      assert_equal "A parameter named 'role_key' is missing but is required.", response.dig('client_error_detail', 'message')
+    end
+  end
+
+  def test_group_from_user
+    user = {
+        'username' => 'testuser',
+        'password' => 'SomeSuperPassword',
+        'email' => 'user@users.com',
+        'name' => 'Test User'
+    }
+
+    group = {
+        'name' => 'testgroup',
+        'description' => 'Test Group'
+    }
+
+    groupid = nil
+    userid = nil
+
+    post '/group/create.json', group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty(response['users'])
+      groupid = response['_id']
+    end
+
+    post '/user/create.json', user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty(response['groups'])
+      userid = response['_id']
+    end
+
+    get("/user/#{userid}/join_group.json", {'group_id' => groupid}) {
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    }
+
+    get "/group/#{groupid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([userid],response['users'])
+    end
+
+    get "/user/#{userid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([groupid], response['groups'])
+    end
+
+    get "/user/#{userid}/leave_group.json", {'group_id' => groupid} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/group/#{groupid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['users']
+    end
+
+    get "/user/#{userid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['groups']
+    end
+  end
+
+  def test_user_from_group
+    user = {
+        'username' => 'testuser',
+        'password' => 'SomeSuperPassword',
+        'email' => 'user@users.com',
+        'name' => 'Test User'
+    }
+
+    group = {
+        'name' => 'testgroup',
+        'description' => 'Test Group'
+    }
+
+    groupid = nil
+    userid = nil
+
+    post '/group/create.json', group.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty(response['users'])
+      groupid = response['_id']
+    end
+
+    post '/user/create.json', user.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty(response['groups'])
+      userid = response['_id']
+    end
+
+    get "/group/#{groupid}/add_user.json", {'user_id' => userid} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/group/#{groupid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([userid],response['users'])
+    end
+
+    get "/user/#{userid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_equal([groupid], response['groups'])
+    end
+
+    get "/group/#{groupid}/remove_user.json", {'user_id' => userid} do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_true response
+    end
+
+    get "/group/#{groupid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['users']
+    end
+
+    get "/user/#{userid}.json" do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, response.to_s
+      assert_empty response['groups']
+    end
+  end
+
+  def test_roles
+    get '/roles.json' do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+
+      expected = []
+      Armagh::Authentication::Role::PREDEFINED_ROLES.each do |role|
+        expected << role.to_hash
+      end
+
+      assert_equal(expected, response)
+    end
+  end
 end
+
+

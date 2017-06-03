@@ -25,9 +25,10 @@ require 'log4r'
 require_relative '../lib/environment.rb'
 Armagh::Environment.init
 
-require_relative '../lib/admin/application/api.rb'
-require_relative '../lib/admin/application/thin_backend.rb'
-require_relative '../lib/configuration/file_based_configuration.rb'
+require_relative '../lib/admin/application/api'
+require_relative '../lib/admin/application/thin_backend'
+require_relative '../lib/configuration/file_based_configuration'
+require_relative '../lib/connection'
 require_relative '../lib/logging'
 
 require_relative '../lib/utils/rest_helper'
@@ -41,6 +42,8 @@ Process.setproctitle(File.basename(__FILE__))
 #------------------------------------------------------------------------------------------------
 
 include Armagh
+
+Connection.setup_indexes
 
 api = Admin::Application::API.instance
 rest_helper = Utils::RestHelper.new(api.logger)
@@ -101,7 +104,7 @@ helpers do
 end
 
 get '/status.json' do
-  rest_helper.handle_request( 'get status', request ) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_status
   end
 end
@@ -112,7 +115,7 @@ end
 #
 #------------------------------
 post '/launcher.json' do
-  rest_helper.handle_request('get launcher', request ) do |fields|
+  rest_helper.handle_request(request ) do |fields|
     api.create_or_update_launcher_configuration(fields)
   end
 end
@@ -135,14 +138,14 @@ end
 
 # list of workflows with status
 get '/workflows.json' do
-  rest_helper.handle_request('get workflows', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_workflows
   end
 end
 
 # create new workflow
 get '/workflow/:workflow_name/new.json' do
-  rest_helper.handle_request('get workflow/NAME/new', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     workflow = api.create_workflow({'workflow' => {'name' => params['workflow_name']}})
     workflow.name
   end
@@ -150,28 +153,28 @@ end
 
 # status for existing workflow
 get '/workflow/:workflow_name/status.json' do
-  rest_helper.handle_request('get workflow/NAME/status', request ) do |fields|
+  rest_helper.handle_request(request ) do |fields|
     api.get_workflow_status(params['workflow_name'])
   end
 end
 
 # update workflow: run
 get '/workflow/:workflow_name/run.json' do
-  rest_helper.handle_request('get workflow/NAME/run', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.run_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: finish
 get '/workflow/:workflow_name/finish.json' do
-  rest_helper.handle_request('get workflow/NAME/finish', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.finish_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: stop
 get '/workflow/:workflow_name/stop.json' do
-  rest_helper.handle_request('get workflow/NAME/stop', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.stop_workflow(params['workflow_name'])
   end
 end
@@ -184,55 +187,55 @@ end
 
 # list of defined action classes
 get '/actions/defined.json' do
-  rest_helper.handle_request('get actions/defined', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_defined_actions
   end
 end
 
 # Trigger a collect
 get '/actions/trigger_collect.json' do
-  rest_helper.handle_request('get actions/trigger_collect', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.trigger_collect(params['name'])
   end
 end
 
 # list of workflow actions with status
 get '/workflow/:workflow_name/actions.json' do
-  rest_helper.handle_request('get workflow/NAME/actions', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_workflow_actions(params['workflow_name'])
   end
 end
 
 # status for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/status.json' do
-  rest_helper.handle_request('get workflow/NAME/action/NAME/status', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_workflow_action_status(params['workflow_name'], params['action_name'])
   end
 end
 
 # edit form for new workflow action
 get '/workflow/:workflow_name/action/config.json' do
-  rest_helper.handle_request('get workflow/NAME/action/config', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.new_workflow_action_config(params['workflow_name'],fields['type'] )
   end
 end
 
 # edit form for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/description.json' do
-  rest_helper.handle_request('workflow/NAME/action/NAME/description', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_workflow_action_description(params['workflow_name'], params['action_name'])
   end
 end
 
 get '/workflow/:workflow_name/action/:action_name/config.json' do
-  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.get_workflow_action_config(params['workflow_name'], params['action_name'])
   end
 end
 
 # submit params to create workflow action
 post '/workflow/:workflow_name/action/config.json' do
-  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     type = fields.delete 'type'
     api.create_workflow_action_config(params['workflow_name'], type, fields)
   end
@@ -240,7 +243,7 @@ end
 
 # submit params to change existing action config
 post '/workflow/:workflow_name/action/:action_name/config.json' do
-  rest_helper.handle_request('workflow/NAME/action/NAME/config', request) do |fields|
+  rest_helper.handle_request(request) do |fields|
     api.update_workflow_action_config(params['workflow_name'], params['action_name'], fields )
   end
 end
@@ -252,9 +255,10 @@ end
 #---------------------
 
 get '/documents.json' do
-  rest_helper.handle_request('get documents', request) do |_fields|
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'type')
     doc_type = params['type']
-    return rest_helper.respond_client_error(request, 'Missing parameter: type') if doc_type.nil? || doc_type.empty?
+
 
     begin_ts = Time.parse(params['begin_ts']) if params.include? 'begin_ts'
     end_ts = Time.parse(params['end_ts']) if params.include? 'end_ts'
@@ -266,25 +270,196 @@ get '/documents.json' do
 end
 
 get '/document.json' do
-  rest_helper.handle_request('get document', request) do |_fields|
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, %w(id type))
+
     doc_id = params['id']
     doc_type = params['type']
-
-    return rest_helper.respond_client_error(request, 'Missing parameter: id') if doc_id.nil? || doc_id.empty?
-    return rest_helper.respond_client_error(request, 'Missing parameter: type') if doc_type.nil? || doc_type.empty?
 
     api.get_document(doc_id, doc_type)
   end
 end
 
 get '/documents/failures.json' do
-  rest_helper.handle_request('get documents/failures', request) do |_fields|
+  rest_helper.handle_request(request) do |_fields|
     api.get_failed_documents
   end
 end
 
+
+#---------------------
+#
+# Version
+#
+#---------------------
+
 get '/version.json' do
-  rest_helper.handle_request('get version', request) do |_fields|
+  rest_helper.handle_request(request) do |_fields|
     api.get_version
   end
 end
+
+#---------------------
+#
+# User/Group/Role
+#
+#---------------------
+
+get '/users.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.get_users
+  end
+end
+
+get '/user/:user_id.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.get_user(params['user_id'])
+  end
+end
+
+put '/user/:user_id.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.update_user(params['user_id'], fields)
+  end
+end
+
+post '/user/create.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.create_user(fields)
+  end
+end
+
+get '/user/:user_id/join_group.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'group_id')
+    api.user_join_group(params['user_id'], params['group_id'])
+  end
+end
+
+get '/user/:user_id/leave_group.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'group_id')
+    api.user_leave_group(params['user_id'], params['group_id'])
+  end
+end
+
+get '/user/:user_id/add_role.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'role_key')
+    api.user_add_role(params['user_id'], params['role_key'])
+  end
+end
+
+get '/user/:user_id/remove_role.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'role_key')
+    api.user_remove_role(params['user_id'], params['role_key'])
+  end
+end
+
+delete '/user/:user_id.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.delete_user(params['user_id'])
+  end
+end
+
+get '/user/:user_id/reset_password.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.user_reset_password(params['user_id'])
+  end
+end
+
+get '/user/:user_id/lock.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.user_lock(params['user_id'])
+  end
+end
+
+get '/user/:user_id/unlock.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.user_unlock(params['user_id'])
+  end
+end
+
+get '/user/:user_id/enable.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.user_enable(params['user_id'])
+  end
+end
+
+get '/user/:user_id/disable.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.user_disable(params['user_id'])
+  end
+end
+
+get '/groups.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.get_groups
+  end
+end
+
+get '/group/:group_id.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.get_group(params['group_id'])
+  end
+end
+
+put '/group/:group_id.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.update_group(params['group_id'], fields)
+  end
+end
+
+get '/group/:group_id/add_user.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'user_id')
+    api.group_add_user(params['group_id'], params['user_id'])
+  end
+end
+
+get '/group/:group_id/remove_user.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'user_id')
+    api.group_remove_user(params['group_id'], params['user_id'])
+  end
+end
+
+post '/group/create.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.create_group(fields)
+  end
+end
+
+get '/group/:group_id/add_role.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'role_key')
+    api.group_add_role(params['group_id'], params['role_key'])
+  end
+end
+
+get '/group/:group_id/remove_role.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.check_params(params, 'role_key')
+    api.group_remove_role(params['group_id'], params['role_key'])
+  end
+end
+
+delete '/group/:group_id.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.delete_group(params['group_id'])
+  end
+end
+
+get '/roles.json' do
+  rest_helper.handle_request(request) do |_fields|
+    api.get_roles
+  end
+end
+
+
+#---------------------
+#
+# Authentication
+#
+#---------------------
