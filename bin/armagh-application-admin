@@ -114,6 +114,7 @@ end
 # launcher
 #
 #------------------------------
+
 post '/launcher.json' do
   rest_helper.handle_request(request ) do |fields|
     api.create_or_update_launcher_configuration(fields)
@@ -144,7 +145,7 @@ get '/workflows.json' do
 end
 
 # create new workflow
-get '/workflow/:workflow_name/new.json' do
+post '/workflow/:workflow_name/new.json' do
   rest_helper.handle_request(request) do |fields|
     workflow = api.create_workflow({'workflow' => {'name' => params['workflow_name']}})
     workflow.name
@@ -159,21 +160,21 @@ get '/workflow/:workflow_name/status.json' do
 end
 
 # update workflow: run
-get '/workflow/:workflow_name/run.json' do
+patch '/workflow/:workflow_name/run.json' do
   rest_helper.handle_request(request) do |fields|
     api.run_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: finish
-get '/workflow/:workflow_name/finish.json' do
+patch '/workflow/:workflow_name/finish.json' do
   rest_helper.handle_request(request) do |fields|
     api.finish_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: stop
-get '/workflow/:workflow_name/stop.json' do
+patch '/workflow/:workflow_name/stop.json' do
   rest_helper.handle_request(request) do |fields|
     api.stop_workflow(params['workflow_name'])
   end
@@ -193,7 +194,7 @@ get '/actions/defined.json' do
 end
 
 # Trigger a collect
-get '/actions/trigger_collect.json' do
+patch '/actions/trigger_collect.json' do
   rest_helper.handle_request(request) do |fields|
     api.trigger_collect(params['name'])
   end
@@ -227,6 +228,7 @@ get '/workflow/:workflow_name/action/:action_name/description.json' do
   end
 end
 
+# config for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/config.json' do
   rest_helper.handle_request(request) do |fields|
     api.get_workflow_action_config(params['workflow_name'], params['action_name'])
@@ -242,7 +244,7 @@ post '/workflow/:workflow_name/action/config.json' do
 end
 
 # submit params to change existing action config
-post '/workflow/:workflow_name/action/:action_name/config.json' do
+put '/workflow/:workflow_name/action/:action_name/config.json' do
   rest_helper.handle_request(request) do |fields|
     api.update_workflow_action_config(params['workflow_name'], params['action_name'], fields )
   end
@@ -258,7 +260,6 @@ get '/documents.json' do
   rest_helper.handle_request(request) do |_fields|
     api.check_params(params, 'type')
     doc_type = params['type']
-
 
     begin_ts = Time.parse(params['begin_ts']) if params.include? 'begin_ts'
     end_ts = Time.parse(params['end_ts']) if params.include? 'end_ts'
@@ -285,7 +286,6 @@ get '/documents/failures.json' do
     api.get_failed_documents
   end
 end
-
 
 #---------------------
 #

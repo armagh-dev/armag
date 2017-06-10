@@ -95,6 +95,7 @@ class TestEditCallback < Test::Unit::TestCase
     assert_nil Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
                                                        content: {},
+                                                       raw: nil,
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
                                                        source: {},
@@ -121,6 +122,7 @@ class TestEditCallback < Test::Unit::TestCase
     assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
     Armagh::Document.create(type: @output_type,
                             content:{'content' => 123},
+                            raw: 'raw',
                             metadata: {'draft_meta' => 'bananas'},
                             pending_actions: [],
                             state: @output_state,
@@ -134,6 +136,7 @@ class TestEditCallback < Test::Unit::TestCase
     @splitter.doc_id = doc_id
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
                                                        content: {},
+                                                       raw: nil,
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
                                                        source: {},

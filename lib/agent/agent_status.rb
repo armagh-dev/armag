@@ -18,8 +18,6 @@
 module Armagh
   class AgentStatus
 
-    attr_reader :statuses
-
     def initialize
       @statuses = {}
       @lock = Mutex.new
@@ -28,7 +26,7 @@ module Armagh
     # Preferred way to access statuses so we don't risk operating on the shared object.  Can't use dup in the instance because
     # the dup object will immediately be GC'd by the server.
     def self.get_statuses(agent_status)
-      agent_status.statuses.dup
+      agent_status.statuses
     end
 
     def report_status(agent_id, status)
@@ -40,6 +38,12 @@ module Armagh
     def remove_agent(agent_id)
       @lock.synchronize do
         @statuses.delete(agent_id)
+      end
+    end
+
+    def statuses
+      @lock.synchronize do
+        @statuses.dup
       end
     end
   end

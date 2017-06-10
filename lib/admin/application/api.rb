@@ -28,7 +28,6 @@ require_relative '../../actions/gem_manager'
 require_relative '../../utils/collection_trigger'
 require_relative '../../authentication'
 
-
 module Armagh
   module Admin
     module Application
@@ -116,7 +115,7 @@ module Armagh
             else
               config = Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
             end
-          rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+          rescue Configh::ConfigInitError, Configh::ConfigValidationError
             raise APIClientError.new( 'Invalid launcher config', markup: Launcher.edit_configuration( { 'launcher' => params}))
           end
           config.serialize['values']
@@ -148,7 +147,7 @@ module Armagh
 
         def create_workflow( config_values )
           wf_set = Actions::WorkflowSet.for_admin(Connection.config)
-          workflow = wf_set.create_workflow(config_values)
+          wf_set.create_workflow(config_values)
         rescue Actions::WorkflowConfigError => e
           raise APIClientError.new( e.message,
                                     markup: Actions::Workflow.edit_configuration( config_values, creating_in: Connection.config ))

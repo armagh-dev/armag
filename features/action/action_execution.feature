@@ -55,7 +55,8 @@ Feature: Actions Execution
       | pending_actions     | []                                                       |
       | dev_errors          | {}                                                       |
       | ops_errors          | {}                                                       |
-      | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
+      | content             | nil                                                      |
+      | raw                 | BSON::Binary.new('collected content')                    |
       | state               | 'ready'                                                  |
       | locked              | false                                                    |
       | error               | nil                                                      |
@@ -68,7 +69,8 @@ Feature: Actions Execution
       | pending_actions     | []                                                          |
       | dev_errors          | {}                                                          |
       | ops_errors          | {}                                                          |
-      | content             | {'bson_binary' => BSON::Binary.new('content-for-dividing')} |
+      | content             | nil                                                         |
+      | raw                 | BSON::Binary.new('content-for-dividing')                    |
       | state               | 'ready'                                                     |
       | locked              | false                                                       |
       | error               | nil                                                         |
@@ -84,6 +86,7 @@ Feature: Actions Execution
       | dev_errors      | {}                        |
       | ops_errors      | {}                        |
       | content         | {'doesnt_matter' => true} |
+      | raw             | nil                       |
       | state           | 'ready'                   |
       | locked          | false                     |
       | error           | nil                       |
@@ -164,7 +167,8 @@ Feature: Actions Execution
       | pending_actions     | []                                                       |
       | dev_errors          | {}                                                       |
       | ops_errors          | {}                                                       |
-      | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
+      | content             | nil                                                      |
+      | raw                 | BSON::Binary.new('collected content')                    |
       | state               | 'ready'                                                  |
       | locked              | false                                                    |
       | error               | nil                                                      |
@@ -235,7 +239,7 @@ Feature: Actions Execution
     And I run armagh
     And I wait until there are agents with the statuses
       | idle |
-    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}"
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}", raw "should disappear"
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
@@ -245,6 +249,7 @@ Feature: Actions Execution
       | ops_errors          | {}                            |
       | metadata            | {'meta' => 'some meta'}       |
       | content             | {'content' => 'some content'} |
+      | raw                 | nil                           |
       | state               | 'published'                   |
       | locked              | false                         |
       | error               | nil                           |
@@ -733,7 +738,7 @@ Feature: Actions Execution
     And I insert 1 "PublishDocument" with a "published" state, document_id "new_id", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
     Then the valid reported status should contain agents with statuses
       | idle |
-    When I insert 1 "PublishDocument" with a "ready" state, document_id "old_id", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "old_id", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}", raw "should disappear"
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
     And I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
@@ -744,6 +749,7 @@ Feature: Actions Execution
       | ops_errors          | {}                                                                          |
       | metadata            | {'orig_meta' => 'old published metadata', 'new_meta' => 'new meta'}         |
       | content             | {'orig_content' => 'old published content', 'new_content' => 'new content'} |
+      | raw                 | nil                                                                         |
       | state               | 'published'                                                                 |
       | locked              | false                                                                       |
       | error               | nil                                                                         |
@@ -840,7 +846,8 @@ Feature: Actions Execution
       | version             | APP_VERSION                                              |
       | collection_task_ids | ['collect_id']                                           |
       | metadata            | {}                                                       |
-      | content             | {'bson_binary' => BSON::Binary.new('collected content')} |
+      | content             | nil                                                      |
+      | raw                 | BSON::Binary.new('collected content')                    |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | 'collect_id'                                                                                                                                     |
       | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]"]} |
@@ -996,4 +1003,52 @@ Feature: Actions Execution
       | title       | 'Document Title' |
     And the logs should contain 2 "Test Long Publish Running"
     And the logs should contain 1 "Test Long Publish Finished"
+
+  Scenario: Raw content gets passed to the consumer
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "publisher_passes_raw_to_consumer"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'content' => 'some content'}", metadata "{'meta' => 'some meta'}", raw "raw content"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
+      | document_id         | '123'                         |
+      | pending_actions     | []                            |
+      | dev_errors          | {}                            |
+      | ops_errors          | {}                            |
+      | metadata            | {'meta' => 'some meta'}       |
+      | content             | {'content' => 'some content'} |
+      | raw                 | nil                           |
+      | state               | 'published'                   |
+      | locked              | false                         |
+      | error               | nil                           |
+      | pending_work        | nil                           |
+      | version             | APP_VERSION                   |
+      | published_timestamp | recent_timestamp              |
+    And I should see a "ConsumeOutputDocument" in "documents" with the following
+      | document_id         | 'consumed'                    |
+      | state               | 'ready'                       |
+      | locked              | false                         |
+      | error               | nil                           |
+      | pending_work        | nil                           |
+      | version             | APP_VERSION                   |
+      | metadata            | {'meta' => 'consumed meta'}   |
+      | content             | {}                            |
+      | raw                 | nil                           |
+    And the logs should contain "Test Publish Passes Raw Running"
+    And the logs should contain "Test Consume Receives Raw Running"
+    And the logs should contain "publish: raw=raw content"
+    And the logs should contain "consume: raw=raw content"
+    And the logs should not contain "ERROR"
+    And I should see 0 "PublishDocument" documents in the "documents" collection
 

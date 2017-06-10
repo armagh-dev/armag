@@ -43,6 +43,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     4.times do |count|
       Armagh::Document.create(type: 'TestDocument',
                               content: {},
+                              raw: nil,
                               metadata: {},
                               pending_actions: ['action'],
                               state: Armagh::Documents::DocState::READY,
@@ -54,6 +55,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
 
     Armagh::Document.create(type: 'PublishedTestDocument',
                             content: {},
+                            raw: nil,
                             metadata: {},
                             pending_actions: ['action'],
                             state: Armagh::Documents::DocState::PUBLISHED,
@@ -88,6 +90,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     assert_raise(Armagh::Connection::DocumentSizeError) do
       Armagh::Document.create(type: 'TestDocument',
                               content: content,
+                              raw: nil,
                               metadata: {},
                               pending_actions: ['action'],
                               state: Armagh::Documents::DocState::READY,
@@ -100,6 +103,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
   def test_create_duplicate
     Armagh::Document.create(type: 'TestDocument',
                             content: {},
+                            raw: nil,
                             metadata: {},
                             pending_actions: ['action'],
                             state: Armagh::Documents::DocState::READY,
@@ -111,6 +115,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     assert_raise(Armagh::Connection::DocumentUniquenessError) do
       Armagh::Document.create(type: 'TestDocument',
                               content: {},
+                              raw: nil,
                               metadata: {},
                               pending_actions: ['action'],
                               state: Armagh::Documents::DocState::READY,
@@ -126,6 +131,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     id = 'doc_test'
     Armagh::Document.create(type: 'TestDocument',
                             content: {},
+                            raw: nil,
                             metadata: {},
                             pending_actions: ['action'],
                             state: Armagh::Documents::DocState::READY,
@@ -168,6 +174,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
         doc = Armagh::Document.create(
           type: dtype,
           content: {},
+          raw: nil,
           metadata: {},
           pending_actions: pending_actions,
           state: dstate,

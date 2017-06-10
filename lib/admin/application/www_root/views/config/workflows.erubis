@@ -176,8 +176,9 @@
         return
       }
 
-      $.post({
-        url:     "/config/" + wf + "/" + status + "?id=" + id,
+      $.ajax({
+        type: 'PATCH',
+        url: '/config/' + wf + '/' + status + '?id=' + id,
         success: function(data, text) {
           update_status_change(data)
           update_request_status()

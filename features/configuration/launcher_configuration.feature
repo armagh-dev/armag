@@ -135,5 +135,5 @@ Feature: Launcher Configuration
     When the logs are emptied
     When armagh's "action" config is
       | iteration | 2 |
-    And I wait 61 seconds
+    And I wait 65 seconds
     Then the logs should contain "Configuration change detected"

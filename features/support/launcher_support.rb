@@ -26,12 +26,10 @@ module LauncherSupport
 
     EXEC = File.join(File.dirname(__FILE__), '..', '..', 'bin', EXEC_NAME)
     DAEMON = File.join(File.dirname(__FILE__), '..', '..', 'bin', DAEMON_NAME)
-    DAEMON_DIR = '/tmp/armagh'
   end
 
   def self.start_launcher_daemon
-    raise "Unable to write to #{DAEMON_DIR}" unless File.writable? DAEMON_DIR
-    system "#{DAEMON} start > /dev/null"
+    `#{DAEMON} start > /dev/null`
     sleep 1
   end
 
@@ -87,15 +85,15 @@ module LauncherSupport
       pid = process.pid
 
       print "Killing armagh running as PID #{pid}"
-      Process.kill(:SIGINT, pid)
+      Process.kill(:INT, pid)
 
       running = true
-      until !running
+      while running
         begin
           Process.kill(0, pid)
           running = true
           print '.'
-          sleep 1
+          sleep 0.25
         rescue Errno::ESRCH
           running = false
         end

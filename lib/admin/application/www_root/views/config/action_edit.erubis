@@ -33,8 +33,10 @@
                                          @data[:supertype],
                                        '</span>',
                                        '<span class="uk-text-small uk-margin-left" title="Workflow">',
-                                         '<i class="uk-icon-sitemap"></i>',
-                                         @data[:workflow],
+                                         "<a href='/config/#{@data[:workflow]}'>",
+                                           '<i class="uk-icon-sitemap"></i>',
+                                           @data[:workflow],
+                                         '</a>',
                                        '</span>'].join(' ')} }}
 
 <ul class="uk-tab uk-margin-bottom" data-uk-tab="{connect:'#page'}">
@@ -74,6 +76,9 @@
 <form id="autoform" method="post" class="uk-form uk-form-horizontal uk-container">
   <fieldset>
 
+    {{ if @data[:edit_action] }}
+      <input name="_method" type="hidden" value="put">
+    {{ end }}
     <input name="type" type="hidden" value="{{= @data[:type] }}">
 
     <ul id="page" class="uk-switcher uk-margin">
@@ -340,7 +345,7 @@
               "/config/#{@data[:workflow]}/new?prev=#{selected_action}"
             end
         }}
-        <a href="{{= back_url }}" class="uk-button">Back</a>
+        <a id="back-button" href="{{= back_url }}" class="uk-button">Back</a>
       </div>
       <div class="uk-width-1-3 uk-text-right">
         {{ if @data[:broken] }}
@@ -401,6 +406,14 @@
   <input id="modal-list-hash"   type="hidden">
 </div>
 
+<a id="scroll-top">
+  <i class="uk-icon-chevron-circle-up"></i>
+</a>
+
+<a id="scroll-bot">
+  <i class="uk-icon-chevron-circle-down"></i>
+</a>
+
 <script>
   $(document).ready(function() {
     $("#autoform").on("keyup keypress", function(e) {
@@ -420,7 +433,69 @@
         $("#page li[class='uk-active']").find("input").first().focus()
       }, 1)
     })
+
+    $(window).scroll(function() {
+      if ($(this).scrollTop() > 100) {
+        scroll_top_show()
+      } else {
+        scroll_top_hide()
+      }
+      if ($(this).scrollTop() > $("#back-button").offset().top - $(window).innerHeight() - 100) {
+        scroll_bot_hide()
+      } else {
+        scroll_bot_show()
+      }
+    })
+
+    $("#scroll-top").click(function() {
+      $('html, body').stop().animate({scrollTop: 0}, 500, function() {
+        $("#scroll-top").stop().animate({top: '-100px'}, 500)
+      })
+    })
+
+    $("#scroll-bot").click(function() {
+      var offset = $("#back-button").offset().top - $(window).innerHeight() + 100
+      $('html, body').stop().animate({scrollTop: offset + 'px'}, 500, function() {
+        scroll_bot_hide()
+      })
+    })
+
+    $(window).resize(function() {
+      if ($(this).scrollTop() <= 100) {
+        scroll_bot_show(false)
+      }
+    })
+
+    scroll_bot_hide(false)
   })
+
+  function scroll_top_show() {
+    $("#scroll-top").stop().animate({top: '20px'}, 500)
+  }
+
+  function scroll_top_hide() {
+    $("#scroll-top").stop().animate({top: '-100px'}, 500)
+  }
+
+  function scroll_bot_show(animate = true) {
+    var offset = 60
+    offset = ($(window).innerHeight() - offset) + 'px'
+    if (animate) {
+      $("#scroll-bot").stop().animate({top: offset}, 500)
+    } else {
+      $("#scroll-bot").stop().css({top: offset})
+    }
+  }
+
+  function scroll_bot_hide(animate = true) {
+    var offset = 100
+    offset = ($(window).innerHeight() + offset) + 'px'
+    if (animate) {
+      $("#scroll-bot").stop().animate({top: offset}, 500)
+    } else {
+      $("#scroll-bot").stop().css({top: offset})
+    }
+  }
 
   function sanitize_string(value, quotes_only = false) {
     var map = {

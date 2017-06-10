@@ -143,8 +143,9 @@
   }
 
   function change_workflow_status(status_request) {
-    $.post({
-      url:     "/config/{{= @data[:workflow] }}/" + status_request,
+    $.ajax({
+      type: 'PATCH',
+      url: '/config/{{= @data[:workflow] }}/' + status_request,
       success: function(data) {
         var data   = JSON.parse(data)
         var status = data[1]

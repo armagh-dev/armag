@@ -34,8 +34,8 @@ require 'test/unit/assertions'
 
 require 'colored'
 
-FileUtils.mkdir_p LauncherSupport::DAEMON_DIR unless File.directory?(LauncherSupport::DAEMON_DIR)
-
+$stdout.sync = true
+$stderr.sync = true
 
 def quiet_raise(msg)
   raise RuntimeError, msg.red, []
@@ -68,15 +68,19 @@ Before do
 end
 
 After do |scenario|
-  if scenario.failed?
-    log_dir = File.join(LogSupport::FAILURE_LOGS, scenario.name)
-    puts "Storing failed logs to #{log_dir}"
-    FileUtils.mkdir_p log_dir
-    FileUtils.cp_r(LogSupport::LOG_DIR, log_dir)
-  end
+  begin
+    if scenario.failed?
+      log_dir = File.join(LogSupport::FAILURE_LOGS, scenario.name)
+      puts "Storing failed logs to #{log_dir}"
+      FileUtils.mkdir_p log_dir
+      FileUtils.cp_r(LogSupport::LOG_DIR, log_dir)
+    end
 
-  puts 'Stopping Armagh'
-  LauncherSupport.kill_launcher_processes
+    puts 'Stopping Armagh'
+    LauncherSupport.kill_launcher_processes
+  rescue => e
+    $stderr.puts "Problem running scenario cleanup: #{e.message}\n#{e.backtrace.join("\n")}"
+  end
 end
 
 After('@agent') do

@@ -19,6 +19,5 @@ require 'drb/unix'
 module Armagh
   module IPC
     DRB_URI = "drbunix:///tmp/armagh-drb-server-#{Process.pid}"
-    DRB_CLIENT_URI = 'drbunix:///tmp/armagh-drb-client-%s'
   end
 end

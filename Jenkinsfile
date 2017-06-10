@@ -32,7 +32,7 @@ currentBuild.result = "SUCCESS"
          echo -e "*********************************************\n** Preparing:" `hg identify -i` "\n*********************************************"
          set -e
          gem install bundler --no-doc
-         bundle install
+         bundle update
          ruby --version
          mongod --version
        """
@@ -77,10 +77,10 @@ currentBuild.result = "SUCCESS"
        ])
      }
 
-     stage('Yard') {
+     stage('Docs') {
 
        sh """#!/bin/bash -l
-         echo -e "*********************************************\n** Yard:" `hg identify -i` "\n*********************************************"
+         echo -e "*********************************************\n** Docs:" `hg identify -i` "\n*********************************************"
          set -e
          bundle exec rake yard
        """
@@ -92,6 +92,15 @@ currentBuild.result = "SUCCESS"
          reportDir: 'doc',
          reportFiles: 'index.html',
          reportName: "YARD Documentation"
+       ])
+
+       publishHTML (target: [
+         allowMissing: true,
+         alwaysLinkToLastBuild: false,
+         keepAll: true,
+         reportDir: 'failure_logs',
+         reportFiles: 'index.html',
+         reportName: "Failure Logs"
        ])
      }
   }

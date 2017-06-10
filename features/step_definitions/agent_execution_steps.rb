@@ -19,7 +19,7 @@ require_relative '../../lib/document/document'
 require_relative '../../lib/actions/workflow_set'
 require_relative '../../lib/logging'
 
-When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"$/) do |count, doc_type, state, document_id, content, meta|
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"(, raw "([^"]*)")?$/) do |count, doc_type, state, document_id, content, meta, rawkeyword, raw|
   @logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')
   @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
   @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
@@ -33,7 +33,7 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   Armagh::Document.version.merge! APP_VERSION
 
   count.to_i.times do
-    Armagh::Document.create(type: doc_type, content: content, metadata: meta,
+    Armagh::Document.create(type: doc_type, content: content, raw: raw, metadata: meta,
                             pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
   end
 end

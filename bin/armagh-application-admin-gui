@@ -179,15 +179,12 @@ get '/status' do
   render :status, data: gui.get_status
 end
 
-post '/status' do
-  # TODO: add restart and shutdown support
-  'not yet supported'
-  # result = `armaghd stop`
-  # if result[/does not exist|is not writable/]
-  #   halt render(:status, error: "Unable to determine Armagh status.\n\n#{result}")
-  # elsif result[/is not running/]
-  #   halt render(:status, notice: 'Armagh was successfully shut down.')
-  # end
+patch '/restart' do
+  gui.shutdown(restart: true)
+end
+
+patch '/shutdown' do
+  gui.shutdown
 end
 
 #
@@ -196,10 +193,10 @@ end
 
 get '/logs' do
   data = gui.get_logs(page:   params['page'],
-                            limit:  params['limit'],
-                            sort:  {params['sort_col']=>params['sort_dir']},
-                            filter: params['filter'],
-                            hide:   params['hide'])
+                      limit:  params['limit'],
+                      sort:  {params['sort_col']=>params['sort_dir']},
+                      filter: params['filter'],
+                      hide:   params['hide'])
   errors = data[:errors]
   data.delete(:errors)
   render :logs, data: data, error: errors
@@ -273,7 +270,7 @@ get '/config/:workflow/export' do
   gui.export_workflow_config(workflow)
 end
 
-post '/config/:workflow/:status_change' do
+patch '/config/:workflow/:status_change' do
   workflow = params['workflow']
   if params['status_change'] == 'activate'
     gui.activate_workflow(workflow)
@@ -331,7 +328,7 @@ get '/config/:workflow/edit/:action' do
   render :config, :action_edit, data: data
 end
 
-post '/config/:workflow/edit/:action' do
+put '/config/:workflow/edit/:action' do
   workflow = params['workflow']
   action   = params['action']
   result   = gui.update_action_config(params)

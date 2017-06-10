@@ -1,3 +1,22 @@
+/*
+ * custom
+ * */
+
+#scroll-top, #scroll-bot {
+  position: fixed;
+  top: -100px;
+  right: 20px;
+  font-size: 40px;
+  color: #aaa;
+}
+#scroll-top:hover, #scroll-bot:hover {
+  color: #a4c1a0;
+}
+
+/*
+ * UIkit
+ * */
+
 html {
   font: normal 14px / 20px "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-text-size-adjust: 100%;

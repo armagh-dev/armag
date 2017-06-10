@@ -21,6 +21,7 @@ require_relative '../../../lib/utils/db_doc_helper'
 
 require 'test/unit'
 require 'mocha/test_unit'
+require 'bson'
 
 class TestDBDocHelper < Test::Unit::TestCase
 
@@ -53,9 +54,12 @@ class TestDBDocHelper < Test::Unit::TestCase
       ]
     }
 
+    @raw = BSON::Binary.new('raw data')
+
     Armagh::Document.any_instance.stubs(:save)
     @doc = Armagh::Document.create(type: 'type',
                                    content: @content,
+                                   raw: 'raw data',
                                    metadata: @metadata,
                                    pending_actions: [],
                                    state: 'ready',
@@ -87,6 +91,7 @@ class TestDBDocHelper < Test::Unit::TestCase
       'state' => 'ready',
       'title' => 'some title',
       'type' => 'type',
+      'raw' => @raw,
 
       'content' => {
         'string' => 'this is some string',

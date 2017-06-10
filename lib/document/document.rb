@@ -24,6 +24,8 @@ require 'armagh/documents'
 require 'armagh/support/encoding'
 require 'armagh/support/random'
 
+require 'bson'
+
 module Armagh
   class Document < Connection::DBDoc
     class DocumentMarkError < StandardError;
@@ -41,6 +43,7 @@ module Armagh
 
     def self.create(type:,
       content:,
+      raw:,
       metadata:,
       pending_actions:,
       state:,
@@ -57,6 +60,7 @@ module Armagh
       doc = Document.new
       doc.type = type
       doc.content = content
+      doc.raw = raw
       doc.metadata = metadata
       doc.document_id = document_id
       doc.add_pending_actions pending_actions
@@ -81,6 +85,7 @@ module Armagh
       doc.add_pending_actions pending_actions
       doc.metadata = {}
       doc.content = {}
+      doc.raw = nil 
       doc.created_timestamp = now
       doc.updated_timestamp = now
 
@@ -276,6 +281,7 @@ module Armagh
       h = {
         'metadata' => {},
         'content' => {},
+        'raw' => nil,
         'type' => nil,
         'locked' => false,
         'pending_actions' => [],
@@ -376,6 +382,22 @@ module Armagh
 
     def content
       @db_doc['content']
+    end
+
+    def raw=(raw_data)
+      if raw_data.is_a?(String)
+        @db_doc['raw'] = BSON::Binary.new(raw_data)
+      elsif raw_data.nil?
+        @db_doc['raw'] = nil
+      elsif raw_data.is_a?(BSON::Binary)
+        @db_doc['raw'] = raw_data
+      else
+        raise TypeError, 'Value for raw expected to be a string.'
+      end
+    end
+
+    def raw
+      @db_doc['raw']&.data
     end
 
     def metadata
@@ -588,6 +610,7 @@ module Armagh
                                     title: title,
                                     copyright: copyright,
                                     content: content,
+                                    raw: raw,
                                     metadata: metadata,
                                     docspec: docspec,
                                     source: Armagh::Documents::Source.from_hash(source),
@@ -601,6 +624,7 @@ module Armagh
                                        title: title,
                                        copyright: copyright,
                                        content: content,
+                                       raw: raw,
                                        metadata: metadata,
                                        docspec: docspec,
                                        source: Armagh::Documents::Source.from_hash(source),
@@ -612,6 +636,7 @@ module Armagh
     def update_from_draft_action_document(action_doc)
       self.document_id = action_doc.document_id
       self.content = action_doc.content
+      self.raw = action_doc.raw
       self.metadata = action_doc.metadata
       self.source = action_doc.source.to_hash
       self.title = action_doc.title

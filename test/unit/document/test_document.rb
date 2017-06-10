@@ -21,6 +21,7 @@ require_relative '../../../lib/document/document'
 require 'armagh/documents/doc_state'
 
 require 'log4r'
+require 'bson'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -36,6 +37,7 @@ class TestDocument < Test::Unit::TestCase
 
     @doc = Armagh::Document.create(type: 'testdoc',
                            content: {'content' => true},
+                           raw: 'raw',
                            metadata: {'meta' => true},
                            pending_actions: [],
                            state: Armagh::Documents::DocState::WORKING,
@@ -79,6 +81,7 @@ class TestDocument < Test::Unit::TestCase
     mock_replace
     doc = Armagh::Document.create(type: 'testdoc',
                           content: {'content' => true},
+                          raw: 'raw',
                           metadata: {'meta' => true},
                           pending_actions: [],
                           state: Armagh::Documents::DocState::WORKING,
@@ -90,6 +93,7 @@ class TestDocument < Test::Unit::TestCase
 
     assert_equal('testdoc', doc.type)
     assert_equal({'content' => true}, doc.content)
+    assert_equal('raw', doc.raw)
     assert_equal({'meta' => true}, doc.metadata)
     assert_equal('id', doc.document_id)
     assert_equal(['whatever'], doc.archive_files)
@@ -98,7 +102,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_create_trigger_document
     expected_qualifier = {'type' => 'type', 'state' => 'ready'}
-    expected_values = {'metadata' => {}, 'content' => {}, 'type' => 'type', 'locked' => false, 'pending_actions' => [],
+    expected_values = {'metadata' => {}, 'content' => {}, 'raw' => nil, 'type' => 'type', 'locked' => false, 'pending_actions' => [],
                        'dev_errors' => {}, 'ops_errors' => {}, 'title' => nil, 'copyright' => nil, 'published_timestamp' => nil,
                        'collection_task_ids' => [], 'archive_files' => [], 'source' => {}, 'document_timestamp' => nil,
                        'display' => nil, 'state' => 'ready'}
@@ -116,6 +120,7 @@ class TestDocument < Test::Unit::TestCase
   def test_from_action_document
     id = 'id'
     content = 'blah'
+    raw = 'raw'
     metadata = 'draft_meta'
     docspec = Armagh::Documents::DocSpec.new('document type', Armagh::Documents::DocState::READY)
     new_doc = true
@@ -127,6 +132,7 @@ class TestDocument < Test::Unit::TestCase
     document_timestamp = Time.at(0)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: id,
                                                        content: content,
+                                                       raw: raw,
                                                        metadata: metadata,
                                                        title: title,
                                                        docspec: docspec,
@@ -139,6 +145,7 @@ class TestDocument < Test::Unit::TestCase
 
     assert_equal(id, doc.document_id)
     assert_equal(content, doc.content)
+    assert_equal(raw, doc.raw)
     assert_equal(metadata, doc.metadata)
     assert_equal(docspec.type, doc.type)
     assert_equal(docspec.state, doc.state)
@@ -350,6 +357,7 @@ class TestDocument < Test::Unit::TestCase
     mock_replace
     doc = Armagh::Document.create(type: 'testdoc',
                           content: {'content' => true},
+                          raw: nil,
                           metadata: {'meta' => true},
                           pending_actions: [],
                           state: Armagh::Documents::DocState::WORKING,
@@ -555,6 +563,7 @@ class TestDocument < Test::Unit::TestCase
   def test_to_draft_action_document
     action_doc = @doc.to_action_document
     assert_equal(@doc.content, action_doc.content)
+    assert_equal(@doc.raw, action_doc.raw)
     assert_equal(@doc.metadata, action_doc.metadata)
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
@@ -564,6 +573,7 @@ class TestDocument < Test::Unit::TestCase
   def test_to_published_document
     pub_doc = @doc.to_published_document
     assert_equal(@doc.content, pub_doc.content)
+    assert_equal(@doc.raw, pub_doc.raw)
     assert_equal(@doc.metadata, pub_doc.metadata)
     assert_equal(@doc.state, pub_doc.docspec.state)
     assert_equal(@doc.type, pub_doc.docspec.type)
@@ -573,6 +583,7 @@ class TestDocument < Test::Unit::TestCase
   def test_update_from_draft_action_document
     id = 'id'
     content = 'new content'
+    raw = 'new raw'
     metadata = 'new meta'
     source = {'some' => 'source'}
     title = 'title'
@@ -583,6 +594,7 @@ class TestDocument < Test::Unit::TestCase
 
     action_document = Armagh::Documents::ActionDocument.new(document_id: id,
                                                             content: content,
+                                                            raw: raw,
                                                             metadata: metadata,
                                                             docspec: docspec,
                                                             source: source,
@@ -591,6 +603,7 @@ class TestDocument < Test::Unit::TestCase
                                                             document_timestamp: document_timestamp)
 
     assert_not_equal(content, @doc.content)
+    assert_not_equal(raw, @doc.raw)
     assert_not_equal(metadata, @doc.metadata)
     assert_not_equal(docspec.type, @doc.type)
     assert_not_equal(docspec.state, @doc.state)
@@ -601,6 +614,7 @@ class TestDocument < Test::Unit::TestCase
     @doc.update_from_draft_action_document(action_document)
 
     assert_equal(content, @doc.content)
+    assert_equal(raw, @doc.raw)
     assert_equal(metadata, @doc.metadata)
     assert_equal(docspec.type, @doc.type)
     assert_equal(docspec.state, @doc.state)
@@ -624,9 +638,10 @@ class TestDocument < Test::Unit::TestCase
 
   def test_publish_save
     testdoc_collection = mock
+    raw_bson = BSON::Binary.new(@doc.raw)
     Armagh::Connection.expects(:documents).with('testdoc').returns(testdoc_collection)
 
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'type' => @doc.type,
+    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
                        'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
                        'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
                        'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
@@ -648,8 +663,9 @@ class TestDocument < Test::Unit::TestCase
 
   def test_archive_save
     archive_collection = mock
+    raw_bson = BSON::Binary.new(@doc.raw)
     Armagh::Connection.expects(:collection_history).returns(archive_collection)
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'type' => @doc.type,
+    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
                        'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
                        'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
                        'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
@@ -679,6 +695,7 @@ class TestDocument < Test::Unit::TestCase
 
     doc = Armagh::Document.create(type: 'testdoc',
                           content: {'content' => true},
+                          raw: nil,
                           metadata: {'meta' => true},
                           pending_actions: [],
                           state: Armagh::Documents::DocState::PUBLISHED,
@@ -690,10 +707,11 @@ class TestDocument < Test::Unit::TestCase
 
   def test_failed_action_save
     failures = mock('failures')
+    raw_bson = BSON::Binary.new(@doc.raw)
     Armagh::Connection.expects(:failures).returns(failures)
     Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
 
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'type' => @doc.type,
+    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
                        'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
                        'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
                        'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
@@ -711,6 +729,7 @@ class TestDocument < Test::Unit::TestCase
     error = assert_raise(Armagh::Connection::DocumentSizeError) do
       Armagh::Document.create(type: 'testdoc',
                       content: {'content' => true},
+                      raw: nil,
                       metadata: {'meta' => true},
                       pending_actions: [],
                       state: Armagh::Documents::DocState::PUBLISHED,
@@ -730,6 +749,7 @@ class TestDocument < Test::Unit::TestCase
     error = assert_raise(Armagh::Connection::DocumentUniquenessError) do
       Armagh::Document.create(type: 'testdoc',
                       content: {'content' => true},
+                      raw: nil,
                       metadata: {'meta' => true},
                       pending_actions: [],
                       state: Armagh::Documents::DocState::PUBLISHED,
@@ -749,6 +769,7 @@ class TestDocument < Test::Unit::TestCase
     assert_raise(Armagh::Connection::ConnectionError.new('An unexpected connection error occurred from Document id: Something.')) do
       Armagh::Document.create(type: 'testdoc',
                       content: {'content' => true},
+                      raw: nil,
                       metadata: {'meta' => true},
                       pending_actions: [],
                       state: Armagh::Documents::DocState::PUBLISHED,
@@ -828,6 +849,7 @@ class TestDocument < Test::Unit::TestCase
     expected = {
       metadata: @doc.metadata,
       content: @doc.content,
+      raw: BSON::Binary.new(@doc.raw),
       type: @doc.type,
       locked: @doc.locked?,
       pending_actions: @doc.pending_actions,

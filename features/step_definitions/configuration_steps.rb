@@ -345,6 +345,26 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
               'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
           }
       )
+
+    when 'publisher_passes_raw_to_consumer'
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublishPassesRaw',
+          {
+              'action' => {'name' => 'test_publish_passes_raw'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
+
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestConsumeReceivesRaw',
+          {
+              'action' => {'name' => 'test_consume_receives_raw'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)},
+              'output' => {'output' => Armagh::Documents::DocSpec.new('ConsumeOutputDocument', Armagh::Documents::DocState::READY)}
+          }
+      )
+
   end
 
 

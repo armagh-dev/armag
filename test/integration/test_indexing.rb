@@ -53,6 +53,7 @@ class TestIndexing < Test::Unit::TestCase
   def create_document(id, type = 'TestDocument', state = Armagh::Documents::DocState::READY)
     Armagh::Document.create(type: type,
                             content: {},
+                            raw: nil,
                             metadata: {},
                             pending_actions: ['action'],
                             state: state,

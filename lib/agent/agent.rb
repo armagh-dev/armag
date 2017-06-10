@@ -64,9 +64,9 @@ module Armagh
     def start
       connect_agent_status
 
-      @logger.info 'Starting'
       unless @shutdown
         @running = true
+        @logger.info 'Starting'
         run
       end
     end
@@ -93,6 +93,7 @@ module Armagh
       archive_files.concat @archive_files if @archive_files
       Document.create(type: docspec.type,
                       content: action_doc.content,
+                      raw: action_doc.raw,
                       metadata: action_doc.metadata,
                       pending_actions: pending_actions,
                       state: docspec.state,
@@ -219,6 +220,7 @@ module Armagh
       else
         action_doc = Documents::ActionDocument.new(document_id: document_id,
                                                    content: {},
+                                                   raw: nil,
                                                    metadata: {},
                                                    docspec: docspec,
                                                    source: {},
@@ -250,35 +252,19 @@ module Armagh
         execute
       end
 
-      if @client
-        @logger.debug 'Stopping internal communication client'
-        @client.stop_service
-        @logger.debug 'Internal communication client stopped'
-      end
-
-      @logger.debug 'Waiting for DRB shutdown'
-      DRb.thread.join
       @logger.info 'Terminated'
     rescue => e
       Logging.dev_error_exception(@logger, e, 'An unexpected error occurred')
     end
 
     private def connect_agent_status
-      client_uri = IPC::DRB_CLIENT_URI % @uuid
-      socket_file = client_uri.sub("drbunix://", '')
-
-      if File.exists? socket_file
-        @logger.debug "Deleting #{socket_file}.  This may have existed already due to a previous crash of the agent."
-        File.delete socket_file
-      end
-
-      @client = DRb.start_service(client_uri)
-
       @agent_status = DRbObject.new_with_uri(IPC::DRB_URI)
+      DRb.start_service
     end
 
 
     private def execute
+      @logger.debug 'Getting document for processing'
       @current_doc = Document.get_for_processing(@uuid)
 
       if @current_doc
@@ -292,6 +278,7 @@ module Armagh
           current_action = nil
 
           begin
+            @logger.debug "Instantiating action #{name}"
             current_action = @workflow_set.instantiate_action_named(name, self, @logger, Connection.action_state)
           rescue Armagh::Actions::ActionInstantiationError
             @logger.ops_error "Document: #{@current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined."
@@ -327,6 +314,7 @@ module Armagh
 
           true # Always remove this action from pending
         end #delete_if
+        @current_doc.raw = nil if @current_doc.pending_actions.empty?
         @current_doc.finish_processing(@logger)
       else
         @logger.debug 'No document found for processing.'
@@ -372,6 +360,7 @@ module Armagh
           doc.document_id = action_doc.document_id || Armagh::Support::Random.random_id
           doc.metadata = action_doc.metadata
           doc.content = action_doc.content
+          doc.raw = action_doc.raw
           doc.title = action_doc.title
           doc.copyright = action_doc.copyright
           doc.document_timestamp = action_doc.document_timestamp || timestamp
@@ -417,6 +406,7 @@ module Armagh
 
     private def report_status(doc, action)
       status = {}
+      now = Time.now
 
       if doc && action
         @idle_since = nil
@@ -424,16 +414,16 @@ module Armagh
           'document' => doc.document_id,
           'action' => action.name
         }
-        status['running_since'] = Time.now
+        status['running_since'] = now
         status['status'] = 'running'
       else
-        @idle_since ||= Time.now
+        @idle_since ||= now
 
         status['status'] = 'idle'
         status['idle_since'] = @idle_since
       end
 
-      status['last_update'] = Time.now
+      status['last_update'] = now
 
       @logger.debug "Reporting Status #{status['status']}"
 

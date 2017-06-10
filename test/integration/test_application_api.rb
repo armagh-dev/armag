@@ -174,10 +174,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       expected_markup = {
           'type' => 'Armagh::Launcher',
           'parameters' => [
-              {"name"=>"num_agents", "description"=>"Number of agents", "type"=>"positive_integer", "required"=>true, "default"=>1, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>"type validation failed: value BAD cannot be cast as an integer", "value"=>nil},
-              {"name"=>"update_frequency", "description"=>"Configuration refresh rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60},
-              {"name"=>"checkin_frequency", "description"=>"Status update rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60},
-              {"name"=>"log_level", "description"=>"Log level", "type"=>"populated_string", "required"=>true, "default"=>"info", "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>"debug"}
+              {"name"=>"num_agents", "description"=>"Number of agents", "type"=>"positive_integer", "required"=>true, "default"=>1, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>"type validation failed: value BAD cannot be cast as an integer", "value"=>nil, "options"=>nil},
+              {"name"=>"update_frequency", "description"=>"Configuration refresh rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60, "options"=>nil},
+              {"name"=>"checkin_frequency", "description"=>"Status update rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60, "options"=>nil},
+              {"name"=>"log_level", "description"=>"Log level", "type"=>"populated_string", "required"=>true, "default"=>"info", "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>"debug", "options"=>nil}
           ]}
 
       assert_equal'Invalid launcher config', failure_detail['message']
@@ -225,7 +225,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     expected_result = {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
 
-    get '/workflow/alice/run.json' do
+    patch '/workflow/alice/run.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -239,7 +239,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
 
-    get '/workflow/alice/finish.json' do
+    patch '/workflow/alice/finish.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -252,7 +252,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
 
     expected_result = { 'client_error_detail' => { 'message' => 'Workflow not running', 'markup' => nil }}
-    get '/workflow/alice/finish.json' do
+    patch '/workflow/alice/finish.json' do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -268,7 +268,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @alice.finish
 
     expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
-    get '/workflow/alice/stop.json' do
+    patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -284,7 +284,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @alice.run
 
     expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
-    get '/workflow/alice/stop.json' do
+    patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -300,7 +300,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @alice.finish
 
     expected_result = { 'client_error_detail' => { 'message' => 'Cannot stop - 41 documents still processing', 'markup' => nil }}
-    get '/workflow/alice/stop.json' do
+    patch '/workflow/alice/stop.json' do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
@@ -671,15 +671,15 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil},
-              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice"},
-              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil},
-              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil},
-              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_state"=>"ready"},
-              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"]},
-              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"]},
-              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>nil}
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_state"=>"ready", "options"=>nil},
+              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil}
           ]}
       assert_equal expected_result, result
     end
@@ -719,15 +719,15 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source"},
-              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice"},
-              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *"},
-              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false},
-              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready"},
-              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"]},
-              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"]},
-              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>6},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
+              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
+              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>6, "options"=>nil},
               {"group"=>"action", "error"=>nil},
               {"group"=>"collect", "error"=>nil}
           ]}
@@ -748,15 +748,15 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source"},
-              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>true},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice"},
-              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *"},
-              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false},
-              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready"},
-              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"]},
-              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"]},
-              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>6},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>true, "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
+              {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
+              {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"], "options"=>nil},
+              {"name"=>"count", "description"=>"desc", "type"=>"integer", "required"=>true, "default"=>6, "prompt"=>nil, "group"=>"tw_test_collect", "warning"=>nil, "error"=>nil, "value"=>6, "options"=>nil},
               {"group"=>"action", "error"=>nil},
               {"group"=>"collect", "error"=>nil}
           ]}
@@ -812,11 +812,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestConsume',
           'supertype' => 'Armagh::Actions::Consume',
           'parameters' =>[
-              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil},
-              {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
-              {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil},
-              {"default"=>nil, "description"=>"Input doctype for this action", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc:published", "warning"=>nil, "valid_state"=>"published"},
-              {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "valid_states"=>[nil, "ready", "working"], "value"=>"alicedoc_out:ready", "warning"=>nil},
+              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+              {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
+              {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+              {"default"=>nil, "description"=>"Input doctype for this action", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc:published", "warning"=>nil, "valid_state"=>"published", "options"=>nil},
+              {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "valid_states"=>[nil, "ready", "working"], "value"=>"alicedoc_out:ready", "warning"=>nil, "options"=>nil},
               {"error"=>nil, "group"=>"action"},
               {"error"=>nil, "group"=>"consume"}
           ].sort{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
@@ -842,11 +842,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               'type' => 'Armagh::StandardActions::TWTestConsume',
               'supertype' => 'Armagh::Actions::Consume',
               'parameters' => [
-                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil},
-                  {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
-                  {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil},
-                  {"default"=>nil, "description"=>"Input doctype for this action", "error"=>"type validation failed: value cannot be nil", "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>nil, "warning"=>nil},
-                  {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc_out:ready", "warning"=>nil},
+                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+                  {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"Input doctype for this action", "error"=>"type validation failed: value cannot be nil", "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>nil, "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc_out:ready", "warning"=>nil, "options"=>nil},
               ]},
           'message' => 'Configuration has errors: Unable to create configuration Armagh::StandardActions::TWTestConsume new_alice_consume: input docspec: type validation failed: value cannot be nil'
       }}.sort{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
@@ -872,7 +872,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   #submit a form to update an EXISTING action
-  def test_post_workflow_action_config_existing
+  def test_put_workflow_action_config_existing
 
     good_alice_in_db
 
@@ -887,7 +887,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     }
 
 
-    post '/workflow/alice/action/collect_alicedocs_from_source/config.json', new_values.to_json  do
+    put '/workflow/alice/action/collect_alicedocs_from_source/config.json', new_values.to_json  do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       result['parameters'].sort!{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
@@ -895,16 +895,16 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [{"error"=>nil, "group"=>"action"},
-                           {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
-                           {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"collect_alicedocs_from_source", "warning"=>nil},
-                           {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil},
+                           {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
+                           {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"collect_alicedocs_from_source", "warning"=>nil, "options"=>nil},
+                           {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
                            {"error"=>nil, "group"=>"collect"},
-                           {"default"=>true, "description"=>"Archive collected documents", "error"=>nil, "group"=>"collect", "name"=>"archive", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
-                           {"default"=>nil, "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "error"=>nil, "group"=>"collect", "name"=>"schedule", "prompt"=>"*/15 * * * *", "required"=>false, "type"=>"populated_string", "value"=>"29 * * * *", "warning"=>nil},
-                           {"default"=>"__COLLECT__:ready", "description"=>"The type of document this action accepts", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"__COLLECT__:ready", "warning"=>nil, "valid_state"=>"ready"},
-                           {"default"=>nil, "description"=>"The docspec of the default output from this action", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_a_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"]},
-                           {"default"=>nil, "description"=>"collected documents of second type", "error"=>nil, "group"=>"output", "name"=>"docspec2", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_b_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"]},
-                           {"default"=>6, "description"=>"desc", "error"=>nil, "group"=>"tw_test_collect", "name"=>"count", "prompt"=>nil, "required"=>true, "type"=>"integer", "value"=>6, "warning"=>nil}
+                           {"default"=>true, "description"=>"Archive collected documents", "error"=>nil, "group"=>"collect", "name"=>"archive", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
+                           {"default"=>nil, "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "error"=>nil, "group"=>"collect", "name"=>"schedule", "prompt"=>"*/15 * * * *", "required"=>false, "type"=>"populated_string", "value"=>"29 * * * *", "warning"=>nil, "options"=>nil},
+                           {"default"=>"__COLLECT__:ready", "description"=>"The type of document this action accepts", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"__COLLECT__:ready", "warning"=>nil, "valid_state"=>"ready", "options"=>nil},
+                           {"default"=>nil, "description"=>"The docspec of the default output from this action", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_a_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
+                           {"default"=>nil, "description"=>"collected documents of second type", "error"=>nil, "group"=>"output", "name"=>"docspec2", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_b_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
+                           {"default"=>6, "description"=>"desc", "error"=>nil, "group"=>"tw_test_collect", "name"=>"count", "prompt"=>nil, "required"=>true, "type"=>"integer", "value"=>6, "warning"=>nil, "options"=>nil}
           ].sort{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
       }
       assert_equal expected_result, result
@@ -918,7 +918,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert_empty JSON.parse(last_response.body)
     end
 
-    doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, raw: 'raw', metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
 
@@ -959,7 +959,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert_equal("A parameter named 'id' is missing but is required.", response.dig('client_error_detail', 'message'))
     end
 
-    doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+    doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, raw: 'raw', metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
     doc.save
@@ -1001,7 +1001,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_document_failures
     count = 10
     count.times do |i|
-      doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, metadata: {},
+      doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, raw: 'raw', metadata: {},
                                     pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "id_#{i}",
                                     collection_task_ids: [ '123' ], document_timestamp: Time.now )
       doc.add_dev_error('test_action', 'details')
@@ -1048,14 +1048,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     @alice.run
 
-    get '/actions/trigger_collect.json', {name: 'collect_alicedocs_from_source'} do
+    patch '/actions/trigger_collect.json', {name: 'collect_alicedocs_from_source'} do
       assert last_response.ok?
       assert_equal true, JSON.parse(last_response.body)
     end
   end
 
   def test_trigger_collect_bad_action
-    get '/actions/trigger_collect.json', {name: 'not_real'} do
+    patch '/actions/trigger_collect.json', {name: 'not_real'} do
       assert last_response.client_error?
       response_hash = JSON.parse(last_response.body)
       message = response_hash.dig('client_error_detail', 'message')
@@ -1067,7 +1067,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     e = RuntimeError.new('Bad')
     @api.expects(:trigger_collect).raises(e)
 
-    get '/actions/trigger_collect.json', {name: 'not_real'} do
+    patch '/actions/trigger_collect.json', {name: 'not_real'} do
       assert last_response.server_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal(e.message, response_hash.dig('server_error_detail', 'message'))
@@ -1075,7 +1075,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_trigger_collect_no_name
-    get '/actions/trigger_collect.json' do
+    patch '/actions/trigger_collect.json' do
       assert last_response.client_error?
       response_hash = JSON.parse(last_response.body)
       assert_equal 'No action name supplied.', response_hash.dig('client_error_detail', 'message')
@@ -1200,7 +1200,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     # users
     get '/users.json' do
       assert last_response.ok?
-      response = JSON.parse(last_response.body)
+      JSON.parse(last_response.body)
 
       assert_equal 'testuser', user['username']
     end
@@ -1642,5 +1642,3 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 end
-
-

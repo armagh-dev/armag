@@ -130,29 +130,31 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_edit_configuration
     result = Armagh::Actions::Workflow.edit_configuration({}, creating_in: @workflow_set)
-    expected = {"parameters"=>
-      [{"default"=>"stop",
-        "description"=>"run, finish, or stop",
-        "error"=>nil,
-        "group"=>"workflow",
-        "name"=>"run_mode",
-        "prompt"=>nil,
-        "required"=>true,
-        "type"=>"string",
-        "value"=>"stop",
-        "warning"=>nil},
-       {"default"=>false,
-        "description"=>"not normally displayed",
-        "error"=>nil,
-        "group"=>"workflow",
-        "name"=>"retired",
-        "prompt"=>nil,
-        "required"=>true,
-        "type"=>"boolean",
-        "value"=>false,
-        "warning"=>nil},
-       {"error"=>nil, "group"=>"workflow"}],
-      "type"=>Armagh::Actions::Workflow}
+    expected = {"parameters" =>
+                    [{"default" => "stop",
+                      "description" => "run, finish, or stop",
+                      "error" => nil,
+                      "group" => "workflow",
+                      "name" => "run_mode",
+                      "prompt" => nil,
+                      "required" => true,
+                      "type" => "string",
+                      "value" => "stop",
+                      "warning" => nil,
+                      "options" => nil},
+                     {"default" => false,
+                      "description" => "not normally displayed",
+                      "error" => nil,
+                      "group" => "workflow",
+                      "name" => "retired",
+                      "prompt" => nil,
+                      "required" => true,
+                      "type" => "boolean",
+                      "value" => false,
+                      "warning" => nil,
+                      "options" => nil},
+                     {"error" => nil, "group" => "workflow"}],
+                "type" => Armagh::Actions::Workflow}
     assert_equal expected, result
   end
 
@@ -574,16 +576,17 @@ class TestWorkflow < Test::Unit::TestCase
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
     assert_equal 9, result['parameters'].size
-    expected = {"default"=>nil,
-      "description"=>"Name of this action configuration",
-      "error"=>nil,
-      "group"=>"action",
-      "name"=>"name",
-      "prompt"=>"ComtexCollectAction",
-      "required"=>true,
-      "type"=>"populated_string",
-      "value"=>nil,
-      "warning"=>nil}
+    expected = {"default" => nil,
+                "description" => "Name of this action configuration",
+                "error" => nil,
+                "group" => "action",
+                "name" => "name",
+                "prompt" => "ComtexCollectAction",
+                "required" => true,
+                "type" => "populated_string",
+                "value" => nil,
+                "warning" => nil,
+                "options" => nil}
     assert_equal expected, result.dig('parameters', 0)
   end
 
@@ -603,16 +606,17 @@ class TestWorkflow < Test::Unit::TestCase
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
     assert_equal 11, result['parameters'].size
-    expected = {"default"=>nil,
-      "description"=>"Name of this action configuration",
-      "error"=>nil,
-      "group"=>"action",
-      "name"=>"name",
-      "prompt"=>"ComtexCollectAction",
-      "required"=>true,
-      "type"=>"populated_string",
-      "value"=>"collect_alicedocs_from_source",
-      "warning"=>nil}
+    expected = {"default" => nil,
+                "description" => "Name of this action configuration",
+                "error" => nil,
+                "group" => "action",
+                "name" => "name",
+                "prompt" => "ComtexCollectAction",
+                "required" => true,
+                "type" => "populated_string",
+                "value" => "collect_alicedocs_from_source",
+                "warning" => nil,
+                "options" => nil}
     assert_equal expected, result.dig('parameters', 0)
   end
 

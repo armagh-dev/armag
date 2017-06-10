@@ -84,17 +84,15 @@
   </div>
   <div class="uk-width-1-2 uk-text-right">
 
-    <form name="shutdown" method="post">
-      <button class="uk-button uk-button-small" onclick="restart_armagh()" disabled>
-        <i class="uk-icon-repeat"></i>
-        Restart
-      </button>
+    <a href="javascript:" onclick="restart_armagh()" class="uk-button uk-button-small">
+      <i class="uk-icon-repeat"></i>
+      Restart
+    </a>
 
-      <a href="javascript:" class="uk-button uk-button-small uk-margin-small-left" onclick="shutdown_armagh()">
-        <span class="uk-icon-justify uk-icon-power-off"></span>
-        Shut Down
-      </a>
-    </form>
+    <a href="javascript:" onclick="shutdown_armagh()" class="uk-button uk-button-small uk-margin-small-left">
+      <i class="uk-icon-power-off"></i>
+      Shut Down
+    </a>
 
   </div>
 </div>
@@ -114,14 +112,27 @@
 
   function restart_armagh() {
     UIkit.modal.confirm('Restart Armagh services now?', function() {
-      /* TODO: implement api */
+      UIkit.modal.blockUI('Attempting to restart services...')
+      $.ajax({
+        type: 'PATCH',
+        url: '/restart',
+        error: function() {
+          window.setTimeout('location.reload()', 5000)
+        }
+      })
     })
   }
 
   function shutdown_armagh() {
     UIkit.modal.confirm('Stop Armagh services now?', function() {
-      UIkit.modal.blockUI('Attempting to stop services...')
-      shutdown.submit()
+      UIkit.modal.blockUI('Attempting to shut down services...')
+      $.ajax({
+        type: 'PATCH',
+        url: '/shutdown',
+        error: function() {
+          location.reload()
+        }
+      })
     })
   }
 </script>

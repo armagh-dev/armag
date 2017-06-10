@@ -75,20 +75,36 @@ module Armagh
           http_request(relative_url, :post, hash_or_json)
         end
 
+        private def put_json(relative_url, hash_or_json = {})
+          http_request(relative_url, :put, hash_or_json)
+        end
+
+        private def patch_json(relative_url, hash_or_json = {})
+          http_request(relative_url, :patch, hash_or_json)
+        end
+
         private def http_request(relative_url, method, data, get_with_status = false)
           relative_url.sub!(/^\//, '')
           relative_url.gsub!(/\ /, '%20')
-          url  = "http://#{@ip}:#{@api_port}/#{relative_url}"
-          body = data.is_a?(JSON) ? data : data.to_json
+          url    = "http://#{@ip}:#{@api_port}/#{relative_url}"
+          header = {'ContentType' => 'application/json'}
+          body   = data.is_a?(JSON) ? data : data.to_json
 
           client = HTTPClient.new
           client.set_auth(url, @username, @password)
 
           response =
-            if method == :get
+            case method
+            when :get
               client.get(url, body)
+            when :post
+              client.post(url, body: body, header: header)
+            when :put
+              client.put(url, body: body, header: header)
+            when :patch
+              client.patch(url, body: body, header: header)
             else
-              client.post(url, body: body, header: {'ContentType' => 'application/json'})
+              raise AdminGUIHTTPError, "Unrecognized HTTP method: #{method}"
             end
 
           begin
@@ -115,7 +131,7 @@ module Armagh
                 raise AdminGUIHTTPError, json['message']
               end
             end
-          when :post
+          when :post, :put, :patch
             [status, json]
           end
         end
@@ -129,6 +145,10 @@ module Armagh
           File.join( __dir__, 'www_root' )
         end
 
+        def shutdown(restart: false)
+          `armaghd #{restart ? 'restart' : 'stop'}`
+        end
+
         def get_status
           get_json('/status.json')
         end
@@ -138,7 +158,7 @@ module Armagh
         end
 
         def new_workflow(workflow)
-          get_json_with_status("/workflow/#{workflow}/new.json")
+          post_json("/workflow/#{workflow}/new.json")
         end
 
         def get_workflow_actions(workflow)
@@ -161,7 +181,7 @@ module Armagh
         private def change_workflow_status(workflow, status_change)
           unchanged_status = status_change == :activate ? 'stop' : 'run'
           status, response =
-            get_json_with_status("/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
+            patch_json("/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else
@@ -351,7 +371,7 @@ module Armagh
             if new_action
               post_json("/workflow/#{workflow}/action/config.json", new_config)
             else
-              post_json("/workflow/#{workflow}/action/#{action}/config.json", new_config)
+              put_json("/workflow/#{workflow}/action/#{action}/config.json", new_config)
             end
 
           if status == :ok && errors.empty?
@@ -418,13 +438,7 @@ module Armagh
                     {'exception.class' => /#{value}/i},
                     {'exception.message' => /#{value}/i},
                     {'exception.cause.class' => /#{value}/i},
-                    {'exception.cause.message' => /#{value}/i},
-                    {'exception.cause.cause.class' => /#{value}/i},
-                    {'exception.cause.cause.message' => /#{value}/i},
-                    {'exception.cause.cause.cause.class' => /#{value}/i},
-                    {'exception.cause.cause.cause.message' => /#{value}/i},
-                    {'exception.cause.cause.cause.cause.class' => /#{value}/i},
-                    {'exception.cause.cause.cause.cause.message' => /#{value}/i}
+                    {'exception.cause.message' => /#{value}/i}
                   ]
                   next
                 end
