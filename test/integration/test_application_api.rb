@@ -36,10 +36,14 @@ require 'fileutils'
 
 require 'mongo'
 
+TEST_DESCRIPTION = 'Yo ho ho and a bottle of rum.'
 module Armagh
   module StandardActions
     class TIAATestCollect < Actions::Collect
       define_parameter name: 'p1', type: 'integer', required: 'true', description: 'desc', default: 42, group: 'params'
+      def self.description
+        TEST_DESCRIPTION
+      end
     end
   end
 end
@@ -182,6 +186,16 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
       assert_equal'Invalid launcher config', failure_detail['message']
       assert_equal expected_markup, failure_detail['markup']
+    end
+  end
+
+  def test_get_actions_defined
+
+    get '/actions/defined.json' do
+      assert last_response.ok?
+      all_actions = JSON.parse( last_response.body )
+      test_action = all_actions[ 'Collect' ].find{ |info_hash| info_hash['name'] == 'Armagh::StandardActions::TIAATestCollect' }
+      assert_equal TEST_DESCRIPTION, test_action['description']
     end
   end
 

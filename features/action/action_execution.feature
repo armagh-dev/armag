@@ -504,7 +504,7 @@ Feature: Actions Execution
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                   |
       | pending_actions | []                                                                                                                                                                                                                                            |
       | dev_errors      | {}                                                                                                                                                                                                                                            |
-      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => 'Document is too large.  Consider using a divider or splitter to break up the document.', 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything'}]} |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                |
       | state           | 'ready'                                                                                                                                                                                                                                       |
       | locked          | false                                                                                                                                                                                                                                         |
@@ -1052,3 +1052,25 @@ Feature: Actions Execution
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
 
+  Scenario: Have a document for a collector that collects something that's too large
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "collect_too_large_raw"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "__COLLECT__test_collect_too_large_raw" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    Then I should see 0 "CollectedDocument" documents in the "documents" collection
+    And  I should see a "__COLLECT__test_collect_too_large_raw" in "failures" with the following
+      | ops_errors      | {'test_collect_too_large_raw' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
+    And the logs should contain "Test Collect Too Large Raw Running"
+    And the logs should contain "ERROR"

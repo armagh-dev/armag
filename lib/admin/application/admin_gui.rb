@@ -42,7 +42,7 @@ module Armagh
         LOG_LOCATION = '/var/log/armagh/application_admin_gui.log'
 
         DEFAULTS = {
-          'ip'       => '127.0.0.1'
+          'ip' => '127.0.0.1'
         }
 
         def initialize
@@ -83,6 +83,10 @@ module Armagh
           http_request(relative_url, :patch, hash_or_json)
         end
 
+        private def delete_json(relative_url, hash_or_json = {})
+          raise NotImplementedError
+        end
+
         private def http_request(relative_url, method, data, get_with_status = false)
           relative_url.sub!(/^\//, '')
           relative_url.gsub!(/\ /, '%20')
@@ -96,13 +100,15 @@ module Armagh
           response =
             case method
             when :get
-              client.get(url, body)
+              client.get(url,    body)
             when :post
-              client.post(url, body: body, header: header)
+              client.post(url,   body: body, header: header)
             when :put
-              client.put(url, body: body, header: header)
+              client.put(url,    body: body, header: header)
             when :patch
-              client.patch(url, body: body, header: header)
+              client.patch(url,  body: body, header: header)
+            when :delete
+              client.delete(url, body)
             else
               raise AdminGUIHTTPError, "Unrecognized HTTP method: #{method}"
             end
@@ -157,15 +163,25 @@ module Armagh
           get_json('/workflows.json')
         end
 
-        def new_workflow(workflow)
+        def create_workflow(workflow)
           post_json("/workflow/#{workflow}/new.json")
         end
 
-        def get_workflow_actions(workflow)
+        def get_workflow(workflow, created, updated)
+          {
+            workflow: workflow,
+            actions:  get_workflow_actions(workflow),
+            active:   workflow_active?(workflow),
+            created:  created,
+            updated:  updated
+          }
+        end
+
+        private def get_workflow_actions(workflow)
           get_json("/workflow/#{workflow}/actions.json")
         end
 
-        def workflow_active?(workflow)
+        private def workflow_active?(workflow)
           status = get_json("/workflow/#{workflow}/status.json")
           status['run_mode'] != 'stop'
         end
@@ -192,7 +208,7 @@ module Armagh
           end
         end
 
-        def get_defined_actions
+        private def get_defined_actions
           get_json('/actions/defined.json')
         end
 
@@ -209,8 +225,7 @@ module Armagh
             config['action']['active']   = false
             config['action']['workflow'] = workflow
 
-            status, response =
-              post_json("/workflow/#{workflow}/action/config.json", config)
+            status, response = post_json("/workflow/#{workflow}/action/config.json", config)
 
             raise "Unable to import action: #{response['message']}" unless status == :ok
             imported << file[:filename]
@@ -237,7 +252,28 @@ module Armagh
             end
             export['actions'] << _export
           end
-          export.to_json
+          JSON.pretty_generate(export)
+        end
+
+        def new_workflow_action(workflow, previous_action, filter)
+          {
+            workflow:        workflow,
+            active:          workflow_active?(workflow),
+            defined_actions: get_defined_actions,
+            previous_action: previous_action,
+            filter:          filter
+          }
+        end
+
+        def new_action_config(workflow, action)
+          params = get_defined_parameters(workflow, action)
+          {
+            workflow:           workflow,
+            action:             action,
+            type:               params.delete(:type),
+            supertype:          params.delete(:supertype),
+            defined_parameters: params
+          }
         end
 
         private def format_action_config_for_gui(config)
@@ -266,8 +302,7 @@ module Armagh
               name:        param['name'],
               description: param['description'],
               type:        param['type'],
-              # TODO: figure out why workflow does not return the options param attribute
-              options:     (group == 'http' && param['name'] == 'method') ? %w(get post) : nil, #param['options'],
+              options:     param['options'],
               required:    param['required'],
               prompt:      param['prompt'],
               default:     param['default'],
@@ -285,15 +320,30 @@ module Armagh
           formatted_config.sort_by { |k, _| k == 'action' ? 0 : 1 }.to_h
         end
 
-        def get_defined_parameters(workflow, type)
+        private def get_defined_parameters(workflow, type)
           fields = {'type' => type}
           config = get_json("/workflow/#{workflow}/action/config.json", fields)
           format_action_config_for_gui(config)
         end
 
-        def get_action_config(workflow, action)
+        private def get_action_config(workflow, action)
           config = get_json("/workflow/#{workflow}/action/#{action}/description.json")
           format_action_config_for_gui(config)
+        end
+
+        def edit_workflow_action(workflow, action)
+          config = get_action_config(workflow, action)
+          type   = config.delete(:type)
+          {
+            locked:             workflow_active?(workflow),
+            workflow:           workflow,
+            action:             action,
+            type:               type,
+            supertype:          config.delete(:supertype),
+            edit_action:        true,
+            defined_parameters: config,
+            test_callbacks:     get_action_test_callbacks(type)
+          }
         end
 
         def create_action_config(data)
@@ -352,6 +402,7 @@ module Armagh
                 next if value.to_s.strip.empty?
               when 'string_array'
                 value = value.split("\x19")
+                value = param[:default] if value.empty?
               when 'hash'
                 new_hash = {}
                 value.split("\x19").each do |pair|
@@ -359,6 +410,7 @@ module Armagh
                   new_hash[k] = v
                 end
                 value = new_hash
+                value = param[:default] if value.empty?
               end
               param[:value] = value
 
@@ -383,8 +435,8 @@ module Armagh
               config.delete(:type)
               config.delete(:supertype)
 
-              docspec_groups.each do |group|
-                config[group].each do |p|
+              docspec_groups&.each do |group|
+                config[group]&.each do |p|
                   if defined_states[group].has_key?(p[:name])
                     p[:defined_states] = defined_states[group][p[:name]]
                   end
@@ -406,10 +458,20 @@ module Armagh
               edit_action:        !new_action,
               defined_parameters: config,
               pending_values:     data,
-              test_callbacks:     nil # TODO: implement callbacks
+              test_callbacks:     get_action_test_callbacks(type)
             }
             [data, errors]
           end
+        end
+
+        private def get_action_test_callbacks(type)
+          get_json("/test/#{type}/callbacks.json")
+        end
+
+        def invoke_action_test_callback(data)
+          status, response = patch_json("/test/invoke_callback.json", data)
+          raise "Unable to invoke action test callback method #{data['method']} for action type #{data['type']}" unless status == :ok
+          response
         end
 
         def get_logs(page:, limit:, sort:, filter:, hide:)
@@ -544,24 +606,6 @@ module Armagh
                     .to_a,
             errors: errors
           }
-        end
-
-        # TODO: implement callbacks
-        def get_action_callbacks_OLD(type)
-          get_action_from_class_name(type)
-            .defined_group_test_callbacks
-        end
-
-        def test_action_callback_OLD(workflow, action_name, index)
-          with_workflow_actions(workflow) do |config|
-            if config['name'] == action_name
-              klass    = config['type']
-              callback = get_action_callbacks(klass)[index]
-              raise "Request test callback does not exist" unless callback
-
-              return callback.callback_class.send(callback.callback_method.to_sym, config)
-            end
-          end
         end
 
       end

@@ -29,7 +29,7 @@
   </head>
   <body>
 
-    <div class="uk-container uk-container-center uk-margin-top uk-margin-large-bottom" style="min-height:65vh;">
+    <div id="layout-container" class="uk-container uk-container-center uk-margin-top uk-margin-large-bottom" style="min-height:65vh;">
 
       <nav class="uk-navbar">
         <ul class="uk-navbar-nav">
@@ -92,9 +92,17 @@
         {{= partial @page, data: @data unless @page == :error }}
       </div>
 
+      <a id="scroll-top">
+        <i class="uk-icon-chevron-circle-up"></i>
+      </a>
+
+      <a id="scroll-bot">
+        <i class="uk-icon-chevron-circle-down"></i>
+      </a>
+
     </div>
 
-    <div class="uk-block uk-block-secondary uk-container-center uk-text-small" style="border-top-style:solid; border-top-color:#777; border-top-width:3px;">
+    <div id="layout-footer" class="uk-block uk-block-secondary uk-container-center uk-text-small" style="border-top-style:solid; border-top-color:#777; border-top-width:3px;">
       <p class="uk-text-center">
         <img id="noragh-analytics-logo" src="/images/noragh_analytics.png" style="opacity:0.3;">
       </p>
@@ -139,3 +147,86 @@
 
   </body>
 </html>
+
+<script type="text/javascript" src="/ui/js/css-element-queries/ResizeSensor.js"></script>
+<script type="text/javascript" src="/ui/js/css-element-queries/ElementQueries.js"></script>
+<script type="text/javascript">
+
+  $(document).ready(function() {
+
+    $(window).scroll(function() {
+      scroll_event()
+    })
+
+    register_resizable_container('#layout-container')
+
+    $('#scroll-top').click(function() {
+      $('html, body').stop().animate({scrollTop: 0}, 500, function() {
+        $('#scroll-top').stop().animate({top: '-100px'}, 500)
+      })
+    })
+
+    $('#scroll-bot').click(function() {
+      var offset = $('#layout-footer').offset().top - $(window).innerHeight()
+      $('html, body').stop().animate({scrollTop: offset + 'px'}, 500, function() {
+        scroll_bot_hide()
+      })
+    })
+
+    $(window).resize(function() {
+      if ($(this).scrollTop() <= 100) {
+        scroll_bot_show(false)
+      }
+    })
+
+    scroll_bot_hide(false)
+    scroll_event()
+  })
+
+  function register_resizable_container(selector) {
+    new ResizeSensor($(selector), function() {
+      scroll_event()
+    })
+  }
+
+  function scroll_event() {
+    if ($(window).scrollTop() > 100) {
+      scroll_top_show()
+    } else {
+      scroll_top_hide()
+    }
+    if ($(window).scrollTop() > $('#layout-footer').offset().top - $(window).innerHeight() - 100) {
+      scroll_bot_hide()
+    } else {
+      scroll_bot_show()
+    }
+  }
+
+  function scroll_top_show() {
+    $('#scroll-top').stop().animate({top: '20px'}, 500)
+  }
+
+  function scroll_top_hide() {
+    $('#scroll-top').stop().animate({top: '-100px'}, 500)
+  }
+
+  function scroll_bot_show(animate = true) {
+    var offset = 60
+    offset = ($(window).innerHeight() - offset) + 'px'
+    if (animate) {
+      $('#scroll-bot').stop().animate({top: offset}, 500)
+    } else {
+      $('#scroll-bot').stop().css({top: offset})
+    }
+  }
+
+  function scroll_bot_hide(animate = true) {
+    var offset = 100
+    offset = ($(window).innerHeight() + offset) + 'px'
+    if (animate) {
+      $('#scroll-bot').stop().animate({top: offset}, 500)
+    } else {
+      $('#scroll-bot').stop().css({top: offset})
+    }
+  }
+</script>

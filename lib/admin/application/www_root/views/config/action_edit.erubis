@@ -65,12 +65,6 @@
     </a></li>
   {{ end }}
 
-  {{ if @data[:test_callbacks]&.any? }}
-    <li><a>
-      Test
-    </a></li>
-  {{ end }}
-
 </ul>
 
 <form id="autoform" method="post" class="uk-form uk-form-horizontal uk-container">
@@ -91,9 +85,10 @@
             {{ params.each do |param| }}
 
               {{
-                param_id      = "#{param[:group] || group}-#{param[:name]}"
-                param_name    = proper_case(param[:name])
-                param_value   = param[:value] || param[:default]
+                param_id    = "#{param[:group] || group}-#{param[:name]}"
+                param_name  = proper_case(param[:name])
+                param_value = param[:value]
+                param_value = param[:default] if param_value.nil?
 
                 if @data[:pending_values]
                   param_value =
@@ -205,7 +200,7 @@
 ----------------------------------------------------------------------------------------------------->
                     {{ when 'boolean' }}
                       <input name="{{= param_id }}" type="hidden" value="{{= param_value }}">
-                      <input id="{{= param_id }}" type="checkbox" {{= param_value == 'true' ? 'checked' : '' }} onchange="toggle_boolean('{{= param_id }}', this.checked)" class="uk-form-large {{= param_invalid }}" style="height: 20px;" {{= param_disabled }} {{= param_tooltip }}>
+                      <input id="{{= param_id }}" type="checkbox" {{= param_value.to_s == 'true' ? 'checked' : '' }} onchange="toggle_boolean('{{= param_id }}', this.checked)" class="uk-form-large {{= param_invalid }}" style="height: 20px;" {{= param_disabled }} {{= param_tooltip }}>
 
 <!----------------------------------------------------------------------------------------------------
   NUMERIC
@@ -266,7 +261,7 @@
                     {{ else }}
                       WARNING: <strong>{{= param[:type] }}</strong> is not supported yet
 
-                    {{ end }}
+                    {{ end # param type case }}
 
                   </div>
                   <div class="uk-width-1-2">
@@ -283,43 +278,38 @@
                   </div>
                 </div>
               </dd>
+
+            {{ end # each param }}
+
+<!----------------------------------------------------------------------------------------------------
+  TEST CALLBACKS
+----------------------------------------------------------------------------------------------------->
+            {{ callbacks = @data[:test_callbacks]&.find_all { |c| c['group'] == group } }}
+
+            {{ if callbacks&.any? }}
+              <hr />
+              <div class="uk-panel uk-panel-box uk-panel-box-primary uk-margin" style="padding: 15px;">
+
+                <span class="uk-text-primary uk-margin-right">Available test callbacks:</span>
+
+                {{ callbacks.each do |callback| }}
+
+                  <button callback="true" type="button" class="uk-button" onclick="invoke_action_test_callback('{{= callback['group'] }}', '{{= callback['class'] }}', '{{= callback['method'] }}')">
+                    <i class="uk-icon-volume-control-phone uk-margin-small-right"></i>
+                    {{= callback['method'] }}
+                  </button>
+
+                {{ end }}
+
+              </div>
+
             {{ end }}
+
           </dl>
 
         </li>
 
-      {{ end }}
-
-      {{ @data[:test_callbacks]&.each_with_index do |callback, index| }}
-
-        {{ unless index.zero? }}
-          <li>
-            <hr>
-          </li>
-        {{ end }}
-
-        <li>
-          <div class="uk-grid">
-            <div class="uk-width-1-5">
-              <a href="/config/{{= @data[:workflow] }}/edit/{{= @data[:action] }}/test?idx={{= index }}" target="_blank" class="uk-button">
-                <i class="uk-icon-rocket"></i>
-                Run Test
-              </a>
-            </div>
-            <div class="uk-width-4-5">
-              <div>
-                <i class="uk-icon-cog"></i>
-                {{= callback.callback_class }}
-              </div>
-              <div>
-                <i class="uk-icon-code"></i>
-                {{= callback.callback_method }}
-              </div>
-            </div>
-          </div>
-        </li>
-
-      {{ end }}
+      {{ end # each group }}
 
     </ul>
 
@@ -406,15 +396,7 @@
   <input id="modal-list-hash"   type="hidden">
 </div>
 
-<a id="scroll-top">
-  <i class="uk-icon-chevron-circle-up"></i>
-</a>
-
-<a id="scroll-bot">
-  <i class="uk-icon-chevron-circle-down"></i>
-</a>
-
-<script>
+<script type="text/javascript">
   $(document).ready(function() {
     $("#autoform").on("keyup keypress", function(e) {
       var keyCode = e.keyCode || e.which
@@ -433,69 +415,7 @@
         $("#page li[class='uk-active']").find("input").first().focus()
       }, 1)
     })
-
-    $(window).scroll(function() {
-      if ($(this).scrollTop() > 100) {
-        scroll_top_show()
-      } else {
-        scroll_top_hide()
-      }
-      if ($(this).scrollTop() > $("#back-button").offset().top - $(window).innerHeight() - 100) {
-        scroll_bot_hide()
-      } else {
-        scroll_bot_show()
-      }
-    })
-
-    $("#scroll-top").click(function() {
-      $('html, body').stop().animate({scrollTop: 0}, 500, function() {
-        $("#scroll-top").stop().animate({top: '-100px'}, 500)
-      })
-    })
-
-    $("#scroll-bot").click(function() {
-      var offset = $("#back-button").offset().top - $(window).innerHeight() + 100
-      $('html, body').stop().animate({scrollTop: offset + 'px'}, 500, function() {
-        scroll_bot_hide()
-      })
-    })
-
-    $(window).resize(function() {
-      if ($(this).scrollTop() <= 100) {
-        scroll_bot_show(false)
-      }
-    })
-
-    scroll_bot_hide(false)
   })
-
-  function scroll_top_show() {
-    $("#scroll-top").stop().animate({top: '20px'}, 500)
-  }
-
-  function scroll_top_hide() {
-    $("#scroll-top").stop().animate({top: '-100px'}, 500)
-  }
-
-  function scroll_bot_show(animate = true) {
-    var offset = 60
-    offset = ($(window).innerHeight() - offset) + 'px'
-    if (animate) {
-      $("#scroll-bot").stop().animate({top: offset}, 500)
-    } else {
-      $("#scroll-bot").stop().css({top: offset})
-    }
-  }
-
-  function scroll_bot_hide(animate = true) {
-    var offset = 100
-    offset = ($(window).innerHeight() + offset) + 'px'
-    if (animate) {
-      $("#scroll-bot").stop().animate({top: offset}, 500)
-    } else {
-      $("#scroll-bot").stop().css({top: offset})
-    }
-  }
 
   function sanitize_string(value, quotes_only = false) {
     var map = {
@@ -770,5 +690,85 @@
     $("select[name='action-active']").removeAttr("disabled")
     $("input[name='action-workflow']").removeAttr("disabled")
     $("#autoform").submit()
+  }
+
+  function invoke_action_test_callback(group, klass, method) {
+    var params = $("[name^='" + group + "-']"),
+        test_config = {}
+
+    params.each(function() {
+      var param = $(this),
+          name  = param.prop("name").replace(/^\w+-/, ''),
+          value = param.val(),
+          values = []
+
+      if (value.indexOf("\x19") > -1) {
+        values = value.split("\x19")
+        value  = values[0].indexOf("\x11") > -1 ? {} : []
+        for (var i=0; i < values.length; i++) {
+          if (!values[i]) { continue }
+          if (values[i].indexOf("\x11") > -1) {
+            var pair = values[i].split("\x11")
+            value[pair[0]] = pair[1]
+          } else {
+            value.push(values[i])
+          }
+        }
+      }
+
+      if (!value) { return }
+
+      test_config[name] = value
+    })
+
+    var data = {}
+    data['type']        = klass
+    data['group']       = group
+    data['method']      = method
+    data['test_config'] = test_config
+
+    disable_callback_buttons(true)
+
+    $.ajax({
+      url: '/config/test',
+      type: 'PATCH',
+      data: JSON.stringify(data),
+      contentType: 'application/json',
+      success: function(data, text) {
+        var result = ''
+        if (data) {
+          result = '<div class="uk-text-danger uk-text-bold uk-text-large uk-margin-bottom">' +
+                     '<i class="uk-icon-times-circle uk-margin-small-right"></i>' +
+                     'Test failed!' +
+                   '</div>' +
+                   data
+        } else {
+          result = '<div class="uk-text-success uk-text-bold uk-text-large uk-margin-bottom">' +
+                     '<i class="uk-icon-check uk-margin-small-right"></i>' +
+                     'Test passed!' +
+                   '</div>' +
+                   '<span class="uk-text-bold">' +
+                     klass +
+                   '</span>' +
+                   ' responded to ' +
+                   '<span class="uk-text-bold">' +
+                     method +
+                   '</span>' +
+                   ' without any errors.'
+        }
+        UIkit.modal.alert(result)
+        disable_callback_buttons(false)
+      },
+      error: function(request, status, error) {
+        UIkit.modal.alert('Failed to invoke test callback: <div class="uk-text-danger uk-text-bold">' + error + '</div>')
+        disable_callback_buttons(false)
+      }
+    })
+  }
+
+  function disable_callback_buttons(disabled = true) {
+    $('button[callback="true"]').each(function(index, button) {
+      $(button).prop('disabled', disabled)
+    })
   }
 </script>

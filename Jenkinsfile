@@ -58,11 +58,25 @@ currentBuild.result = "SUCCESS"
 
      stage('Cucumber Test') {
      
-       sh """#!/bin/bash -l
-         echo -e "*********************************************\n** Cucumber testing:" `hg identify -i` "\n*********************************************"
-         set -e
-         bundle exec rake cucumber
-       """
+       try {
+         sh """#!/bin/bash -l
+           echo -e "*********************************************\n** Cucumber testing:" `hg identify -i` "\n*********************************************"
+           set -e
+           bundle exec rake cucumber
+         """
+       }
+       catch(err){
+         publishHTML (target: [
+           allowMissing: true,
+           alwaysLinkToLastBuild: true,
+           keepAll: true,
+           reportDir: 'failure_logs',
+           reportFiles: 'index.html',
+           reportName: "Failure Logs"
+         ])
+         currentBuild.result = "FAILURE! - ${err}"
+         throw err
+       }
      }
 
      stage('Rcov') {
@@ -93,15 +107,6 @@ currentBuild.result = "SUCCESS"
          reportFiles: 'index.html',
          reportName: "YARD Documentation"
        ])
-
-       publishHTML (target: [
-         allowMissing: true,
-         alwaysLinkToLastBuild: false,
-         keepAll: true,
-         reportDir: 'failure_logs',
-         reportFiles: 'index.html',
-         reportName: "Failure Logs"
-       ])
      }
   }
 }
@@ -121,3 +126,4 @@ finally {
   properties([[$class: 'BuildDiscarderProperty', strategy: [$class: 'LogRotator', artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10']]]);
 
 }
+

@@ -124,10 +124,6 @@ not_found do
   halt 404, render(:error, error: "404: <strong>#{request.path_info}</strong> does not exist" )
 end
 
-error Timeout::Error do
-  render :error, error: @on_error
-end
-
 error do |e|
   render :error, error: e.message
 end
@@ -197,8 +193,7 @@ get '/logs' do
                       sort:  {params['sort_col']=>params['sort_dir']},
                       filter: params['filter'],
                       hide:   params['hide'])
-  errors = data[:errors]
-  data.delete(:errors)
+  errors = data.delete(:errors)
   render :logs, data: data, error: errors
 end
 
@@ -219,7 +214,7 @@ post '/config/new' do
 
   halt render(:config, :workflow_new, error: 'Workflow name cannot be empty') if workflow.to_s.strip.empty?
 
-  status, response = gui.new_workflow(workflow)
+  status, response = gui.create_workflow(workflow)
   if status == :ok
     redirect "/config/#{workflow}"
   else
@@ -232,27 +227,13 @@ get '/config/:workflow' do
   workflow = params['workflow']
   created  = params['created']
   updated  = params['updated']
-  data     = {
-    workflow: workflow,
-    actions:  gui.get_workflow_actions(workflow),
-    active:   gui.workflow_active?(workflow),
-    created:  created,
-    updated:  updated
-  }
-  success = "Successfully #{created ? 'created' : 'updated'} action <strong>#{created ? created : updated}</strong>." if created || updated
+  data     = gui.get_workflow(workflow, created, updated)
+  success  = "Successfully #{created ? 'created' : 'updated'} action <strong>#{created ? created : updated}</strong>." if created || updated
   render :config, :workflow_edit, data: data, success: success
 end
 
 get '/config/:workflow/new' do
-  workflow = params['workflow']
-  data = {
-    workflow:        workflow,
-    active:          gui.workflow_active?(workflow),
-    defined_actions: gui.get_defined_actions,
-    previous_action: params['prev'],
-    filter:          params['filter']
-  }
-  render :config, :action_new, data: data
+  render :config, :action_new, data: gui.new_workflow_action(params['workflow'], params['prev'], params['filter'])
 end
 
 post '/config/:workflow/new' do
@@ -288,17 +269,7 @@ end
 #
 
 get '/config/:workflow/new/:action' do
-  workflow = params['workflow']
-  action   = params['action']
-  config   = gui.get_defined_parameters(workflow, action)
-  data     = {
-    workflow:           workflow,
-    action:             action,
-    type:               config.delete(:type),
-    supertype:          config.delete(:supertype),
-    defined_parameters: config
-  }
-  render :config, :action_edit, data: data
+  render :config, :action_edit, data: gui.new_action_config(params['workflow'], params['action'])
 end
 
 post '/config/:workflow/new/:action' do
@@ -312,20 +283,7 @@ post '/config/:workflow/new/:action' do
 end
 
 get '/config/:workflow/edit/:action' do
-  workflow = params['workflow']
-  action   = params['action']
-  config   = gui.get_action_config(workflow, action)
-  data     = {
-    locked:             gui.workflow_active?(workflow),
-    workflow:           workflow,
-    action:             action,
-    type:               config.delete(:type),
-    supertype:          config.delete(:supertype),
-    edit_action:        true,
-    defined_parameters: config,
-    test_callbacks:     nil #gui.get_action_callbacks(klass) # TODO: implement callbacks
-  }
-  render :config, :action_edit, data: data
+  render :config, :action_edit, data: gui.edit_workflow_action(params['workflow'], params['action'])
 end
 
 put '/config/:workflow/edit/:action' do
@@ -339,11 +297,7 @@ put '/config/:workflow/edit/:action' do
   end
 end
 
-get '/config/:workflow/edit/:action/test' do
-  workflow = params['workflow']
-  action   = params['action']
-  index    = params['idx'].to_i
-  raise "Test callback method attempted does not exist" unless index
-  error    = gui.test_action_callback(workflow, action, index)
-  sanitize_string(error)
+patch '/config/test' do
+  data = JSON.parse(request.body.read)
+  gui.invoke_action_test_callback(data)
 end

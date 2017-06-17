@@ -250,6 +250,20 @@ put '/workflow/:workflow_name/action/:action_name/config.json' do
   end
 end
 
+# get defined group test callbacks
+get '/test/:type/callbacks.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.get_action_test_callbacks(params['type'])
+  end
+end
+
+# invoke action test callback
+patch '/test/invoke_callback.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.invoke_action_test_callback(fields)
+  end
+end
+
 #---------------------
 #
 # documents

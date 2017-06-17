@@ -65,7 +65,7 @@ end
 class TestAgent < Test::Unit::TestCase
   include ArmaghTest
 
-  THREAD_SLEEP_TIME = 0.25
+  THREAD_SLEEP_TIME = 0.75
 
   STARTED = []
 
@@ -1376,6 +1376,45 @@ class TestAgent < Test::Unit::TestCase
       'collect' => {'schedule' => '0 * * * *', 'archive' => false},
       'input' => {'docspec' => '__COLLECT__testc:ready'},
       'output' => {'docspec' => 'dancollected:ready'}
+    })
+    action_name = action.config.action.name
+    action.stubs(:collect).raises(exception)
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :raw => 'raw',
+               :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
+               :dev_errors => [], :ops_errors => [], :error? => false
+    )
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    doc.expects(:add_ops_error)
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
+    doc.expects(:finish_processing).at_least_once
+
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Armagh::Logging.expects(:ops_error_exception).with do |_logger, e, msg|
+      assert_equal exception, e
+      assert_equal "Error while executing action '#{action_name}' on 'document_id'", msg
+      true
+    end
+
+    @default_agent.expects(:execute_action).raises(exception)
+    @default_agent.send(:execute)
+  end
+
+  def test_too_large_raw
+    exception = Armagh::Documents::Errors::DocumentRawSizeError.new('too large')
+    action = setup_action(Armagh::StandardActions::CollectTest, {
+        'action' => {'name' => 'testc'},
+        'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+        'input' => {'docspec' => '__COLLECT__testc:ready'},
+        'output' => {'docspec' => 'dancollected:ready'}
     })
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)

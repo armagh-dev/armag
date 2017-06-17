@@ -365,6 +365,19 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
           }
       )
 
+    when 'collect_too_large_raw'
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestCollectTooLargeRaw',
+          {
+              'action' => {'name' => 'test_collect_too_large_raw'},
+              'collect' => {'archive' => false, 'schedule' => '0 0 1 1 0'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
+              }
+          }
+      )
+
+
   end
 
 

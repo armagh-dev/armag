@@ -45,10 +45,11 @@
                   <optgroup label="{{= type }}">
                 {{ end }}
 
-                  {{ @data[:defined_actions][type].each do |action| }}
+                  {{ @data[:defined_actions][type].each do |action_info| }}
 
-                    {{ selected = @data[:previous_action] == action ? 'selected' : '' }}
-                    <option value="{{= action }}" {{= selected }}>{{= action.split('::').last }}</option>
+                    {{ action_name = action_info['name']  # also available, action_info['description'] }}
+                    {{ selected = @data[:previous_action] == action_name ? 'selected' : '' }}
+                    <option value="{{= action_name }}" {{= selected }}>{{= action_name.split('::').last }}</option>
 
                   {{ end }}
 

@@ -5,12 +5,12 @@
 #scroll-top, #scroll-bot {
   position: fixed;
   top: -100px;
-  right: 20px;
-  font-size: 40px;
-  color: #aaa;
+  right: 15px;
+  font-size: 35px;
+  color: #777;
 }
 #scroll-top:hover, #scroll-bot:hover {
-  color: #a4c1a0;
+  color: #3aa52e;
 }
 
 /*
@@ -1001,6 +1001,9 @@ iframe {
 .uk-panel:hover {
   text-decoration: none;
 }
+.uk-panel:hover {
+  box-shadow: 3px 3px 1px #eee;
+}
 .uk-panel:before,
 .uk-panel:after {
   content: "";
@@ -1059,9 +1062,10 @@ iframe {
   margin: 0 -15px;
 }
 .uk-panel-box-primary {
-  background-color: #efefef;
+  background-color: #fff;
   color: #575857;
   border-color: rgba(87, 88, 87, 0.3);
+  box-shadow: 3px 3px 1px #eee;
 }
 .uk-panel-box-primary-hover:hover {
   color: #575857;
@@ -1509,6 +1513,7 @@ html:not(.uk-touch) .uk-nav-offcanvas ul a:hover {
   background-origin: border-box;
   background-image: -webkit-linear-gradient(top, #ffffff, #f0f0f0);
   background-image: linear-gradient(to bottom, #ffffff, #f0f0f0);
+  box-shadow: 3px 3px 1px #eee;
 }
 .uk-navbar:before,
 .uk-navbar:after {
@@ -2603,6 +2608,7 @@ select.uk-form-width-mini {
   outline: none;
   text-decoration: none;
   background-image: none;
+  box-shadow: 2px 2px 1px #ddd;
 }
 .uk-button:active,
 .uk-button.uk-active {
@@ -2624,7 +2630,7 @@ select.uk-form-width-mini {
 }
 .uk-button-primary:hover,
 .uk-button-primary:focus {
-  background-color: #6e5a5a;
+  background-color: #4c6649;
   color: #ffffff;
   background-image: none;
 }

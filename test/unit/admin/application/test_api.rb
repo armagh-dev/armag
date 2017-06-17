@@ -638,17 +638,74 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_kind_of Hash, defined_actions
     assert_equal %w(Collect Consume Divide Publish Split), defined_actions.keys.sort
 
-    defined_classes = []
-    defined_actions.each {|_t, classes| defined_classes.concat classes}
+    defined_classes_names = defined_actions.collect {|_t, classes| classes.collect{ |c| c['name']}}.flatten
+    defined_classes_descriptions = defined_actions.collect{ |_t, classes| classes.collect{ |c| c['description']}}.flatten
 
-    assert_empty(global_actions - defined_classes)
-    assert_empty(defined_classes - global_actions)
+    assert_empty(global_actions - defined_classes_names)
+    assert_empty(defined_classes_names - global_actions)
+    assert_equal( defined_classes_names.length, defined_classes_descriptions.compact.length)
   end
 
   def test_get_action_super
     assert_equal('Collect', @api.get_action_super(Armagh::StandardActions::TATestCollect))
     assert_equal('Collect', @api.get_action_super(Armagh::StandardActions::ChildCollect))
     assert_raise(RuntimeError.new('Unexpected action type: Hash')){@api.get_action_super(Hash)}
+  end
+
+  def test_private_get_action_class_from_type
+    Armagh::Actions.expects(:defined_actions).once.returns(['Armagh::Some::Type'])
+    result = @api.send(:get_action_class_from_type, 'Armagh::Some::Type')
+    assert_equal 'Armagh::Some::Type', result
+  end
+
+  def test_private_get_action_class_from_type_does_not_exist
+    Armagh::Actions.expects(:defined_actions).once.returns(['Armagh::Some::Type'])
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.send(:get_action_class_from_type, 'Does::Not::Exist')
+    end
+    assert_equal 'Action type Does::Not::Exist does not exist', e.message
+  end
+
+  def test_get_action_test_callbacks
+    type = 'Armagh::Some::Type'
+    type_class = mock('type_class')
+    type_class.expects(:defined_group_test_callbacks).once.returns([stub(group: 'group', callback_method: 'method')])
+    @api.expects(:get_action_class_from_type).once.returns(type_class)
+    result = @api.get_action_test_callbacks(type)
+    expected = [{class: type_class, group: 'group', method: 'method'}]
+    assert_equal expected, result
+  end
+
+  def test_invoke_action_test_callback
+    type_class = mock('type_class')
+    mod = mock('module')
+    mod.expects(:method).once.returns('blah')
+    mod.expects(:create_configuration).once.returns('config')
+    type_class.expects(:included_modules).once.returns([mod])
+    @api.expects(:get_action_class_from_type).once.returns(type_class)
+    data = {
+      'type'   => 'type_class',
+      'group'  => 'group',
+      'method' => 'method'
+    }
+    result = @api.invoke_action_test_callback(data)
+    assert_equal 'blah', result
+  end
+
+  def test_invoke_action_test_callback_failed_to_instantiate_test_config
+    type_class = mock('type_class')
+    mod = mock('module')
+    mod.stubs(:method).returns('blah')
+    mod.expects(:create_configuration).once.raises(RuntimeError.new('some error'))
+    type_class.expects(:included_modules).once.returns([mod])
+    @api.expects(:get_action_class_from_type).once.returns(type_class)
+    data = {
+      'type'   => 'type_class',
+      'group'  => 'group',
+      'method' => 'method'
+    }
+    result = @api.invoke_action_test_callback(data)
+    assert_equal 'Failed to instantiate test configuration: some error', result
   end
 
   def test_get_users

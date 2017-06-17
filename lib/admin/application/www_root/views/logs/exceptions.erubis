@@ -28,7 +28,7 @@
 
   {{ if @data['cause'] }}
     <hr />
-    {{= partial :logs_exception, data: @data['cause'] }}
+    {{= partial :logs, :exceptions, data: @data['cause'] }}
   {{ end }}
 
 </div>

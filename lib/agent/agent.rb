@@ -297,7 +297,7 @@ module Armagh
                 end
               end
               @logger.debug "Execution of #{name} on document '#{exec_id}' completed in #{Time.now-start} seconds."
-            rescue Documents::Errors::DocumentSizeError => e
+            rescue Documents::Errors::DocumentSizeError, Documents::Errors::DocumentRawSizeError => e
               Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}' on '#{@current_doc.document_id}'")
               @current_doc.add_ops_error(name, e)
             rescue Exception => e

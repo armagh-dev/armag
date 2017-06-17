@@ -4,7 +4,7 @@
 
 {{ columns = %w(timestamp component level message hostname pid) }}
 
-<div class="uk-overflow-container" style="min-height:500px;">
+<div id="logs-container" class="uk-overflow-container" style="min-height:500px;">
   <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap">
 
     <caption>
@@ -123,7 +123,7 @@
             <td colspan="99" style="white-space: normal;">
               <div class="uk-margin-left uk-margin-bottom">
 
-                {{= partial :logs_exception, data: log['exception'] }}
+                {{= partial :logs, :exceptions, data: log['exception'] }}
 
               </div>
             </td>
@@ -165,6 +165,10 @@
 </form>
 
 <script>
+  $(document).ready(function() {
+    register_resizable_container('#logs-container')
+  })
+
   $('[data-uk-pagination]').on('select.uk.pagination', function(e, pageIndex){
     $("input[name='page']").val(pageIndex + 1)
     submit()

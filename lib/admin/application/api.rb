@@ -187,7 +187,7 @@ module Armagh
           Actions.defined_actions.each do |action|
             type = get_action_super(action)
             actions[type] ||= []
-            actions[type] << action.to_s
+            actions[type] << { 'name' => action.to_s, 'description' => action.description }
           end
           actions.sort.to_h
         end
@@ -240,6 +240,52 @@ module Armagh
           edit_action_config['type'] = edit_action_config['type'].to_s
           edit_action_config['supertype'] = constant(edit_action_config['type']).superclass.to_s
           edit_action_config
+        end
+
+        private def get_action_class_from_type(type)
+          Actions.defined_actions.each do |defined|
+            next unless defined.to_s == type.to_s
+            return defined
+          end
+          raise APIClientError, "Action type #{type} does not exist"
+        end
+
+        def get_action_test_callbacks(type)
+          type_class = get_action_class_from_type(type)
+          defined_callbacks = []
+          type_class.defined_group_test_callbacks.each do |callback|
+            defined_callbacks << {
+              group:  callback.group,
+              class:  type_class,
+              method: callback.callback_method
+            }
+          end
+          defined_callbacks
+        end
+
+        def invoke_action_test_callback(data)
+          type_class  = get_action_class_from_type(data['type'])
+          group       = data['group']
+          method      = data['method'].to_sym
+          test_config = {group => data['test_config']}
+
+          mod  = nil
+          mods = type_class.included_modules
+          mods.each do |m|
+            if m.respond_to?(method)
+              mod = m
+              break
+            end
+          end
+          return "Test callback method #{method} does not exist for action type #{type}" unless mod
+
+          begin
+            config = mod.create_configuration([], 'test', test_config)
+          rescue => e
+            return "Failed to instantiate test configuration: #{e.message}"
+          end
+
+          mod.send(method, config)
         end
 
         def get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
