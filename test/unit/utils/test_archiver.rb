@@ -17,10 +17,10 @@
 require_relative '../../helpers/coverage_helper'
 
 require_relative '../../helpers/mock_logger'
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/utils/archiver'
+require_relative '../../../lib/armagh/utils/archiver'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -112,5 +112,42 @@ class TestArchiver < Test::Unit::TestCase
   def test_archive_file_no_context
     error = Armagh::Utils::Archiver::ArchiveError.new('Unable to archive file when outside of an archive context.')
     assert_raise(error){@archiver.archive_file('path', {})}
+  end
+
+  def test_archive_file_fix_encoding
+    sftp = mock('sftp')
+    sftp.stubs(:put_file)
+    @archiver.instance_variable_set(:@sftp, sftp)
+    @archiver.instance_variable_set(:@remaining_files, 1)
+    @archiver.stubs(:update_archive_dir)
+    File.stubs(:write)
+    File.stubs(:delete)
+    File.stubs(:join).returns('all ok')
+    archive_data = {
+      'title'    => "\xE2",
+      'encoding' => 'UTF-8'
+    }
+    result = @archiver.archive_file('file_path', archive_data)
+    assert_equal 'all ok', result
+  end
+
+  def test_archive_file_encoding_error
+    sftp = mock('sftp')
+    sftp.stubs(:put_file)
+    @archiver.instance_variable_set(:@sftp, sftp)
+    @archiver.instance_variable_set(:@remaining_files, 1)
+    @archiver.stubs(:update_archive_dir)
+    File.stubs(:write)
+    File.stubs(:delete)
+    File.stubs(:join)
+    archive_data = {
+      'title'    => "\xE2",
+      'encoding' => 'UTF-8'
+    }
+    Armagh::Support::Encoding.stubs(:fix_encoding).returns(archive_data)
+    e = assert_raise JSON::GeneratorError do
+      @archiver.archive_file('file_path', archive_data)
+    end
+    assert_equal 'partial character in source, but hit end', e.message
   end
 end

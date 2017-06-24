@@ -16,8 +16,8 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/document/document'
-require_relative '../../../lib/utils/db_doc_helper'
+require_relative '../../../lib/armagh/document/document'
+require_relative '../../../lib/armagh/utils/db_doc_helper'
 
 require 'test/unit'
 require 'mocha/test_unit'

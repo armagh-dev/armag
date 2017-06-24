@@ -19,11 +19,11 @@ require_relative '../../helpers/coverage_helper'
 
 require_relative '../../helpers/mock_logger'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/logging'
-require_relative '../../../lib/utils/collection_trigger'
+require_relative '../../../lib/armagh/logging'
+require_relative '../../../lib/armagh/utils/collection_trigger'
 
 
 require 'test/unit'

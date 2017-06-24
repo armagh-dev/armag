@@ -17,16 +17,15 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/agent/agent'
+require_relative '../../../lib/armagh/agent/agent'
+require_relative '../../../lib/armagh/document/document'
+require_relative '../../../lib/armagh/logging'
+require_relative '../../../lib/armagh/connection'
+
 require_relative '../../helpers/mock_logger'
-require_relative '../../../lib/agent/agent_status'
-require_relative '../../../lib/ipc'
-require_relative '../../../lib/document/document'
-require_relative '../../../lib/logging'
-require_relative '../../../lib/connection'
 
 require 'mocha/test_unit'
 require 'test/unit'
@@ -67,23 +66,23 @@ class TestAgent < Test::Unit::TestCase
 
   THREAD_SLEEP_TIME = 0.75
 
-  STARTED = []
-
   def setup
     @logger = mock_logger
     @workflow_set = mock('workflow set')
+    @hostname = 'test-hostname'
     @config_store = []
     @backoff_mock = mock('backoff')
     @current_doc_mock = mock('current_doc')
     @running = true
-    @default_agent = prep_an_agent('default', {}, 'default')
+    @agent_id = 'agent_id'
+    @default_agent = prep_an_agent('default', {}, @agent_id)
     @state_coll = mock
     Armagh::Connection.stubs(:action_state).returns(@state_coll)
   end
 
   def prep_an_agent(config_name, config_values, id)
     agent_config = Armagh::Agent.create_configuration(@config_store, config_name, config_values)
-    agent = Armagh::Agent.new(agent_config, @workflow_set)
+    agent = Armagh::Agent.new(agent_config, @workflow_set, @hostname)
     agent.instance_variable_set(:@backoff, @backoff_mock)
     agent.instance_variable_set(:@current_doc, @current_doc_mock)
     agent.instance_variable_set(:@running, @running)
@@ -111,9 +110,6 @@ class TestAgent < Test::Unit::TestCase
     @default_agent.instance_variable_set(:@running, false)
     assert_false @default_agent.running?
 
-    agent_status = Armagh::AgentStatus.new
-    DRbObject.stubs(:new_with_uri).returns(agent_status)
-
     Thread.new { @default_agent.start }
     sleep THREAD_SLEEP_TIME
     assert_true @default_agent.running?
@@ -139,28 +135,20 @@ class TestAgent < Test::Unit::TestCase
     @logger.expects(:level=).with(Log4r::ERROR).at_least_once
     agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
-    agent_status = mock
-
-    DRbObject.stubs(:new_with_uri).returns(agent_status)
-
     Thread.new { agent.start }
     sleep THREAD_SLEEP_TIME
     agent.stop
   end
 
   def test_start_without_config
-    agent_status = mock
+    Thread.new { @default_agent.start}
 
-    DRbObject.stubs(:new_with_uri).returns(agent_status)
-
-    Thread.new { @default_agent.start }
     sleep THREAD_SLEEP_TIME
+    assert_true @default_agent.running?
   end
 
   def test_start_and_stop
     @default_agent.instance_variable_set(:@running, false)
-    agent_status = Armagh::AgentStatus.new
-    DRbObject.stubs(:new_with_uri).returns(agent_status)
 
     assert_false @default_agent.running?
     Thread.new { @default_agent.start }
@@ -615,6 +603,140 @@ class TestAgent < Test::Unit::TestCase
     sleep THREAD_SLEEP_TIME
   end
 
+  def test_run_collect_abort
+    action = setup_action(Armagh::StandardActions::CollectTest, {
+      'action' => {'name' => 'testc'},
+      'collect' => {'schedule' => '0 * * * *', 'archive' => false},
+      'input' => {'docspec' => '__COLLECT__testc:ready'},
+      'output' => {'docspec' => 'dancollected:ready'}
+    })
+    action_name = action.config.action.name
+
+    e = Armagh::Agent::AbortDocument.new('abort')
+    action.expects(:collect).raises(e)
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+
+    @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    doc.expects(:mark_abort)
+
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+
+    doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
+    doc.expects(:finish_processing).at_least_once
+    doc.expects(:metadata).never
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_publish_abort
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    output_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
+
+    action = setup_action(Armagh::StandardActions::PublishTest, {
+      'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
+    })
+    action_name = action.config.action.name
+    pending_actions = %w(one two)
+
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'old' => 'content'},
+                                                       raw: 'action',
+                                                       metadata: {'old' => 'meta'},
+                                                       docspec: input_docspec,
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil)
+    e = Armagh::Agent::AbortDocument.new('abort')
+    action.expects(:publish).raises(e)
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :raw => 'action', :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
+               :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
+               :error? => false)
+    doc.expects(:to_action_document).returns(action_doc)
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    doc.expects(:document_id=, action_doc.document_id).never
+    doc.expects(:content=, action_doc.content).never
+    doc.expects(:metadata=, action_doc.metadata).never
+    doc.expects(:title=, action_doc.title).never
+    doc.expects(:copyright=, action_doc.copyright).never
+    doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED).never
+    doc.expects(:document_timestamp=).never
+    doc.expects(:add_pending_actions).with(pending_actions).never
+    doc.expects(:delete).never
+    doc.expects(:mark_publish).never
+    doc.expects(:finish_processing).never
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+    doc.expects(:get_published_copy).never
+    doc.expects(:published_timestamp=).never
+    doc.expects(:display=).never
+    doc.expects(:mark_abort)
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_consume_abort
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
+    action = setup_action(Armagh::StandardActions::ConsumeTest, {'input' => {'docspec' => input_docspec}})
+    action_name = action.config.action.name
+
+    published_doc = Armagh::Documents::PublishedDocument.new(document_id: 'id',
+                                                             content: {'content' => 'old'},
+                                                             raw: 'raw',
+                                                             metadata: {'meta' => 'old'},
+                                                             docspec: input_docspec,
+                                                             source: {},
+                                                             title: nil,
+                                                             copyright: nil,
+                                                             document_timestamp: nil)
+
+    e = Armagh::Agent::AbortDocument.new('abort)')
+    action.expects(:consume).raises(e)
+
+    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+               :raw => 'raw', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
+               :archive_files => [], :error? => false)
+    doc.expects(:to_published_document).returns(published_doc)
+    doc.expects(:finish_processing).never
+    doc.expects(:mark_abort)
+
+    doc.expects(:metadata=).never
+
+    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
   def test_run_failed_action
     exception = RuntimeError.new
     action = setup_action(Armagh::StandardActions::CollectTest, {
@@ -733,50 +855,46 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_report_status_no_work
-    agent_status = Armagh::AgentStatus.new
-    @default_agent.instance_variable_set(:@agent_status, agent_status)
+    time = Time.now
+    Armagh::Status::AgentStatus.expects(:report).with(
+        id: @agent_id,
+        hostname: @hostname,
+        status: Armagh::Status::IDLE,
+        task: nil,
+        running_since: nil,
+        idle_since: anything) do |args|
+      assert_in_delta(time, args[:idle_since], 1)
+      true
+    end.twice
     @default_agent.send(:report_status, nil, nil)
-
-    statuses = Armagh::AgentStatus.get_statuses(agent_status)
-
-    assert_includes(statuses, @default_agent.uuid)
-    status = statuses[@default_agent.uuid]
-
-    assert_equal('idle', status['status'])
-    assert_includes(status, 'last_update')
-    assert_includes(status, 'idle_since')
+    sleep 2
+    @default_agent.send(:report_status, nil, nil)
   end
 
   def test_report_status_with_work
     doc = stub(:document_id => 'document_id')
     action = stub(:name => 'action_id')
+    time = Time.now
+    times = []
 
-    agent_status = Armagh::AgentStatus.new
-    @default_agent.instance_variable_set(:@agent_status, agent_status)
+    Armagh::Status::AgentStatus.expects(:report).with(
+        id: @agent_id,
+        hostname: @hostname,
+        status: Armagh::Status::RUNNING,
+        task: {'document' => 'document_id', 'action' => 'action_id'},
+        running_since: time,
+        idle_since: nil
+    ) do |args|
+      times << args[:running_since]
+      true
+    end.twice
+    @default_agent.send(:report_status, doc, action)
+    sleep 2
     @default_agent.send(:report_status, doc, action)
 
-    statuses = Armagh::AgentStatus.get_statuses(agent_status)
-
-    assert_includes(statuses, @default_agent.uuid)
-
-    status = statuses[@default_agent.uuid]
-    status_task = status['task']
-
-    assert_equal('running', status['status'])
-    assert_in_delta(Time.now, status['running_since'], 1)
-    assert_in_delta(Time.now, status['last_update'], 1)
-
-    assert_equal(doc.document_id, status_task['document'])
-    assert_equal(action.name, status_task['action'])
-
-    DRb.stop_service
+    assert_equal 2, times.length
+    assert_not_in_delta(times[0], times[1], 1)
   end
-
-#  def test_instantiate_divider
-#    docspec = Armagh::Documents::DocSpec.new('type', Armagh::Documents::DocState::READY)
-#    @workflow_set.expects(:instantiate_divider).with(docspec, @default_agent, @logger, @state_coll)
- #   @default_agent.instantiate_divider(docspec)
-#  end
 
   def test_create_document
     action = mock
@@ -1184,6 +1302,10 @@ class TestAgent < Test::Unit::TestCase
         doc.metadata['something'] = 'value'
       end
     end
+  end
+
+  def test_abort
+    assert_raise(Armagh::Agent::AbortDocument){@default_agent.abort}
   end
 
   def test_get_existing_published_document

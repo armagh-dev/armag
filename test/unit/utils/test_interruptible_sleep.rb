@@ -17,11 +17,11 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../../helpers/mock_logger'
-require_relative '../../../lib/utils/interruptible_sleep'
+require_relative '../../../lib/armagh/utils/interruptible_sleep'
 require 'test/unit'
 
 class TestInterruptibleSleep < Test::Unit::TestCase

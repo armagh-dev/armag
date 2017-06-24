@@ -67,6 +67,7 @@ Then(/^armagh should run in the background$/) do
   status = LauncherSupport.get_daemon_status
   assert_match(/armagh-agentsd is running as PID \d+/, status)
   @spawn_pid = status[/\d+/].to_i
+  sleep 2
 end
 
 Then(/^the armagh daemon can be stopped$/) do

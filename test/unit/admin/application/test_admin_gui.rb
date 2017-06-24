@@ -19,7 +19,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 require_relative '../../../helpers/coverage_helper'
-require_relative '../../../../lib/admin/application/admin_gui'
+require_relative '../../../../lib/armagh/admin/application/admin_gui'
 
 module Armagh
   module Admin
@@ -203,7 +203,7 @@ module Armagh
         end
 
         def test_root_directory
-          assert_match(/\/lib\/admin\/application\/www_root$/, @admin_gui.root_directory)
+          assert_match(/\/lib\/armagh\/admin\/application\/www_root$/, @admin_gui.root_directory)
         end
 
         def test_get_status

@@ -17,11 +17,11 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../../helpers/mock_logger'
-require_relative '../../../lib/configuration/file_based_configuration.rb'
+require_relative '../../../lib/armagh/configuration/file_based_configuration.rb'
 require 'test/unit'
 require 'mocha/test_unit'
 require 'fakefs/safe'
@@ -44,7 +44,7 @@ class TestFileBasedConfiguration < Test::Unit::TestCase
   def test_filepath_default
     path = FileBasedConfiguration.filepath
     assert_true File.exists? path
-    default_config_path = File.absolute_path(File.join(File.dirname(__FILE__), '..', '..', '..', 'lib', 'armagh_env.json'))
+    default_config_path = File.absolute_path(File.join(File.dirname(__FILE__), '..', '..', '..', 'lib', 'armagh', 'armagh_env.json'))
     assert_equal(default_config_path, path)
   end
 

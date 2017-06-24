@@ -15,9 +15,9 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/document/document'
-require_relative '../../lib/actions/workflow_set'
-require_relative '../../lib/logging'
+require_relative '../../lib/armagh/document/document'
+require_relative '../../lib/armagh/actions/workflow_set'
+require_relative '../../lib/armagh/logging'
 
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"(, raw "([^"]*)")?$/) do |count, doc_type, state, document_id, content, meta, rawkeyword, raw|
   @logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')

@@ -17,10 +17,10 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/logging/hash_formatter'
+require_relative '../../../lib/armagh/logging/hash_formatter'
 require_relative '../../helpers/mock_logger'
 
 require 'log4r'

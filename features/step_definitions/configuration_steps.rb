@@ -16,9 +16,9 @@
 #
 
 require_relative '../../test/helpers/mongo_support'
-require_relative '../../lib/launcher/launcher'
-require_relative '../../lib/agent/agent'
-require_relative '../../lib/connection'
+require_relative '../../lib/armagh/launcher/launcher'
+require_relative '../../lib/armagh/agent/agent'
+require_relative '../../lib/armagh/connection'
 
 require 'test/unit/assertions'
 
@@ -377,6 +377,34 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
           }
       )
 
+  when 'consume_abort'
+    @workflow.create_action_config(
+      'Armagh::CustomActions::TestConsumeAbort',
+      {
+        'action' => {'name' => 'test_consume_abort'},
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('ConsumeDocument', Armagh::Documents::DocState::PUBLISHED)},
+      }
+    )
+
+  when 'split_abort'
+    @workflow.create_action_config(
+      'Armagh::CustomActions::TestSplitAbort',
+      {
+        'action' => {'name' => 'test_split_abort'},
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('SplitDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('SplitDocument2', Armagh::Documents::DocState::READY)}
+      }
+    )
+
+  when 'publish_abort'
+      @workflow.create_action_config(
+        'Armagh::CustomActions::TestPublishAbort',
+        {
+          'action' => {'name' => 'test_publish_abort'},
+          'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+          'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+        }
+      )
 
   end
 

@@ -17,21 +17,23 @@
 # limitations under the License.
 #
 
+require 'bundler/setup'
+
 require 'sinatra'
 require 'thin'
 require 'json'
 require 'log4r'
 
-require_relative '../lib/environment.rb'
+require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
-require_relative '../lib/admin/application/api'
-require_relative '../lib/admin/application/thin_backend'
-require_relative '../lib/configuration/file_based_configuration'
-require_relative '../lib/connection'
-require_relative '../lib/logging'
+require_relative '../lib/armagh/admin/application/api'
+require_relative '../lib/armagh/admin/application/thin_backend'
+require_relative '../lib/armagh/configuration/file_based_configuration'
+require_relative '../lib/armagh/connection'
+require_relative '../lib/armagh/logging'
 
-require_relative '../lib/utils/rest_helper'
+require_relative '../lib/armagh/utils/rest_helper'
 
 Process.setproctitle(File.basename(__FILE__))
 
@@ -46,7 +48,7 @@ include Armagh
 Connection.setup_indexes
 
 api = Admin::Application::API.instance
-rest_helper = Utils::RestHelper.new(api.logger)
+rest_helper = Utils::RestHelper.new(api.logger, 'Application Admin API')
 
 Authentication::User.setup_default_users
 Authentication::Group.setup_default_groups
@@ -84,27 +86,47 @@ configure do
   end
 end # end configure
 
+before do
+  rest_helper.headers = headers
+end
+
 enable :sessions, :logging
 
 set :session_secret, 'arm-866w(c@n$f2pv+8sgg7&y_i#c+6!-d(u&f*dec7sp!ju*a%9*a'
 
 use Rack::CommonLogger, api.logger
 
-use Rack::Auth::Basic, 'Armagh Admin' do |username, password|
-  api.authenticate_and_authorize username, password
-end # use Rack::Auth::Basic
-
 #------------------------------------------------------------------------------------------------
 #
 # REST API
 #
 #------------------------------------------------------------------------------------------------
+get '/' do
+  rest_helper.handle_request(request) do |_fields, _remote_user|
+    'Armagh Application Admin API'
+  end
+end
 
-helpers do
+#------------------------------
+#
+# status
+#
+#------------------------------
+
+get '/agent_status.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.get_agent_status
+  end
+end
+
+get '/launcher_status.json' do
+  rest_helper.handle_request(request) do |fields|
+    api.get_launcher_status
+  end
 end
 
 get '/status.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_status
   end
 end
@@ -116,7 +138,7 @@ end
 #------------------------------
 
 post '/launcher.json' do
-  rest_helper.handle_request(request ) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.create_or_update_launcher_configuration(fields)
   end
 end
@@ -128,7 +150,9 @@ end
 #------------------------------
 
 post '/agent.json' do
-  # TODO Agent configuration
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    # TODO Agent configuration
+  end
 end
 
 #------------------------------
@@ -139,14 +163,14 @@ end
 
 # list of workflows with status
 get '/workflows.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflows
   end
 end
 
 # create new workflow
 post '/workflow/:workflow_name/new.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     workflow = api.create_workflow({'workflow' => {'name' => params['workflow_name']}})
     workflow.name
   end
@@ -154,28 +178,28 @@ end
 
 # status for existing workflow
 get '/workflow/:workflow_name/status.json' do
-  rest_helper.handle_request(request ) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflow_status(params['workflow_name'])
   end
 end
 
 # update workflow: run
 patch '/workflow/:workflow_name/run.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.run_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: finish
 patch '/workflow/:workflow_name/finish.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.finish_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: stop
 patch '/workflow/:workflow_name/stop.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.stop_workflow(params['workflow_name'])
   end
 end
@@ -188,56 +212,56 @@ end
 
 # list of defined action classes
 get '/actions/defined.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_defined_actions
   end
 end
 
 # Trigger a collect
 patch '/actions/trigger_collect.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.trigger_collect(params['name'])
   end
 end
 
 # list of workflow actions with status
 get '/workflow/:workflow_name/actions.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflow_actions(params['workflow_name'])
   end
 end
 
 # status for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/status.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflow_action_status(params['workflow_name'], params['action_name'])
   end
 end
 
 # edit form for new workflow action
 get '/workflow/:workflow_name/action/config.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.new_workflow_action_config(params['workflow_name'],fields['type'] )
   end
 end
 
 # edit form for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/description.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflow_action_description(params['workflow_name'], params['action_name'])
   end
 end
 
 # config for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/config.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.get_workflow_action_config(params['workflow_name'], params['action_name'])
   end
 end
 
 # submit params to create workflow action
 post '/workflow/:workflow_name/action/config.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     type = fields.delete 'type'
     api.create_workflow_action_config(params['workflow_name'], type, fields)
   end
@@ -245,21 +269,21 @@ end
 
 # submit params to change existing action config
 put '/workflow/:workflow_name/action/:action_name/config.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.update_workflow_action_config(params['workflow_name'], params['action_name'], fields )
   end
 end
 
 # get defined group test callbacks
 get '/test/:type/callbacks.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields|
     api.get_action_test_callbacks(params['type'])
   end
 end
 
 # invoke action test callback
 patch '/test/invoke_callback.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields|
     api.invoke_action_test_callback(fields)
   end
 end
@@ -271,9 +295,11 @@ end
 #---------------------
 
 get '/documents.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request) do |_fields, remote_user|
     api.check_params(params, 'type')
     doc_type = params['type']
+
+    api.user_has_document_role(remote_user, doc_type)
 
     begin_ts = Time.parse(params['begin_ts']) if params.include? 'begin_ts'
     end_ts = Time.parse(params['end_ts']) if params.include? 'end_ts'
@@ -285,18 +311,21 @@ get '/documents.json' do
 end
 
 get '/document.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request) do |_fields, remote_user|
     api.check_params(params, %w(id type))
 
-    doc_id = params['id']
     doc_type = params['type']
+    api.user_has_document_role(remote_user, doc_type)
+
+    doc_id = params['id']
+
 
     api.get_document(doc_id, doc_type)
   end
 end
 
 get '/documents/failures.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_failed_documents
   end
 end
@@ -308,7 +337,7 @@ end
 #---------------------
 
 get '/version.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_version
   end
 end
@@ -320,153 +349,153 @@ end
 #---------------------
 
 get '/users.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.get_users
   end
 end
 
 get '/user/:user_id.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN, params['user_id']) do |_fields, _remote_user|
     api.get_user(params['user_id'])
   end
 end
 
 put '/user/:user_id.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN, params['user_id']) do |fields, _remote_user|
     api.update_user(params['user_id'], fields)
   end
 end
 
 post '/user/create.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |fields, _remote_user|
     api.create_user(fields)
   end
 end
 
 get '/user/:user_id/join_group.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'group_id')
-    api.user_join_group(params['user_id'], params['group_id'])
+    api.user_join_group(params['user_id'], params['group_id'], remote_user)
   end
 end
 
 get '/user/:user_id/leave_group.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'group_id')
-    api.user_leave_group(params['user_id'], params['group_id'])
+    api.user_leave_group(params['user_id'], params['group_id'], remote_user)
   end
 end
 
 get '/user/:user_id/add_role.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'role_key')
-    api.user_add_role(params['user_id'], params['role_key'])
+    api.user_add_role(params['user_id'], params['role_key'], remote_user)
   end
 end
 
 get '/user/:user_id/remove_role.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'role_key')
-    api.user_remove_role(params['user_id'], params['role_key'])
+    api.user_remove_role(params['user_id'], params['role_key'], remote_user)
   end
 end
 
 delete '/user/:user_id.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.delete_user(params['user_id'])
   end
 end
 
 get '/user/:user_id/reset_password.json' do
-  rest_helper.handle_request(request) do |_fields|
-    api.user_reset_password(params['user_id'])
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
+    api.user_reset_password(params['user_id'], remote_user)
   end
 end
 
 get '/user/:user_id/lock.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.user_lock(params['user_id'])
   end
 end
 
 get '/user/:user_id/unlock.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.user_unlock(params['user_id'])
   end
 end
 
 get '/user/:user_id/enable.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.user_enable(params['user_id'])
   end
 end
 
 get '/user/:user_id/disable.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.user_disable(params['user_id'])
   end
 end
 
 get '/groups.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.get_groups
   end
 end
 
 get '/group/:group_id.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.get_group(params['group_id'])
   end
 end
 
 put '/group/:group_id.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |fields, _remote_user|
     api.update_group(params['group_id'], fields)
   end
 end
 
 get '/group/:group_id/add_user.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'user_id')
-    api.group_add_user(params['group_id'], params['user_id'])
+    api.group_add_user(params['group_id'], params['user_id'], remote_user)
   end
 end
 
 get '/group/:group_id/remove_user.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'user_id')
-    api.group_remove_user(params['group_id'], params['user_id'])
+    api.group_remove_user(params['group_id'], params['user_id'], remote_user)
   end
 end
 
 post '/group/create.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |fields, _remote_user|
     api.create_group(fields)
   end
 end
 
 get '/group/:group_id/add_role.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'role_key')
-    api.group_add_role(params['group_id'], params['role_key'])
+    api.group_add_role(params['group_id'], params['role_key'], remote_user)
   end
 end
 
 get '/group/:group_id/remove_role.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
     api.check_params(params, 'role_key')
-    api.group_remove_role(params['group_id'], params['role_key'])
+    api.group_remove_role(params['group_id'], params['role_key'], remote_user)
   end
 end
 
 delete '/group/:group_id.json' do
-  rest_helper.handle_request(request) do |_fields|
-    api.delete_group(params['group_id'])
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, remote_user|
+    api.delete_group(params['group_id'], remote_user)
   end
 end
 
 get '/roles.json' do
-  rest_helper.handle_request(request) do |_fields|
+  rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
     api.get_roles
   end
 end
@@ -477,3 +506,9 @@ end
 # Authentication
 #
 #---------------------
+
+get '/authenticate.json' do
+  rest_helper.handle_request(request) do |_fields, _remote_user|
+    true
+  end
+end

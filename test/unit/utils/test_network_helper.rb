@@ -17,12 +17,12 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require 'test/unit'
 
-require_relative '../../../lib/utils/network_helper'
+require_relative '../../../lib/armagh/utils/network_helper'
 
 class TestNetworkHelper < Test::Unit::TestCase
 

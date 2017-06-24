@@ -16,16 +16,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+require 'bundler/setup'
 
 require 'sinatra'
 require 'thin'
 
-require_relative '../lib/environment.rb'
+require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
 require 'armagh/support/templating'
 
-require_relative '../lib/admin/application/admin_gui.rb'
+require_relative '../lib/armagh/admin/application/admin_gui.rb'
 
 Process.setproctitle(File.basename(__FILE__))
 

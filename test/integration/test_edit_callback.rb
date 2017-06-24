@@ -18,21 +18,20 @@
 require_relative '../helpers/coverage_helper'
 require_relative '../helpers/integration_helper'
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 
-require_relative '../../lib/logging'
-require_relative '../../lib/connection'
-require_relative '../../lib/agent/agent'
-require_relative '../../lib/actions/workflow_set'
-require_relative '../../lib/document/document'
+require_relative '../../lib/armagh/logging'
+require_relative '../../lib/armagh/connection'
+require_relative '../../lib/armagh/agent/agent'
+require_relative '../../lib/armagh/actions/workflow_set'
+require_relative '../../lib/armagh/document/document'
 
 require 'test/unit'
 
 require 'mongo'
-require 'connection'
 require 'armagh/actions'
 
 module Armagh
@@ -63,6 +62,7 @@ class TestEditCallback < Test::Unit::TestCase
   def setup
     MongoSupport.instance.clean_database
     @logger = Armagh::Logging.set_logger('Test::Logger')
+    @hostname = 'test_hostname'
 
     @output_type = 'OutputDocument'
     @output_state = Armagh::Documents::DocState::WORKING
@@ -79,7 +79,7 @@ class TestEditCallback < Test::Unit::TestCase
     )
     wf.run
     agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )
-    agent = Armagh::Agent.new( agent_config, workflow_set )
+    agent = Armagh::Agent.new(agent_config, workflow_set, @hostname)
 
     @splitter = workflow_set.instantiate_action_named( 'test_splitter', agent, @logger, nil )
 

@@ -15,11 +15,11 @@
 # limitations under the License.
 #
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../lib/connection'
-require_relative '../../lib/version'
+require_relative '../../lib/armagh/connection'
+require_relative '../../lib/armagh/version'
 
 require_relative '../../test/helpers/coverage_helper'
 

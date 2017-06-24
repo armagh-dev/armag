@@ -16,7 +16,7 @@
 #
 
 require 'fileutils'
-require_relative '../../lib/logging'
+require_relative '../../lib/armagh/logging'
 
 Armagh::Logging.init_log_env
 

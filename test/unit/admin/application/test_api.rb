@@ -17,11 +17,11 @@
 
 require_relative '../../../helpers/coverage_helper'
 require_relative '../../../helpers/mock_logger'
-require_relative '../../../../lib/environment'
+require_relative '../../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../../lib/admin/application/api'
-require_relative '../../../../lib/connection'
+require_relative '../../../../lib/armagh/admin/application/api'
+require_relative '../../../../lib/armagh/connection'
 require_relative '../../../../test/helpers/workflow_generator_helper'
 
 require 'armagh/actions'
@@ -67,6 +67,15 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @alice_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_divide( 'alice' )
     @fred_workflow_config_values = {'workflow'=>{'name' => 'fred'}}
     @fred_workflow_actions_config_values  = WorkflowGeneratorHelper.workflow_actions_config_values_no_divide('fred')
+    @remote_user = mock('remote_user')
+    set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN, Armagh::Authentication::Role::USER])
+  end
+
+  def set_remote_user_roles(roles)
+    @remote_user.unstub(:has_role?)
+    @remote_user.stubs(:roles).returns(roles)
+    @remote_user.stubs(:has_role?).returns(false)
+    @remote_user.roles.each{|r| @remote_user.stubs(:has_role?).with(r).returns(true)}
   end
 
   def good_alice_in_db
@@ -88,6 +97,22 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       @fred.create_action_config(type, action_config_values)
     end
     @fred
+  end
+
+  def agent_statuses
+    [
+        {'_id' => 'agent-1', 'hostname' => 'host1', 'status' => 'running', 'running_since' => Time.at(0), 'last_updated' => Time.at(1000)},
+        {'_id' => 'agent-2', 'hostname' => 'host1', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000), 'task' => {'document' => 'doc1', 'action' => 'action1'}},
+        {'_id' => 'agent-1', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(0), 'last_updated' => Time.at(1000)},
+        {'_id' => 'agent-2', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000)}
+    ]
+  end
+
+  def launcher_statuses
+    [
+        {'_id' => 'host1', 'status' => 'running', 'versions' => {'armagh' => '1.0.0', 'actions' => {'standard' => '1.0.1', 'armagh_test' => '1.0.2'}}, 'last_updated' => Time.at(1000)},
+        {'_id' => 'host2', 'status' => 'running', 'versions' => {'armagh' => '2.0.0', 'actions' => {'standard' => '2.0.1', 'armagh_test' => '2.0.2'}}, 'last_updated' => Time.at(1000)}
+    ]
   end
 
   def expect_alice_docs_in_db
@@ -138,6 +163,87 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_true @api.check_params(params, %w(one two))
     assert_true @api.check_params(params, %w(one two three))
     assert_raise(Armagh::Admin::Application::APIClientError.new("A parameter named 'four' is missing but is required.")){@api.check_params(params, %w(one two three four))}
+  end
+
+  def test_get_agent_status
+    agent_status = agent_statuses
+
+    Armagh::Status::AgentStatus.expects(:find_all).with(raw: true).returns(agent_status)
+    assert_equal(agent_status, @api.get_agent_status)
+  end
+
+  def test_get_launcher_status
+    launcher_status = launcher_statuses
+    Armagh::Status::LauncherStatus.expects(:find_all).with(raw: true).returns(launcher_status)
+    assert_equal(launcher_status, @api.get_launcher_status)
+  end
+
+  def test_get_status
+    expected = [
+        {
+            '_id' => 'host1',
+            'agents' => [
+                {
+                    '_id' => 'agent-1',
+                    'hostname' => 'host1',
+                    'last_updated' => Time.at(1000),
+                    'running_since' => Time.at(0),
+                    'status' => 'running'
+                },
+                {
+                    '_id' => 'agent-2',
+                    'hostname' => 'host1',
+                    'idle_since' => Time.at(100),
+                    'last_updated' => Time.at(1000),
+                    'status' => 'idle',
+                    'task' => {
+                        'action' => 'action1',
+                        'document' => 'doc1'
+                    }
+                }
+            ],
+            'last_updated' => Time.at(1000),
+            'status' => 'running',
+            'versions' => {
+                'actions' => {
+                    'armagh_test' => '1.0.2',
+                    'standard' => '1.0.1'
+                },
+                'armagh' => '1.0.0'
+            }
+        },
+        {
+            '_id' => 'host2',
+            'agents' => [
+                {
+                    '_id' => 'agent-1',
+                    'hostname' => 'host2',
+                    'idle_since' => Time.at(0),
+                    'last_updated' => Time.at(1000),
+                    'status' => 'idle'},
+                {
+                    '_id' => 'agent-2',
+                    'hostname' => 'host2',
+                    'idle_since' => Time.at(100),
+                    'last_updated' => Time.at(1000),
+                    'status' => 'idle'}],
+            'last_updated' => Time.at(1000),
+            'status' => 'running',
+            'versions' => {
+                'actions' => {
+                    'armagh_test' => '2.0.2',
+                    'standard' => '2.0.1'
+                },
+                'armagh' => '2.0.0'
+            }
+        }
+    ]
+
+    @api.expects(:get_agent_status).returns(agent_statuses)
+    @api.expects(:get_launcher_status).returns(launcher_statuses)
+    
+
+    assert_equal expected, @api.get_status
   end
 
   def test_get_workflows
@@ -790,99 +896,151 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_user_join_group
     user = mock 'user'
+    user.stubs(:all_roles).returns({'self' => []})
     group = mock 'group'
+    group.stubs(:name).returns('Group123')
+    group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
 
     user.expects(:join_group).with(group)
     user.expects(:save)
-    assert_true @api.user_join_group('user_id', 'group_id')
+    assert_true @api.user_join_group('user_id', 'group_id', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_join_group('none', 'group_id')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_join_group('user_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_join_group('none', 'group_id', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_join_group('user_id', 'none', @remote_user)}
 
     Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_join_group('error', 'group_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_join_group('error', 'group_id', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot add user user_id to group group_id. Doing so would grant the following roles, which you don't have: User Admin.")){ @api.user_join_group('user_id', 'group_id', @remote_user)}
+
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN]})
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    group.expects(:add_user).with(user)
+    group.expects(:save)
+    assert_true @api.group_add_user('group_id', 'user_id', @remote_user)
   end
 
   def test_user_leave_group
     user = mock 'user'
     group = mock 'group'
+    group.stubs(:name).returns('Group123')
+    group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
 
     user.expects(:leave_group).with(group)
     user.expects(:save)
-    assert_true @api.user_leave_group('user_id', 'group_id')
+    assert_true @api.user_leave_group('user_id', 'group_id', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_leave_group('none', 'group_id')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_leave_group('user_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_leave_group('none', 'group_id', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_leave_group('user_id', 'none', @remote_user)}
 
     Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_leave_group('error', 'group_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_leave_group('error', 'group_id', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::USER_ADMIN]})
+    user.expects(:leave_group).with(group)
+    user.expects(:save)
+    assert_true @api.user_leave_group('user_id', 'group_id', @remote_user)
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.stubs(:all_roles).returns({'self' => [], 'Group123' => [Armagh::Authentication::Role::USER_ADMIN]})
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove user user_id from group group_id. Doing so would remove the following roles, which you don't have: User Admin.")){ @api.user_leave_group('user_id', 'group_id', @remote_user)}
   end
 
   def test_user_add_role
     user = mock 'user'
-    role = mock 'role'
+    user.stubs(:all_roles).returns({'self' => []})
+    role = Armagh::Authentication::Role::USER_ADMIN
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
-    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     user.expects(:add_role).with(role)
     user.expects(:save)
-    assert_true @api.user_add_role('user_id', 'role_key')
+    assert_true @api.user_add_role('user_id', 'role_key', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_add_role('none', 'role_key')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_add_role('user_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_add_role('none', 'role_key', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_add_role('user_id', 'none', @remote_user)}
 
     Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_add_role('error', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_add_role('error', 'role_key', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot add role User Admin to user user_id. Doing so would grant the following roles, which you don't have: User Admin.")){ @api.user_add_role('user_id', 'role_key', @remote_user)}
+
+    user.stubs(:all_roles).returns({'self' => [], 'group' => [role]})
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.expects(:add_role).with(role)
+    user.expects(:save)
+    assert_true @api.user_add_role('user_id', 'role_key', @remote_user)
   end
 
   def test_user_remove_role
     user = mock 'user'
-    role = mock 'role'
+    role = Armagh::Authentication::Role::USER_ADMIN
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
-    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'group' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
+
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     user.expects(:remove_role).with(role)
     user.expects(:save)
-    assert_true @api.user_remove_role('user_id', 'role_key')
+    assert_true @api.user_remove_role('user_id', 'role_key', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_remove_role('none', 'role_key')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_remove_role('user_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_remove_role('none', 'role_key', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_remove_role('user_id', 'none', @remote_user)}
 
     Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_remove_role('error', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_remove_role('error', 'role_key', @remote_user)}
+
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'group' => [Armagh::Authentication::Role::USER_ADMIN]})
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.expects(:remove_role).with(role)
+    user.expects(:save)
+    assert_true @api.user_remove_role('user_id', 'role_key', @remote_user)
+
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN]})
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove role role_key from user user_id. Doing so would remove the following roles, which you don't have: User Admin.")){ @api.user_remove_role('user_id', 'role_key', @remote_user)}
   end
 
   def test_user_reset_password
     expected = 'NeWPaSsWoRd'
     user = mock('user')
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
 
     user.expects(:reset_password).returns(expected)
-    assert_equal expected,@api.user_reset_password('user_id')
+    assert_equal expected,@api.user_reset_password('user_id', @remote_user)
 
     user.expects(:reset_password).raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_reset_password('user_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_reset_password('user_id', @remote_user)}
+
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
+    user.expects(:reset_password).never
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot reset password for user_id. The user has the following roles, which you don't have: Resource Admin.")){@api.user_reset_password('user_id', @remote_user)}
   end
 
   def test_user_lock
@@ -998,103 +1156,169 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_group_add_role
     group = mock 'group'
-    role = mock 'role'
+    role = Armagh::Authentication::Role::USER
 
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).twice
-    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(2)
 
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     group.expects(:add_role).with(role)
     group.expects(:save)
-    assert_true @api.group_add_role('group_id', 'role_key')
+    assert_true @api.group_add_role('group_id', 'role_key', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_role('none', 'role_key')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_add_role('group_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_role('none', 'role_key', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_add_role('group_id', 'none', @remote_user)}
 
     Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_role('error', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_role('error', 'role_key', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot add role User to group group_id. Doing so would grant the following roles, which you don't have: User.")){@api.group_add_role('group_id', 'role_key', @remote_user)}
   end
 
   def test_group_remove_role
     group = mock 'group'
-    role = mock 'role'
+    role = Armagh::Authentication::Role::USER
 
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).twice
-    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(2)
 
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     group.expects(:remove_role).with(role)
     group.expects(:save)
-    assert_true @api.group_remove_role('group_id', 'role_key')
+    assert_true @api.group_remove_role('group_id', 'role_key', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_role('none', 'role_key')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_remove_role('group_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_role('none', 'role_key', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_remove_role('group_id', 'none', @remote_user)}
 
     Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_role('error', 'role_key')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_role('error', 'role_key', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove role User from group group_id. Doing so would remove the following roles, which you don't have: User.")){@api.group_remove_role('group_id', 'role_key', @remote_user)}
   end
 
   def test_group_add_user
     user = mock 'user'
+    user.stubs(:all_roles).returns({'self' => []})
     group = mock 'group'
+    group.stubs(:name).returns('Group123')
+    group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(5)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
 
     group.expects(:add_user).with(user)
     group.expects(:save)
-    assert_true @api.group_add_user('group_id', 'user_id')
+    assert_true @api.group_add_user('group_id', 'user_id', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_user('none', 'user_id')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_add_user('group_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_user('none', 'user_id', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_add_user('group_id', 'none', @remote_user)}
 
     Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_user('error', 'user_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_user('error', 'user_id', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot add user user_id to group group_id. Doing so would grant the following roles, which you don't have: User Admin.")){ @api.group_add_user('group_id', 'user_id', @remote_user)}
+
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN]})
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    group.expects(:add_user).with(user)
+    group.expects(:save)
+    assert_true @api.group_add_user('group_id', 'user_id', @remote_user)
   end
 
   def test_group_remove_user
     user = mock 'user'
     group = mock 'group'
+    group.stubs(:name).returns('Group123')
+    group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(5)
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
 
     Armagh::Authentication::User.expects(:find).with('none').returns(nil)
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
 
     group.expects(:remove_user).with(user)
     group.expects(:save)
-    assert_true @api.group_remove_user('group_id', 'user_id')
+    assert_true @api.group_remove_user('group_id', 'user_id', @remote_user)
 
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_user('none', 'user_id')}
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_remove_user('group_id', 'none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_user('none', 'user_id', @remote_user)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_remove_user('group_id', 'none', @remote_user)}
 
     Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_user('error', 'user_id')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_user('error', 'user_id', @remote_user)}
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::USER_ADMIN]})
+    user.expects(:leave_group).with(group)
+    user.expects(:save)
+    assert_true @api.user_leave_group('user_id', 'group_id', @remote_user)
+
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    user.stubs(:all_roles).returns({'self' => [], 'Group123' => [Armagh::Authentication::Role::USER_ADMIN]})
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove user user_id from group group_id. Doing so would remove the following roles, which you don't have: User Admin.")){ @api.user_leave_group('user_id', 'group_id', @remote_user)}
   end
 
   def test_delete_group
-    group = mock
+    group = mock('group')
     group.expects(:delete)
+    group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
     Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
-    assert_true@api.delete_group('group_id')
+    assert_true@api.delete_group('group_id', @remote_user)
 
     Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
-    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.delete_group('none')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.delete_group('none', @remote_user)}
 
     Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_group('error')}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_group('error', @remote_user)}
+
+    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    set_remote_user_roles([Armagh::Authentication::Role::USER])
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove group group_id. Doing so would remove the following roles, which you don't have: User Admin.")){@api.delete_group('group_id', @remote_user)}
   end
 
   def test_get_roles
     Armagh::Authentication::Role.expects(:all)
     @api.get_roles
+  end
+
+  def test_user_has_document_role
+    user = mock('user')
+    user.stubs(:username).returns('test_user')
+
+    pub_collection = stub({name: 'documents.test_doc'})
+    doc_role = Armagh::Authentication::Role.published_collection_role(pub_collection)
+
+    # has role
+    Armagh::Authentication::Role.expects(:find_from_published_doctype).with('test_doc').returns(doc_role)
+    user.expects(:has_role?).with(doc_role).returns true
+    @api.user_has_document_role(user, 'test_doc')
+
+    # does not have role
+    Armagh::Authentication::Role.expects(:find_from_published_doctype).with('test_doc').returns(doc_role)
+    user.expects(:has_role?).with(doc_role).returns false
+    assert_raise(Armagh::Authentication::AuthenticationError.new('User test_user does not have the required role to access test_doc documents.')){@api.user_has_document_role(user, 'test_doc')}
+
+    Armagh::Authentication::Role.unstub(:find_from_published_doctype)
+
+    # Unknown doc type
+    Armagh::Authentication::Role.expects(:find_from_published_doctype).with('invalid').returns(nil)
+    user.expects(:has_role?).with(Armagh::Authentication::Role::USER).returns true
+    @api.user_has_document_role(user, 'invalid')
+
+    # Unknown doc type without user
+    Armagh::Authentication::Role.expects(:find_from_published_doctype).with('invalid').returns(nil)
+    user.expects(:has_role?).with(Armagh::Authentication::Role::USER).returns false
+    assert_raise(Armagh::Authentication::AuthenticationError.new('User test_user does not have the required role to access invalid documents.')){@api.user_has_document_role(user, 'invalid')}
   end
 end

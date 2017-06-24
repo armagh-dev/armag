@@ -20,7 +20,7 @@ require 'singleton'
 require 'socket'
 require 'log4r'
 
-require_relative '../../lib/connection'
+require_relative '../../lib/armagh/connection'
 
 class MongoSupport
 
@@ -116,8 +116,12 @@ class MongoSupport
     @client['config'].find('type' => type).replace_one(config.merge({'type' => type}), {upsert: true})
   end
 
-  def get_status
-    @client['status'].find('_id' => @hostname).limit(1).first
+  def get_agent_statuses
+    @client['agent_status'].find('hostname' => @hostname).to_a
+  end
+
+  def get_launcher_status
+    @client['launcher_status'].find('_id' => @hostname).limit(1).first
   end
 
   def get_mongo_documents(collection)

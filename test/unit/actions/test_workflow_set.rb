@@ -20,9 +20,9 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 require_relative '../../helpers/workflow_generator_helper'
-require_relative '../../../lib/actions/workflow_set'
-require_relative '../../../lib/connection'
-require_relative '../../../lib/document/document'
+require_relative '../../../lib/armagh/actions/workflow_set'
+require_relative '../../../lib/armagh/connection'
+require_relative '../../../lib/armagh/document/document'
 
 require 'armagh/actions'
 
@@ -346,7 +346,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     wf_set.instantiate_action_from_config(action_config, @caller, @logger, @state_coll)
     trigger = mock('trigger')
     trigger.expects(:trigger_individual_collection).once
-    require_relative '../../../lib/utils/collection_trigger'
+    require_relative '../../../lib/armagh/utils/collection_trigger'
     Armagh::Utils::CollectionTrigger.expects(:new).once.returns(trigger)
     result = wf_set.trigger_collect(action_name)
     assert_true result

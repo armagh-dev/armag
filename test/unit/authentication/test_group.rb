@@ -17,8 +17,8 @@
 
 require_relative '../../helpers/bson_support'
 require_relative '../../helpers/coverage_helper'
-require_relative '../../../lib/connection'
-require_relative '../../../lib/authentication/group'
+require_relative '../../../lib/armagh/connection'
+require_relative '../../../lib/armagh/authentication/group'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -63,7 +63,6 @@ class TestGroup < Test::Unit::TestCase
     assert_default_group 'super_administrators'
     assert_default_group 'administrators'
     assert_default_group 'user_administrators'
-    assert_default_group 'user_managers'
     assert_default_group 'users'
 
     Armagh::Authentication::Group.setup_default_groups
@@ -245,6 +244,7 @@ class TestGroup < Test::Unit::TestCase
 
     group.add_user user1
     group.add_user user2
+    group.add_user user2
 
     assert_true group.has_user? user1
     assert_true group.has_user? user2
@@ -270,7 +270,7 @@ class TestGroup < Test::Unit::TestCase
     doc_role = Armagh::Authentication::Role.send(:new, name: 'specific doc', description: 'specific doc access', key: 'some_doc', published_collection_role: true)
 
     Armagh::Authentication::Role.stubs(:find).with(Armagh::Authentication::Role::APPLICATION_ADMIN.key).returns(Armagh::Authentication::Role::APPLICATION_ADMIN)
-    Armagh::Authentication::Role.stubs(:find).with(Armagh::Authentication::Role::USER_MANAGER.key).returns(Armagh::Authentication::Role::USER_MANAGER)
+    Armagh::Authentication::Role.stubs(:find).with(Armagh::Authentication::Role::USER_ADMIN.key).returns(Armagh::Authentication::Role::USER_ADMIN)
     Armagh::Authentication::Role.stubs(:find).with(Armagh::Authentication::Role::USER.key).returns(Armagh::Authentication::Role::USER)
     Armagh::Authentication::Role.stubs(:find).with(doc_role.key).returns(doc_role)
 
@@ -279,7 +279,7 @@ class TestGroup < Test::Unit::TestCase
 
     assert_true group.has_role? Armagh::Authentication::Role::APPLICATION_ADMIN
     assert_true group.has_role? doc_role
-    assert_false group.has_role? Armagh::Authentication::Role::USER_MANAGER
+    assert_false group.has_role? Armagh::Authentication::Role::USER_ADMIN
     assert_equal [Armagh::Authentication::Role::APPLICATION_ADMIN, doc_role], group.roles
 
     group.remove_role doc_role

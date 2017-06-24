@@ -17,21 +17,23 @@
 # limitations under the License.
 #
 
+require 'bundler/setup'
+
 require 'sinatra'
 require 'thin'
 require 'json'
 require 'log4r'
 
-require_relative '../lib/environment.rb'
+require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
-require_relative '../lib/admin/resource/api.rb'
-require_relative '../lib/admin/resource/thin_backend.rb'
-require_relative '../lib/configuration/file_based_configuration.rb'
-require_relative '../lib/connection'
-require_relative '../lib/logging'
+require_relative '../lib/armagh/admin/resource/api.rb'
+require_relative '../lib/armagh/admin/resource/thin_backend.rb'
+require_relative '../lib/armagh/configuration/file_based_configuration.rb'
+require_relative '../lib/armagh/connection'
+require_relative '../lib/armagh/logging'
 
-require_relative '../lib/utils/rest_helper'
+require_relative '../lib/armagh/utils/rest_helper'
 
 Process.setproctitle(File.basename(__FILE__))
 
@@ -46,7 +48,7 @@ include Armagh
 Connection.setup_indexes
 
 api = Admin::Resource::API.instance
-rest_helper = Utils::RestHelper.new(api.logger)
+rest_helper = Utils::RestHelper.new(api.logger, 'Resource Admin API')
 
 Authentication::User.setup_default_users
 Authentication::Group.setup_default_groups
@@ -84,40 +86,17 @@ configure do
   end
 end # end configure
 
+before do
+  rest_helper.headers = headers
+end
+
 enable :sessions, :logging
 
 set :session_secret, 'arm-l&bjq&7em+r)4a%#$3zzig0*=_#gnm57))*1*010_m(kn-u#$e'
 
 use Rack::CommonLogger, api.logger
 
-use Rack::Auth::Basic, 'Armagh Resource Admin' do |username, password|
-  api.authenticate_and_authorize username, password
-end # use Rack::Auth::Basic
-
 helpers do
-end
-
-
-helpers do
-  def route_after_success(format, message, html_redirect_to, helper)
-    case format
-      when 'json'
-        helper.respond_success(message)
-      when 'html'
-        session['message'] = message
-        redirect to(html_redirect_to)
-    end
-  end
-
-  def route_after_error(format, error, html_redirect_to, helper)
-    case format
-      when 'json'
-        helper.respond_exception(error, 'ERROR')
-      when 'html'
-        session['message'] = error.message
-        redirect to(html_redirect_to)
-    end
-  end
 end
 
 #------------------------------------------------------------------------------------------------
@@ -126,32 +105,8 @@ end
 #
 #------------------------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------------------------
-#
-# GET /noop
-#
-#------------------------------------------------------------------------------------------------
-get '/noop.?:format?' do
-  begin
-    message = session.delete 'message'
-
-    case params['format']
-      when 'json'
-        return [200, {result: 'way to go!'}.to_json]
-      when 'html'
-        erb '/views-subdir/page.html'.to_sym #.erb
-    end
-  rescue => e
-    rest_helper.respond_exception(e, 'Noop Failure')
-  end
-end
-
-post '/noop.?:format?' do
-  obj_params = params['form_object']
-  begin
-    do_something(obj_params)
-    route_after_success(params['format'], 'You did something right!', '/noop', rest_helper)
-  rescue => e
-    route_after_error(params['format'], e, '/some/url', rest_helper)
+get '/' do
+  rest_helper.handle_request(request) do |_fields, _remote_user|
+    'Armagh Application Admin API'
   end
 end

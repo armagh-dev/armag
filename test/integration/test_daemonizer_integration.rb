@@ -17,7 +17,7 @@
 
 require_relative '../helpers/coverage_helper'
 
-require_relative '../../lib/utils/daemonizer'
+require_relative '../../lib/armagh/utils/daemonizer'
 
 require 'test/unit'
 require 'mocha/test_unit'

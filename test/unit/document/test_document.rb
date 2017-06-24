@@ -16,7 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../../../lib/document/document'
+require_relative '../../../lib/armagh/document/document'
 
 require 'armagh/documents/doc_state'
 
@@ -720,6 +720,19 @@ class TestDocument < Test::Unit::TestCase
     Armagh::Document.expects(:db_replace).with({:_id => 'internal_id'}, has_entries(expected_values), failures)
 
     @doc.add_dev_error('test_action', 'Failure Details')
+    @doc.save
+  end
+
+  def test_abort_save
+    Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
+    @doc.mark_abort
+    @doc.save
+  end
+
+  def test_abort_save_published
+    @documents.expects(:replace_one)
+    @doc.state = Armagh::Documents::DocState::PUBLISHED
+    @doc.mark_abort
     @doc.save
   end
 

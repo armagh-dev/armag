@@ -1074,3 +1074,74 @@ Feature: Actions Execution
       | ops_errors      | {'test_collect_too_large_raw' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
     And the logs should contain "Test Collect Too Large Raw Running"
     And the logs should contain "ERROR"
+
+  Scenario: Have a document for a splitter that aborts
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "split_abort"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "SplitDocument" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    Then I should see 0 "SplitDocument" documents in the "documents" collection
+    Then I should see 0 "SplitDocument2" documents in the "documents" collection
+    And the logs should not contain "SHOULD NOT LOG"
+    And the logs should not contain "ERROR"
+    And the logs should contain "aborted"
+
+  Scenario: Have a document for a publisher that aborts
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "publish_abort"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123_trigger", content "{'doesnt_matter' => true}", metadata "{}"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    Then I should see 0 "PublishDocument" documents in the "documents" collection
+    And I should see 0 "PublishDocument" documents in the "documents.PublishDocument" collection
+    And the logs should not contain "SHOULD NOT LOG"
+    And the logs should not contain "ERROR"
+    And the logs should contain "aborted"
+
+  Scenario: Have a document for a consumer that aborts
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "consume_abort"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    When I insert 1 "ConsumeDocument" with a "published" state, document_id "123", content "{'text' => 'incoming content'}", metadata "{'meta' => 'incoming meta'}"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    Then I should see 0 "ConsumeDocument" documents in the "documents" collection
+    And I should see 1 "ConsumeDocument" documents in the "documents.ConsumeDocument" collection
+    And I should see a "ConsumeDocument" in "documents.ConsumeDocument" with the following
+      | metadata | {'meta' => 'incoming meta'} |
+    And the logs should not contain "SHOULD NOT LOG"
+    And the logs should not contain "ERROR"
+    And the logs should contain "aborted"

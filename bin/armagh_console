@@ -21,6 +21,8 @@
 #            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
 #            as part of the requirement as well as in the gemspec.
 
+require 'bundler/setup'
+
 require 'irb'
 
 require_relative '../lib/armagh'

@@ -5,7 +5,7 @@
 #
 
 require 'bundler/setup'
-require_relative '../lib/utils/daemonizer'
+require_relative '../lib/armagh/utils/daemonizer'
 
 file = File.join(__dir__, 'armagh-application-admin-gui')
 Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-application-admin-gui', work_dir: '/var/log/armagh')

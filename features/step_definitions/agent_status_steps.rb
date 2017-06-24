@@ -16,7 +16,7 @@
 #
 
 require_relative '../../test/helpers/mongo_support'
-require_relative '../../lib/version'
+require_relative '../../lib/armagh/version'
 
 require 'test/unit/assertions'
 
@@ -25,36 +25,27 @@ Then(/^I should see an agent with a status of "([^"]*)" within (\d+) seconds*$/)
   found_status = false
 
   until (Time.now > end_time) || found_status
-    db_status = MongoSupport.instance.get_status
-    if db_status
-      agent_status = db_status['agents']
-      found_status = agent_status.collect{|_a,s| s['status']}.include? status if agent_status
-    end
-    sleep 0.25
+    statuses = MongoSupport.instance.get_agent_statuses.collect{|s| s['status']}
+    found_status = statuses.include? status
+    sleep 0.1
   end
 
   assert_true(found_status, "No agents were seen with a status of #{status}")
 end
 
 Then(/^I wait until there are agents with the statuses$/) do |table|
-  end_time = Time.now + 15 # time limit (seconds)
+  end_time = Time.now + 65 # time limit (seconds)
   matched_statuses = false
 
-  expected_agent_statuses = table.raw.flatten.sort
-  expected_agent_statuses = expected_agent_statuses.delete_if {|e| e == 'nil'}.sort
+  expected_agent_statuses = table.raw.flatten
+  expected_agent_statuses = expected_agent_statuses.delete_if {|e| e == 'nil'}
+  expected_agent_statuses.sort!
 
   until (Time.now > end_time) || matched_statuses
-    status = MongoSupport.instance.get_status
+    seen_statuses = MongoSupport.instance.get_agent_statuses.collect{|s| s['status']}
+    seen_statuses.sort!
+    matched_statuses = seen_statuses == expected_agent_statuses
 
-    if status
-      agents = status['agents']
-      seen_statuses = []
-      agents.each do |_id, details|
-        seen_statuses << details['status']
-      end
-      seen_statuses.sort!
-      matched_statuses = seen_statuses == expected_agent_statuses
-    end
     sleep 0.1
   end
 
@@ -67,15 +58,14 @@ Then(/^the valid reported status should contain agents with statuses$/) do |tabl
 
   expected_agent_statuses = table.raw.flatten.sort
   expected_agent_statuses = expected_agent_statuses.delete_if {|e| e == 'nil'}
-  status = MongoSupport.instance.get_status
+  agent_statuses = MongoSupport.instance.get_agent_statuses
 
-  agents = status['agents']
-  assert_equal(expected_agent_statuses.length, agents.length, 'Incorrect number of agents')
+  assert_equal(expected_agent_statuses.length, agent_statuses.length, 'Incorrect number of agents')
 
   seen_statuses = []
-  agents.each do |id, details|
-    assert_not_empty(id)
-    assert_in_delta(start_time, details['last_update'], 10, 'Incorrect agent last_update time')
+  agent_statuses.each do |details|
+    assert_not_empty(details['_id'])
+    assert_in_delta(start_time, details['last_updated'], 10, 'Incorrect agent last_updated time')
 
     agent_status = details['status']
 
@@ -93,8 +83,5 @@ Then(/^the valid reported status should contain agents with statuses$/) do |tabl
   seen_statuses.sort!
 
   assert_equal(expected_agent_statuses, seen_statuses, 'Incorrect agent statuses')
-  assert_in_delta(start_time, status['last_update'], 5, 'Incorrect last_update')
-
-  assert_equal(Armagh::VERSION, status['versions']['armagh'], 'Invalid version')
 end
 

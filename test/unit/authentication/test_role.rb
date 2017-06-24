@@ -17,7 +17,7 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/authentication/role'
+require_relative '../../../lib/armagh/authentication/role'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -44,6 +44,28 @@ class TestRole < Test::Unit::TestCase
     assert_true published.published_collection_role?
   end
 
+  def test_published_collection_role
+    published_collection = mock
+    published_collection.expects(:name).returns('documents.SomeTypeCollection')
+    role = Armagh::Authentication::Role.published_collection_role published_collection
+    assert_kind_of Armagh::Authentication::Role, role
+    assert_true role.published_collection_role?
+  end
+
+  def test_find_from_published_collection
+    doctype = 'SomeDocType'
+    doc_collection = mock
+    doc_collection.expects(:name).returns("documents.#{doctype}")
+
+    Armagh::Connection.expects(:all_published_collections).returns([])
+
+    assert_nil Armagh::Authentication::Role.find_from_published_doctype(doctype)
+
+    Armagh::Connection.expects(:all_published_collections).returns([doc_collection])
+    role = Armagh::Authentication::Role.find_from_published_doctype(doctype)
+    assert_equal(Armagh::Authentication::Role.key_from_published_doctype(doctype),role.key)
+  end
+
   def test_find
     Armagh::Connection.stubs(:all_published_collections).returns([])
     assert_nil Armagh::Authentication::Role.find('invalid')
@@ -56,6 +78,17 @@ class TestRole < Test::Unit::TestCase
 
     assert_true Armagh::Authentication::Role::APPLICATION_ADMIN.eql?(Armagh::Authentication::Role::APPLICATION_ADMIN)
     assert_false Armagh::Authentication::Role::APPLICATION_ADMIN.eql?(Armagh::Authentication::Role::RESOURCE_ADMIN)
+  end
+
+  def test_to_json
+    role = Armagh::Authentication::Role::APPLICATION_ADMIN
+    expected = {
+        'name' => role.name,
+        'description' => role.description,
+        'key' => role.key,
+        'published_collection_role' => role.published_collection_role?
+    }.to_json
+    assert_equal(expected, Armagh::Authentication::Role::APPLICATION_ADMIN.to_json)
   end
 
 end

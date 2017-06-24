@@ -19,10 +19,10 @@ require_relative '../../helpers/coverage_helper'
 require 'test/unit'
 require 'mocha/test_unit'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/actions/gem_manager'
+require_relative '../../../lib/armagh/actions/gem_manager'
 
 class TestGemManager < Test::Unit::TestCase
   

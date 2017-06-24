@@ -6,9 +6,9 @@
 
 require 'bundler/setup'
 
-require_relative '../lib/environment'
+require_relative '../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../lib/utils/daemonizer'
+require_relative '../lib/armagh/utils/daemonizer'
 
 Armagh::Utils::Daemonizer.run("/bin/mongod -f #{ ENV['ARMAGH_CONFIG'] }/mongo/mongod-first.conf", app_name: 'armagh-mongod', work_dir: '/var/log/armagh')

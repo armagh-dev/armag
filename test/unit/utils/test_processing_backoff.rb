@@ -17,11 +17,11 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../../helpers/mock_logger'
-require_relative '../../../lib/utils/processing_backoff'
+require_relative '../../../lib/armagh/utils/processing_backoff'
 require 'test/unit'
 
 class TestProcessingBackoff < Test::Unit::TestCase

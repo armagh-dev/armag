@@ -19,13 +19,13 @@ require_relative '../helpers/coverage_helper'
 require_relative '../helpers/integration_helper'
 require_relative '../helpers/bson_support'
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 
-require_relative '../../lib/authentication'
-require_relative '../../lib/connection'
+require_relative '../../lib/armagh/authentication'
+require_relative '../../lib/armagh/connection'
 
 require 'test/unit'
 
@@ -120,7 +120,7 @@ class TestAuthentication < Test::Unit::TestCase
     user2.add_role doctype_role
 
     group1.add_role Armagh::Authentication::Role::USER_ADMIN
-    group2.add_role Armagh::Authentication::Role::USER_MANAGER
+    group2.add_role Armagh::Authentication::Role::USER
 
     user1.save
     user2.save
@@ -136,7 +136,6 @@ class TestAuthentication < Test::Unit::TestCase
 
     # User1 through Groups
     assert_true user1.has_role? Armagh::Authentication::Role::USER_ADMIN
-    assert_true user1.has_role? Armagh::Authentication::Role::USER_MANAGER
 
     # User1 no
     assert_false user1.has_role? Armagh::Authentication::Role::APPLICATION_ADMIN
@@ -145,11 +144,8 @@ class TestAuthentication < Test::Unit::TestCase
     assert_true user2.has_role? Armagh::Authentication::Role::APPLICATION_ADMIN
     assert_true user2.has_role? doctype_role
 
-    # User2 indirect
-    assert_false user2.has_role? Armagh::Authentication::Role::USER
-
     # User2 through groups
-    assert_true user2.has_role? Armagh::Authentication::Role::USER_MANAGER
+    assert_true user2.has_role? Armagh::Authentication::Role::USER
 
     # User2 no
     assert_false user2.has_role? Armagh::Authentication::Role::RESOURCE_ADMIN

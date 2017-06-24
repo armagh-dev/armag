@@ -18,15 +18,13 @@
 require_relative '../helpers/coverage_helper'
 require_relative '../helpers/integration_helper'
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 require_relative '../helpers/mock_logger'
 
-require_relative '../../lib/utils/collection_trigger'
-require_relative '../../lib/ipc'
-require_relative '../../lib/agent/agent_status'
+require_relative '../../lib/armagh/utils/collection_trigger'
 
 require 'armagh/actions'
 

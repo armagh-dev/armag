@@ -18,11 +18,11 @@
 require_relative '../helpers/coverage_helper'
 require_relative '../helpers/integration_helper'
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
-require_relative '../../lib/connection'
+require_relative '../../lib/armagh/connection'
 
 require 'mocha/test_unit'
 

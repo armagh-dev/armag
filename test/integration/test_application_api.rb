@@ -20,14 +20,14 @@ require_relative '../helpers/coverage_helper'
 require_relative '../helpers/integration_helper'
 require_relative '../helpers/workflow_generator_helper'
 
-require_relative '../../lib/environment'
+require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 
-require_relative '../../lib/connection'
-require_relative '../../lib/launcher/launcher'
-require_relative '../../lib/admin/application/api'
+require_relative '../../lib/armagh/connection'
+require_relative '../../lib/armagh/launcher/launcher'
+require_relative '../../lib/armagh/admin/application/api'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -97,10 +97,34 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         .returns( response  )
   end
 
+  def fake_agent_status
+    {
+        '_id'           => 'agent-123',
+        'hostname'      => 'host.example.com',
+        'task'          => { 'document' => '123', 'action' => '456' },
+        'running_since' => 'a time',
+        'idle_since'    => 'a time',
+        'last_updated'   => 'a time',
+        'status'        => 'peachy',
+    }
+  end
+
+  def fake_launcher_status
+    {
+        '_id'          => 'host.example.com',
+        'versions'     => { 'thing' => 1 },
+        'last_updated'  => 'a time',
+        'status'       => 'peachy',
+    }
+  end
+
   def setup
     MongoSupport.instance.clean_database
     MongoSupport.instance.clean_replica_set
     Connection.setup_indexes
+
+    Armagh::Authentication::User.setup_default_users
+    Armagh::Authentication::Group.setup_default_groups
 
     @alice_workflow_config_values = {'workflow'=>{'name'=>'alice'}}
     @alice_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_divide( 'alice' )
@@ -110,29 +134,107 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @logger.stubs(:any)
     @logger.stubs(:debug)
     @api = Armagh::Admin::Application::API.instance
+    @test_username = 'superadmin_user'
+    @test_password = 'superadmin_password'
 
-    authorize 'any', 'secret'
+    @test_user = Authentication::User.create(username: @test_username,
+                                             password: @test_password,
+                                             name: 'Super Admin',
+                                             email: 'superadmin@example.com')
+
+    @test_user.join_group(Authentication::Group.find_name('super_administrators'))
+    @test_user.save
+
+    authorize @test_username, @test_password
   end
 
-  def test_get_status
-    launcher_fake_status = {
-        '_id'          => 'host.example.com',
-        'versions'     => { 'thing' => 1 },
-        'last_update'  => 'a time',
-        'status'       => 'peachy',
-        'agents'       => [ 'we are all cool' ]
-    }
+  def user_with_role(role)
+    role_key = role ? role.key : ''
+    user = Authentication::User.create(username: "user_#{role_key}",
+                                       password: "password_#{role_key}",
+                                       name: 'test user',
+                                       email: 'user@example.com')
+    user.add_role(role) if role
+    user.save
+    user
+  end
 
-    get '/status.json' do
+  def users_with_all_roles
+    users = {}
+    Authentication::Role.all.each do |role|
+      users[role] = user_with_role(role)
+    end
+    users[nil] = user_with_role(nil)
+    users
+  end
+
+  def test_get_agent_status
+    get '/agent_status.json' do
       assert last_response.ok?
       assert_empty JSON.parse(last_response.body)
     end
 
-    Armagh::Connection.status.insert_one( launcher_fake_status )
+    Armagh::Connection.agent_status.insert_one( fake_agent_status )
 
-    get '/status.json' do
+    get '/agent_status.json' do
       assert last_response.ok?
-      assert_equal [launcher_fake_status], JSON.parse(last_response.body)
+      assert_equal [fake_agent_status], JSON.parse(last_response.body)
+    end
+  end
+
+  def test_get_launcher_status
+    get '/launcher_status.json' do
+      assert last_response.ok?
+      assert_empty JSON.parse(last_response.body)
+    end
+
+    Armagh::Connection.launcher_status.insert_one( fake_launcher_status )
+
+    get '/launcher_status.json' do
+      assert last_response.ok?
+      assert_equal [fake_launcher_status], JSON.parse(last_response.body)
+    end
+  end
+
+  def test_get_status
+    get '/status.json'do
+      assert last_response.ok?
+      assert_empty JSON.parse(last_response.body)
+    end
+
+    Armagh::Connection.launcher_status.insert_one( fake_launcher_status )
+    Armagh::Connection.agent_status.insert_one( fake_agent_status )
+
+    expected = fake_launcher_status
+    expected['agents'] = [fake_agent_status]
+
+    get '/status.json'do
+      assert last_response.ok?
+      assert_equal [expected],  JSON.parse(last_response.body)
+    end
+  end
+
+  def test_get_agent_status_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_agent_status).raises(e)
+
+    get '/agent_status.json' do
+      assert last_response.server_error?
+      server_error_detail = JSON.parse(last_response.body)[ 'server_error_detail']
+      assert_equal e.class.to_s, server_error_detail[ 'class' ]
+      assert_equal e.message, server_error_detail['message']
+    end
+  end
+
+  def test_get_launcher_status_error
+    e = RuntimeError.new('Bad')
+    @api.expects(:get_launcher_status).raises(e)
+
+    get '/launcher_status.json' do
+      assert last_response.server_error?
+      server_error_detail = JSON.parse(last_response.body)[ 'server_error_detail']
+      assert_equal e.class.to_s, server_error_detail[ 'class' ]
+      assert_equal e.message, server_error_detail['message']
     end
   end
 
@@ -927,11 +1029,13 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_documents
     type = 'TestType'
+    @api.expects(:user_has_document_role)
     get '/documents.json', {type: type} do
       assert last_response.ok?
       assert_empty JSON.parse(last_response.body)
     end
 
+    @api.unstub(:user_has_document_role)
     doc = Armagh::Document.create(type: type, content: { 'text' => 'bogusness' }, raw: 'raw', metadata: {},
                                   pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED, document_id: 'test-id',
                                   collection_task_ids: [ '123' ], document_timestamp: Time.now, title: 'Test Document' )
@@ -949,6 +1053,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_documents_error
     e = RuntimeError.new('Bad')
 
+    @api.expects(:user_has_document_role)
     @api.expects(:get_documents).raises(e)
     get '/documents.json', {type: 'type'} do
       assert last_response.server_error?
@@ -989,6 +1094,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_document_error
     e = RuntimeError.new('Bad')
 
+    @api.expects(:user_has_document_role)
     @api.expects(:get_document).raises(e)
     get '/document.json', {type: 'type', id: 'id'} do
       assert last_response.server_error?
@@ -1097,17 +1203,18 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_users
+    initial_user_length = Armagh::Authentication::User.find_all.length
     Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
     get '/users.json' do
       assert last_response.ok?
       response = JSON.parse(last_response.body)
-      assert_equal 1, response.length
-      result = response.first
-      assert_kind_of(String, result['_id'])
+      assert_equal initial_user_length + 1, response.length
+      result = response.last
+      assert_kind_of(String, result['id'])
       assert_equal('testuser',result['username'])
       assert_equal('Test User',result['name'])
       assert_equal('test@user.com',result['email'])
-      assert_equal(Armagh::Authentication::User.find_all.first.to_json, result.to_json)
+      assert_equal(Armagh::Authentication::User.find_all.last.to_json, result.to_json)
     end
   end
 
@@ -1127,7 +1234,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert_equal('Test User', response['name'])
       assert_equal('user@users.com', response['email'])
       assert_equal('testuser', response['username'])
-      user_id = response['_id']
+      user_id = response['id']
       assert_not_nil user_id
     end
 
@@ -1349,15 +1456,16 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_groups
+    initial_group_length = Armagh::Authentication::Group.find_all.length
     Armagh::Authentication::Group.create(name: 'testgroup', description: 'Test Group')
     get '/groups.json' do
       assert last_response.ok?
       response = JSON.parse(last_response.body)
-      assert_equal 1, response.length
-      result = response.first
+      assert_equal initial_group_length + 1, response.length
+      result = response.last
       assert_equal('testgroup',result['name'])
       assert_equal('Test Group', result['description'])
-      assert_equal(Armagh::Authentication::Group.find_all.first.to_json, result.to_json)
+      assert_equal(Armagh::Authentication::Group.find_all.last.to_json, result.to_json)
     end
   end
 
@@ -1374,7 +1482,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       assert last_response.ok?, response.to_s
       assert_equal('testgroup', response['name'])
       assert_equal('Test Group', response['description'])
-      group_id = response['_id']
+      group_id = response['id']
       assert_not_nil group_id
     end
 
@@ -1452,7 +1560,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       group =  response.first
-      assert_equal 'testgroup', group['name']
+      assert_include response.collect{|g|g['name']}, 'testgroup'
     end
 
     # delete
@@ -1528,14 +1636,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       assert_empty(response['users'])
-      groupid = response['_id']
+      groupid = response['id']
     end
 
     post '/user/create.json', user.to_json do
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       assert_empty(response['groups'])
-      userid = response['_id']
+      userid = response['id']
     end
 
     get("/user/#{userid}/join_group.json", {'group_id' => groupid}) {
@@ -1595,14 +1703,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       assert_empty(response['users'])
-      groupid = response['_id']
+      groupid = response['id']
     end
 
     post '/user/create.json', user.to_json do
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       assert_empty(response['groups'])
-      userid = response['_id']
+      userid = response['id']
     end
 
     get "/group/#{groupid}/add_user.json", {'user_id' => userid} do
@@ -1653,6 +1761,128 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       end
 
       assert_equal(expected, response)
+    end
+  end
+
+  def test_authenticate
+    get '/authenticate.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_true response
+    end
+
+    authorize @test_username, 'invalid password'
+    get '/authenticate.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal("Authentication failed for #{@test_username}.", response.dig('authentication_error_detail', 'message'))
+    end
+
+    authorize 'invalid_user', @test_password
+    get '/authenticate.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal('Authentication failed for invalid_user.', response.dig('authentication_error_detail', 'message'))
+    end
+  end
+
+  def test_role_permissions
+    users = users_with_all_roles
+    endpoints = {
+        lambda{get('/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post('/launcher.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post('/agent.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflows.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post('/workflow/:workflow_name/new.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/workflow/:workflow_name/run.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/workflow/:workflow_name/finish.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/workflow/:workflow_name/stop.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/actions/defined.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/actions/trigger_collect.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/actions.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/action/:action_name/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/action/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/action/:action_name/description.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/workflow/:workflow_name/action/:action_name/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post('/workflow/:workflow_name/action/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{put('/workflow/:workflow_name/action/:action_name/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/test/:type/callbacks.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/test/invoke_callback.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/documents.json', {type: 'type'}){}} => Authentication::Role::USER,
+        lambda{get('/document.json', {type: 'type', id: '123'}){}} => Authentication::Role::USER,
+        lambda{get('/documents/failures.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/version.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/users.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{put('/user/:user_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{post('/user/create.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/join_group.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/leave_group.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/add_role.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/remove_role.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{delete('/user/:user_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/reset_password.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/lock.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/unlock.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/enable.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/user/:user_id/disable.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/groups.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/group/:group_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{put('/group/:group_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/group/:group_id/add_user.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/group/:group_id/remove_user.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{post('/group/create.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/group/:group_id/add_role.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/group/:group_id/remove_role.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{delete('/group/:group_id.json'){}} => Authentication::Role::USER_ADMIN,
+        lambda{get('/roles.json'){}} => Authentication::Role::USER_ADMIN
+    }
+
+    endpoints.each do |lam, role|
+      users.each do |user_role, user|
+        username = user.username
+        password = user.username.sub('user', 'password')
+        authorize username, password
+
+        file, line = lam.source_location
+        lam_src = File.readlines(file)[line-1].strip
+
+        if role == user_role
+          lam.call
+          response = JSON.parse(last_response.body)
+          if response.is_a? Hash
+            assert_false response.key?('authentication_error_detail'), "An unexpected authentication error was returned for #{username} from #{lam_src}"
+          end
+        else
+          lam.call
+          response = JSON.parse(last_response.body)
+          assert_true response.key?('authentication_error_detail'), "No authentication error was returned for #{username} from #{lam_src}"
+        end
+      end
+    end
+  end
+
+  def test_user_permissions
+    user1 = Authentication::User.create(username: 'user1',
+                                       password: 'password_1',
+                                       name: 'test user',
+                                       email: 'user@example.com')
+
+    user2 = Authentication::User.create(username: 'user2',
+                                       password: 'password_2',
+                                       name: 'test user',
+                                       email: 'user@example.com')
+
+    authorize 'user1', 'password_1'
+    get("/user/#{user1.internal_id}.json") do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, "User 1 cannot get their own details: #{response}"
+    end
+
+    get("/user/#{user2.internal_id}.json") do
+      response = JSON.parse(last_response.body)
+      assert_true response.key?('authentication_error_detail'), "User 1 can get User 2 details: #{response}"
     end
   end
 end

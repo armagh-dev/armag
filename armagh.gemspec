@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 
-require_relative 'lib/version'
+require_relative 'lib/armagh/version'
 
 def self.get_build_version(version)
   if ENV['ARMAGH_PRODUCTION_RELEASE']

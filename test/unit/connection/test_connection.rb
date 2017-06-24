@@ -17,10 +17,10 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/connection'
+require_relative '../../../lib/armagh/connection'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -121,9 +121,14 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.users
   end
 
-  def test_status
-    @connection.expects(:[]).with('status')
-    Armagh::Connection.status
+  def test_agent_status
+    @connection.expects(:[]).with('agent_status')
+    Armagh::Connection.agent_status
+  end
+
+  def test_launcher_status
+    @connection.expects(:[]).with('launcher_status')
+    Armagh::Connection.launcher_status
   end
 
   def test_log
@@ -208,20 +213,26 @@ class TestConnection < Test::Unit::TestCase
     users_indexes = mock
     groups_indexes = mock
     doc_indexes = mock
+    agent_status_indexes = mock
+
     config = stub(indexes: config_indexes)
     action_state = stub(indexes: action_state_indexes)
     users = stub(indexes: users_indexes)
     groups = stub(indexes: groups_indexes)
+    agent_status = stub(indexes: agent_status_indexes)
+
     @connection.stubs(:[]).with('config').returns(config)
     @connection.stubs(:[]).with('action_state').returns(action_state)
     @connection.stubs(:[]).with('users').returns(users)
     @connection.stubs(:[]).with('groups').returns(groups)
+    @connection.stubs(:[]).with('agent_status').returns(agent_status)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
     action_state_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
-    users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'username'})
+    users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'usernames'})
     groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
+    agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames', :sparse => true})
     doc_indexes.expects(:create_one).twice
 
     Armagh::Connection.setup_indexes

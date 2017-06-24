@@ -17,10 +17,10 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/environment'
+require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../../lib/logging/enhanced_exception'
+require_relative '../../../lib/armagh/logging/enhanced_exception'
 
 require 'test/unit'
 

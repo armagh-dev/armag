@@ -16,7 +16,7 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/utils/password'
+require_relative '../../../lib/armagh/utils/password'
 
 require 'test/unit'
 

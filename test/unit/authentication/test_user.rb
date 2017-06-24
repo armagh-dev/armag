@@ -17,8 +17,10 @@
 
 require_relative '../../helpers/coverage_helper'
 require_relative '../../helpers/bson_support'
-require_relative '../../../lib/connection'
-require_relative '../../../lib/authentication/user'
+require_relative '../../../lib/armagh/connection'
+require_relative '../../../lib/armagh/authentication/user'
+require_relative '../../../lib/armagh/connection'
+require_relative '../../../lib/armagh/authentication'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -212,64 +214,44 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_class_authenticate_bad_password
-    user = mock('user')
-    user.expects(:authenticate).with('testpassword').returns(false)
-    Armagh::Authentication::User.expects(:find_username).returns(user)
-    result = Armagh::Authentication::User.authenticate('testuser', 'testpassword')
-    assert_nil result
-  end
-
-  def test_class_authenticate_bad_password_lockout
     user = Armagh::Authentication::User.send(:new)
     user.stubs(:save)
-    e = Armagh::Authentication::User::AccountError.new('Account Locked')
+    e = Armagh::Authentication::AuthenticationError.new('Account Locked')
     Armagh::Authentication::User.stubs(:find_username).returns(user)
     Armagh::Authentication::User::MAX_TRIES.times do
-      Armagh::Authentication::User.authenticate('testuser', 'testpassword')
+      assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
+        Armagh::Authentication::User.authenticate('testuser', 'testpassword')
+      }
     end
 
     assert_raise(e){Armagh::Authentication::User.authenticate('testuser', 'testpassword')}
   end
 
   def test_class_authenticate_bad_username
-    Armagh::Authentication::User.unstub(:find_username)
-    Armagh::Authentication::User.expects(:find_username).returns(nil)
-    @dummy_user.expects(:unlock)
-    @dummy_user.expects(:enable)
-    @dummy_user.expects(:authenticate).with('testpassword').returns(true)
-    result = Armagh::Authentication::User.authenticate('testuser', 'testpassword')
-    assert_nil result
-  end
-
-  def test_class_authentcate_bad_username_lockout
     Armagh::Authentication::User.stubs(:find_username).returns(nil)
     @dummy_user.stubs(:unlock)
     @dummy_user.stubs(:enable)
     @dummy_user.stubs(:authenticate).with('testpassword').returns(true)
     @dummy_user.expects(:lock)
 
-    Armagh::Authentication::User::MAX_TRIES.times do
-      Armagh::Authentication::User.authenticate('testuser', 'testpassword')
+    (Armagh::Authentication::User::MAX_TRIES).times do
+      assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
+        Armagh::Authentication::User.authenticate('testuser', 'testpassword')
+      }
     end
 
     assert_equal({'testuser' => 3}, @dummy_user.db_doc['attempted_usernames'])
   end
 
   def test_class_authenticate_dummy_username
-    @dummy_user.expects(:authenticate).returns(true) # lets even pretend it's a valid password
-    @dummy_user.expects(:unlock)
-    @dummy_user.expects(:enable)
-    result = Armagh::Authentication::User.authenticate(Armagh::Authentication::User::DUMMY_USERNAME, 'testpassword')
-    assert_nil result
-  end
-
-  def test_class_authenticate_dummy_username_lockout
     @dummy_user.stubs(:authenticate).returns(true) # lets even pretend it's a valid password
     @dummy_user.stubs(:unlock)
     @dummy_user.stubs(:enable)
     @dummy_user.expects(:lock)
     Armagh::Authentication::User::MAX_TRIES.times do
-      Armagh::Authentication::User.authenticate(Armagh::Authentication::User::DUMMY_USERNAME, 'testpassword')
+      assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for __dummy_user__.')) {
+        Armagh::Authentication::User.authenticate(Armagh::Authentication::User::DUMMY_USERNAME, 'testpassword')
+      }
     end
 
     assert_equal({Armagh::Authentication::User::DUMMY_USERNAME => 3}, @dummy_user.db_doc['attempted_usernames'])
@@ -323,7 +305,7 @@ class TestUser < Test::Unit::TestCase
     user.lock
     assert_true user.locked?
 
-    e = Armagh::Authentication::User::AccountError.new('Account Locked')
+    e = Armagh::Authentication::AuthenticationError.new('Account Locked')
     assert_raise(e){user.authenticate('testpassword')}
 
     user.unlock
@@ -337,7 +319,7 @@ class TestUser < Test::Unit::TestCase
     user.disable
     assert_true user.disabled?
 
-    e = Armagh::Authentication::User::AccountError.new('Account Disabled')
+    e = Armagh::Authentication::AuthenticationError.new('Account Disabled')
     assert_raise(e){user.authenticate('testpassword')}
 
     user.enable
@@ -534,6 +516,11 @@ class TestUser < Test::Unit::TestCase
     user.leave_group group3
 
     assert_raise(Armagh::Authentication::User::GroupError.new("User 'testuser' is not a member of 'group_3'.")){user.leave_group group3}
+
+    user.join_group group1
+
+    Armagh::Authentication::Group.expects(:find_all).with(%w(id1 id2))
+    user.groups
   end
 
   def test_roles
@@ -578,15 +565,15 @@ class TestUser < Test::Unit::TestCase
     Armagh::Authentication::Group.any_instance.stubs(:save)
     group = Armagh::Authentication::Group.create(name: 'group_1', description: 'test group')
 
-    group.stubs(:roles).returns [Armagh::Authentication::Role::USER_MANAGER]
+    group.stubs(:roles).returns [Armagh::Authentication::Role::USER_ADMIN]
 
     user.stubs(:groups).returns([group])
 
     group.expects(:add_user).with(user, reciprocate: false)
     user.join_group group
 
-    assert_true user.has_role? Armagh::Authentication::Role::USER_MANAGER
-    assert_false user.has_role? Armagh::Authentication::Role::USER_ADMIN
+    assert_true user.has_role? Armagh::Authentication::Role::USER_ADMIN
+    assert_false user.has_role? Armagh::Authentication::Role::APPLICATION_ADMIN
   end
 
   def test_permanent
@@ -628,6 +615,8 @@ class TestUser < Test::Unit::TestCase
     hash['disabled'] = false
     hash['locked'] = false
     hash['permanent'] = false
+    hash['id'] = hash['_id']
+    hash.delete('_id')
     hash.delete('hashed_password')
     assert_equal(hash.to_json, user1.to_json)
   end
