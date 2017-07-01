@@ -17,6 +17,7 @@
 
 require 'set'
 
+require_relative 'configuration/file_based_configuration'
 require_relative 'connection/db_doc'
 require_relative 'connection/mongo_error_handler'
 require_relative 'connection/mongo_connection'
@@ -141,6 +142,19 @@ module Armagh
       @can_connect_message
     end
 
+    def self.require_connection(logger = nil)
+      unless Connection.can_connect?
+        Logging.disable_mongo_log
+        msg = "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  #{Connection.can_connect_message}"
+        if logger
+          logger.error msg
+        else
+          $stderr.puts msg
+        end
+        exit 1
+      end
+    end
+
     def self.clear_indexed_doc_collections
       @indexed_doc_collections.clear if @indexed_doc_collections
     end
@@ -150,7 +164,7 @@ module Armagh
       action_state.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       users.indexes.create_one({'username' => 1}, unique: true, name: 'usernames')
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
-      agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames', sparse: true)
+      agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames')
 
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e

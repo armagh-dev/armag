@@ -17,19 +17,15 @@
 
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/armagh/environment'
-Armagh::Environment.init
-
 require_relative '../../../lib/armagh/agent/agent'
 require_relative '../../../lib/armagh/document/document'
 require_relative '../../../lib/armagh/logging'
 require_relative '../../../lib/armagh/connection'
 
-require_relative '../../helpers/mock_logger'
+require_relative '../../helpers/armagh_test'
 
 require 'mocha/test_unit'
 require 'test/unit'
-require 'log4r'
 
 module Armagh
   module StandardActions
@@ -41,8 +37,7 @@ module Armagh
     end
     class PublishTest < Armagh::Actions::Publish; end
     class ConsumeTest < Armagh::Actions::Consume; end
-    class DividerTest < Armagh::Actions::Divide
-    end
+    class DividerTest < Armagh::Actions::Divide; end
     class UnknownAction < Armagh::Actions::Action; end
   end
 end
@@ -128,11 +123,11 @@ class TestAgent < Test::Unit::TestCase
         'agent' => {'log_level' => 'justbelowthesurface'}
       })
     }
-    assert_equal "Unable to create configuration Armagh::Agent bad: Log level must be one of all, debug, info, warn, dev_warn, ops_warn, error, dev_error, ops_error, fatal, any, off", e.message
+    assert_equal 'Unable to create configuration Armagh::Agent bad: Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any', e.message
   end
 
   def test_start_with_config
-    @logger.expects(:level=).with(Log4r::ERROR).at_least_once
+    Armagh::Logging.expects(:set_level).with(@logger, 'error').at_least_once
     agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
     Thread.new { agent.start }
@@ -1344,7 +1339,7 @@ class TestAgent < Test::Unit::TestCase
     message = 'test message'
     logger_name = 'test_logger'
     logger = mock('logger')
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     logger.expects(:debug).with(message)
     @default_agent.log_debug(logger_name, message)
   end
@@ -1352,7 +1347,7 @@ class TestAgent < Test::Unit::TestCase
   def test_log_debug_block
     logger_name = 'test_logger'
     logger = FakeBlockLogger.new
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger).yields(nil)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger).yields(nil)
     block_called = false
     @default_agent.log_debug(logger_name) { block_called = true }
     assert_true block_called
@@ -1363,7 +1358,7 @@ class TestAgent < Test::Unit::TestCase
     message = 'test message'
     logger_name = 'test_logger'
     logger = mock('logger')
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     logger.expects(:info).with(message)
     @default_agent.log_info(logger_name, message)
   end
@@ -1371,7 +1366,7 @@ class TestAgent < Test::Unit::TestCase
   def test_log_info_block
     logger_name = 'test_logger'
     logger = FakeBlockLogger.new
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger).yields(nil)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger).yields(nil)
     block_called = false
     @default_agent.log_info(logger_name) { block_called = true }
     assert_true block_called
@@ -1383,7 +1378,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     message = 'message'
     logger = mock
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_ops_error).with(action_name, message)
     logger.expects(:ops_error).with(message)
     @default_agent.notify_ops(logger_name, action_name, message)
@@ -1394,7 +1389,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     message = 'message'
     logger = mock
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_dev_error).with(action_name, message)
     logger.expects(:dev_error).with(message)
     @default_agent.notify_dev(logger_name, action_name, message)
@@ -1405,7 +1400,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     error = RuntimeError.new('error')
     logger = mock
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_ops_error).with(action_name, error)
     Armagh::Logging.expects(:ops_error_exception).with(logger, error, 'Notify Ops')
     @default_agent.notify_ops(logger_name, action_name, error)
@@ -1416,7 +1411,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = 'action'
     error = RuntimeError.new('error')
     logger = mock
-    Log4r::Logger.expects(:[]).with{|name| name.include? logger_name}.returns(logger)
+    Armagh::Logging.expects(:set_logger).with{|name| name.include? logger_name}.returns(logger)
     @current_doc_mock.expects(:add_dev_error).with(action_name, error)
     Armagh::Logging.expects(:dev_error_exception).with(logger, error, 'Notify Dev')
     @default_agent.notify_dev(logger_name, action_name, error)
@@ -1467,11 +1462,19 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_instantiate_divider
-    divider = mock
-    other = mock
-    divider.expects(:is_a?).with(Armagh::Actions::Divide).returns(true)
-    other.expects(:is_a?).with(Armagh::Actions::Divide).returns(false)
+    divider = mock('divider')
+    other = mock('other')
 
+    config = mock('config')
+    action_config = mock('action_config')
+    divider.stubs(:config).returns(config)
+    config.stubs(:action).returns(action_config)
+    action_config.stubs(:workflow).returns('workflow')
+    divider.stubs(:name).returns('name')
+    divider.stubs(:class).returns(Armagh::StandardActions::DividerTest)
+    divider.expects(:is_a?).with(Armagh::Actions::Divide).returns(true)
+    Armagh::Actions.stubs(:defined_actions).returns([divider.class])
+    other.expects(:is_a?).with(Armagh::Actions::Divide).returns(false)
 
     docspec = Armagh::Documents::DocSpec.new('something', Armagh::Documents::DocState::READY)
     @workflow_set.expects(:instantiate_actions_handling_docspec).with(docspec, @default_agent, @logger, @state_coll).returns([other, divider])

@@ -20,7 +20,7 @@ require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/mock_logger'
+require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/configuration/file_based_configuration.rb'
 require 'test/unit'
 require 'mocha/test_unit'

@@ -18,8 +18,6 @@
 require 'fileutils'
 require_relative '../../lib/armagh/logging'
 
-Armagh::Logging.init_log_env
-
 module LogSupport
 
   LOG_DIR = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh' unless defined? LOG_DIR

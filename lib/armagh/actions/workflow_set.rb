@@ -114,8 +114,7 @@ module Armagh
         raise( ActionInstantiationError, 'Attempt to instantiate nil action config' ) unless action_config
         raise( ActionInstantiationError, 'Action not active' ) unless action_config.action.active
         action_type = action_config.__type
-        action_name = action_config.__name
-        action_type.new( caller, "#{logger.fullname}::#{action_name}", action_config, state_collection )
+        action_type.new( caller, logger.name, action_config, state_collection )
       end
 
       def instantiate_action_named(action_name, caller, logger, state_collection)

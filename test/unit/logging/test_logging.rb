@@ -40,14 +40,16 @@ class TestLogging < Test::Unit::TestCase
   def teardown
     $stderr = @stderr
     FileUtils.rm_rf @dir
+    Armagh::Logging.clear_details
   end
 
   def has_mongo_outputter
-    Log4r::Logger.each_logger do |logger|
-      logger.outputters.each do |outputter|
-        return true if outputter.is_a? Log4r::MongoOutputter
+    Armagh::Logging.loggers.each do |logger|
+      logger.appenders.each do |a|
+        return true if a.is_a? Armagh::Logging::MongoAppender
       end
     end
+
     false
   end
 
@@ -118,25 +120,51 @@ class TestLogging < Test::Unit::TestCase
 
   def test_set_logger
     logger = Armagh::Logging.set_logger('test_logger')
-    assert_kind_of(Log4r::Logger, logger)
+    assert_kind_of(::Logging::Logger, logger)
     assert_same(logger, Armagh::Logging.set_logger('test_logger'))
     assert_not_same(logger, Armagh::Logging.set_logger('test_logger2'))
+  end
+
+  def test_set_and_clear_details
+    workflow = 'workflow_name'
+    action = 'action_name'
+    action_supertype = 'supertype_name'
+
+    assert_nil ::Logging.mdc['workflow']
+    assert_nil ::Logging.mdc['action']
+    assert_nil ::Logging.mdc['action_supertype']
+    assert_nil ::Logging.mdc['action_workflow']
+
+    Armagh::Logging.set_details(workflow, action, action_supertype)
+
+    assert_equal workflow, ::Logging.mdc['workflow']
+    assert_equal action, ::Logging.mdc['action']
+    assert_equal action_supertype, ::Logging.mdc['action_supertype']
+    assert_equal " [#{workflow}/#{action}]", ::Logging.mdc['action_workflow']
+
+    Armagh::Logging.clear_details
+
+    assert_nil ::Logging.mdc['workflow']
+    assert_nil ::Logging.mdc['action']
+    assert_nil ::Logging.mdc['action_supertype']
+    assert_nil ::Logging.mdc['action_workflow']
   end
 
   def test_default_log_level
     logger = mock
     logger.expects(:name).returns('test_logger')
-    logger.expects(:level).returns(2)
-    logger.expects(:levels).returns(%w(error warn info))
+    logger.expects(:level).returns(Armagh::Logging::WARN)
     Armagh::Logging.expects(:set_logger).returns(logger)
-    assert_equal('info', Armagh::Logging.default_log_level(logger))
+    assert_equal(Armagh::Logging::LEVELS[Armagh::Logging::WARN], Armagh::Logging.default_log_level(logger))
   end
 
   def test_set_level
     logger = Armagh::Logging.set_logger('test_logger')
-    assert_not_equal(2, logger.level)
-    Armagh::Logging.set_level(logger, 'info')
-    assert_equal(2, logger.level)
+    logger.clear_appenders
+    logger.additive = false
+    assert_not_equal(Armagh::Logging::INFO, logger.level)
+    Armagh::Logging.set_level(logger, 'INFO')
+    assert_equal(Armagh::Logging::INFO, logger.level)
   end
 
   def test_valid_log_levels

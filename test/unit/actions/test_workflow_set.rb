@@ -23,17 +23,17 @@ require_relative '../../helpers/workflow_generator_helper'
 require_relative '../../../lib/armagh/actions/workflow_set'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/document/document'
+require_relative '../../helpers/armagh_test'
+require_relative '../../helpers/armagh_test'
 
 require 'armagh/actions'
 
 class TestWorkflowSet < Test::Unit::TestCase
+  include ArmaghTest
 
   def setup
     @config_store = []
-    @logger = mock
-    @logger.stubs(:fullname).returns('fred')
-    @logger.expects(:debug).at_least(0)
-    @logger.expects(:any).at_least(0)
+    @logger = mock_logger
     @caller = mock
 
     @alice_workflow_config_values = {'workflow'=>{'name'=>'alice'}}

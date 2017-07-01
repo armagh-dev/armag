@@ -22,7 +22,6 @@ require 'bundler/setup'
 require 'sinatra'
 require 'thin'
 require 'json'
-require 'log4r'
 
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
@@ -45,10 +44,10 @@ Process.setproctitle(File.basename(__FILE__))
 
 include Armagh
 
-Connection.setup_indexes
-
 api = Admin::Resource::API.instance
 rest_helper = Utils::RestHelper.new(api.logger, 'Resource Admin API')
+
+Connection.setup_indexes
 
 Authentication::User.setup_default_users
 Authentication::Group.setup_default_groups

@@ -717,7 +717,7 @@ Feature: Actions Execution
       | title               | 'The Title'                   |
       | copyright           | 'Copyright the future'        |
       | published_timestamp | recent_timestamp              |
-    And the logs should contain "Test Change ID Publish Running "
+    And the logs should contain "Test Change ID Publish Running"
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
 
@@ -758,7 +758,7 @@ Feature: Actions Execution
       | title               | 'The Title'                                                                 |
       | copyright           | 'Copyright the future'                                                      |
       | published_timestamp | recent_timestamp                                                            |
-    And the logs should contain "Test Change ID Publish Running "
+    And the logs should contain "Test Change ID Publish Running"
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
 

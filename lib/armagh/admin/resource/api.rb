@@ -47,6 +47,8 @@ module Armagh
         def initialize
           @logger = Logging.set_logger('Armagh::ResourceAdminAPI')
 
+          Connection.require_connection(@logger)
+
           begin
             config      = Configuration::FileBasedConfiguration.load( self.class.to_s )
           rescue => e

@@ -24,7 +24,6 @@
 require 'fileutils'
 require 'socket'
 
-require 'log4r'
 require 'configh'
 
 require_relative '../environment'
@@ -90,11 +89,7 @@ module Armagh
     def initialize( launcher_name = 'default' )
       @logger = Logging.set_logger('Armagh::Application::Launcher')
 
-      unless Connection.can_connect?
-        Logging.disable_mongo_log
-        @logger.error "Unable to establish connection to the MongoConnection database configured in '#{Configuration::FileBasedConfiguration.filepath}'.  #{Connection.can_connect_message}"
-        exit 1
-      end
+      Connection.require_connection(@logger)
       
       bind_ip = Connection.ip
       launcher_config_name = [ bind_ip, launcher_name ].join('_')

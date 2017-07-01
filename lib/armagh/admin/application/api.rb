@@ -28,6 +28,8 @@ require_relative '../../actions/gem_manager'
 require_relative '../../utils/collection_trigger'
 require_relative '../../authentication'
 require_relative '../../status'
+require_relative '../../connection'
+require_relative '../../utils/action_helper'
 
 module Armagh
   module Admin
@@ -54,8 +56,6 @@ module Armagh
                       :cluster_design_filepath,
                       :logger
 
-        LOG_LOCATION = '/var/log/armagh/application_admin_api.log'
-
         DEFAULTS = {
             'ip'             => '127.0.0.1',
             'port'           => 4599,
@@ -65,6 +65,9 @@ module Armagh
 
         def initialize
           @logger = Logging.set_logger('Armagh::ApplicationAdminAPI')
+          @logger.level = Logging::ANY if ENV['RACK_ENV'] == 'test'
+
+          Connection.require_connection(@logger)
 
           begin
             config  = Configuration::FileBasedConfiguration.load( self.class.to_s )
@@ -186,13 +189,7 @@ module Armagh
 
         def get_action_super(type)
           raise "Action type must be a Class.  Was a #{type}." unless type.is_a?(Class)
-          unless Actions.defined_actions.include?(type)
-            raise "Unexpected action type: #{type}"
-          end
-
-          superclass_name = type.superclass.to_s
-
-          superclass_name.sub!(/^Armagh::Actions::/, '') ? superclass_name : get_action_super(type.superclass)
+          Utils::ActionHelper.get_action_super(type)
         end
 
         def get_defined_actions

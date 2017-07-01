@@ -15,28 +15,19 @@
 # limitations under the License.
 #
 
-require 'log4r/outputter/outputter'
-require 'socket'
+module Armagh
+  module Utils
+    class ActionHelper
+      class ActionClassError < StandardError; end
 
-require_relative '../connection'
+      def self.get_action_super(type)
+        type = type.class unless type.is_a? Class
 
-module Log4r
-  class MongoOutputter < Log4r::Outputter
-    def initialize(_name, hash={})
-      super
-      @resource_log = hash['resource_log']
-    end
+        raise ActionClassError, "#{type} is not a known action type." unless Actions.defined_actions.include?(type)
 
-    def write(data)
-      raise ArgumentError, 'Data must be a hash.' unless data.is_a? Hash
-
-      if @resource_log
-        Armagh::Connection.resource_log.insert_one data
-      else
-        Armagh::Connection.log.insert_one data
+        superclass_name = type.superclass.to_s
+        superclass_name.sub!(/^Armagh::Actions::/, '') ? superclass_name : get_action_super(type.superclass)
       end
-    rescue => e
-      raise Armagh::Connection.convert_mongo_exception(e)
     end
   end
 end

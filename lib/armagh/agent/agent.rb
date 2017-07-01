@@ -31,6 +31,7 @@ require_relative '../logging'
 require_relative '../status'
 require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
+require_relative '../utils/action_helper'
 
 module Armagh
   class Agent
@@ -193,7 +194,10 @@ module Armagh
       end
 
       actions.each do |action|
-       return action if action.is_a? Actions::Divide
+        if action.is_a? Actions::Divide
+          Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class))
+          return action
+        end
       end
       nil
     end
@@ -327,6 +331,8 @@ module Armagh
 
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
+      Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class)) if action.is_a? Actions::Action
+
       initial_id = doc.document_id
       allowed_id_change = false
       case action
@@ -403,6 +409,7 @@ module Armagh
     ensure
       @num_creates = 0
       @archives_for_collect.clear
+      Logging.clear_details
     end
 
     private def report_status(doc, action)

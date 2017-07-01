@@ -22,7 +22,6 @@ require_relative '../../lib/armagh/connection'
 
 require 'test/unit/assertions'
 
-require 'log4r'
 require 'time'
 
 When(/^armagh's workflow config is "([^"]*)"$/) do |config|

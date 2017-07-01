@@ -22,15 +22,26 @@ Armagh::Environment.init
 
 require_relative '../../../../lib/armagh/admin/resource/api'
 
+require_relative '../../../helpers/armagh_test'
+
 
 require 'test/unit'
 require 'mocha/test_unit'
 
 
 class TestResourceApplicationAPI < Test::Unit::TestCase
+  include ArmaghTest
 
   def setup
-    @logger = mock
+    @logger = mock_logger
+
+    Armagh::Connection.stubs(:require_connection)
     @api = Armagh::Admin::Resource::API.instance
+  end
+
+  def test_init_checks_connection
+    Armagh::Connection.unstub(:require_connection)
+    Armagh::Connection.expects(:require_connection)
+    Armagh::Admin::Resource::API.send(:new)
   end
 end

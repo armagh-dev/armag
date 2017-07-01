@@ -20,7 +20,6 @@ require_relative '../../../lib/armagh/document/document'
 
 require 'armagh/documents/doc_state'
 
-require 'log4r'
 require 'bson'
 
 require 'test/unit'

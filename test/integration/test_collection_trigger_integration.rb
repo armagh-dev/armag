@@ -22,7 +22,7 @@ require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
-require_relative '../helpers/mock_logger'
+require_relative '../helpers/armagh_test'
 
 require_relative '../../lib/armagh/utils/collection_trigger'
 

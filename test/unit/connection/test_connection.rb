@@ -37,7 +37,6 @@ class TestConnection < Test::Unit::TestCase
     instance = mock
     instance.stubs(:connection).returns(@connection)
 
-
     @admin_connection = mock
     admin_instance = mock
     admin_instance.stubs(:connection).returns(@admin_connection)
@@ -207,6 +206,21 @@ class TestConnection < Test::Unit::TestCase
     assert_equal 'error message', Armagh::Connection.can_connect_message
   end
 
+  def test_require_connection
+    Armagh::Connection.expects(:can_connect?).returns(true)
+    assert_nothing_raised{Armagh::Connection.require_connection}
+  end
+
+  def test_require_connection_none
+    logger = mock('logger')
+    logger.expects(:error)
+    Armagh::Connection.expects(:can_connect?).returns(false)
+    assert_raise(SystemExit){Armagh::Connection.require_connection(logger)}
+  ensure
+    # Restore the log env (since we deleted the mongo outputter)
+    Armagh::Logging.init_log_env
+  end
+
   def test_setup_indexes
     config_indexes = mock
     action_state_indexes = mock
@@ -232,7 +246,7 @@ class TestConnection < Test::Unit::TestCase
     action_state_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'usernames'})
     groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
-    agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames', :sparse => true})
+    agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames'})
     doc_indexes.expects(:create_one).twice
 
     Armagh::Connection.setup_indexes

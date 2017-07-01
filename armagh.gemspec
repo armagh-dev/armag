@@ -60,9 +60,9 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'sinatra', '~> 1.4'
   spec.add_runtime_dependency 'thin', '~> 1.6'
   spec.add_runtime_dependency 'oj', '~> 2.14'
-  spec.add_runtime_dependency 'log4r', '~> 1.1'
   spec.add_runtime_dependency 'argon2', '~> 1.1'
-  spec.add_dependency 'mongo', '~> 2.4'
+  spec.add_runtime_dependency 'mongo', '~> 2.4'
+  spec.add_runtime_dependency 'logging', '~> 2.2'
 
   spec.add_development_dependency 'rake', '~> 11.0'
   spec.add_development_dependency 'noragh-gem-tasks'

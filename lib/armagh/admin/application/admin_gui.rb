@@ -39,8 +39,6 @@ module Armagh
                       :port,
                       :logger
 
-        LOG_LOCATION = '/var/log/armagh/application_admin_gui.log'
-
         DEFAULTS = {
           'ip' => '127.0.0.1'
         }

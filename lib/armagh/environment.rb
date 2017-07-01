@@ -32,8 +32,11 @@ module Armagh
   module Environment
     
     def self.init
-      init_env_vars
-      Armagh::Logging.init_log_env
+      unless @initialized
+        init_env_vars
+        Logging.init_log_env
+        @initialized = true
+      end
     end
     
     def self.init_env_vars

@@ -7,5 +7,8 @@
 require 'bundler/setup'
 require_relative '../lib/armagh/utils/daemonizer'
 
+require_relative '../lib/armagh/environment.rb'
+Armagh::Environment.init
+
 file = File.join(__dir__, 'armagh-resource-admin')
-Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-res-admin', work_dir: '/var/log/armagh')
+Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-res-admin', work_dir: Armagh::Logging.log_dir)

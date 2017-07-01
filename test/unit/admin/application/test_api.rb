@@ -16,7 +16,7 @@
 #
 
 require_relative '../../../helpers/coverage_helper'
-require_relative '../../../helpers/mock_logger'
+require_relative '../../../helpers/armagh_test'
 require_relative '../../../../lib/armagh/environment'
 Armagh::Environment.init
 
@@ -50,9 +50,9 @@ end
 class TestAdminApplicationAPI < Test::Unit::TestCase
   include ArmaghTest
 
-
   def setup
     @logger = mock_logger
+    Armagh::Connection.stubs(:require_connection)
     @api = Armagh::Admin::Application::API.instance
     @config_store = []
     Armagh::Connection.stubs(:config).returns(@config_store)
@@ -755,7 +755,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_action_super
     assert_equal('Collect', @api.get_action_super(Armagh::StandardActions::TATestCollect))
     assert_equal('Collect', @api.get_action_super(Armagh::StandardActions::ChildCollect))
-    assert_raise(RuntimeError.new('Unexpected action type: Hash')){@api.get_action_super(Hash)}
+    e = Armagh::Utils::ActionHelper::ActionClassError.new('Hash is not a known action type.')
+    assert_raise(e){@api.get_action_super(Hash)}
   end
 
   def test_private_get_action_class_from_type
@@ -1320,5 +1321,11 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     Armagh::Authentication::Role.expects(:find_from_published_doctype).with('invalid').returns(nil)
     user.expects(:has_role?).with(Armagh::Authentication::Role::USER).returns false
     assert_raise(Armagh::Authentication::AuthenticationError.new('User test_user does not have the required role to access invalid documents.')){@api.user_has_document_role(user, 'invalid')}
+  end
+
+  def test_init_checks_connection
+    Armagh::Connection.unstub(:require_connection)
+    Armagh::Connection.expects(:require_connection)
+    Armagh::Admin::Application::API.send(:new)
   end
 end

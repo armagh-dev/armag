@@ -18,8 +18,8 @@
 require 'mongo'
 require 'singleton'
 require 'socket'
-require 'log4r'
 
+require_relative '../../lib/armagh/logging'
 require_relative '../../lib/armagh/connection'
 
 class MongoSupport
@@ -45,7 +45,8 @@ class MongoSupport
 
     @hostname = Socket.gethostname
 
-    Mongo::Logger.logger = Log4r::Logger.root
+    Mongo::Logger.logger = Armagh::Logging.set_logger('mongo logger')
+    Mongo::Logger.logger.level = :warn
 
     raise 'No mongod found' if @mongod_exec.nil? || @mongod_exec.empty?
     raise 'No mongo found' if @mongo_exec.nil? || @mongo_exec.empty?
