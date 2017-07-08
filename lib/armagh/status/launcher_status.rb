@@ -25,12 +25,13 @@ module Armagh
         Connection.launcher_status
       end
 
-      def self.report(hostname:, status:, versions:)
+      def self.report(hostname:, status:, versions:, started:)
         launcher_status = new
         launcher_status.hostname = hostname
         launcher_status.status = status
         launcher_status.versions = versions
-        launcher_status.last_updated = Time.now
+        launcher_status.last_updated = Time.now.utc
+        launcher_status.started = started
         launcher_status.save
         launcher_status
       end
@@ -67,7 +68,7 @@ module Armagh
 
       def save
         Utils::DBDocHelper.clean_model(self)
-        self.class.db_find_and_update({'_id' => internal_id}, @db_doc)
+        self.class.db_replace({'_id' => internal_id}, @db_doc)
       rescue => e
         raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
       end
@@ -102,6 +103,14 @@ module Armagh
 
       def last_updated
         @db_doc['last_updated']
+      end
+
+      def started=(started)
+        @db_doc['started'] = started
+      end
+
+      def started
+        @db_doc['started']
       end
     end
   end

@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test'
 
 require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
@@ -23,15 +24,57 @@ Armagh::Environment.init
 require_relative '../../../lib/armagh/launcher/launcher'
 require_relative '../../../lib/armagh/logging'
 require_relative '../../../lib/armagh/connection'
+require_relative '../../../lib/armagh/status'
 
+require 'socket'
 require 'mocha/test_unit'
 require 'test/unit'
 require 'configh'
 
 class TestLauncher < Test::Unit::TestCase
+  include ArmaghTest
 
   def setup
     @config_store = []
+    mock_collection_trigger
+    mock_connection
+    mock_authentication
+
+    Armagh::Logging.stubs(:set_level)
+
+    @launcher_config = mock('launcher_config')
+    @agent_config = mock('agent_config')
+    lc = mock
+    lc.stubs(:log_level).returns(Armagh::Logging::FATAL)
+    @launcher_config.stubs(:launcher).returns(lc)
+    Armagh::Launcher.stubs(:find_or_create_configuration).returns(@launcher_config)
+    Armagh::Agent.stubs(:find_or_create_configuration).returns(@agent_config)
+
+    @workflow_set = mock('workflow_set')
+    Armagh::Actions::WorkflowSet.stubs(:for_agent).returns(@workflow_set)
+
+    Armagh::Logging.stubs(:set_logger).returns(mock_logger)
+    @launcher = Armagh::Launcher.new
+  end
+
+  def mock_collection_trigger
+    @collection_trigger = mock
+    @collection_trigger.stubs(:start)
+    @collection_trigger.stubs(:stop)
+    @collection_trigger.stubs(:logger)
+    Armagh::Utils::CollectionTrigger.stubs(:new).returns(@collection_trigger)
+  end
+
+  def mock_connection
+
+    Armagh::Connection.stubs(:require_connection)
+    Armagh::Connection.stubs(:config).returns(@config)
+    Armagh::Connection.stubs(:ip).returns('10.10.10.10')
+  end
+
+  def mock_authentication
+    Armagh::Authentication::User.stubs :setup_default_users
+    Armagh::Authentication::Group.stubs :setup_default_groups
   end
   
   def assert_configure( candidate_values, exp_num_agents, exp_checkin_freq, exp_update_freq, exp_log_level, raises = nil, error_message = nil )
@@ -87,6 +130,36 @@ class TestLauncher < Test::Unit::TestCase
 
   def test_configure_set_log_level_invalid
     assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any' )
+  end
+
+  def test_checkin_running
+    Armagh::Status::LauncherStatus.expects(:report).with do |args|
+      assert_equal Socket.gethostname, args[:hostname]
+      assert_equal Armagh::Status::RUNNING, args[:status]
+      assert args[:versions].key? 'armagh'
+      assert args[:versions].key? 'actions'
+      assert_in_delta(Time.now, args[:started], 1)
+      true
+    end
+
+    Thread.new{@launcher.run}  # Generate the start time
+    sleep 0.5
+    @launcher.checkin(Armagh::Status::RUNNING)
+  ensure
+    @launcher.shutdown :SIGINT
+  end
+
+  def test_checkin_not_running
+    Armagh::Status::LauncherStatus.expects(:report).with do |args|
+      assert_equal Socket.gethostname, args[:hostname]
+      assert_equal Armagh::Status::STOPPING, args[:status]
+      assert args[:versions].key? 'armagh'
+      assert args[:versions].key? 'actions'
+      assert_nil args[:started]
+      true
+    end
+
+    @launcher.checkin(Armagh::Status::STOPPING)
   end
       
 end

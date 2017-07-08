@@ -93,7 +93,7 @@ module Armagh
       
       bind_ip = Connection.ip
       launcher_config_name = [ bind_ip, launcher_name ].join('_')
-      
+
       begin
         @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, maintain_history: true )
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
@@ -102,7 +102,7 @@ module Armagh
 
       Armagh::Authentication::User.setup_default_users
       Armagh::Authentication::Group.setup_default_groups
-      
+
       @logger.any "Using Launcher Config: #{launcher_config_name}"
       Logging.set_level(@logger, @config.launcher.log_level)
 
@@ -113,13 +113,13 @@ module Armagh
       @versions[ 'actions' ].each do |package, version|
         Document.version[ package ] = version
       end
-      
+
       begin
         @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, maintain_history: true )
       rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
         @logger.dev_error AgentConfigError
       end
-      
+
       begin
         @workflow_set = Actions::WorkflowSet.for_agent( Connection.config )
         @logger.any 'workflow init successful'
@@ -127,7 +127,7 @@ module Armagh
         @logger.any 'Workflow initialization failed, because at least one configuration in the database has an error. Review current workflow settings in the admin GUI to fix the problem.'
         @logger.dev_error WorkflowConfigError
       end
-      
+
       @collection_trigger = Utils::CollectionTrigger.new(@workflow_set)
       Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
 
@@ -155,7 +155,8 @@ module Armagh
 
     def checkin(status)
       @logger.debug "Checking In: #{status}"
-      Status::LauncherStatus.report(hostname: @hostname, status: status, versions: @versions)
+      started = status == Status::RUNNING ? @started : nil
+      Status::LauncherStatus.report(hostname: @hostname, status: status, versions: @versions, started: started)
       @last_checkin = Time.now
     rescue => e
       raise Connection.convert_mongo_exception(e)
@@ -279,6 +280,10 @@ module Armagh
     end
 
     def run
+      return if @running
+
+      @started = Time.now.utc
+
       # Stop agents before stopping armagh
       TERM_SIGNALS.each do |signal|
         trap(signal) { shutdown(signal) }

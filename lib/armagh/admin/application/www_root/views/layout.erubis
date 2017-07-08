@@ -53,6 +53,9 @@
           <li class="{{= active_domain(:logs) }}" title="Logs">
             <a href="/logs"><i class="uk-icon-terminal uk-icon-small"></i></a>
           </li>
+          <li class="{{= active_domain(:docs) }}" title="Documents">
+            <a href="/docs"><i class="uk-icon-search uk-icon-small"></i></a>
+          </li>
           <li class="{{= active_domain(:config) }}" title="Workflows">
             <a href="/config"><i class="uk-icon-sitemap uk-icon-small"></i></a>
           </li>

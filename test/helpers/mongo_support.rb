@@ -36,6 +36,8 @@ class MongoSupport
 
   OUT_PATH = '/tmp/test_mongo.out' unless defined? OUT_PATH
 
+  MAX_LAUNCH_TIME = 60
+
   def initialize
     @mongod_exec = `which mongod`.strip
     @mongo_exec = `which mongo`.strip
@@ -61,10 +63,24 @@ class MongoSupport
 
     unless running?
       File.truncate(OUT_PATH, 0) if File.file? OUT_PATH
-      @mongo_pid = Process.spawn(cmd, :out => OUT_PATH)
+      @mongo_pid = Process.spawn(cmd, out: OUT_PATH, err: OUT_PATH)
     end
 
-    sleep 0.5 until Armagh::Connection.can_connect?
+    stop = Time.now + MAX_LAUNCH_TIME
+
+    until Armagh::Connection.can_connect?
+      if Time.now > stop
+        $stderr.puts "Mongo could not be started in #{MAX_LAUNCH_TIME} seconds."
+        $stderr.puts File.read(OUT_PATH)
+        exit 1
+      elsif !running?
+        $stderr.puts 'Mongo is no longer running.'
+        $stderr.puts File.read(OUT_PATH)
+        exit 1
+      end
+
+      sleep 0.5
+    end
 
     @client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => DATABASE_NAME)
     @admin_client ||= Mongo::Client.new([ CONNECTION_STRING ], :database => ADMIN_DATABASE_NAME)
@@ -85,15 +101,7 @@ class MongoSupport
 
   def running?
     running = false
-    if @mongo_pid
-      begin
-        Process.kill(0, @mongo_pid) # check if running
-        running = true
-      rescue Errno::ESRCH
-        running = false
-        @mongo_pid = nil
-      end
-    end
+    running = `ps -p #{@mongo_pid} -o command=`.strip == @mongod_exec if @mongo_pid
     running
   end
 

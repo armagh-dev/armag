@@ -25,12 +25,13 @@ require 'mocha/test_unit'
 
 class TestLauncherStatus < Test::Unit::TestCase
   def setup
+
     @launcher_status = create_launcher_status
   end
 
   def create_launcher_status
     Armagh::Status::LauncherStatus.any_instance.stubs(:save)
-    launcher_status = Armagh::Status::LauncherStatus.report(hostname: nil, status: nil, versions: nil)
+    launcher_status = Armagh::Status::LauncherStatus.report(hostname: nil, status: nil, versions: nil, started: nil)
     launcher_status
   end
 
@@ -40,13 +41,14 @@ class TestLauncherStatus < Test::Unit::TestCase
 
   def test_report
     Armagh::Status::LauncherStatus.any_instance.expects(:save)
-    launcher_status = Armagh::Status::LauncherStatus.report(hostname: 'hostname', status: 'status', versions: 'versions')
+    launcher_status = Armagh::Status::LauncherStatus.report(hostname: 'hostname', status: 'status', versions: 'versions', started: Time.at(0).utc)
     assert_kind_of(Armagh::Status::LauncherStatus, launcher_status)
 
     assert_equal 'hostname', launcher_status.internal_id
     assert_equal 'hostname', launcher_status.hostname
     assert_equal 'status', launcher_status.status
     assert_equal 'versions', launcher_status.versions
+    assert_equal Time.at(0).utc, launcher_status.started
   end
 
   def test_delete
@@ -93,11 +95,11 @@ class TestLauncherStatus < Test::Unit::TestCase
 
   def test_save
     Armagh::Status::LauncherStatus.any_instance.unstub(:save)
-    Armagh::Status::LauncherStatus.expects(:db_find_and_update).with({'_id' => @launcher_status.internal_id}, @launcher_status.db_doc)
+    Armagh::Status::LauncherStatus.expects(:db_replace).with({'_id' => @launcher_status.internal_id}, @launcher_status.db_doc)
     @launcher_status.save
 
     e = RuntimeError.new('boom')
-    Armagh::Status::LauncherStatus.expects(:db_find_and_update).raises(e)
+    Armagh::Status::LauncherStatus.expects(:db_replace).raises(e)
     assert_raise(e){@launcher_status.save}
   end
 

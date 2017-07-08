@@ -793,6 +793,57 @@ module Armagh
           assert_equal expected, result
         end
 
+        def test_get_doc_collections
+          collection = mock('collection')
+          collection.expects(:namespace).once.returns('armagh.documents.collection')
+          Connection.expects(:all_document_collections).once.returns([collection])
+          result = @admin_gui.get_doc_collections
+          expected = {"armagh.documents.collection"=>"Collection", "armagh.failures"=>"Failures"}
+          assert_equal expected, result
+        end
+
+        private def mock_doc_connection
+          BSON.stubs(:ObjectId).returns('mongo_id')
+          count = mock('count')
+          count.expects(:count).once.returns(1)
+          array = [{doc: true}]
+          skip = mock('skip')
+          skip.expects(:limit).once.returns(array)
+          sort = mock('sort')
+          sort.expects(:skip).once.returns(skip)
+          doc = mock('doc')
+          doc.expects(:sort).once.returns(sort)
+          sample = mock('sample')
+          sample.expects(:limit).returns([{doc: 'doc'}])
+          connection = mock('connection')
+          connection.expects(:find).times(3).returns(sample, count, doc)
+          all_docs = mock('all_docs')
+          all_docs.expects(:find).once.returns(connection)
+          Connection.expects(:all_document_collections).once.returns(all_docs)
+        end
+
+        def test_get_doc
+          params = {
+            'collection' => 'collection',
+            'page'       => 1,
+            'from'       => '1982-01-04',
+            'thru'       => '1982-12-27',
+            'search'     => 'search'
+          }
+          mock_doc_connection
+          result = @admin_gui.get_doc(params)
+          expected = {
+            :count=>1,
+            :doc=>{:doc=>true},
+            :expand=>false,
+            :from=>"1982-01-04",
+            :page=>0,
+            :search=>"search",
+            :thru=>"1982-12-27"
+          }
+          assert_equal expected, result
+        end
+
       end
     end
   end

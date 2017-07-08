@@ -43,7 +43,7 @@ currentBuild.result = "SUCCESS"
        sh """#!/bin/bash -l
          echo -e "*********************************************\n** Unit testing:" `hg identify -i` "\n*********************************************"
          set -e
-         bundle exec rake test
+         bundle exec rake test --trace
        """
      }
   
@@ -52,7 +52,7 @@ currentBuild.result = "SUCCESS"
        sh """#!/bin/bash -l
          echo -e "*********************************************\n** Integration testing:" `hg identify -i` "\n*********************************************"
          set -e
-         bundle exec rake integration
+         bundle exec rake integration --trace
        """
      }
 
@@ -62,7 +62,7 @@ currentBuild.result = "SUCCESS"
          sh """#!/bin/bash -l
            echo -e "*********************************************\n** Cucumber testing:" `hg identify -i` "\n*********************************************"
            set -e
-           bundle exec rake cucumber
+           bundle exec rake cucumber --trace
          """
        }
        catch(err){
@@ -96,7 +96,7 @@ currentBuild.result = "SUCCESS"
        sh """#!/bin/bash -l
          echo -e "*********************************************\n** Docs:" `hg identify -i` "\n*********************************************"
          set -e
-         bundle exec rake yard
+         bundle exec rake yard --trace
        """
      
        publishHTML (target: [

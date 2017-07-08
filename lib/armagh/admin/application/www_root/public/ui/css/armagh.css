@@ -1042,6 +1042,7 @@ iframe {
   color: #444444;
   border: 1px solid #dddddd;
   border-radius: 4px;
+  box-shadow: 3px 3px 1px #eee;
 }
 .uk-panel-box-hover:hover {
   color: #444444;
@@ -1065,7 +1066,6 @@ iframe {
   background-color: #fff;
   color: #575857;
   border-color: rgba(87, 88, 87, 0.3);
-  box-shadow: 3px 3px 1px #eee;
 }
 .uk-panel-box-primary-hover:hover {
   color: #575857;

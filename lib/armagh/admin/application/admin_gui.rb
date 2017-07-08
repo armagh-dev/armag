@@ -473,6 +473,7 @@ module Armagh
         end
 
         def get_logs(page:, limit:, sort:, filter:, hide:)
+          # TODO move this to the API and create a modal
           errors = []
           page   = page.to_i
           page   = 1 if page <= 0
@@ -604,6 +605,81 @@ module Armagh
                     .to_a,
             errors: errors
           }
+        end
+
+        def get_doc_collections # TODO move this to the API
+          collections = {'armagh.failures' => 'Failures'}
+          Connection.all_document_collections.each do |collection|
+            id    = collection.namespace
+            label = id[/armagh\.documents\.?(\w+)$/, 1]
+            collections[id] = label&.gsub(/(?:^|_)\w/) { |x| x.sub(/_/, ' ').upcase } || 'Pending Publish'
+          end
+          collections
+        end
+
+        def get_doc(params) # TODO move this to the API and create a modal
+          query  = {}
+          ts     = 'updated_timestamp'
+          id     = params['collection']
+          page   = params['page'].to_i - 1
+          page   = 0 if page < 0
+          from   = params['from']
+          thru   = params['thru']
+          search = params['search']
+
+          collection =
+            case id
+            when 'armagh.failures'
+              Connection.failures
+            else
+              ts = 'document_timestamp'
+              Connection.all_document_collections.find { |c| c.namespace == id }
+            end
+          raise AdminGUIError, "Unexpected document collection #{id.inspect}" unless collection
+
+          unless from.empty?
+            from = Time.parse(from)
+            query[ts] = {:$gte => Time.new(from.year, from.month, from.day, 00, 00, 00, '+00:00')}
+          end
+
+          unless thru.empty?
+            thru = Time.parse(thru)
+            query[ts] ||= {}
+            query[ts].merge!({:$lte => Time.new(thru.year, thru.month, thru.day, 23, 59, 59, '+00:00')})
+          end
+
+          unless search.empty?
+            sample = collection.find().limit(1).to_a.first
+            fields = get_doc_searchable_fields(sample)
+            query['$or'] =
+              fields.map! do |field|
+                {field => /#{search}/i}
+              end
+            query['$or'] << {'_id' => BSON::ObjectId(search)} if BSON::ObjectId.legal?(search)
+          end
+
+          {
+            page:   page,
+            from:   params['from'],
+            thru:   params['thru'],
+            search: params['search'],
+            count:  collection.find(query).count,
+            doc:    collection.find(query).sort(ts => -1).skip(page).limit(1).to_a.first,
+            expand: params['expand'] == 'true'
+          }
+        end
+
+        private def get_doc_searchable_fields(doc, ancestry = nil)
+          fields = []
+          doc&.each do |key, value|
+            case value
+            when String
+              fields << "#{ancestry + '.' if ancestry}#{key}"
+            when BSON::Document
+              fields << get_doc_searchable_fields(value, "#{ancestry + '.' if ancestry}#{key}")
+            end
+          end
+          fields.flatten
         end
 
       end

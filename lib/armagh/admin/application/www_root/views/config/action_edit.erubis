@@ -71,9 +71,9 @@
   <fieldset>
 
     {{ if @data[:edit_action] }}
-      <input name="_method" type="hidden" value="put">
+      <input name="_method" type="hidden" value="put" />
     {{ end }}
-    <input name="type" type="hidden" value="{{= @data[:type] }}">
+    <input name="type" type="hidden" value="{{= @data[:type] }}" />
 
     <ul id="page" class="uk-switcher uk-margin">
 
@@ -144,7 +144,7 @@
                     {{ case param[:type] }}
                     {{ when 'docspec' }}
                       {{ value_type, value_state = param_value.to_s.split(':') }}
-                      <input name="{{= param_id }}_type" type="text" value="{{= value_type }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                      <input name="{{= param_id }}_type" type="text" value="{{= value_type }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }} />
                       <select name="{{= param_id }}_state" class="{{= param_invalid }}" {{= param_disabled }}>
                         {{ unless value_state }}
                           <option value="">...</option>
@@ -161,7 +161,7 @@
 ----------------------------------------------------------------------------------------------------->
                     {{ when 'encoded_string' }}
                       <div class="uk-form-password uk-width-1-1">
-                        <input name="{{= param_id }}" type="password" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                        <input name="{{= param_id }}" type="password" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }} />
                         <a href="" class="uk-form-password-toggle" data-uk-form-password='{lblShow: "<i class=\"uk-icon-eye\"></i>", lblHide: "<i class=\"uk-icon-eye-slash\"></i>"}'>
                           <i class="uk-icon-eye"></i>
                         </a>
@@ -192,27 +192,27 @@
                           {{ end }}
                         </select>
                       {{ else }}
-                        <input name="{{= param_id }}" type="text" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                        <input name="{{= param_id }}" type="text" value="{{== param_value }}" class="uk-width-1-1 {{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }} />
                       {{ end }}
 
 <!----------------------------------------------------------------------------------------------------
   BOOLEAN
 ----------------------------------------------------------------------------------------------------->
                     {{ when 'boolean' }}
-                      <input name="{{= param_id }}" type="hidden" value="{{= param_value }}">
-                      <input id="{{= param_id }}" type="checkbox" {{= param_value.to_s == 'true' ? 'checked' : '' }} onchange="toggle_boolean('{{= param_id }}', this.checked)" class="uk-form-large {{= param_invalid }}" style="height: 20px;" {{= param_disabled }} {{= param_tooltip }}>
+                      <input name="{{= param_id }}" type="hidden" value="{{= param_value }}" />
+                      <input id="{{= param_id }}" type="checkbox" {{= param_value.to_s == 'true' ? 'checked' : '' }} onchange="toggle_boolean('{{= param_id }}', this.checked)" class="uk-form-large {{= param_invalid }}" style="height: 20px;" {{= param_disabled }} {{= param_tooltip }} />
 
 <!----------------------------------------------------------------------------------------------------
   NUMERIC
 ----------------------------------------------------------------------------------------------------->
                     {{ when 'integer', 'positive_integer', 'negative_integer', 'timestamp' }}
-                      <input name="{{= param_id }}" type="number" min="0" value="{{= param_value }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                      <input name="{{= param_id }}" type="number" min="0" value="{{= param_value }}" class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }} />
 
 <!----------------------------------------------------------------------------------------------------
   DATE
 ----------------------------------------------------------------------------------------------------->
                     {{ when 'date' }}
-                      <input name="{{= param_id }}" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" value="{{= param_value }} class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }}>
+                      <input name="{{= param_id }}" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" value="{{= param_value }} class="{{= param_invalid }}" {{= param_disabled }} {{= param_tooltip }} />
 
 <!----------------------------------------------------------------------------------------------------
   LIST
@@ -256,7 +256,7 @@
                       {{ if param_disabled.empty? }}
                         </a>
                       {{ end }}
-                      <input name="{{= param_id }}" type="hidden" value="{{= sanitize_string(value) }}">
+                      <input name="{{= param_id }}" type="hidden" value="{{= sanitize_string(value) }}" />
 
                     {{ else }}
                       WARNING: <strong>{{= param[:type] }}</strong> is not supported yet
@@ -389,11 +389,11 @@
       </div>
     </div>
   </div>
-  <input id="modal-list-id"     type="hidden">
-  <input id="modal-list-count"  type="hidden">
-  <input id="modal-list-row"    type="hidden">
-  <input id="modal-list-prompt" type="hidden">
-  <input id="modal-list-hash"   type="hidden">
+  <input id="modal-list-id"     type="hidden" />
+  <input id="modal-list-count"  type="hidden" />
+  <input id="modal-list-row"    type="hidden" />
+  <input id="modal-list-prompt" type="hidden" />
+  <input id="modal-list-hash"   type="hidden" />
 </div>
 
 <script type="text/javascript">
@@ -589,7 +589,7 @@
               'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
               'onkeydown="modal_list_onkey(this, event)" ' +
               'value="' + sanitize_string(values[0]) + '" ' +
-            '>' +
+            '/>' +
             '<span ' +
               'class="uk-text-bold uk-text-muted uk-margin-small-left uk-margin-small-top" ' +
               'style="position:absolute;" ' +
@@ -603,7 +603,7 @@
               'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
               'onkeydown="modal_list_onkey(this, event)" ' +
               'value="' + sanitize_string(values[1]) + '" ' +
-            '>' +
+            '/>' +
           '</div>' +
         '</div>'
       prompt = ""
@@ -616,7 +616,7 @@
           'onfocus="modal_list_select(&apos;' + id + '&apos;)" ' +
           'onkeydown="modal_list_onkey(this, event)" ' +
           'value="' + sanitize_string(new_value) + '" ' +
-        '>'
+        '/>'
     }
 
     $("#modal-list-items").append('<li>' + input + '</li>')

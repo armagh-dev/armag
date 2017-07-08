@@ -1,0 +1,139 @@
+{{
+  main = !@data&.has_key?(:uuid)
+  none = @data[:doc]&.size.to_i.zero?
+
+  def highlight_term(value)
+    return value if @data[:search].to_s.strip.empty?
+    value.gsub(/#{@data[:search]}/i) { |term| %Q(<span markup style="background-color:yellow; padding:2px 0px; box-shadow:2px 2px 2px #d6d600;">#{term}</span>) }
+  end
+}}
+
+{{ if main }}
+  {{
+    unless none
+      doc = {
+        'document_id'        => @data[:doc].delete('document_id'),
+        'title'              => @data[:doc].delete('title'),
+        'docspec'            => "#{@data[:doc].delete('type')}:#{@data[:doc].delete('state')}",
+        'document_timestamp' => @data[:doc].delete('document_timestamp'),
+        'source'             => @data[:doc].delete('source'),
+        'metadata'           => @data[:doc].delete('metadata'),
+        'content'            => @data[:doc].delete('content')
+      }
+      doc.reject! { |_k, v| v.nil? }
+      doc.merge!(@data[:doc])
+    end
+  }}
+
+  <div style="font-size:13px;">
+{{ else }}
+  {{ doc = @data[:doc] }}
+  <div {{= %Q(id="attr-#{@data[:uuid]}") }} style="font-size:13px; {{= 'display:none;' unless @data[:expand] }}">
+{{ end }}
+
+{{ if none }}
+  <div class="uk-text-muted {{= 'uk-margin-left' unless main }}">
+    No data
+  </div>
+{{ end }}
+
+{{ index = -1 }}
+{{ doc&.each do |field, value| }}
+  {{
+    if doc.is_a?(Array) && value.nil?
+      index += 1
+      array = true
+      value = field
+      field = index
+    end
+  }}
+
+  <div class="{{= 'uk-margin-left' unless main }}">
+
+    {{ if [BSON::Document, Hash, Array].include?(value.class) }}
+
+      {{ type = value.is_a?(Array) ? 'Array' : 'Object' }}
+      {{ uuid = SecureRandom.uuid }}
+      <span onclick="toggle_visibility('{{= uuid }}')" style="cursor: pointer;" title="{{= type }}">
+        <span class="uk-text-primary {{= 'uk-text-bold' unless array }}">
+          <i id="icon-{{= uuid }}" class="{{= @data[:expand] ? 'uk-icon-caret-down' : 'uk-icon-caret-right' }}"></i>
+          <span class="{{= 'uk-text-muted' if array }}">
+            {{= field }}:
+          </span>
+        </span>
+        <span class="uk-text-muted uk-margin-small-left">
+          {{ size = type == 'Array' ? value.size : value.keys.size }}
+          {{= 'Empty' if size.zero? }}
+          {{= type }}
+          {{= "(#{size})" if type == 'Array' && !size.zero? }}
+        </span>
+      </span>
+
+      {{= partial :docs, :doc, data: {doc: value, uuid: uuid, search: @data[:search], expand: @data[:expand]} }}
+
+    {{ else }}
+
+      <span title="{{= value.class }}" {{= 'class="uk-text-muted"' if %w(_id).include?(field) }}>
+        <span class="{{= array ? 'uk-text-muted' : 'uk-text-bold' }} uk-margin-small-right">
+          {{= array ? index : field }}:
+        </span>
+        {{
+          value =
+            if value.is_a?(BSON::ObjectId) && value.to_s[/^#{@data[:search]}$/i]
+              highlight_term(value.to_s)
+            elsif value.is_a?(String) && value[/^https?:\/\//i]
+              if value[/#{@data[:search]}/i]
+                %Q(<a markup href="#{value}" target="_blank">#{highlight_term(value)}</a>)
+              else
+                %Q(<a markup href="#{value}" target="_blank">#{value}</a>)
+              end
+            elsif value.is_a?(String) && !array && !@data[:search].to_s.strip.empty? && value[/#{@data[:search]}/i]
+              highlight_term(value)
+            else
+              value
+            end
+
+          value = CGI.escape_html(value.to_s)
+
+          value.gsub!(/&lt;a markup.+?&lt;\/a&gt;|&lt;span markup.+?&lt;\/span&gt;/im) do |markup|
+            CGI.unescape_html(markup)
+          end
+        }}
+        <span style="font-family:monospace; white-space:pre-wrap; {{= 'font-size:16px; color:#007700;' if field == 'title' }}">{{= value }}</span>
+      </span>
+
+    {{ end }}
+
+  </div>
+
+{{ end }}
+
+{{ if main }}
+  <script>
+    $(document).ready(function() {
+      pagination.pages       = {{= @data[:count] }}
+      pagination.currentPage = {{= @data[:page] }}
+      pagination.render()
+
+      if (pagination.pages == 0) {
+        $('#doc-controls').hide()
+      } else {
+        $('#doc-controls').show()
+      }
+    })
+
+    function toggle_visibility(id) {
+      var div = $("#attr-" + id),
+          ico = $("#icon-" + id)
+      if (div.is(":visible")) {
+        div.hide()
+        ico.prop("class", "uk-icon-caret-right")
+      } else {
+        div.show()
+        ico.prop("class", "uk-icon-caret-down")
+      }
+    }
+  </script>
+{{ end }}
+
+</div>

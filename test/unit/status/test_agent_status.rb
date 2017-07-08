@@ -112,11 +112,11 @@ class TestAgentStatus < Test::Unit::TestCase
 
   def test_save
     Armagh::Status::AgentStatus.any_instance.unstub(:save)
-    Armagh::Status::AgentStatus.expects(:db_find_and_update).with({'_id' => @agent_status.internal_id}, @agent_status.db_doc)
+    Armagh::Status::AgentStatus.expects(:db_replace).with({'_id' => @agent_status.internal_id}, @agent_status.db_doc)
     @agent_status.save
 
     e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_find_and_update).raises(e)
+    Armagh::Status::AgentStatus.expects(:db_replace).raises(e)
     assert_raise(e){@agent_status.save}
   end
 

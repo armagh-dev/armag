@@ -68,6 +68,7 @@ helpers do
   def partial(*page, **context)
     page.map! { |p| p.to_s }
     page = File.join(page)
+    template_config(mode: :html)
     render_partial(File.join(settings.views, "#{page}.erubis"), context)
   end
 
@@ -189,13 +190,27 @@ end
 #
 
 get '/logs' do
-  data = gui.get_logs(page:   params['page'],
-                      limit:  params['limit'],
-                      sort:  {params['sort_col']=>params['sort_dir']},
-                      filter: params['filter'],
-                      hide:   params['hide'])
+  data = gui.get_logs(
+    page:   params['page'],
+    limit:  params['limit'],
+    sort:  {params['sort_col']=>params['sort_dir']},
+    filter: params['filter'],
+    hide:   params['hide']
+  )
   errors = data.delete(:errors)
   render :logs, data: data, error: errors
+end
+
+#
+# docs
+#
+
+get '/docs' do
+  render :docs, data: gui.get_doc_collections
+end
+
+get '/docs/:collection' do
+  partial :docs, :doc, data: gui.get_doc(params)
 end
 
 #

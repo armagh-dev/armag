@@ -87,7 +87,7 @@ module Armagh
 
       def save
         Utils::DBDocHelper.clean_model(self)
-        self.class.db_find_and_update({'_id' => internal_id}, @db_doc)
+        self.class.db_replace({'_id' => internal_id}, @db_doc)
       rescue => e
         raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
       end

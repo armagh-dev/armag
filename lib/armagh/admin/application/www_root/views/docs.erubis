@@ -1,0 +1,138 @@
+<script type="text/javascript" src="/ui/js/components/tooltip.min.js"></script>
+<script type="text/javascript" src="/ui/js/components/datepicker.min.js"></script>
+<script type="text/javascript" src="/ui/js/components/pagination.min.js"></script>
+
+{{= partial :header, data: {title: 'Documents'} }}
+
+<div class="uk-grid uk-form uk-form-horizontal uk-margin-bottom">
+  {{ icon_style = 'style="line-height:28px;"' }}
+
+  <div class="uk-form-icon">
+    <i class="uk-icon-folder-o"></i>
+    <select id="query-collection" style="text-indent:20px;" title="Document Collection" data-uk-tooltip="{animate:true}" onchange="get_doc(); if (!this.options[0].value){this.options[0].remove()}">
+      <option value="">Choose Collection...</option>
+      {{ @data&.each do |id, label| }}
+        <option value="{{= id }}">{{= label }}</option>
+        {{ if id == 'armagh.documents' }}
+          <option disabled>──────────</option>
+        {{ end }}
+      {{ end }}
+    </select>
+  </div>
+
+  <div class="uk-form-icon">
+    <i class="uk-icon-calendar"></i>
+    <input id="query-from" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="From Date" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+  </div>
+
+  <div class="uk-form-icon uk-padding-remove">
+    <i class="uk-icon-calendar"></i>
+    <input id="query-thru" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="Thru Date" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+  </div>
+
+  <div class="uk-form-icon">
+    <i class="uk-icon-search"></i>
+    <input id="query-search" style="width:250px;" title="Search" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+  </div>
+
+  <button class="uk-button uk-button-primary uk-button-small" onclick="get_doc()">Find</button>
+</div>
+
+<div>
+  <div id="doc-controls" class="uk-margin-bottom" style="display:none;">
+    <hr />
+    <div class="uk-grid">
+      <div class="uk-width-1-4">
+
+      </div>
+      <div class="uk-width-2-4 uk-text-center">
+
+        <ul class="uk-pagination"></ul>
+
+      </div>
+      <div class="uk-width-1-4 uk-text-right">
+
+        <div data-uk-button-checkbox>
+          <button class="uk-button uk-button-mini" onclick="expand_all_fields(this)" data="init">
+            Expand All
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="doc-container" class="uk-panel uk-panel-box uk-panel-box-secondary" style="padding:15px;">
+    <span class="uk-text-muted">Please select a document collection</span>
+  </div>
+</div>
+
+<script>
+  var pagination,
+      expand_all_state = false
+
+  $(document).ready(function() {
+    register_resizable_container('#doc-container')
+
+    $('#query-collection').css('width', '+=20') // accounting for icon's indent
+
+    pagination = UIkit.pagination('.uk-pagination', {pages:1, currentPage:0, displayedPages:3})
+    $('.uk-pagination').on('select.uk.pagination', function(e, pageIndex) {
+      get_doc(pageIndex + 1)
+    })
+  })
+
+  function get_doc(page = 0) {
+    var collection = $('#query-collection').val(),
+        query      = {}
+
+    if (!collection) {
+      $('#query-collection').addClass('uk-form-danger')
+      return false
+    } else {
+      $('#query-collection').removeClass('uk-form-danger')
+    }
+
+    query = '?page=' + page +
+      '&from=' + $('#query-from').val() +
+      '&thru=' + $('#query-thru').val() +
+      '&search=' + $('#query-search').val() +
+      '&expand=' + expand_all_state
+
+    $.ajax({
+      url: '/docs/' + collection + query,
+      type: 'GET',
+      success: function(data, text) {
+
+        $('#doc-container').html(data)
+
+      },
+      error: function(request, status, error) {
+        UIkit.modal.alert('Failed to retrieve document: <span class="uk-text-danger uk-text-bold">' + error + '</span>')
+      }
+    })
+  }
+
+  function expand_all_fields(toggle) {
+    toggle = $(toggle)
+
+    if (toggle.attr('data') == 'init') {
+      toggle.attr('data', '')
+      return
+    }
+
+    expand_all_state = !toggle.hasClass('uk-active')
+
+    $('div[id^="attr-"]').each(function(index, attr) {
+      attr = $(attr)
+      icon = $('#' + attr.prop('id').replace(/^attr-/, 'icon-'))
+      if (expand_all_state) {
+        icon.prop("class", "uk-icon-caret-down")
+        attr.show()
+      } else {
+        icon.prop("class", "uk-icon-caret-right")
+        attr.hide()
+      }
+    })
+  }
+</script>
