@@ -174,6 +174,14 @@ class TestDocument < Test::Unit::TestCase
     assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.find('id', 'testdoc', Armagh::Documents::DocState::WORKING) }
   end
 
+  def test_find_raw
+    expected = {'document_id' => 'docid'}
+    mock_find_one(expected)
+    Armagh::Utils::DBDocHelper.expects(:restore_model).with(expected, raw: true)
+    found = Armagh::Document.find('docid', 'testdoc', Armagh::Documents::DocState::READY, raw: true)
+    assert_equal(expected, found)
+  end
+
   def test_get_for_processing
     @documents.stubs(:find_one_and_update => {'document_id' => 'docid'})
     doc = Armagh::Document.get_for_processing('agent-123')
@@ -851,10 +859,12 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_raw_failures
+    results = [{'document_id' => 'raw fail id'}]
     failures = mock('failures')
-    failures.stubs(:find => [{'document_id' => 'raw fail id'}])
+    failures.stubs(:find => results)
     Armagh::Connection.stubs(:failures).returns(failures)
-    assert_equal([{'document_id' => 'raw fail id'}], Armagh::Document.failures(raw: true))
+    Armagh::Utils::DBDocHelper.expects(:restore_model).with(results.first, raw: true)
+    assert_equal(results, Armagh::Document.failures(raw: true))
   end
 
   def test_to_json

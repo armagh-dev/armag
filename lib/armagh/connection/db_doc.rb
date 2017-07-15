@@ -32,6 +32,7 @@ module Armagh
 
       def initialize(image = {})
         @db_doc = image
+        Utils::DBDocHelper.restore_model(self)
       end
 
       def internal_id

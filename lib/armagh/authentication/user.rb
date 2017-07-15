@@ -188,6 +188,8 @@ module Armagh
 
       def refresh
         @db_doc = self.class.db_find_one({'_id' => internal_id})
+        Utils::DBDocHelper.restore_model(self)
+        @db_doc
       end
 
       def authenticate(pass)

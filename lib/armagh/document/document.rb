@@ -125,8 +125,6 @@ module Armagh
     end
 
     def self.count_incomplete_by_doctype( pub_type_names = nil )
-
-
       pub_types = pub_type_names ?
           pub_type_names.collect{ |pt| Connection.documents(pt) } :
           Connection.all_document_collections.select{ |c| Connection.published_collection?(c) }
@@ -169,6 +167,7 @@ module Armagh
     def self.find(document_id, type, state, raw: false)
       db_doc = db_find_one({'document_id' => document_id, 'type' => type}, collection(type, state))
       if raw
+        Utils::DBDocHelper.restore_model(db_doc, raw: true)
         return db_doc
       else
         db_doc ? Document.new(db_doc) : nil
@@ -180,6 +179,7 @@ module Armagh
     def self.failures(raw: false)
       if raw
         documents = Connection.failures.find.to_a
+        documents.each{|d| Utils::DBDocHelper.restore_model(d, raw: true)}
       else
         documents = []
         Connection.failures.find.each do |db_doc|

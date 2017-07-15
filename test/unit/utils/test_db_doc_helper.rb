@@ -16,108 +16,90 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../../lib/armagh/document/document'
 require_relative '../../../lib/armagh/utils/db_doc_helper'
+require_relative '../../../lib/armagh/connection/db_doc'
 
 require 'test/unit'
 require 'mocha/test_unit'
 require 'bson'
+require 'facets/kernel/deep_copy'
+
+class TestDoc < Armagh::Connection::DBDoc
+  def self.create(content)
+    new(content)
+  end
+end
 
 class TestDBDocHelper < Test::Unit::TestCase
 
   def setup
+    @raw = BSON::Binary.new('raw data')
     @content = {
       'string' => 'this is some string',
       'dirty' => "\n  this is some dirty\n string\n ",
       'ts' => Time.at(0).utc,
+      '$bad_key' => 'dollar',
+      'bad.key' => 'dot',
+      'nil' => nil,
       'array' => [
         'some string',
         '   another dirty ',
         {
           'inner' => '   inner   ',
           'ts' => Time.at(0).utc,
-          'inary' => ['  howdy', 'okay']
+          'inary' => ['  howdy', 'okay'],
+          '$bad_key' => 'dollar',
+          'bad.key' => 'dot',
+          'nil' => nil
         }
       ],
       'hash' => {
         '1' => '   something     ',
         '2' => 'another',
         '3' => ['  one', 2, ['three '], {'four' => ' eek '}],
-        'ts' => Time.at(0).utc
+        'ts' => Time.at(0).utc,
+        '$bad_key' => 'dollar',
+        'bad.key' => 'dot'
       },
-      ' key ' => 'string'
+      ' key ' => 'string',
+      'raw' => @raw
     }
 
-    @metadata = {
-      'something' => [
-        '  inside  '
-      ]
+    @clean_content = {
+      'string' => 'this is some string',
+      'dirty' => "this is some dirty\n string",
+      'ts' => Time.at(0).utc,
+      "#{Armagh::Utils::DBDocHelper::DOLLAR_REPLACEMENT}bad_key" => 'dollar',
+      "bad#{Armagh::Utils::DBDocHelper::DOT_REPLACEMENT}key" => 'dot',
+      'array' => [
+        'some string',
+        'another dirty',
+        {
+          'inner' => 'inner',
+          'ts' => Time.at(0).utc,
+          'inary' => %w(howdy okay),
+          "#{Armagh::Utils::DBDocHelper::DOLLAR_REPLACEMENT}bad_key" => 'dollar',
+          "bad#{Armagh::Utils::DBDocHelper::DOT_REPLACEMENT}key" => 'dot'
+        }
+      ],
+      'hash' => {
+        '1' => 'something',
+        '2' => 'another',
+        '3' => ['one', 2, ['three'], {'four' => 'eek'}],
+        'ts' => Time.at(0).utc,
+        "#{Armagh::Utils::DBDocHelper::DOLLAR_REPLACEMENT}bad_key" => 'dollar',
+        "bad#{Armagh::Utils::DBDocHelper::DOT_REPLACEMENT}key" => 'dot'
+      },
+      ' key ' => 'string',
+      'raw' => @raw
     }
 
-    @raw = BSON::Binary.new('raw data')
-
-    Armagh::Document.any_instance.stubs(:save)
-    @doc = Armagh::Document.create(type: 'type',
-                                   content: @content,
-                                   raw: 'raw data',
-                                   metadata: @metadata,
-                                   pending_actions: [],
-                                   state: 'ready',
-                                   document_id: '123  ',
-                                   collection_task_ids: ['abc'],
-                                   document_timestamp: Time.at(0).utc,
-                                   title: '  some title  ',
-                                   copyright: "copyright\n",
-                                   display: '  display    '
-    )
-
-
+    @doc = TestDoc.create(@content)
   end
 
   def test_clean_document
-    expected = {
-      'archive_files' =>[],
-      'collection_task_ids' =>['abc'],
-      'copyright' => 'copyright',
-      'dev_errors' =>{},
-      'display' => 'display',
-      'document_id' => '123',
-      'document_timestamp' =>Time.at(0).utc,
-      'locked' =>false,
-      'metadata' =>{'something' =>['inside']},
-      'ops_errors' =>{},
-      'pending_actions' =>[],
-      'source' =>{},
-      'state' => 'ready',
-      'title' => 'some title',
-      'type' => 'type',
-      'raw' => @raw,
-
-      'content' => {
-        'string' => 'this is some string',
-        'dirty' => "this is some dirty\n string",
-        'ts' => Time.at(0).utc,
-        'array' => [
-          'some string',
-          'another dirty',
-          {
-            'inner' => 'inner',
-            'ts' => Time.at(0).utc,
-            'inary' => %w(howdy okay)
-          }
-        ],
-        'hash' => {
-          '1' => 'something',
-          '2' => 'another',
-          '3' => ['one', 2, ['three'], {'four' => 'eek'}],
-          'ts' => Time.at(0).utc
-        },
-        ' key ' => 'string'
-      }
-    }
-    
     Armagh::Utils::DBDocHelper.clean_model(@doc)
-    assert_equal(expected, @doc.db_doc)
+    assert_equal(@clean_content, @doc.db_doc)
   end
 
 
@@ -125,5 +107,80 @@ class TestDBDocHelper < Test::Unit::TestCase
     @doc.db_doc.clear
     Armagh::Utils::DBDocHelper.clean_model(@doc)
     assert_equal({}, @doc.db_doc)
+  end
+
+  def test_restore_document
+    expected = {
+      'string' => 'this is some string',
+      'dirty' => "this is some dirty\n string",
+      'ts' => Time.at(0).utc,
+      '$bad_key' => 'dollar',
+      'bad.key' => 'dot',
+      'array' => [
+        'some string',
+        'another dirty',
+        {
+          'inner' => 'inner',
+          'ts' => Time.at(0).utc,
+          'inary' => %w(howdy okay),
+          '$bad_key' => 'dollar',
+          'bad.key' => 'dot',
+        }
+      ],
+      'hash' => {
+        '1' => 'something',
+        '2' => 'another',
+        '3' => ['one', 2, ['three'], {'four' => 'eek'}],
+        'ts' => Time.at(0).utc,
+        '$bad_key' => 'dollar',
+        'bad.key' => 'dot'
+      },
+      ' key ' => 'string',
+      'raw' => @raw
+    }
+    doc = TestDoc.create(@clean_content)
+    Armagh::Utils::DBDocHelper.restore_model doc
+    assert_equal(expected, doc.db_doc)
+  end
+
+  def test_restore_document_empty
+    @doc.db_doc.clear
+    Armagh::Utils::DBDocHelper.restore_model @doc
+    assert_equal({}, @doc.db_doc)
+  end
+
+  def test_restore_document_raw
+    expected = {
+      'string' => 'this is some string',
+      'dirty' => "this is some dirty\n string",
+      'ts' => Time.at(0).utc,
+      '$bad_key' => 'dollar',
+      'bad.key' => 'dot',
+      'array' => [
+        'some string',
+        'another dirty',
+        {
+          'inner' => 'inner',
+          'ts' => Time.at(0).utc,
+          'inary' => %w(howdy okay),
+          '$bad_key' => 'dollar',
+          'bad.key' => 'dot',
+        }
+      ],
+      'hash' => {
+        '1' => 'something',
+        '2' => 'another',
+        '3' => ['one', 2, ['three'], {'four' => 'eek'}],
+        'ts' => Time.at(0).utc,
+        '$bad_key' => 'dollar',
+        'bad.key' => 'dot'
+      },
+      ' key ' => 'string',
+      'raw' => @raw
+    }
+
+    content = @clean_content.deep_copy
+    Armagh::Utils::DBDocHelper.restore_model(content, raw: true)
+    assert_equal(expected, content)
   end
 end

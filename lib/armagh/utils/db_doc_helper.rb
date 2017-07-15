@@ -18,29 +18,44 @@
 module Armagh
   module Utils
     class DBDocHelper
+      DOT_REPLACEMENT = '~!p!~'
+      DOLLAR_REPLACEMENT = '~!d!~'
+
       def self.clean_model(model)
         clean_hash(model.db_doc)
-        remove_root_nils(model.db_doc)
       end
 
-      private_class_method def self.remove_root_nils(hash)
-        hash.delete_if{|_k,v| v == nil}
+      def self.restore_model(model, raw: false)
+        hash = raw ? model : model.db_doc
+        restore_hash(hash)
       end
 
-      private_class_method def self.clean(object)
-        if object.is_a? String
-          return clean_string(object)
-        elsif object.is_a? Hash
-          return clean_hash(object)
-        elsif object.is_a? Array
-          return clean_array(object)
+      private_class_method
+      def self.clean(object)
+        case object
+        when String
+          clean_string object
+        when Hash
+          clean_hash object
+        when Array
+          clean_array object
         else
-          return object
+          object
         end
       end
 
       private_class_method def self.clean_hash(hash)
-        hash.each_value { |v| clean(v) }
+        hash.keys.each do |k|
+          v = hash[k]
+          clean(v)
+          if v.nil?
+            hash.delete(k)
+          elsif k =~ /[.$]/
+            hash.delete(k)
+            hash[k.gsub('.', DOT_REPLACEMENT).gsub('$', DOLLAR_REPLACEMENT)] = v
+          end
+        end
+        hash
       end
 
       private_class_method def self.clean_string(string)
@@ -48,7 +63,34 @@ module Armagh
       end
 
       private_class_method def self.clean_array(array)
-        array.each { |v| clean(v) }
+        array.each{|v| clean(v)}
+      end
+
+      private_class_method def self.restore(object)
+        case object
+        when Hash
+          restore_hash object
+        when Array
+          restore_array object
+        else
+          object
+        end
+      end
+
+      private_class_method def self.restore_hash(hash)
+        hash.keys.each do |k|
+          v = hash[k]
+          restore(v)
+          if k =~ /(#{DOT_REPLACEMENT}|#{DOLLAR_REPLACEMENT})/
+            hash.delete(k)
+            hash[k.gsub(DOT_REPLACEMENT, '.').gsub(DOLLAR_REPLACEMENT, '$')] = v
+          end
+        end
+        hash
+      end
+
+      def self.restore_array(array)
+        array.each{|v| restore(v)}
       end
     end
   end
