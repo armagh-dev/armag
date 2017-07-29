@@ -27,6 +27,7 @@ require 'time'
 When(/^armagh's workflow config is "([^"]*)"$/) do |config|
   @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
   @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
+  @workflow.unused_output_docspec_check = false
 
   case config
     when 'test_actions'
@@ -428,6 +429,7 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     when 'action'
       @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
       @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
+      @workflow.unused_output_docspec_check = false
 
       config.merge! ({
         'action' => {'name' => 'test-action', 'active' => true},

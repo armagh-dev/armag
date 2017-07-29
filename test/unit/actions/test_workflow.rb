@@ -46,12 +46,22 @@ class TestWorkflow < Test::Unit::TestCase
     Armagh::Connection.stubs(:config).returns(@state_coll)
   end
 
-  def good_alice_in_db
+  def good_alice_in_db(check_unused_output = false)
     @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @alice.unused_output_docspec_check = check_unused_output
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
     end
     @alice
+  end
+
+  def good_fred_in_db(check_unused_output = false)
+    @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @fred.unused_output_docspec_check = check_unused_output
+    @fred_workflow_actions_config_values.each do |type,action_config_values|
+      @fred.create_action_config(type, action_config_values)
+    end
+    @fred
   end
 
   def bad_alice_in_db
@@ -116,6 +126,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal 'alice',alice.name
     assert_equal 'stop',alice.run_mode
     assert_equal false,alice.retired
+    assert_equal true,alice.unused_output_docspec_check
     assert_empty alice.valid_action_configs
     assert_true alice.has_no_cycles
   end
@@ -153,6 +164,17 @@ class TestWorkflow < Test::Unit::TestCase
                       "value" => false,
                       "warning" => nil,
                       "options" => nil},
+                     {"default" => true,
+                      "description" => "verify that there are no unused output docspecs",
+                      "error" => nil,
+                      "group" => "workflow",
+                      "name" => "unused_output_docspec_check",
+                      "prompt" => nil,
+                      "required" => true,
+                      "type" => "boolean",
+                      "value" => true,
+                      "warning" => nil,
+                      "options" => nil},
                      {"error" => nil, "group" => "workflow"}],
                 "type" => Armagh::Actions::Workflow}
     assert_equal expected, result
@@ -181,6 +203,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal 'alice',stored_alice.name
     assert_equal 'stop',stored_alice.run_mode
     assert_equal false,stored_alice.retired
+    assert_equal true,stored_alice.unused_output_docspec_check
     assert_empty stored_alice.valid_action_configs
     assert_true stored_alice.has_no_cycles
   end
@@ -647,4 +670,52 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal 'Workflow alice has no some_action action', e.message
   end
 
+  def test_setting_output_check_to_non_boolean_fails
+    alice = Armagh::Actions::Workflow.create(@config_store, 'alice')
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      alice.unused_output_docspec_check = 'boo'
+    end
+    assert_equal 'Must specify boolean value for unused_output_docspec_check', e.message
+  end
+
+  def test_setting_output_check_while_running_fails
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    assert_false @alice.unused_output_docspec_check
+    @alice.run
+    assert_true @alice.running?
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.unused_output_docspec_check = true
+    end
+    assert_equal 'Stop workflow before changing unused_output_docspec_check', e.message
+  end
+
+  def test_workflow_that_has_no_unused_outputs
+    @fred_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_no_unused_output('fred')
+    good_fred_in_db
+    assert_false @fred.unused_output_docspec_check
+    assert_nothing_raised do
+      @fred.unused_output_docspec_check = true
+    end
+    assert_true @fred.unused_output_docspec_check
+  end
+
+  def test_workflow_that_has_unused_outputs
+    good_alice_in_db
+    assert_false @alice.unused_output_docspec_check
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.unused_output_docspec_check = true
+    end
+    assert_equal 'Workflow has unused outputs: a_alicedoc_out:ready from consume_a_alicedoc_2, b_aliceconsume_out_doc:ready from consume_b_alicedoc_1, b_alicedocs_aggr:ready from divide_b_alicedocs', e.message
+    assert_false @alice.unused_output_docspec_check
+  end
+
+  def test_workflow_run_checks_unused_outputs
+    good_alice_in_db(true)
+    assert_true @alice.unused_output_docspec_check
+    e = assert_raise Armagh::Actions::WorkflowActivationError do
+      @alice.run
+    end
+    assert_equal 'Workflow has unused outputs: a_alicedoc_out:ready from consume_a_alicedoc_2, b_aliceconsume_out_doc:ready from consume_b_alicedoc_1, b_alicedocs_aggr:ready from divide_b_alicedocs', e.message
+  end
 end

@@ -46,6 +46,7 @@ class TestWorkflowSet < Test::Unit::TestCase
 
   def good_alice_in_db
     @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
     end
@@ -54,6 +55,7 @@ class TestWorkflowSet < Test::Unit::TestCase
 
   def good_fred_in_db
     @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @fred.unused_output_docspec_check = false
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
     end
@@ -205,8 +207,8 @@ class TestWorkflowSet < Test::Unit::TestCase
     end
 
     expected = [
-      {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41},
-      {"name"=>"fred", "run_mode"=>"run", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+      {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41},
+      {"name"=>"fred", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
     ]
 
     expect_alice_docs_in_db

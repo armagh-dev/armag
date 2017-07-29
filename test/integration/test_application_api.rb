@@ -63,6 +63,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def good_alice_in_db
     wf_set = Armagh::Actions::WorkflowSet.for_admin( Connection.config )
     @alice = wf_set.create_workflow( { 'workflow' => { 'name' => 'alice' }} )
+    @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
     end
@@ -304,7 +305,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflows
 
     good_alice_in_db
-    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}]
 
     get '/workflows.json' do
       assert last_response.ok?
@@ -316,7 +317,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow
     good_alice_in_db
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
     get '/workflow/alice/status.json' do
       result = JSON.parse(last_response.body)
       assert last_response.ok?
@@ -339,7 +340,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     expect_alice_docs_in_db
 
-    expected_result = {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
 
     patch '/workflow/alice/run.json' do
       assert last_response.ok?
@@ -353,7 +354,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     @alice.run
 
-    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
 
     patch '/workflow/alice/finish.json' do
       assert last_response.ok?
@@ -383,7 +384,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     @alice.run
     @alice.finish
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -399,7 +400,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     @alice.run
 
-    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )

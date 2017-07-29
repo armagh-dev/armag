@@ -42,6 +42,7 @@ module Armagh
 
       define_parameter name: 'run_mode', type: 'string', description: 'run, finish, or stop', required: true, default: 'stop', group: 'workflow'
       define_parameter name: 'retired',  type: 'boolean', description: 'not normally displayed', required: true, default: false, group: 'workflow'
+      define_parameter name: 'unused_output_docspec_check', type: 'boolean', description: 'verify that there are no unused output docspecs', required: true, default: true, group: 'workflow'
       define_group_validation_callback callback_class: Workflow, callback_method: 'check_run_mode'
 
       def self.check_run_mode(candidate_config)
@@ -107,6 +108,8 @@ module Armagh
         @valid_action_configs = []
         @invalid_action_configs = []
         @has_no_cycles = true
+        @check_unused_outputs = unused_output_docspec_check
+        @unused_outputs = {}
         load_action_configs
       end
 
@@ -168,6 +171,7 @@ module Armagh
         if actions_valid?
           @has_no_cycles = Workflow.actions_have_no_cycles?(@valid_action_configs)
         end
+        @check_unused_outputs = @config.workflow.unused_output_docspec_check
       end
 
       def retired
@@ -178,6 +182,33 @@ module Armagh
         raise(WorkflowConfigError, 'Stop workflow before retiring it') unless run_mode == 'stop'
         @config.update_merge({'workflow'=>{'retired'=>retire}})
         @notify_to_refresh&.refresh
+      end
+
+      def unused_output_message
+        unused = ''
+        @unused_outputs.each { |docspec, action| unused = unused + (unused.empty? ? '' : ', ') + "#{docspec} from #{action}" }
+        "Workflow has unused outputs: #{unused}"
+      end
+
+      def unused_output_docspec_check
+        @config.workflow.unused_output_docspec_check
+      end
+
+      def unused_output_docspec_check=(val)
+        return if val == unused_output_docspec_check
+        raise(WorkflowConfigError, 'Must specify boolean value for unused_output_docspec_check') unless val == true || val == false
+        raise(WorkflowConfigError, 'Stop workflow before changing unused_output_docspec_check') unless run_mode == 'stop'
+        @check_unused_outputs = val
+        raise(WorkflowConfigError, unused_output_message) if val && has_unused_output?
+        @config.update_merge({'workflow'=>{'unused_output_docspec_check'=>val}})
+        @notify_to_refresh&.refresh
+      end
+
+      def has_unused_output?
+        return @unused_outputs.any? unless @check_unused_outputs
+        @unused_outputs = Workflow.find_unused_output_docspecs(@valid_action_configs)
+        @check_unused_outputs = false # no need to recheck unless config changes
+        @unused_outputs.any?
       end
 
       def actions_valid?
@@ -199,6 +230,7 @@ module Armagh
       def run
         raise(WorkflowActivationError, 'Workflow not valid') unless valid?
         raise(WorkflowActivationError, 'Wait for workflow to stop before restarting' ) unless run_mode == 'stop'
+        raise(WorkflowActivationError, unused_output_message) if has_unused_output?
         change_actions_active_status(true)
         @config.update_merge({'workflow'=>{'run_mode' => 'run'}})
 
@@ -255,6 +287,18 @@ module Armagh
         return true
       end
 
+      def Workflow.find_unused_output_docspecs(action_configs)
+        inputs  = {}
+        outputs = {}
+        action_configs.each do |config|
+          inputs[config.input.docspec] = config.action.name
+          config.find_all_parameters{ |p| p.group == 'output' and p.type == 'docspec' }.each do |out_spec|
+            outputs[out_spec.value] = config.action.name
+          end
+        end
+        outputs.delete_if { |k, v| inputs.has_key?(k) }
+      end
+
       private def change_actions_active_status( active, collect_actions_only: false )
         @valid_action_configs.reject{ |a| collect_actions_only && !(a.__type < Collect) }.each do |action_config|
           action_config.update_merge( { 'action' => { 'active' => active }} )
@@ -266,6 +310,7 @@ module Armagh
         { 'name' => @name,
           'run_mode' => run_mode,
           'retired' => retired,
+          'unused_output_docspec_check' => unused_output_docspec_check,
           'working_docs_count' => working_docs_count,
           'failed_docs_count'  => failed_docs_count,
           'published_pending_consume_docs_count' => published_pending_consume_docs_count,

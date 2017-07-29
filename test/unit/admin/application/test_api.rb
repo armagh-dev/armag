@@ -80,6 +80,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def good_alice_in_db
     @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
     end
@@ -93,6 +94,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def good_fred_in_db
     @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @fred.unused_output_docspec_check = false
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
     end
@@ -252,7 +254,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     expect_fred_docs_in_db
 
-    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}, {"name"=>"fred", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}, {"name"=>"fred", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50}]
 
     assert_equal expected_result, @api.get_workflows
   end
@@ -286,13 +288,13 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_fred_in_db
 
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
     assert_equal expected_result, @api.get_workflow_status( 'alice' )
   end
 
   def test_new_workflow
     params = @api.new_workflow
-    assert_equal 'workflow:run_mode|workflow:retired', params.collect{ |p| "#{p['group']}:#{p['name']}" }.join('|')
+    assert_equal 'workflow:run_mode|workflow:retired|workflow:unused_output_docspec_check', params.collect{ |p| "#{p['group']}:#{p['name']}" }.join('|')
     assert_equal [], params.collect{ |p| p['value'] }.compact
   end
 
@@ -310,7 +312,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     wf = @api.create_workflow( { 'workflow' => { 'name' => test_wf_name }})
     assert_equal test_wf_name, wf.name
-    expected_response = {"name"=>test_wf_name, "run_mode"=>"stop", "retired"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_response = {"name"=>test_wf_name, "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
     assert_equal expected_response,@api.get_workflow_status( test_wf_name )
   end
 

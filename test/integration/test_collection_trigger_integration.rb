@@ -81,6 +81,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
 
     @workflow_set = Armagh::Actions::WorkflowSet.for_agent(@config_store)
     @wf = @workflow_set.create_workflow( {'workflow' => { 'name' => 'wf'}})
+    @wf.unused_output_docspec_check = false
     @collect_config = Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'collect_action', collected_doctype: 'collect_type')
     Armagh::StandardActions::SplitActionForTest.make_test_config(workflow: @wf, action_name: 'split_action', input_doctype: 'incoming_split', output_doctype: 'outgoing_split')
 

@@ -108,6 +108,16 @@ module Armagh
         val
       end
     end
+
+    class TWTestConsumeNilOutput < Actions::Consume
+
+      def self.make_config_values(action_name:, input_doctype:)
+        {
+          'action' => { 'name' => action_name },
+          'input'  => { 'docspec' => Armagh::Documents::DocSpec.new( input_doctype, DS_PUBLISHED) }
+        }
+      end
+    end
   end
 end
 
@@ -194,6 +204,16 @@ module WorkflowGeneratorHelper
     }[1][ 'input' ][ 'docspec' ] = big_doc_docspec
 
     configs
+  end
+
+  def self.workflow_actions_config_values_with_no_unused_output(workflow_name)
+    consume_class = "Armagh::StandardActions::TWTestConsume"
+    # start with the usual array of actions
+    configs = workflow_actions_config_values_no_divide(workflow_name)
+    # delete the output docspec from the consumers
+    configs.each{ |class_name, values| values.delete("output") if class_name == consume_class }
+    # change the consumer actions to a consumer class that expects no output docspec
+    configs.map{ |class_name, values| class_name == consume_class ? [ class_name + "NilOutput", values ] : [ class_name, values ] }
   end
 
   def self.break_array_config_store( config_store, workflow_name)

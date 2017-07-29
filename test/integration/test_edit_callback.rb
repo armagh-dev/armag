@@ -70,6 +70,7 @@ class TestEditCallback < Test::Unit::TestCase
     config_store = []
     workflow_set = Armagh::Actions::WorkflowSet.for_agent( config_store )
     wf = workflow_set.create_workflow( {'workflow' => { 'name' => 'test_wf'}})
+    wf.unused_output_docspec_check = false
     wf.create_action_config(
       'Armagh::StandardActions::TestSplitter', 
       { 'action' => { 'name' => 'test_splitter' },
