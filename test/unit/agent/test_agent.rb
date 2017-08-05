@@ -349,7 +349,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:copyright=, action_doc.copyright)
     doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED)
     doc.expects(:document_timestamp=)
-    doc.expects(:add_pending_actions).with(pending_actions)
+    doc.expects(:add_items_to_pending_actions).with(pending_actions)
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
     doc.expects(:finish_processing).at_least_once
@@ -440,7 +440,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:copyright=, action_doc.copyright)
     doc.expects(:state=, Armagh::Documents::DocState::PUBLISHED)
     doc.expects(:document_timestamp=)
-    doc.expects(:add_pending_actions).with(pending_actions)
+    doc.expects(:add_items_to_pending_actions).with(pending_actions)
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
     doc.expects(:finish_processing).at_least_once

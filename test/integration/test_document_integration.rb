@@ -184,7 +184,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
           document_timestamp: nil)
         n += 1
         if failed
-          doc.add_dev_error( 'bad_action', 'error_msg_here')
+          doc.add_error_to_dev_errors( 'bad_action', 'error_msg_here')
           doc.save
         end
       end

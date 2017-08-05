@@ -213,17 +213,17 @@ class TestDocument < Test::Unit::TestCase
     assert_empty(@doc.pending_actions)
     assert_false(@doc.pending_work?)
 
-    @doc.add_pending_actions(pending_actions)
+    @doc.add_items_to_pending_actions(pending_actions)
     assert_equal(3, @doc.pending_actions.length)
     assert_true(@doc.pending_work?)
 
     pending_actions.each_with_index do |action, idx|
-      @doc.remove_pending_action(action)
+      @doc.remove_item_from_pending_actions(action)
       assert_equal(3-(1+idx), @doc.pending_actions.length)
     end
     assert_false(@doc.pending_work?)
 
-    @doc.add_pending_actions(pending_actions)
+    @doc.add_items_to_pending_actions(pending_actions)
     assert_true @doc.pending_work?
     @doc.clear_pending_actions
     assert_false @doc.pending_work?
@@ -238,7 +238,7 @@ class TestDocument < Test::Unit::TestCase
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
       {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
     assert_equal(2, @doc.dev_errors.length)
     assert_true @doc.error?
@@ -258,14 +258,14 @@ class TestDocument < Test::Unit::TestCase
 
       assert_kind_of(Time, db_details['timestamp'])
 
-      @doc.remove_dev_error(name)
+      @doc.remove_error_from_dev_errors(name)
       assert_false(@doc.dev_errors.has_key?(name))
     end
 
     assert_empty @doc.dev_errors
     assert_false @doc.error?
 
-    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
     assert_true @doc.error?
 
@@ -282,7 +282,7 @@ class TestDocument < Test::Unit::TestCase
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
       {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each { |f| @doc.add_ops_error(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_error_to_ops_errors(f[:name], f[:details]) }
 
     assert_equal(2, @doc.ops_errors.length)
     assert_true @doc.error?
@@ -302,14 +302,14 @@ class TestDocument < Test::Unit::TestCase
 
       assert_kind_of(Time, db_details['timestamp'])
 
-      @doc.remove_ops_error(name)
+      @doc.remove_error_from_ops_errors(name)
       assert_false(@doc.ops_errors.has_key?(name))
     end
 
     assert_empty @doc.ops_errors
     assert_false @doc.error?
 
-    failures.each { |f| @doc.add_ops_error(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_error_to_ops_errors(f[:name], f[:details]) }
 
     assert_true @doc.error?
 
@@ -323,7 +323,7 @@ class TestDocument < Test::Unit::TestCase
     assert_false @doc.error?
 
     pending_actions = %w(Action1 Action2 Action3)
-    @doc.add_pending_actions pending_actions
+    @doc.add_items_to_pending_actions pending_actions
 
     assert_true @doc.pending_work?
     assert_false @doc.error?
@@ -332,7 +332,7 @@ class TestDocument < Test::Unit::TestCase
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
       {name: 'failed_action2', details: 'string error'},
     ]
-    failures.each { |f| @doc.add_dev_error(f[:name], f[:details]) }
+    failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
     assert_false @doc.pending_work?
     assert_true @doc.error?
@@ -399,8 +399,8 @@ class TestDocument < Test::Unit::TestCase
 
   def test_collection_task_ids
     assert_empty @doc.collection_task_ids
-    @doc.collection_task_ids = [1]
-    @doc.collection_task_ids << 2
+    @doc.add_item_to_collection_task_ids 1
+    @doc.add_item_to_collection_task_ids 2
     assert_equal([1, 2], @doc.collection_task_ids)
   end
 
@@ -726,7 +726,7 @@ class TestDocument < Test::Unit::TestCase
 
     Armagh::Document.expects(:db_replace).with({:_id => 'internal_id'}, has_entries(expected_values), failures)
 
-    @doc.add_dev_error('test_action', 'Failure Details')
+    @doc.add_error_to_dev_errors('test_action', 'Failure Details')
     @doc.save
   end
 
@@ -804,6 +804,7 @@ class TestDocument < Test::Unit::TestCase
     version = '12345abcdefh'
     Armagh::Document.version['armagh'] = version
     assert_equal({'armagh' => version}, Armagh::Document.version)
+    Armagh::Document.version.delete 'armagh'
   end
 
   def test_version
@@ -812,11 +813,12 @@ class TestDocument < Test::Unit::TestCase
     Armagh::Document.version['armagh'] = version
     @doc.save
     assert_equal({'armagh' => version}, @doc.version)
+    Armagh::Document.version.delete 'armagh'
   end
 
   def test_clear_errors
-    @doc.add_dev_error('test', 'test')
-    @doc.add_ops_error('test', 'test')
+    @doc.add_error_to_dev_errors('test', 'test')
+    @doc.add_error_to_ops_errors('test', 'test')
     assert_false @doc.dev_errors.empty?
     assert_false @doc.ops_errors.empty?
     @doc.clear_errors
@@ -883,9 +885,9 @@ class TestDocument < Test::Unit::TestCase
       archive_files: @doc.archive_files,
       source: @doc.source,
       document_timestamp: @doc.document_timestamp,
+      version: @doc.version,
       document_id: @doc.document_id,
       state: @doc.state,
-      version: @doc.version,
       _id: @doc.internal_id
     }.to_json
     assert_equal(expected, @doc.to_json)

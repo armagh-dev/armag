@@ -1125,7 +1125,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       doc = Armagh::Document.create(type: 'TestType', content: { 'text' => 'bogusness' }, raw: 'raw', metadata: {},
                                     pending_actions: [], state: Armagh::Documents::DocState::READY, document_id: "id_#{i}",
                                     collection_task_ids: [ '123' ], document_timestamp: Time.now )
-      doc.add_dev_error('test_action', 'details')
+      doc.add_error_to_dev_errors('test_action', 'details')
       doc.save
     end
 

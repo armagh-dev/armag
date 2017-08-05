@@ -391,7 +391,7 @@ module Armagh
 
           doc.published_timestamp = timestamp
           doc.state = action.config.output.docspec.state unless doc.error?
-          doc.add_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))
+          doc.add_items_to_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
           @collection_task_ids = doc.collection_task_ids

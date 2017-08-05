@@ -35,10 +35,59 @@ module Armagh
       Connection.documents
     end
 
-    attr_accessor :published_id
-
     def self.version
       @version ||= {}
+    end
+
+    attr_accessor :published_id
+    delegated_attr_accessor       :document_id
+    delegated_attr_accessor       :version
+    delegated_attr_accessor       :title
+    delegated_attr_accessor       :copyright
+    delegated_attr_accessor       :published_timestamp, after_return: :get_ts_utc
+    delegated_attr_accessor_array :collection_task_ids
+    delegated_attr_accessor       :source
+    delegated_attr_accessor       :document_timestamp,  after_return: :get_ts_utc
+    delegated_attr_accessor       :display
+    delegated_attr_accessor       :content
+    delegated_attr_accessor       :metadata
+    delegated_attr_accessor       :type
+    delegated_attr_accessor_array :archive_files
+    delegated_attr_accessor       :raw,                 validates_with: :validate_raw,  after_return: :get_raw_data
+    delegated_attr_accessor       :state,               validates_with: :validate_state
+    delegated_attr_accessor_array :pending_actions,     after_change: :update_pending_work
+    delegated_attr_accessor       :error
+    delegated_attr_accessor_errors :dev_errors,         after_change: :update_pending_work
+    delegated_attr_accessor_errors :ops_errors,         after_change: :update_pending_work
+    delegated_attr_accessor       :pending_work
+
+    alias_method :add_dev_error, :add_error_to_dev_errors
+    alias_method :remove_dev_error, :remove_error_from_dev_errors
+    alias_method :add_ops_error, :add_error_to_ops_errors
+    alias_method :remove_ops_error, :remove_error_from_ops_errors
+
+    def validate_raw(raw)
+      if raw.is_a?(String)
+        BSON::Binary.new(raw)
+      elsif raw.nil?
+        nil
+      elsif raw.is_a?(BSON::Binary)
+        raw
+      else
+        raise TypeError, 'Value for raw expected to be a string.'
+      end
+    end
+
+    def get_raw_data(raw)
+      raw&.data
+    end
+
+    def validate_state(state)
+      if Documents::DocState.valid_state?(state)
+        state
+      else
+        raise Documents::Errors::DocStateError.new "Tried to set state to an unknown state: '#{state}'."
+      end
     end
 
     def self.create(type:,
@@ -56,6 +105,7 @@ module Armagh
       document_timestamp:,
       display: nil,
       new: false,
+      version: {},
       logger: nil)
       doc = Document.new
       doc.type = type
@@ -63,15 +113,16 @@ module Armagh
       doc.raw = raw
       doc.metadata = metadata
       doc.document_id = document_id
-      doc.add_pending_actions pending_actions
+      doc.add_items_to_pending_actions pending_actions
       doc.state = state
       doc.title = title if title
       doc.copyright = copyright if copyright
       doc.source = source.to_hash if source
-      doc.collection_task_ids = collection_task_ids
-      doc.archive_files = archive_files
+      doc.add_items_to_collection_task_ids collection_task_ids
+      doc.add_items_to_archive_files archive_files
       doc.document_timestamp = document_timestamp if document_timestamp
       doc.display = display if display
+      doc.version = version
       doc.save(new: new, logger: logger)
       doc
     end
@@ -82,7 +133,7 @@ module Armagh
       doc.document_id = Armagh::Support::Random.random_id
       doc.type = type
       doc.state = state
-      doc.add_pending_actions pending_actions
+      doc.add_items_to_pending_actions pending_actions
       doc.metadata = {}
       doc.content = {}
       doc.raw = nil 
@@ -99,7 +150,7 @@ module Armagh
     def self.from_action_document(action_doc, pending_actions = [])
       doc = Document.new
       doc.update_from_draft_action_document(action_doc)
-      doc.add_pending_actions pending_actions
+      doc.add_items_to_pending_actions pending_actions
       doc
     end
 
@@ -297,6 +348,7 @@ module Armagh
         'archive_files' => [],
         'source' => {},
         'document_timestamp' => nil,
+        'version' => {},
         'display' => nil
       }
       h.merge! image
@@ -304,69 +356,6 @@ module Armagh
       super(h)
     end
 
-    def document_id
-      @db_doc['document_id']
-    end
-
-    def document_id=(id)
-      @db_doc['document_id'] = id
-    end
-
-    def title
-      @db_doc['title']
-    end
-
-    def title=(title)
-      @db_doc['title'] = title
-    end
-
-    def copyright
-      @db_doc['copyright']
-    end
-
-    def copyright=(copyright)
-      @db_doc['copyright'] = copyright
-    end
-
-    def published_timestamp
-      @db_doc['published_timestamp']&.utc
-    end
-
-    def published_timestamp=(ts)
-      @db_doc['published_timestamp'] = ts
-    end
-
-    def collection_task_ids
-      @db_doc['collection_task_ids']
-    end
-
-    def collection_task_ids=(collection_task_ids)
-      @db_doc['collection_task_ids'] = collection_task_ids
-    end
-
-    def source
-      @db_doc['source']
-    end
-
-    def source=(source)
-      @db_doc['source'] = source
-    end
-
-    def document_timestamp
-      @db_doc['document_timestamp']&.utc
-    end
-
-    def document_timestamp=(document_timestamp)
-      @db_doc['document_timestamp'] = document_timestamp
-    end
-
-    def display
-      @db_doc['display']
-    end
-
-    def display=(display)
-      @db_doc['display'] = display
-    end
 
     def locked?
       # only return true or false
@@ -375,126 +364,6 @@ module Armagh
 
     def locked_by
       @db_doc['locked'] || nil
-    end
-
-    def content=(content)
-      @db_doc['content'] = content
-    end
-
-    def content
-      @db_doc['content']
-    end
-
-    def raw=(raw_data)
-      if raw_data.is_a?(String)
-        @db_doc['raw'] = BSON::Binary.new(raw_data)
-      elsif raw_data.nil?
-        @db_doc['raw'] = nil
-      elsif raw_data.is_a?(BSON::Binary)
-        @db_doc['raw'] = raw_data
-      else
-        raise TypeError, 'Value for raw expected to be a string.'
-      end
-    end
-
-    def raw
-      @db_doc['raw']&.data
-    end
-
-    def metadata
-      @db_doc['metadata']
-    end
-
-    def metadata=(meta)
-      @db_doc['metadata'] = meta
-    end
-
-    def type=(type)
-      @db_doc['type'] = type
-    end
-
-    def type
-      @db_doc['type']
-    end
-
-    def version
-      @db_doc['version']
-    end
-
-    def archive_files
-      @db_doc['archive_files']
-    end
-
-    def archive_files=(archive_files)
-      @db_doc['archive_files'] = archive_files
-    end
-
-    def pending_actions
-      @db_doc['pending_actions']
-    end
-
-    def add_pending_actions(*actions)
-      self.pending_actions.concat(actions.flatten.compact)
-      update_pending_work
-    end
-
-    def remove_pending_action(action)
-      self.pending_actions.delete(action)
-      update_pending_work
-    end
-
-    def clear_pending_actions
-      self.pending_actions.clear
-      update_pending_work
-    end
-
-    def add_dev_error(action_name, details)
-      self.dev_errors[action_name] ||= []
-
-      if details.is_a? Exception
-        self.dev_errors[action_name] << Utils::ExceptionHelper.exception_to_hash(details)
-      else
-        self.dev_errors[action_name] << {'message' => details.to_s, 'timestamp' => Time.now.utc}
-      end
-      update_pending_work
-    end
-
-    def remove_dev_error(action)
-      self.dev_errors.delete(action)
-      update_pending_work
-    end
-
-    def clear_dev_errors
-      self.dev_errors.clear
-      update_pending_work
-    end
-
-    def dev_errors
-      @db_doc['dev_errors']
-    end
-
-    def add_ops_error(action_name, details)
-      self.ops_errors[action_name] ||= []
-      if details.is_a? Exception
-        self.ops_errors[action_name] << Utils::ExceptionHelper.exception_to_hash(details)
-      else
-        self.ops_errors[action_name] << {'message' => details.to_s, 'timestamp' => Time.now.utc}
-      end
-      update_pending_work
-    end
-
-    def remove_ops_error(action)
-      self.ops_errors.delete(action)
-      update_pending_work
-    end
-
-    def clear_ops_errors
-      self.ops_errors.clear
-      update_pending_work
-    end
-
-    def ops_errors
-      @db_doc['ops_errors']
     end
 
     def clear_errors
@@ -507,11 +376,11 @@ module Armagh
     end
 
     def error?
-      errors.any?
+      dev_errors.any? || ops_errors.any?
     end
 
     def pending_work?
-      @db_doc['pending_work'] ? true : false
+      pending_work ? true : false
     end
 
     def finish_processing(logger)
@@ -522,18 +391,18 @@ module Armagh
 
     def save(new: false, logger: nil)
       self.mark_timestamp
-      @db_doc['version'] = self.class.version
+      self.version = self.class.version
       self.collection_task_ids.uniq!
       self.archive_files.uniq!
 
       if error?
-        @db_doc['error'] = true
+        self.error = true
       else
-        @db_doc.delete 'error'
+        delete_error
       end
 
-      @db_doc = Armagh::Support::Encoding.fix_encoding(@db_doc, proposed_encoding: @db_doc['source']['encoding'], logger: logger)
-      Armagh::Utils::DBDocHelper.clean_model(self)
+      fix_encoding( source['encoding'], logger: logger)
+      clean_model
 
       delete_orig = false
 
@@ -576,18 +445,6 @@ module Armagh
       @published_id = nil
     rescue => e
       raise Connection.convert_mongo_exception(e, id: document_id, type_class: self.class)
-    end
-
-    def state
-      @db_doc['state']
-    end
-
-    def state=(state)
-      if Documents::DocState.valid_state?(state)
-        @db_doc['state'] = state
-      else
-        raise Documents::Errors::DocStateError.new "Tried to set state to an unknown state: '#{state}'."
-      end
     end
 
     def ready?
@@ -678,12 +535,13 @@ module Armagh
       @abort = false
     end
 
-    private def update_pending_work
-      if self.pending_actions.any? && !error?
-        @db_doc['pending_work'] = true
+    private def update_pending_work( _pending_actions=nil)
+      if pending_actions.any? && !error?
+        self.pending_work = true
       else
-        @db_doc.delete 'pending_work'
+        delete_pending_work
       end
+      pending_actions
     end
   end
 end
