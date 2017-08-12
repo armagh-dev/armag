@@ -538,16 +538,23 @@ class TestAgent < Test::Unit::TestCase
     })
     action_name = action.config.action.name
 
-    action.expects(:collect).with()
+    action.expects(:collect).at_least_once
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    pending_actions = [action_name]
+
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
+    collection = mock(name: 'published_collection')
+    Armagh::Connection.stubs(:documents).returns(collection)
+
+    doc.expects(:published?).returns(true)
+    doc.expects(:type).returns('DevErrorType')
+
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
 
-    doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
@@ -555,12 +562,15 @@ class TestAgent < Test::Unit::TestCase
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @logger.expects(:warn)
+    @logger.expects(:warn).with("Error executing action 'testc' on 'document_id'.  See document (in the published_collection collection) for details.")
+
 
     @default_agent.instance_variable_set(:@running, true)
 
     Thread.new { @default_agent.send(:run) }
     sleep THREAD_SLEEP_TIME
+
+    assert_equal([action_name], pending_actions)
   end
 
   def test_run_action_with_ops_errors
@@ -572,17 +582,23 @@ class TestAgent < Test::Unit::TestCase
     })
     action_name = action.config.action.name
 
-    action.expects(:collect).with()
+    action.expects(:collect).at_least_once
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    pending_actions = [action_name]
+
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
+    collection = mock(name: 'documents')
+    Armagh::Connection.stubs(:documents).returns(collection)
+
+    doc.expects(:published?).returns(false)
+
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
     doc.expects(:dev_errors).returns({})
 
-    doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
@@ -590,12 +606,14 @@ class TestAgent < Test::Unit::TestCase
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
-    @logger.expects(:warn)
+    @logger.expects(:warn).with("Error executing action 'testc' on 'document_id'.  See document (in the documents collection) for details.")
 
     @default_agent.instance_variable_set(:@running, true)
 
     Thread.new { @default_agent.send(:run) }
     sleep THREAD_SLEEP_TIME
+
+    assert_equal([action_name], pending_actions)
   end
 
   def test_run_collect_abort

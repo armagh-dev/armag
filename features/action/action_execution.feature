@@ -406,7 +406,7 @@ Feature: Actions Execution
     Then I should see a "UnimplementedSplitInputDocument" in "failures" with the following
       | document_id     | '123'                                                                                                                                                                                                               |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                         |
-      | pending_actions | []                                                                                                                                                                                                                  |
+      | pending_actions | ['unimplemented_splitter']                                                                                                                                                                                                                  |
       | dev_errors      | {'unimplemented_splitter' => [{'class' => 'Armagh::Actions::Errors::ActionMethodNotImplemented', 'message' => 'Split actions must overwrite the split method.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
       | ops_errors      | {}                                                                                                                                                                                                                  |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                      |
@@ -438,7 +438,7 @@ Feature: Actions Execution
     And I should see a "BadPublishDocument" in "failures" with the following
       | document_id     | '123'                                                                                                        |
       | metadata        | {'meta' => 'incoming meta'}                                                                                  |
-      | pending_actions | []                                                                                                           |
+      | pending_actions | ['bad_publisher']                                                                                                           |
       | dev_errors      | {'bad_publisher' => [{'class' => 'RuntimeError', 'message' => 'poorly implemented', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                           |
       | content         | {'text' => 'incoming content'}                                                                               |
@@ -470,7 +470,7 @@ Feature: Actions Execution
     Then I should see a "BadConsumeDocument" in "documents.BadConsumeDocument" with the following
       | document_id     | '123'                                                                                                       |
       | metadata        | {'meta' => 'published metadata'}                                                                            |
-      | pending_actions | []                                                                                                          |
+      | pending_actions | ['bad_consumer']                                                                                                          |
       | dev_errors      | {'bad_consumer' => [{'class' => 'RuntimeError', 'message' => 'poorly implemented', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                          |
       | content         | {'content' => 'published content'}                                                                          |
@@ -502,7 +502,7 @@ Feature: Actions Execution
     Then I should see a "__COLLECT__too_large_collector" in "failures" with the following
       | document_id     | 'incoming'                                                                                                                                                                                                                                    |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                   |
-      | pending_actions | []                                                                                                                                                                                                                                            |
+      | pending_actions | ['too_large_collector']                                                                                                                                                                                                                                            |
       | dev_errors      | {}                                                                                                                                                                                                                                            |
       | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything'}]} |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                |
@@ -565,7 +565,7 @@ Feature: Actions Execution
     Then I should see a "EditCurrentInputDocType" in "failures" with the following
       | document_id     | 'incoming'                                                                                                                                                                                                                                            |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                           |
-      | pending_actions | []                                                                                                                                                                                                                                                    |
+      | pending_actions | ['edit_current_splitter']                                                                                                                                                                                                                                                    |
       | dev_errors      | {'edit_current_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentError', 'message' => 'Cannot edit document \'incoming\'.  It is the same document that was passed into the action.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
       | ops_errors      | {}                                                                                                                                                                                                                                                    |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                        |
@@ -598,7 +598,7 @@ Feature: Actions Execution
     And I should see a "UpdateErrorInputDocType" in "failures" with the following
       | document_id     | 'incoming'                                                                                                |
       | metadata        | {'meta' => 'incoming meta'}                                                                               |
-      | pending_actions | []                                                                                                        |
+      | pending_actions | ['update_error_splitter']                                                                                                        |
       | dev_errors      | {'update_error_splitter' => [{'class' => 'RuntimeError', 'message' => 'Failure', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                        |
       | content         | {'text' => 'incoming content'}                                                                            |
@@ -640,7 +640,7 @@ Feature: Actions Execution
     And I should see a "NotifyDevDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
-      | pending_actions | []                                             |
+      | pending_actions | ['notify_dev']                                             |
       | dev_errors      | {'notify_dev' => [{'message' => 'Dev Error'}]} |
       | ops_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |
@@ -672,7 +672,7 @@ Feature: Actions Execution
     And I should see a "NotifyOpsDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
-      | pending_actions | []                                             |
+      | pending_actions | ['notify_ops']                                             |
       | ops_errors      | {'notify_ops' => [{'message' => 'Ops Error'}]} |
       | dev_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |

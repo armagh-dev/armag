@@ -273,6 +273,8 @@ module Armagh
         @backoff.reset
 
         @current_doc.pending_actions.delete_if do |name|
+          action_success = true
+
           if @current_doc.error?
             @logger.info("Skipping further actions on document '#{@current_doc.document_id}' since it has errors.")
             break
@@ -315,9 +317,13 @@ module Armagh
             @backoff.interruptible_backoff { !@running }
           end
 
-          @logger.warn "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document for details." if @current_doc.dev_errors.any? || @current_doc.ops_errors.any?
+          if @current_doc.dev_errors.any? || @current_doc.ops_errors.any?
+            collection_name = @current_doc.published? ? Connection.documents(@current_doc.type).name : Connection.documents.name
+            @logger.warn "Error executing action '#{name}' on '#{@current_doc.document_id}'.  See document (in the #{collection_name} collection) for details."
+            action_success = false
+          end
 
-          true # Always remove this action from pending
+          action_success
         end #delete_if
         @current_doc.raw = nil if @current_doc.pending_actions.empty?
         @current_doc.finish_processing(@logger)

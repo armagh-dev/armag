@@ -254,7 +254,7 @@ module Armagh
     end
 
     def refresh_config
-      @logger.debug 'Checking for updating configuration'
+      @logger.debug 'Checking for updated configuration'
 
       # Explicitly call them all out to refresh all if there any any to refresh
       config = @config.refresh
