@@ -37,8 +37,7 @@ module Armagh
           response.stubs(:body).returns({'message'=>'stuff'}.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
           result = @admin_gui.send(:get_json, 'ok.url')
-          expected = {'message'=>'stuff'}
-          assert_equal expected, result
+          assert_equal 'stuff', result
         end
 
         def test_private_get_json_error
@@ -71,8 +70,7 @@ module Armagh
           response.stubs(:body).returns({'message'=>'stuff'}.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
           result = @admin_gui.send(:get_json_with_status, 'ok.url')
-          data = {'message'=>'stuff'}
-          assert_equal [:ok, data], result
+          assert_equal [:success, 'stuff'], result
         end
 
         def test_private_post_json
@@ -82,19 +80,17 @@ module Armagh
           response.stubs(:body).returns(data.to_json)
           HTTPClient.any_instance.expects(:post).once.returns(response)
           result = @admin_gui.send(:post_json, 'ok.url')
-          expected = [:ok, data]
-          assert_equal expected, result
+          assert_equal [:success, 'value'], result
         end
 
         def test_private_post_json_error
           response = mock('response')
           response.stubs(:status).returns(400)
-          data = {'message'=>'some error'}
+          data = 'some error'
           response.stubs(:body).returns({'client_error_detail'=>data}.to_json)
           HTTPClient.any_instance.expects(:post).once.returns(response)
           result = @admin_gui.send(:post_json, 'error.url')
-          expected = [:error, data]
-          assert_equal expected, result
+          assert_equal [:error, data], result
         end
 
         def test_private_post_json_http_404
@@ -104,7 +100,7 @@ module Armagh
           response.stubs(:body).returns('body')
           HTTPClient.any_instance.expects(:post).once.returns(response)
           result = @admin_gui.send(:post_json, 'missing.url')
-          expected = {'message' => 'API HTTP post request to http://127.0.0.1:4599/missing.url failed with status 404 not found'}
+          expected = 'API HTTP post request to http://127.0.0.1:4599/missing.url failed with status 404 not found'
           assert_equal [:error, expected], result
         end
 
@@ -115,19 +111,17 @@ module Armagh
           response.stubs(:body).returns(data.to_json)
           HTTPClient.any_instance.expects(:put).once.returns(response)
           result = @admin_gui.send(:put_json, 'ok.url')
-          expected = [:ok, data]
-          assert_equal expected, result
+          assert_equal [:success, 'value'], result
         end
 
         def test_private_put_json_error
           response = mock('response')
           response.stubs(:status).returns(400)
-          data = {'message'=>'some error'}
+          data = 'some error'
           response.stubs(:body).returns({'client_error_detail'=>data}.to_json)
           HTTPClient.any_instance.expects(:put).once.returns(response)
           result = @admin_gui.send(:put_json, 'error.url')
-          expected = [:error, data]
-          assert_equal expected, result
+          assert_equal [:error, data], result
         end
 
         def test_private_put_json_http_404
@@ -137,7 +131,7 @@ module Armagh
           response.stubs(:body).returns('body')
           HTTPClient.any_instance.expects(:put).once.returns(response)
           result = @admin_gui.send(:put_json, 'missing.url')
-          expected = {'message' => 'API HTTP put request to http://127.0.0.1:4599/missing.url failed with status 404 not found'}
+          expected = 'API HTTP put request to http://127.0.0.1:4599/missing.url failed with status 404 not found'
           assert_equal [:error, expected], result
         end
 
@@ -148,19 +142,17 @@ module Armagh
           response.stubs(:body).returns(data.to_json)
           HTTPClient.any_instance.expects(:patch).once.returns(response)
           result = @admin_gui.send(:patch_json, 'ok.url')
-          expected = [:ok, data]
-          assert_equal expected, result
+          assert_equal [:success, 'value'], result
         end
 
         def test_private_patch_json_error
           response = mock('response')
           response.stubs(:status).returns(400)
-          data = {'message'=>'some error'}
+          data = 'some error'
           response.stubs(:body).returns({'client_error_detail'=>data}.to_json)
           HTTPClient.any_instance.expects(:patch).once.returns(response)
           result = @admin_gui.send(:patch_json, 'error.url')
-          expected = [:error, data]
-          assert_equal expected, result
+          assert_equal [:error, data], result
         end
 
         def test_private_patch_json_http_404
@@ -170,7 +162,7 @@ module Armagh
           response.stubs(:body).returns('body')
           HTTPClient.any_instance.expects(:patch).once.returns(response)
           result = @admin_gui.send(:patch_json, 'missing.url')
-          expected = {'message' => 'API HTTP patch request to http://127.0.0.1:4599/missing.url failed with status 404 not found'}
+          expected = 'API HTTP patch request to http://127.0.0.1:4599/missing.url failed with status 404 not found'
           assert_equal [:error, expected], result
         end
 
@@ -184,8 +176,7 @@ module Armagh
           HTTPClient.any_instance.stubs(:new).returns(http)
           HTTPClient.any_instance.stubs(:get).returns(response)
           result = @admin_gui.send(:get_json, 'fake.url')
-          expected = {'message'=>
-            'API HTTP get request to http://127.0.0.1:4599/fake.url failed with status 200 ok'}
+          expected = {'message'=> 'API HTTP get request to http://127.0.0.1:4599/fake.url failed with status 200 ok'}
           assert_equal expected, result
         end
 
@@ -196,14 +187,103 @@ module Armagh
           assert_equal 'Unrecognized HTTP method: unknown', e.message
         end
 
-        def test_set_auth
-          @admin_gui.set_auth('hacker', 'secret')
-          assert_equal 'hacker', @admin_gui.instance_variable_get(:@username)
-          assert_equal 'secret', @admin_gui.instance_variable_get(:@password)
-        end
-
         def test_root_directory
           assert_match(/\/lib\/armagh\/admin\/application\/www_root$/, @admin_gui.root_directory)
+        end
+
+        def test_private_set_auth
+          username = 'hacker'
+          password = 'secret'
+          @admin_gui.send(:set_auth, username, password)
+          assert_equal username, @admin_gui.instance_variable_get(:@username)
+          assert_equal password, @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_login
+          username = 'hacker'
+          password = 'secret'
+          @admin_gui.expects(:get_json_with_status).once.with('/authenticate.json').returns(:success)
+          users = [{"roles"=>[], "username"=>username, "name"=>"Neo", "id"=>"123"}]
+          @admin_gui.expects(:get_json).with('/users.json').once.returns(users)
+          result = @admin_gui.login(username, password)
+          assert_equal [:success, {id: '123', name: 'Neo', roles: []}], result
+          assert_equal username, @admin_gui.instance_variable_get(:@username)
+          assert_equal password, @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_login_empty_fields
+          username = ''
+          password = ''
+          result = @admin_gui.login(username, password)
+          assert_equal [:error, 'Username and/or password cannot be blank.'], result
+          assert_nil @admin_gui.instance_variable_get(:@username)
+          assert_nil @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_login_failed_authentication
+          username = 'hacker'
+          password = 'secret'
+          @admin_gui.expects(:get_json_with_status).once.with('/authenticate.json').returns([:error, 'failed'])
+          result = @admin_gui.login(username, password)
+          assert_equal [:error, 'failed'], result
+          assert_nil @admin_gui.instance_variable_get(:@username)
+          assert_nil @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_login_required_password_reset
+          user_id  = '123'
+          username = 'hacker'
+          password = 'secret'
+          @admin_gui.expects(:get_json_with_status).once.with('/authenticate.json').returns(:success)
+          users = [{"username"=>username, "id"=>user_id, "required_password_reset"=>true}]
+          @admin_gui.expects(:get_json).with('/users.json').once.returns(users)
+          result = @admin_gui.login(username, password)
+          assert_equal [:change_password, user_id], result
+          assert_equal username, @admin_gui.instance_variable_get(:@username)
+          assert_equal password, @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_change_password
+          user_id = '123'
+          username = 'hacker'
+          params = {'old'=>'secrey', 'new'=>'crypto', 'con'=>'crypto'}
+          @admin_gui.expects(:authenticate?).once.returns(true)
+          @admin_gui.expects(:put_json).once.returns([:success, 'user'])
+          result = @admin_gui.change_password(user_id, username, params)
+          assert_equal [:success, 'user'], result
+          assert_equal username,      @admin_gui.instance_variable_get(:@username)
+          assert_equal params['new'], @admin_gui.instance_variable_get(:@password)
+        end
+
+        def test_change_password_empty_fields
+          params = {'old'=>'', 'new'=>'', 'con'=>''}
+          expected = [:error, 'One or more required fields are blank.']
+          assert_equal expected, @admin_gui.change_password('123', 'hacker', params)
+        end
+
+        def test_change_password_mismatch
+          params = {'old'=>'secret', 'new'=>'abc', 'con'=>'xyz'}
+          expected = [:error, 'New password does not match confirmation.']
+          assert_equal expected, @admin_gui.change_password('123', 'hacker', params)
+        end
+
+        def test_change_password_old_and_new_equal
+          params = {'old'=>'secret', 'new'=>'secret', 'con'=>'secret'}
+          expected = [:error, 'New password cannot be the same as current.']
+          assert_equal expected, @admin_gui.change_password('123', 'hacker', params)
+        end
+
+        def test_change_password_failed_authentication
+          params = {'old'=>'fail', 'new'=>'jellybeans', 'con'=>'jellybeans'}
+          expected = [:error, 'Incorrect current password provided.']
+          @admin_gui.expects(:authenticate?).once.returns(false)
+          assert_equal expected, @admin_gui.change_password('123', 'hacker', params)
+        end
+
+        def test_logout
+          @admin_gui.logout
+          assert_nil @admin_gui.instance_variable_get(:@username)
+          assert_nil @admin_gui.instance_variable_get(:@password)
         end
 
         def test_get_status
@@ -212,7 +292,7 @@ module Armagh
           expected = {'status'=>'ok'}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
-          assert_equal expected, @admin_gui.get_status
+          assert_equal 'ok', @admin_gui.get_status
         end
 
         def test_get_workflows
@@ -221,7 +301,7 @@ module Armagh
           expected = {'workflows'=>[]}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
-          assert_equal expected, @admin_gui.get_workflows
+          assert_equal [], @admin_gui.get_workflows
         end
 
         def test_create_workflow
@@ -230,7 +310,7 @@ module Armagh
           expected = {'workflow'=>{'run_mode'=>'stop'}}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:post).once.returns(response)
-          assert_equal [:ok, expected], @admin_gui.create_workflow('workflow')
+          assert_equal [:success, {'run_mode'=>'stop'}], @admin_gui.create_workflow('workflow')
         end
 
         def test_get_workflow
@@ -249,10 +329,10 @@ module Armagh
         def test_private_get_workflow_actions
           response = mock('response')
           response.stubs(:status).returns(200)
-          expected = {'workflow'=>{'actions'=>[]}}
+          expected = {'actions'=>[]}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
-          assert_equal expected, @admin_gui.send(:get_workflow_actions, 'workflow')
+          assert_equal [], @admin_gui.send(:get_workflow_actions, 'workflow')
         end
 
         def test_private_workflow_active?
@@ -270,26 +350,23 @@ module Armagh
           expected = {'defined_actions'=>[]}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
-          assert_equal expected, @admin_gui.send(:get_defined_actions)
+          assert_equal [], @admin_gui.send(:get_defined_actions)
         end
 
         def test_activate_workflow
           response = {
             'run_mode' => 'run'
           }
-          @admin_gui.expects(:patch_json).once.returns([:ok, response])
+          @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.activate_workflow('dummy')
-          expected = ['run', response]
-          assert_equal expected, result
+          assert_equal ['run', response], result
         end
 
         def test_activate_workflow_failure
-          response = {
-            'message' => 'some error'
-          }
+          response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.activate_workflow('dummy')
-          expected = ['stop', "Unable to activate workflow dummy: #{response['message']}"]
+          expected = ['stop', "Unable to activate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 
@@ -303,19 +380,16 @@ module Armagh
           response = {
             'run_mode' => 'stop'
           }
-          @admin_gui.expects(:patch_json).once.returns([:ok, response])
+          @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.deactivate_workflow('dummy')
-          expected = ['stop', response]
-          assert_equal expected, result
+          assert_equal ['stop', response], result
         end
 
         def test_deactivate_workflow_failure
-          response = {
-            'message' => 'some error'
-          }
+          response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.deactivate_workflow('dummy')
-          expected = ['run', "Unable to deactivate workflow dummy: #{response['message']}"]
+          expected = ['run', "Unable to deactivate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 
@@ -419,7 +493,7 @@ module Armagh
             'splat' => [],
             'captures' => []
           }
-          response = [:ok]
+          response = [:success]
           @admin_gui.expects(:get_defined_parameters).once.returns(parameters)
           @admin_gui.expects(:post_json).once.returns(response)
           assert_equal :success, @admin_gui.create_action_config(data)
@@ -465,7 +539,7 @@ module Armagh
             :test_callbacks=>nil,
             :type=>"Armagh::SomeType",
             :workflow=>"workflow"},
-            ["Missing expected parameter \"name\" for group \"action\""]]
+            ["Missing expected parameter \"name\" for group \"action\"", {"markup"=>{}}]]
           assert_equal expected, result
         end
 
@@ -483,7 +557,7 @@ module Armagh
             'splat' => [],
             'captures' => []
           }
-          response = [:ok]
+          response = [:success]
           @admin_gui.expects(:get_defined_parameters).once.returns(parameters)
           @admin_gui.expects(:post_json).once.returns(response)
           result = @admin_gui.create_action_config(data)
@@ -525,12 +599,12 @@ module Armagh
                        :test_callbacks=>nil,
                        :type=>"Armagh::SomeType",
                        :workflow=>"workflow"},
-                      ["Missing expected parameter \"name\" for group \"action\""]]
+                      ["Missing expected parameter \"name\" for group \"action\"", {}]]
           assert_equal expected, result
         end
 
         def test_import_action_config
-          response = [:ok]
+          response = [:success]
           @admin_gui.expects(:post_json).once.returns(response)
           config = {
             'type'=>'Armagh::SomeAction',
@@ -548,12 +622,11 @@ module Armagh
             ]
           }
           result = @admin_gui.import_action_config(params)
-          expected = %w(filename).to_json
-          assert_equal expected, result
+          assert_equal %w(filename).to_json, result
         end
 
         def test_import_action_config_with_action_class_name
-          response = [:ok]
+          response = [:success]
           @admin_gui.expects(:post_json).once.returns(response)
           config = {
             'action_class_name'=>'Armagh::SomeAction',
@@ -571,8 +644,7 @@ module Armagh
             ]
           }
           result = @admin_gui.import_action_config(params)
-          expected = %w(filename).to_json
-          assert_equal expected, result
+          assert_equal %w(filename).to_json, result
         end
 
         def test_import_action_config_missing_files
@@ -606,7 +678,7 @@ module Armagh
         end
 
         def test_import_action_config_server_error
-          response = [:error, {'message'=>'some error'}]
+          response = [:error, 'some error']
           @admin_gui.expects(:post_json).once.returns(response)
           config = {
             'action_class_name'=>'Armagh::SomeAction',
@@ -669,10 +741,12 @@ module Armagh
             :supertype   => 'supertype'
           }
           @admin_gui.expects(:get_defined_parameters).once.with('workflow', 'action').returns(params)
+          @admin_gui.expects(:get_action_test_callbacks).once.with('type').returns(nil)
           expects = {
             :action=>"action",
             :defined_parameters=>{"parameters"=>["params_go_here"]},
             :supertype=>"supertype",
+            :test_callbacks=>nil,
             :type=>"type",
             :workflow=>"workflow"
           }
@@ -694,7 +768,7 @@ module Armagh
             'method' => 'method'
           }
           response = 'some callback error'
-          @admin_gui.expects(:patch_json).once.returns([:ok, response])
+          @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.invoke_action_test_callback(data)
           assert_equal response, result
         end

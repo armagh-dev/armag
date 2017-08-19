@@ -15,13 +15,30 @@
 # limitations under the License.
 #
 
+require_relative 'authentication/configuration'
 require_relative 'authentication/directory'
 require_relative 'authentication/group'
 require_relative 'authentication/role'
 require_relative 'authentication/user'
 
+require_relative 'connection'
+
 module Armagh
   module Authentication
     class AuthenticationError < StandardError; end
+
+    def self.setup_authentication
+      @config = find_or_create_config
+      User.setup_default_users
+      Group.setup_default_groups
+    end
+
+    def self.config
+      @config ||= find_or_create_config
+    end
+
+    private_class_method def self.find_or_create_config
+      Configuration.find_or_create_configuration( Connection.config, Configuration::CONFIG_NAME, values_for_create: {}, maintain_history: true )
+    end
   end
 end

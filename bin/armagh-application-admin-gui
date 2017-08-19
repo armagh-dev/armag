@@ -38,19 +38,20 @@ enable :sessions, :logging
 
 configure do
   if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
-    set :environment, :production
+    set :environment,     :production
+    set :show_exceptions, false
   else
-    set :environment, :development
-    set :show_exceptions, :after_handler
+    set :environment,     :development
+    set :show_exceptions, true
   end
 
-  set :bind,          gui.ip
-  set :port,          gui.port
-  set :server,        'thin'
-  set :root,          Proc.new { gui.root_directory }
-  set :public_folder, Proc.new { File.join(settings.root, 'public') }
-  set :views,         Proc.new { File.join(settings.root, 'views') }
-  set :run,           true
+  set :bind,            gui.ip
+  set :port,            gui.port
+  set :server,          'thin'
+  set :root,            Proc.new { gui.root_directory }
+  set :public_folder,   Proc.new { File.join(settings.root, 'public') }
+  set :views,           Proc.new { File.join(settings.root, 'views') }
+  set :run,             true
 end
 
 use Rack::CommonLogger, gui.logger
@@ -131,8 +132,8 @@ error do |e|
 end
 
 before do
-  pass if request.path_info[/^\/login/]
-  redirect "/login?re=#{request.path_info}" unless session[:user]
+  pass if request.path_info[/^\/login/] || gui.authenticated?
+  redirect "/login?re=#{request.path_info}"
 end
 
 #
@@ -144,19 +145,43 @@ get '/login' do
 end
 
 post '/login' do
-  username = params['username']
-  password = params['password']
-
-  if username.strip.empty? || password.strip.empty?
-    halt render(:login, error: 'Username and/or password cannot be blank')
-  else
-    gui.set_auth(username, password)
-    session['user'] = username
-    redirect params['re']
+  if %w[username password].all? { |k| params.key? k }
+    username         = params['username']
+    password         = params['password']
+    status, response = gui.login(username, password)
+    case status
+    when :error
+      session['user'] = nil
+      halt render :login, error: response
+    when :change_password
+      session['change_password'] = {user_id:  response, username: username}
+      render :login, :change_password, notice: 'It seems this may be your first login. Please change your password using the form below.'
+    when :success
+      session['user']       = response[:name] || username
+      session['user_id']    = response[:id]
+      session['user_roles'] = response[:roles]
+      redirect params['re']
+    end
+  elsif %w[old new con].all? { |k| params.key? k }
+    change_password  = session['change_password']
+    user_id          = change_password[:user_id]
+    username         = change_password[:username]
+    status, response = gui.change_password(user_id, username, params)
+    case status
+    when :error
+      render(:login, :change_password, error: response)
+    when :success
+      session['change_password'] = nil
+      session['user']       = response['name'] || username
+      session['user_id']    = user_id
+      session['user_roles'] = response['roles']
+      redirect params['re']
+    end
   end
 end
 
 get '/logout' do
+  gui.logout
   session['user'] = nil
   redirect '/'
 end
@@ -231,7 +256,7 @@ post '/config/new' do
   halt render(:config, :workflow_new, error: 'Workflow name cannot be empty') if workflow.to_s.strip.empty?
 
   status, response = gui.create_workflow(workflow)
-  if status == :ok
+  if status == :success
     redirect "/config/#{workflow}"
   else
     data = {value: workflow}

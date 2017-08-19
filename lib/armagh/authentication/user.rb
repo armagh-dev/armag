@@ -19,6 +19,7 @@ require_relative 'directory'
 require_relative 'group'
 require_relative 'role'
 
+require_relative 'configuration'
 require_relative '../connection'
 require_relative '../utils/db_doc_helper'
 require_relative '../utils/password'
@@ -40,7 +41,6 @@ module Armagh
       class RoleError < UserError; end
       class GroupError < UserError; end
 
-      MAX_TRIES = 3 # TODO Make this configurable
       DUMMY_USERNAME = '__dummy_user__'
       ADMIN_USERNAME = 'admin'
       DEFAULT_ADMIN_PASSWORD = 'armaghadmin'
@@ -90,11 +90,12 @@ module Armagh
       end
 
       private_class_method def self.auth_dummy_user(username, pass)
+        Authentication.config.refresh
         @dummy_user.unlock
         @dummy_user.enable
         @dummy_user.db_doc['attempted_usernames'][username] ||= 0
         @dummy_user.db_doc['attempted_usernames'][username] += 1
-        @dummy_user.lock if @dummy_user.db_doc['attempted_usernames'][username] >= MAX_TRIES
+        @dummy_user.lock if @dummy_user.db_doc['attempted_usernames'][username] >= Authentication.config.authentication.max_login_attempts
         @dummy_user.authenticate(pass)
         return nil
       end
@@ -181,6 +182,7 @@ module Armagh
         image.delete('id')
 
         super
+
         @db_doc['roles'] ||= []
         @db_doc['groups'] ||= []
         @db_doc['auth_failures'] ||= 0
@@ -196,6 +198,8 @@ module Armagh
         raise AuthenticationError, 'Account Locked' if locked?
         raise AuthenticationError, 'Account Disabled' if disabled?
 
+        Authentication.config.refresh
+
         if directory == Directory::INTERNAL
           result = Utils::Password.correct?(pass, hashed_password)
         elsif directory == Directory::LDAP
@@ -208,7 +212,7 @@ module Armagh
           mark_last_login
         else
           increment_auth_failures
-          lock if auth_failures >= MAX_TRIES && !permanent?
+          lock if auth_failures >= Authentication.config.authentication.max_login_attempts && !permanent?
         end
 
         save(update_timestamps: false)
@@ -256,7 +260,8 @@ module Armagh
 
       def password=(password)
         raise DirectoryError, 'No password stored for external users.' unless directory == Directory::INTERNAL
-        Utils::Password.verify_strength password
+        Authentication.config.refresh
+        Utils::Password.verify_strength(password, Authentication.config.authentication.min_password_length)
         @db_doc['hashed_password'] = Utils::Password.hash(password)
         @db_doc['password_timestamp'] = Time.now
         clear_password_reset
@@ -268,7 +273,8 @@ module Armagh
       end
 
       def reset_password
-        random_password = Utils::Password.random_password
+        Authentication.config.refresh
+        random_password = Utils::Password.random_password(Authentication.config.authentication.min_password_length)
         self.password = random_password
         mark_password_reset
         save

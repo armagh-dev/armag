@@ -41,6 +41,11 @@ class TestUser < Test::Unit::TestCase
     @connection.stubs(:[]).with('users').returns(@users)
     @users.stubs(:replace_one)
 
+    @config = mock('config')
+    @authentication_config = mock('authentication_config')
+    Armagh::Authentication.stubs(:config).returns(@config)
+    @config.stubs(:authentication).returns(@authentication_config)
+
     @admin_user = mock('admin_user')
     @admin_user.stubs({remove_all_roles: nil, add_role: nil, save: nil})
     Armagh::Authentication::User.stubs(:find_username).with(Armagh::Authentication::User::ADMIN_USERNAME).returns(@admin_user)
@@ -59,6 +64,8 @@ class TestUser < Test::Unit::TestCase
 
   def create_user
     Armagh::Authentication::User.any_instance.stubs(:save)
+    @config.expects(:refresh)
+    @authentication_config.expects(:min_password_length).returns(10)
     user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
     user
   end
@@ -69,6 +76,9 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_setup_default_users
+    @config.expects(:refresh).twice
+    @authentication_config.expects(:min_password_length).returns(10).twice
+
     Armagh::Authentication::User.expects(:find_username).with(Armagh::Authentication::User::ADMIN_USERNAME).returns(nil)
     Armagh::Authentication::User.expects(:db_create).with(has_entry('username', Armagh::Authentication::User::ADMIN_USERNAME))
 
@@ -79,6 +89,8 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_create
+    @config.expects(:refresh).twice
+    @authentication_config.expects(:min_password_length).returns(10).twice
     Armagh::Authentication::User.expects(:db_create).times(3)
 
     user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
@@ -214,11 +226,15 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_class_authenticate_bad_password
+    max_tries = 3
+    @config.stubs(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+
     user = Armagh::Authentication::User.send(:new)
     user.stubs(:save)
     e = Armagh::Authentication::AuthenticationError.new('Account Locked')
     Armagh::Authentication::User.stubs(:find_username).returns(user)
-    Armagh::Authentication::User::MAX_TRIES.times do
+    max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
         Armagh::Authentication::User.authenticate('testuser', 'testpassword')
       }
@@ -228,13 +244,17 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_class_authenticate_bad_username
+    max_tries = 3
+    @config.stubs(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+
     Armagh::Authentication::User.stubs(:find_username).returns(nil)
     @dummy_user.stubs(:unlock)
     @dummy_user.stubs(:enable)
     @dummy_user.stubs(:authenticate).with('testpassword').returns(true)
     @dummy_user.expects(:lock)
 
-    (Armagh::Authentication::User::MAX_TRIES).times do
+    max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
         Armagh::Authentication::User.authenticate('testuser', 'testpassword')
       }
@@ -244,11 +264,15 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_class_authenticate_dummy_username
+    max_tries = 3
+    @config.stubs(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+
     @dummy_user.stubs(:authenticate).returns(true) # lets even pretend it's a valid password
     @dummy_user.stubs(:unlock)
     @dummy_user.stubs(:enable)
     @dummy_user.expects(:lock)
-    Armagh::Authentication::User::MAX_TRIES.times do
+    max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for __dummy_user__.')) {
         Armagh::Authentication::User.authenticate(Armagh::Authentication::User::DUMMY_USERNAME, 'testpassword')
       }
@@ -260,6 +284,7 @@ class TestUser < Test::Unit::TestCase
   def test_authenticate
     user = create_user
     assert_nil user.last_login
+    @config.expects(:refresh)
     assert_true user.authenticate('testpassword')
     assert_in_delta Time.now, user.last_login, 1
   end
@@ -267,19 +292,27 @@ class TestUser < Test::Unit::TestCase
   def test_authenticate_ldap
     user = create_user
     user.directory = Armagh::Authentication::Directory::LDAP
+    @config.expects(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(3)
     assert_false user.authenticate('testpassword')
     omit('ldap not implemented yet')
   end
 
   def test_authenticate_failure
     user = create_user
+    @config.expects(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(3)
     assert_false user.authenticate('bad')
   end
 
   def test_authentication_lockout
+    max_tries = 3
+    @config.stubs(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+
     user = create_user
     assert_equal 0, user.auth_failures
-    Armagh::Authentication::User::MAX_TRIES.times do |i|
+    max_tries.times do |i|
       assert_false user.locked?
       user.authenticate('bad')
       assert_equal i+1, user.auth_failures
@@ -288,10 +321,14 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_authentication_lockout_permanent
+    max_tries = 3
+    @config.stubs(:refresh)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+
     user = create_user
     user.mark_permanent
 
-    Armagh::Authentication::User::MAX_TRIES.times do |i|
+    max_tries.times do |i|
       assert_false user.locked?
       user.authenticate('bad')
       assert_equal i+1, user.auth_failures
@@ -305,6 +342,7 @@ class TestUser < Test::Unit::TestCase
     user.lock
     assert_true user.locked?
 
+    @config.expects(:refresh)
     e = Armagh::Authentication::AuthenticationError.new('Account Locked')
     assert_raise(e){user.authenticate('testpassword')}
 
@@ -320,6 +358,7 @@ class TestUser < Test::Unit::TestCase
     assert_true user.disabled?
 
     e = Armagh::Authentication::AuthenticationError.new('Account Disabled')
+    @config.expects(:refresh)
     assert_raise(e){user.authenticate('testpassword')}
 
     user.enable
@@ -426,6 +465,8 @@ class TestUser < Test::Unit::TestCase
     original_timestamp = user.password_timestamp
     original_hashed = user.hashed_password
 
+    @config.expects(:refresh)
+    @authentication_config.expects(:min_password_length).returns(10)
     user.password = 'testpassword'
 
     assert_not_equal 'testpassword', user.hashed_password
@@ -446,18 +487,27 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_password_reset
+    min_length = 10
     user = create_user
+
+    @config.expects(:refresh).times(3)
+    @authentication_config.expects(:min_password_length).returns(min_length).times(3)
+
     user.password = 'testpassword'
     old_hash = user.hashed_password
     assert_false user.required_password_reset?
     new_password = user.reset_password
     assert_not_equal(old_hash, user.hashed_password)
-    assert_equal Armagh::Utils::Password::MIN_PWD_LENGTH, new_password.length
+    assert_equal min_length, new_password.length
     assert_true user.required_password_reset?
   end
 
   def test_password_reset_external_dir
     user = create_user
+
+    @config.expects(:refresh)
+    @authentication_config.expects(:min_password_length).returns(10)
+
     user.directory = Armagh::Authentication::Directory::LDAP
     e = Armagh::Authentication::User::DirectoryError.new 'No password stored for external users.'
     assert_raise(e){user.reset_password}

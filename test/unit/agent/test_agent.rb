@@ -70,14 +70,23 @@ class TestAgent < Test::Unit::TestCase
     @current_doc_mock = mock('current_doc')
     @running = true
     @agent_id = 'agent_id'
-    @default_agent = prep_an_agent('default', {}, @agent_id)
+    @archive_config_values = {
+      'sftp' => {
+        'username' => 'testuser',
+        'host' => 'localhost',
+        'directory_path' => '/tmp/var/archive'
+      }
+    }
+    @default_agent = prep_an_agent('default', 'archive_config_name',{}, @agent_id)
     @state_coll = mock
     Armagh::Connection.stubs(:action_state).returns(@state_coll)
   end
 
-  def prep_an_agent(config_name, config_values, id)
+  def prep_an_agent(config_name, archive_config_name, config_values, id)
+    Armagh::Support::SFTP.stubs(:test_connection)
     agent_config = Armagh::Agent.create_configuration(@config_store, config_name, config_values)
-    agent = Armagh::Agent.new(agent_config, @workflow_set, @hostname)
+    archive_config = Armagh::Utils::Archiver.create_configuration(@config_store, archive_config_name, @archive_config_values)
+    agent = Armagh::Agent.new(agent_config, archive_config,@workflow_set, @hostname)
     agent.instance_variable_set(:@backoff, @backoff_mock)
     agent.instance_variable_set(:@current_doc, @current_doc_mock)
     agent.instance_variable_set(:@running, @running)
@@ -128,7 +137,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_with_config
     Armagh::Logging.expects(:set_level).with(@logger, 'error').at_least_once
-    agent = prep_an_agent('logserror', {'agent' => {'log_level' => 'error'}}, 'start_id')
+    agent = prep_an_agent('logserror', 'archive', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
     Thread.new { agent.start }
     sleep THREAD_SLEEP_TIME

@@ -33,6 +33,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 require 'rack/test'
 require 'fileutils'
+require 'etc'
 
 require 'mongo'
 
@@ -120,12 +121,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def setup
+    @current_user = Etc.getpwuid(Process.uid).name
     MongoSupport.instance.clean_database
     MongoSupport.instance.clean_replica_set
     Connection.setup_indexes
-
-    Armagh::Authentication::User.setup_default_users
-    Armagh::Authentication::Group.setup_default_groups
+    Armagh::Authentication.setup_authentication
 
     @alice_workflow_config_values = {'workflow'=>{'name'=>'alice'}}
     @alice_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_divide( 'alice' )
@@ -251,31 +251,42 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 
-  def test_create_launcher
+  def test_launcher
     test_config = {
+      'launcher' => {
         'num_agents' => '1',
         'update_frequency' => '60',
         'checkin_frequency' => '60',
         'log_level' => 'debug'
+      }
     }
 
-    post '/launcher.json', test_config.to_json do
+    post "/configuration/launcher/#{Launcher.config_name}.json", test_config.to_json do
       assert last_response.ok?
       result = JSON.parse(last_response.body)
-      expected_result = { 'launcher' => test_config }
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+
+    get "/configuration/launcher/#{Launcher.config_name}.json" do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
       assert_equal expected_result, result
     end
   end
 
   def test_create_launcher_client_error
     test_config = {
+      'launcher' => {
         'num_agents' => 'BAD',
         'update_frequency' => '60',
         'checkin_frequency' => '60',
         'log_level' => 'debug'
+      }
     }
 
-    post '/launcher.json', test_config.to_json do
+    post "/configuration/launcher/#{Launcher.config_name}.json", test_config.to_json do
       assert last_response.client_error?
       failure_detail = JSON.parse(last_response.body)['client_error_detail']
       expected_markup = {
@@ -288,6 +299,239 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           ]}
 
       assert_equal'Invalid launcher config', failure_detail['message']
+      assert_equal expected_markup, failure_detail['markup']
+    end
+  end
+
+  def test_launchers
+    test_config1 = {
+      'launcher' => {
+        'num_agents' => '1',
+        'update_frequency' => '60',
+        'checkin_frequency' => '60',
+        'log_level' => 'debug'
+      }
+    }
+
+    test_config2 = {
+      'launcher' => {
+        'num_agents' => '2',
+        'update_frequency' => '60',
+        'checkin_frequency' => '60',
+        'log_level' => 'info'
+      }
+    }
+
+    expected_result = {
+      'launcher_1' => test_config1,
+      'launcher_2' => test_config2
+    }
+
+    # Dummy Launcher 1
+    dummy_1 = test_config1.deep_copy
+    dummy_1['launcher']['num_agents'] = 3
+    post '/configuration/launcher/launcher_1.json', dummy_1.to_json do
+      assert last_response.ok?
+    end
+
+    sleep 1
+    post '/configuration/launcher/launcher_1.json', test_config1.to_json do
+      assert last_response.ok?
+    end
+
+    post '/configuration/launcher/launcher_2.json', test_config2.to_json do
+      assert last_response.ok?, last_response.body
+    end
+
+    get '/configuration/launchers.json' do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      assert_equal expected_result, result
+    end
+  end
+
+  def test_agent
+    test_config = {
+      'agent' => {
+        'log_level' => 'debug',
+      }
+    }
+
+    post '/configuration/agent.json', test_config.to_json do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+
+    get '/configuration/agent.json' do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+  end
+
+  def test_create_agent_client_error
+    test_config = {
+      'agent' => {
+        'something' => 'BAD',
+        'log_level' => 'debug'
+      }
+    }
+
+    post '/configuration/agent.json', test_config.to_json do
+      assert last_response.client_error?
+      failure_detail = JSON.parse(last_response.body)['client_error_detail']
+      expected_markup = {
+        'type' => 'Armagh::Agent',
+        'parameters' => [
+          {"name" => "log_level", "description" => "Logging level for agents", "type" => "populated_string", "required" => true, "default" => "info", "prompt" => nil, "group" => "agent", "warning" => nil, "error" => nil, "value" => "debug", "options" => nil},
+          {"name" => "something", "description" => "non-existent", "type" => "string", "required" => false, "default" => nil, "prompt" => nil, "group" => "agent", "warning" => nil, "error" => "Configuration provided for parameter that does not exist", "value" => "BAD", "options" => nil}
+        ]}
+
+      assert_equal'Invalid agent config', failure_detail['message']
+      assert_equal expected_markup, failure_detail['markup']
+    end
+  end
+
+  def test_authentication
+    test_config = {
+      'authentication' => {
+        'max_login_attempts' => '5',
+        'min_password_length' => '10'
+      }
+    }
+
+    post '/configuration/authentication.json', test_config.to_json do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+
+    get '/configuration/authentication.json' do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+  end
+
+  def test_create_authentication_client_error
+    test_config = {
+      'authentication' => {
+        'max_login_attempts' => '5',
+        'min_password_length' => 'BAD'
+      }
+    }
+
+    post '/configuration/authentication.json', test_config.to_json do
+      assert last_response.client_error?
+      failure_detail = JSON.parse(last_response.body)['client_error_detail']
+      expected_markup = {
+        'type' => 'Armagh::Authentication::Configuration',
+        'parameters' => [
+          {"default" => 3, "description" => "Maximum number of allowed failed login attempts before locking account.", "error" => nil, "group" => "authentication", "name" => "max_login_attempts", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => 5, "warning" => nil},
+          {"default" => 8, "description" => "Minimum length of a password.", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "authentication", "name" => "min_password_length", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
+        ]}
+
+      assert_equal'Invalid authentication config', failure_detail['message']
+      assert_equal expected_markup, failure_detail['markup']
+    end
+  end
+
+  def test_archive
+    test_config = {
+      'sftp' => {
+        'host' => 'localhost',
+        'port' => '22',
+        'username' => @current_user,
+        'directory_path' => '/tmp/var/archive'
+      },
+      'archive' => {
+        'max_archives_per_dir' => '100'
+      }
+    }
+
+    post '/configuration/archive.json', test_config.to_json do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+
+    get '/configuration/archive.json' do
+      assert last_response.ok?
+      result = JSON.parse(last_response.body)
+      expected_result = test_config
+      assert_equal expected_result, result
+    end
+  end
+
+  def test_create_archive_client_error
+    test_config = {
+      'sftp' => {
+        'host' => 'localhost',
+        'port' => 'BAD',
+        'username' => @current_user,
+        'directory_path' => '/tmp/var/archive'
+      },
+      'archive' => {
+        'max_archives_per_dir' => 'BAD'
+      }
+    }
+
+    post '/configuration/archive.json', test_config.to_json do
+      assert last_response.client_error?
+      failure_detail = JSON.parse(last_response.body)['client_error_detail']
+      expected_markup = {
+        'type' => 'Armagh::Utils::Archiver',
+        'parameters' => [
+          {"default" => nil, "description" => "SFTP host or IP", "error" => nil, "group" => "sftp", "name" => "host", "options" => nil, "prompt" => "host.example.com or 10.0.0.1", "required" => true, "type" => "populated_string", "value" => "localhost", "warning" => nil},
+          {"default" => 22, "description" => "SFTP port", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "sftp", "name" => "port", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil},
+          {"default" => "./", "description" => "SFTP base directory path", "error" => nil, "group" => "sftp", "name" => "directory_path", "options" => nil, "prompt" => nil, "required" => true, "type" => "populated_string", "value" => "/tmp/var/archive", "warning" => nil},
+          {"default" => nil, "description" => "SFTP user name", "error" => nil, "group" => "sftp", "name" => "username", "options" => nil, "prompt" => "user", "required" => true, "type" => "populated_string", "value" => @current_user, "warning" => nil},
+          {"default" => nil, "description" => "SFTP user password", "error" => nil, "group" => "sftp", "name" => "password", "options" => nil, "prompt" => "password", "required" => false, "type" => "encoded_string", "value" => nil, "warning" => nil},
+          {"default" => nil, "description" => "SSH Key (not filename!) for SFTP connection", "error" => nil, "group" => "sftp", "name" => "key", "options" => nil, "prompt" => "password", "required" => false, "type" => "string", "value" => nil, "warning" => nil},
+          {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
+        ]}
+
+      assert_equal'Invalid archive config', failure_detail['message']
+      assert_equal expected_markup, failure_detail['markup']
+    end
+  end
+
+  def test_create_archive_client_validation_error
+    test_config = {
+      'sftp' => {
+        'host' => 'invalid.noragh.com',
+        'port' => '22',
+        'username' => 'invalid',
+        'directory_path' => '/tmp/var/archive'
+      },
+      'archive' => {
+        'max_archives_per_dir' => '100'
+      }
+    }
+
+    post '/configuration/archive.json', test_config.to_json do
+      assert last_response.client_error?
+      failure_detail = JSON.parse(last_response.body)['client_error_detail']
+      expected_markup = {
+        'type' => 'Armagh::Utils::Archiver',
+        'parameters' => [
+          {"default" => nil, "description" => "SFTP host or IP", "error" => nil, "group" => "sftp", "name" => "host", "options" => nil, "prompt" => "host.example.com or 10.0.0.1", "required" => true, "type" => "populated_string", "value" => "invalid.noragh.com", "warning" => nil},
+          {"default" => 22, "description" => "SFTP port", "error" => nil, "group" => "sftp", "name" => "port", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => 22, "warning" => nil},
+          {"default" => "./", "description" => "SFTP base directory path", "error" => nil, "group" => "sftp", "name" => "directory_path", "options" => nil, "prompt" => nil, "required" => true, "type" => "populated_string", "value" => "/tmp/var/archive", "warning" => nil},
+          {"default" => nil, "description" => "SFTP user name", "error" => nil, "group" => "sftp", "name" => "username", "options" => nil, "prompt" => "user", "required" => true, "type" => "populated_string", "value" => "invalid", "warning" => nil},
+          {"default" => nil, "description" => "SFTP user password", "error" => nil, "group" => "sftp", "name" => "password", "options" => nil, "prompt" => "password", "required" => false, "type" => "encoded_string", "value" => nil, "warning" => nil},
+          {"default" => nil, "description" => "SSH Key (not filename!) for SFTP connection", "error" => nil, "group" => "sftp", "name" => "key", "options" => nil, "prompt" => "password", "required" => false, "type" => "string", "value" => nil, "warning" => nil},
+          {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => nil, "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => 100, "warning" => nil},
+          {"error" => "Unable to resolve host invalid.noragh.com.", "group" => "sftp"}
+        ]}
+
+      assert_equal'Invalid archive config', failure_detail['message']
       assert_equal expected_markup, failure_detail['markup']
     end
   end
@@ -1400,7 +1644,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
       assert_kind_of(String, response)
-      assert_true response.length >= Armagh::Utils::Password::MIN_PWD_LENGTH
+      assert_true response.length >= Armagh::Authentication.config.authentication.min_password_length
     end
 
     # delete
@@ -1791,8 +2035,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     users = users_with_all_roles
     endpoints = {
         lambda{get('/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
-        lambda{post('/launcher.json'){}} => Authentication::Role::APPLICATION_ADMIN,
-        lambda{post('/agent.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post("/configuration/launcher/#{Launcher.config_name}.json"){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{post('/configuration/agent.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/workflows.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{post('/workflow/:workflow_name/new.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/workflow/:workflow_name/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
@@ -1851,7 +2095,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
         if role == user_role
           lam.call
-          response = JSON.parse(last_response.body)
+          response = assert_nothing_raised("An unparsable response was returned for #{username} from #{lam_src}: #{last_response.body}") {JSON.parse(last_response.body)}
           if response.is_a? Hash
             assert_false response.key?('authentication_error_detail'), "An unexpected authentication error was returned for #{username} from #{lam_src}"
           end

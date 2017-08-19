@@ -33,7 +33,11 @@ class TestArchiver < Test::Unit::TestCase
 
   def setup
     @logger = mock_logger
-    @archiver = Armagh::Utils::Archiver.new(@logger)
+    @config = mock('config')
+    @archive_config = mock('archive_config')
+    @sftp_config = mock('sftp_config')
+    @config.stubs({sftp: @sftp_config, archive: @archive_config})
+    @archiver = Armagh::Utils::Archiver.new(@logger, @config)
   end
 
   def teardown
@@ -45,11 +49,10 @@ class TestArchiver < Test::Unit::TestCase
     metadata = {'meta' => true}
     source = Armagh::Documents::Source.new(mime_type: 'test_type')
     archive_data = {'metadata' => metadata, 'source' => source.to_hash}
+    @archive_config.expects(:max_archives_per_dir).returns(5)
 
-    config = mock('config')
     sftp = mock('sftp)')
-    Armagh::Support::SFTP.expects(:archive_config).returns(config)
-    Armagh::Support::SFTP::Connection.expects(:open).with(config).yields(sftp)
+    Armagh::Support::SFTP::Connection.expects(:open).with(@config).yields(sftp)
     Time.stubs(:now).returns(Time.new(2010, 2, 15, 10))
 
     date_dir = '2010/02/15.0000'
@@ -84,10 +87,8 @@ class TestArchiver < Test::Unit::TestCase
     source = Armagh::Documents::Source.new(mime_type: 'test_type')
     archive_data = {'metadata' => metadata, 'source' => source.to_hash}
 
-    config = mock('config')
     sftp = mock('sftp)')
-    Armagh::Support::SFTP.expects(:archive_config).returns(config)
-    Armagh::Support::SFTP::Connection.expects(:open).with(config).yields(sftp)
+    Armagh::Support::SFTP::Connection.expects(:open).with(@config).yields(sftp)
     Time.stubs(:now).returns(Time.new(2010, 2, 15, 10))
 
     date_dir = '2010/02/15.0000'
@@ -95,7 +96,8 @@ class TestArchiver < Test::Unit::TestCase
     sftp.expects(:ls).with('2010/02').returns(%w(15.0000 15.0001 15.0002))
 
     files = []
-    Armagh::Utils::Archiver::MAX_ARCHIVES_PER_DIR.times{|i| files << "file_#{i}"}
+    @archive_config.expects(:max_archives_per_dir).returns(5)
+    5.times{|i| files << "file_#{i}"}
 
     sftp.expects(:ls).with('2010/02/15.0002').returns(files)
 
@@ -149,5 +151,24 @@ class TestArchiver < Test::Unit::TestCase
       @archiver.archive_file('file_path', archive_data)
     end
     assert_equal 'partial character in source, but hit end', e.message
+  end
+
+  def test_find_or_create_config
+    store = mock('store')
+    values = {'eggs' => 'yummy', 'sftp' => {'username' => 'testuser'}}
+    Armagh::Utils::Archiver.expects(:find_or_create_configuration).with(
+                                                                    store,
+                                                                    Armagh::Utils::Archiver::CONFIG_NAME,
+                                                                    values_for_create: {
+                                                                      'eggs' => 'yummy',
+                                                                      'sftp' => {
+                                                                        'host' => 'localhost',
+                                                                        'username' => 'testuser',
+                                                                        'directory_path' => '/tmp/var/archive'
+                                                                      }
+                                                                    },
+                                                                    maintain_history: true
+    )
+    Armagh::Utils::Archiver.find_or_create_config(store, values)
   end
 end

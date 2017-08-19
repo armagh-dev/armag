@@ -37,6 +37,8 @@ module Armagh
   class Agent
     class AbortDocument < RuntimeError; end
 
+    CONFIG_NAME = 'default'
+
     include Configh::Configurable
 
     define_parameter name: 'log_level', type: 'populated_string', description: 'Logging level for agents', required: true, default: 'info', group: 'agent'
@@ -44,8 +46,9 @@ module Armagh
 
     attr_reader :uuid
 
-    def initialize(agent_config, workflow_set, hostname)
+    def initialize(agent_config, archive_config, workflow_set, hostname)
       @config = agent_config
+      @archive_config = archive_config
       @workflow_set = workflow_set
       @hostname = hostname
 
@@ -61,7 +64,7 @@ module Armagh
 
       @num_creates = 0
       @archives_for_collect = []
-      @archiver = Utils::Archiver.new(@logger)
+      @archiver = Utils::Archiver.new(@logger, @archive_config)
     end
 
     def start

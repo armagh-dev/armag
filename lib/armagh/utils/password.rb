@@ -26,16 +26,15 @@ module Armagh
     module Password
       class PasswordError < StandardError; end
 
-      MIN_PWD_LENGTH = 8 # TODO Make this configurable
       BAD_PASSWORD_FILES = File.join(__dir__, '..', '..', '..', 'config', 'common_passwords.b64')
 
       def self.hash(password)
         Argon2::Password.create(password)
       end
 
-      def self.verify_strength(password)
+      def self.verify_strength(password, min_length)
         raise PasswordError, 'Password must be a string.' unless password.is_a? String
-        raise PasswordError, "Password must contain at least #{MIN_PWD_LENGTH} characters." if password.length < MIN_PWD_LENGTH
+        raise PasswordError, "Password must contain at least #{min_length} characters." if password.length < min_length
         raise PasswordError, 'Password is a common password.' if common? password
         true
       end
@@ -50,8 +49,8 @@ module Armagh
         Argon2::Password.verify_password(password, hash)
       end
 
-      def self.random_password
-        Support::Random.random_str MIN_PWD_LENGTH
+      def self.random_password(length)
+        Support::Random.random_str length
       end
     end
   end

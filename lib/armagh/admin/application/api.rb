@@ -30,6 +30,9 @@ require_relative '../../authentication'
 require_relative '../../status'
 require_relative '../../connection'
 require_relative '../../utils/action_helper'
+require_relative '../../agent/agent'
+require_relative '../../authentication/configuration'
+require_relative '../../utils/archiver'
 
 module Armagh
   module Admin
@@ -122,23 +125,93 @@ module Armagh
           launchers
         end
 
-        def create_or_update_launcher_configuration( params )
+        def get_all_launcher_configurations
+          configs = {}
+
+          Launcher.find_all_configurations(Connection.config).each do |_klass, config|
+            configs[config.__name] = config.serialize['values']
+          end
+
+          configs
+        end
+
+        def create_or_update_launcher_configuration(name, values)
           begin
-            config = nil
-            current_config = get_launcher_configuration
+            current_config = Launcher.find_configuration(Connection.config, name)
             if current_config
-              config = current_config.update_replace( { 'launcher' => params })
+              config = current_config.update_replace( values )
             else
-              config = Launcher.create_configuration( Connection.config, Launcher.config_name, {'launcher' => params}, maintain_history: true )
+              config = Launcher.create_configuration( Connection.config, name, values, maintain_history: true )
             end
           rescue Configh::ConfigInitError, Configh::ConfigValidationError
-            raise APIClientError.new( 'Invalid launcher config', markup: Launcher.edit_configuration( { 'launcher' => params}))
+            raise APIClientError.new( 'Invalid launcher config', markup: Launcher.edit_configuration( values))
           end
           config.serialize['values']
         end
 
-        def get_launcher_configuration
-          Launcher.find_configuration( Connection.config, Launcher.config_name )
+        def get_launcher_configuration(name)
+          config = Launcher.find_configuration(Connection.config, name)
+          config.nil? ? nil : config.serialize['values']
+        end
+
+        def create_or_update_agent_configuration(values)
+          begin
+            current_config = Agent.find_configuration(Connection.config, Agent::CONFIG_NAME)
+            if current_config
+              config = current_config.update_replace(values)
+            else
+              config = Agent.create_configuration(Connection.config, Agent::CONFIG_NAME, values, maintain_history: true)
+            end
+          rescue Configh::ConfigInitError, Configh::ConfigValidationError
+            raise APIClientError.new('Invalid agent config', markup: Agent.edit_configuration(values))
+          end
+
+          config.serialize['values']
+        end
+
+        def get_agent_configuration
+          config = Agent.find_configuration(Connection.config, Agent::CONFIG_NAME)
+          config.nil? ? nil : config.serialize['values']
+        end
+
+        def create_or_update_authentication_configuration(values)
+          begin
+            current_config = Authentication::Configuration.find_configuration(Connection.config, Authentication::Configuration::CONFIG_NAME)
+            if current_config
+              config = current_config.update_replace(values)
+            else
+              config = Authentication::Configuration.create_configuration(Connection.config, Authentication::Configuration::CONFIG_NAME, values, maintain_history: true)
+            end
+          rescue Configh::ConfigInitError, Configh::ConfigValidationError
+            raise APIClientError.new('Invalid authentication config', markup: Authentication::Configuration.edit_configuration(values))
+          end
+
+          config.serialize['values']
+        end
+
+        def get_authentication_configuration
+          config = Authentication::Configuration.find_configuration(Connection.config, Authentication::Configuration::CONFIG_NAME)
+          config.nil? ? nil : config.serialize['values']
+        end
+
+        def create_or_update_archive_configuration(values)
+          begin
+            current_config = Utils::Archiver.find_configuration(Connection.config, Utils::Archiver::CONFIG_NAME)
+            if current_config
+              config = current_config.update_replace(values)
+            else
+              config = Utils::Archiver.create_configuration(Connection.config, Utils::Archiver::CONFIG_NAME, values, maintain_history: true)
+            end
+          rescue Configh::ConfigInitError, Configh::ConfigValidationError
+            raise APIClientError.new('Invalid archive config', markup: Utils::Archiver.edit_configuration(values))
+          end
+
+          config.serialize['values']
+        end
+
+        def get_archive_configuration
+          config = Utils::Archiver.find_configuration(Connection.config, Utils::Archiver::CONFIG_NAME)
+          config.nil? ? nil : config.serialize['values']
         end
 
         def get_workflows

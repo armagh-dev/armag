@@ -78,9 +78,12 @@ class TestEditCallback < Test::Unit::TestCase
         'output' => { 'docspec' => Armagh::Documents::DocSpec.new( @output_type, @output_state )}
       }
     )
+
     wf.run
+
     agent_config = Armagh::Agent.create_configuration( config_store, 'default', {} )
-    agent = Armagh::Agent.new(agent_config, workflow_set, @hostname)
+    archive_config = Armagh::Utils::Archiver.find_or_create_config(config_store)
+    agent = Armagh::Agent.new(agent_config, archive_config, workflow_set, @hostname)
 
     @splitter = workflow_set.instantiate_action_named( 'test_splitter', agent, @logger, nil )
 

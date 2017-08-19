@@ -49,8 +49,7 @@ rest_helper = Utils::RestHelper.new(api.logger, 'Application Admin API')
 
 Connection.setup_indexes
 
-Authentication::User.setup_default_users
-Authentication::Group.setup_default_groups
+Authentication.setup_authentication
 
 configure do
 
@@ -130,29 +129,6 @@ get '/status.json' do
   end
 end
 
-#------------------------------
-#
-# launcher
-#
-#------------------------------
-
-post '/launcher.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
-    api.create_or_update_launcher_configuration(fields)
-  end
-end
-
-#------------------------------
-#
-# agent
-#
-#------------------------------
-
-post '/agent.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
-    # TODO Agent configuration
-  end
-end
 
 #------------------------------
 #
@@ -509,5 +485,65 @@ end
 get '/authenticate.json' do
   rest_helper.handle_request(request) do |_fields, _remote_user|
     true
+  end
+end
+
+#---------------------
+#
+# Configuration
+#
+#---------------------
+
+get '/configuration/launchers.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.get_all_launcher_configurations
+  end
+end
+
+get '/configuration/launcher/:launcher_name.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.get_launcher_configuration(params['launcher_name'])
+  end
+end
+
+post '/configuration/launcher/:launcher_name.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.create_or_update_launcher_configuration(params['launcher_name'], fields)
+  end
+end
+
+get '/configuration/agent.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.get_agent_configuration
+  end
+end
+
+post '/configuration/agent.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.create_or_update_agent_configuration(fields)
+  end
+end
+
+get '/configuration/authentication.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.get_authentication_configuration
+  end
+end
+
+post '/configuration/authentication.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.create_or_update_authentication_configuration(fields)
+  end
+end
+
+get '/configuration/archive.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.get_archive_configuration
+  end
+end
+
+post '/configuration/archive.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.create_or_update_archive_configuration(fields)
   end
 end

@@ -3,18 +3,18 @@
     <fieldset>
       <legend>Login</legend>
       <div class="uk-form-row">
-        <div class="uk-form-icon">
+        <div class="uk-form-icon uk-width-1-1">
           <i class="uk-icon-user"></i>
-          <input name="username" type="text" placeholder="Username">
+          <input name="username" type="text" placeholder="Username" autocomplete="off" class="uk-width-1-1">
         </div>
       </div>
       <div class="uk-form-row">
-        <div class="uk-form-icon">
-          <i class="uk-icon-key"></i>
-          <input name="password" type="password" placeholder="Password">
+        <div class="uk-form-icon uk-width-1-1">
+          <i class="uk-icon-lock"></i>
+          <input name="password" type="password" placeholder="Password" class="uk-width-1-1">
         </div>
       </div>
-      <div class="uk-form-row uk-text-right">
+      <div class="uk-form-row uk-text-center">
         <button class="uk-button">Login</button>
       </div>
     </fieldset>

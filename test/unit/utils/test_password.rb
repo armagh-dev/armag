@@ -23,6 +23,7 @@ require 'test/unit'
 class TestPassword < Test::Unit::TestCase
   def setup
     @common_pass = 'computer'
+    @password_length = 10
   end
 
   def test_hash
@@ -35,23 +36,23 @@ class TestPassword < Test::Unit::TestCase
 
   def test_strength_not_string
     assert_raise(Armagh::Utils::Password::PasswordError.new('Password must be a string.')) do
-      Armagh::Utils::Password.verify_strength(123)
+      Armagh::Utils::Password.verify_strength(123, @password_length)
     end
   end
 
   def test_strength_too_short
-    assert_raise(Armagh::Utils::Password::PasswordError.new("Password must contain at least #{Armagh::Utils::Password::MIN_PWD_LENGTH} characters.")) do
-      Armagh::Utils::Password.verify_strength('a')
+    assert_raise(Armagh::Utils::Password::PasswordError.new("Password must contain at least #{@password_length} characters.")) do
+      Armagh::Utils::Password.verify_strength('a', @password_length)
     end
   end
 
   def test_strength_strong
-    assert_true Armagh::Utils::Password.verify_strength('*3hfuH#&H#jdf#*FJ*J#JKJD(J#FKEJ FKSDJIEJR#98*#HF383hfisfhoE#*hf')
+    assert_true Armagh::Utils::Password.verify_strength('*3hfuH#&H#jdf#*FJ*J#JKJD(J#FKEJ FKSDJIEJR#98*#HF383hfisfhoE#*hf', @password_length)
   end
 
   def test_strength_common
     assert_raise(Armagh::Utils::Password::PasswordError, 'Password is a common password.') do
-      Armagh::Utils::Password.verify_strength @common_pass
+      Armagh::Utils::Password.verify_strength(@common_pass, @password_length)
     end
   end
 
@@ -64,8 +65,9 @@ class TestPassword < Test::Unit::TestCase
   end
 
   def test_random_password
-    pwd = Armagh::Utils::Password.random_password
-    assert_equal Armagh::Utils::Password::MIN_PWD_LENGTH, pwd.length
-    assert_not_equal(pwd, Armagh::Utils::Password.random_password)
+    @password_length = 10
+    pwd = Armagh::Utils::Password.random_password(@password_length)
+    assert_equal @password_length, pwd.length
+    assert_not_equal(pwd, Armagh::Utils::Password.random_password(@password_length))
   end
 end

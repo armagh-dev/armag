@@ -31,12 +31,14 @@ Rake::TestTask.new(:test) do |t|
   t.libs << 'test'
   t.pattern = "test/unit/**/test_*.rb"
   t.warning = false
+  t.options = '-v'
 end
 
 Rake::TestTask.new(:integration) do |t|
   t.libs << 'integration'
   t.pattern = "test/integration/**/test_*.rb"
   t.warning = false
+  t.options = '-v'
 end
 
 task :clean do

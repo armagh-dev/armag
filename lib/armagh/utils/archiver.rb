@@ -15,25 +15,54 @@
 # limitations under the License.
 #
 
+require 'configh'
+require 'etc'
+
+require 'armagh/support/encoding'
 require 'armagh/documents/source'
 require 'armagh/support/sftp'
 
+require 'facets/hash/deep_merge'
+
 module Armagh
   module Utils
+
     class Archiver
+      CONFIG_NAME = 'default'
+
       class ArchiveError < StandardError; end
 
-      MAX_ARCHIVES_PER_DIR = 5_000
+      DEFAULT_CONFIG = {
+        'host' => 'localhost',
+        'username' => Etc.getpwuid(Process.uid).name,
+        'directory_path' => '/tmp/var/archive'
+      }
 
-      def initialize(logger)
+      include Configh::Configurable
+      include Support::SFTP
+
+      define_parameter name: 'max_archives_per_dir', type: 'positive_integer', description: 'Maximum number archives to store per subdirectory.', required: true, default: 5000, group: 'archive'
+
+      define_constant name: 'duplicate_put_directory_paths', value: [], group: 'sftp'
+      define_constant name: 'filename_pattern', value: nil, group: 'sftp'
+      define_constant name: 'maximum_transfer', value: 10_000_000, group: 'sftp'
+      define_constant name: 'create_directory_path', value: true, group: 'sftp'
+
+      def self.find_or_create_config(config_store, values = {})
+        config_values = {'sftp' => DEFAULT_CONFIG}.deep_merge(values)
+        find_or_create_configuration(config_store, CONFIG_NAME, values_for_create: config_values, maintain_history: true)
+      end
+
+      def initialize(logger, archive_config)
         @logger = logger
+        @archive_config = archive_config
       end
 
       def within_archive_context
         @remaining_files = nil
         @archive_dir = nil
 
-        Support::SFTP::Connection.open(Support::SFTP.archive_config) do |sftp|
+        Support::SFTP::Connection.open(@archive_config) do |sftp|
           @sftp = sftp
           yield
         end
@@ -79,17 +108,18 @@ module Armagh
         base_day_dir = File.join(month_dir, "#{day}.%04d") % 0
         @sftp.mkdir_p base_day_dir
 
-        newest_today_dir = @sftp.ls(month_dir).select { |d| d.start_with? day }.last
+        newest_today_dir = @sftp.ls(month_dir).select {|d| d.start_with? day}.last
         archive_dir = File.join(month_dir, newest_today_dir)
         num_files = @sftp.ls(archive_dir).length
 
-        remaining = MAX_ARCHIVES_PER_DIR - num_files
+        max_archives_per_dir = @archive_config.archive.max_archives_per_dir
+        remaining = max_archives_per_dir - num_files
 
         if remaining > 0
           @remaining_files = remaining
           @archive_dir = archive_dir
         else
-          @remaining_files = MAX_ARCHIVES_PER_DIR
+          @remaining_files = max_archives_per_dir
           dir_num = newest_today_dir.split('.').last.to_i + 1
           @archive_dir = File.join(month_dir, "#{day}.%04d") % dir_num
         end

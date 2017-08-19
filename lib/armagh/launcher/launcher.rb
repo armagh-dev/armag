@@ -21,6 +21,7 @@
 #            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
 #            as part of the requirement as well as in the gemspec.
 
+require 'etc'
 require 'fileutils'
 require 'socket'
 
@@ -29,6 +30,7 @@ require 'configh'
 require_relative '../environment'
 Armagh::Environment.init
 
+require_relative '../authentication'
 require_relative '../agent/agent'
 require_relative '../actions/workflow_set'
 require_relative '../actions/gem_manager'
@@ -40,12 +42,12 @@ require_relative '../utils/collection_trigger'
 require_relative '../version'
 
 module Armagh
-  
-  class LauncherConfigError < StandardError; end
-  class AgentConfigError    < StandardError; end
-  class WorkflowConfigError < StandardError; end
-  
+
+  class InitializationError < StandardError; end
+
   class Launcher
+    CONFIG_NAME = 'default'
+
     include Configh::Configurable
 
     define_parameter name: "num_agents",        description: "Number of agents",                      type: 'positive_integer', required: true, default: 1,      group: 'launcher'
@@ -64,7 +66,7 @@ module Armagh
       errors
     end
 
-    def Launcher.config_name( launcher_name = 'default' )
+    def Launcher.config_name( launcher_name = CONFIG_NAME )
       [ Connection.ip, launcher_name ].join("_")
     end
 
@@ -86,7 +88,7 @@ module Armagh
       versions
     end
 
-    def initialize( launcher_name = 'default' )
+    def initialize( launcher_name = CONFIG_NAME )
       @logger = Logging.set_logger('Armagh::Application::Launcher')
 
       Connection.require_connection(@logger)
@@ -94,16 +96,9 @@ module Armagh
       bind_ip = Connection.ip
       launcher_config_name = [ bind_ip, launcher_name ].join('_')
 
-      begin
-        @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, maintain_history: true )
-      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
-        @logger.dev_error LauncherConfigError
-      end
-
-      Armagh::Authentication::User.setup_default_users
-      Armagh::Authentication::Group.setup_default_groups
-
+      @config = Launcher.find_or_create_configuration( Connection.config, launcher_config_name, values_for_create: {}, maintain_history: true )
       @logger.any "Using Launcher Config: #{launcher_config_name}"
+
       Logging.set_level(@logger, @config.launcher.log_level)
 
       action_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
@@ -114,19 +109,20 @@ module Armagh
         Document.version[ package ] = version
       end
 
-      begin
-        @agent_config = Agent.find_or_create_configuration( Connection.config, 'default', values_for_create: {}, maintain_history: true )
-      rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
-        @logger.dev_error AgentConfigError
-      end
+      Armagh::Authentication.setup_authentication
+
+      @agent_config = Agent.find_or_create_configuration( Connection.config, Agent::CONFIG_NAME, values_for_create: {}, maintain_history: true )
 
       begin
         @workflow_set = Actions::WorkflowSet.for_agent( Connection.config )
         @logger.any 'workflow init successful'
-      rescue Actions::WorkflowInitError, Actions::WorkflowActivationError  => e
-        @logger.any 'Workflow initialization failed, because at least one configuration in the database has an error. Review current workflow settings in the admin GUI to fix the problem.'
-        @logger.dev_error WorkflowConfigError
+      rescue Actions::WorkflowInitError, Actions::WorkflowActivationError
+        raise InitializationError, 'Workflow initialization failed, because at least one configuration in the database has an error. Review current workflow settings in the admin GUI to fix the problem.'
       end
+
+      @authentication_config = Authentication.config
+
+      @archive_config = Utils::Archiver.find_or_create_config(Connection.config)
 
       @collection_trigger = Utils::CollectionTrigger.new(@workflow_set)
       Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
@@ -227,7 +223,7 @@ module Armagh
     end
 
     def start_agent_in_process
-      agent = Agent.new( @agent_config, @workflow_set, @hostname )
+      agent = Agent.new( @agent_config, @archive_config,@workflow_set, @hostname )
 
       pid = Process.fork do
         Process.setproctitle("armagh-#{agent.uuid}")
@@ -260,8 +256,10 @@ module Armagh
       config = @config.refresh
       agent_config = @agent_config.refresh
       workflow_set = @workflow_set.refresh
+      authentication_config = @authentication_config.refresh
+      archive_config = @archive_config.refresh
 
-      if config || agent_config || workflow_set
+      if config || agent_config || workflow_set || archive_config || authentication_config
         @logger.any 'Configuration change detected.  Restarting agents...'
 
         @logger.debug {
@@ -269,6 +267,8 @@ module Armagh
           changed_configs << 'launcher' if config
           changed_configs << 'agent' if agent_config
           changed_configs << 'workflow_set' if workflow_set
+          changed_configs << 'archive_config' if archive_config
+          changed_configs << 'authentication_config' if authentication_config
           "Triggered by configuration changes to #{changed_configs.join(', ')}"
         }
 
@@ -277,6 +277,9 @@ module Armagh
       else
         @logger.debug 'No configuration updates to apply.'
       end
+    rescue => e
+      Logging.ops_error_exception(@logger, e, 'A configuration error was detected.  Ignoring the configuration and stopping all agents.')
+      kill_all_agents
     end
 
     def run

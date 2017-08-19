@@ -61,6 +61,10 @@ module Armagh
           end
         end
 
+        def root_directory
+          File.join( __dir__, 'www_root' )
+        end
+
         private def get_json(relative_url, fields = {})
           http_request(relative_url, :get, fields)
         end
@@ -117,36 +121,100 @@ module Armagh
             json = {'server_error_detail' => {'message' =>
               "API HTTP #{method} request to #{url} failed with status #{response.status} #{response.reason}"}}
           end
-          status = response.status == 200 ? :ok : :error
 
-          if json.is_a?(Hash)
-            json = json['client_error_detail'] if json.has_key?('client_error_detail')
-            json = json['server_error_detail'] if json.has_key?('server_error_detail')
-          end
+          status = response.status == 200 ? :success : :error
+          json   = json[json.keys.first] if json.is_a?(Hash) && json.keys.size == 1
+          json   = json['message'] if status == :error && json.respond_to?(:has_key?) && json&.has_key?('message')
 
           case method
           when :get
             if get_with_status
               [status, json]
             else
-              if status == :ok
-                json
-              else
-                raise AdminGUIHTTPError, json['message']
-              end
+              raise AdminGUIHTTPError, json if status == :error
+              json
             end
           when :post, :put, :patch
             [status, json]
           end
         end
 
-        def set_auth(username, password)
+        private def set_auth(username, password)
           @username = username
           @password = password
         end
 
-        def root_directory
-          File.join( __dir__, 'www_root' )
+        private def authenticate(username, password)
+          set_auth(username, password)
+          get_json_with_status('/authenticate.json')
+        end
+
+        private def authenticate?(username, password)
+          authenticate(username, password).first == :success
+        end
+
+        def login(username, password)
+          if username.strip.empty? || password.strip.empty?
+            logout
+            [:error, 'Username and/or password cannot be blank.']
+          else
+            status, response = authenticate(username, password)
+            if status == :success
+              response = get_json('/users.json')
+              user     = response.select { |match| match['username'] == username }.first
+              if user&.[]('required_password_reset')
+                [:change_password, user['id']]
+              else
+                @authenticated = true
+                [:success, {id: user['id'], name: user['name'], roles: user['roles']}]
+              end
+            else
+              logout
+              [:error, response]
+            end
+          end
+        end
+
+        def change_password(user_id, username, params)
+          old = params['old'].strip
+          new = params['new'].strip
+          con = params['con'].strip
+
+          if old.empty? || new.empty? || con.empty?
+            [:error, 'One or more required fields are blank.']
+          elsif new != con
+            [:error, 'New password does not match confirmation.']
+          elsif old == new # TODO move this check upstream into the API
+            [:error, 'New password cannot be the same as current.']
+          elsif !authenticate?(username, old)
+            [:error, 'Incorrect current password provided.']
+          else
+            params = {
+              'user_id'  => user_id,
+              'username' => username,
+              'password' => new,
+              'name'     => 'Admin', # TODO admim doesn't have default name and email
+              'email'    => 'update_me@armagh.com'
+            }
+            status, response = put_json("/user/#{user_id}.json", params)
+            if status == :success
+              set_auth(username, new)
+              @authenticated = true
+              [:success, response]
+            else
+              [:error, response]
+            end
+          end
+        end
+
+        def logout
+          @authenticated = false
+          @username      = nil
+          @password      = nil
+        end
+
+        def authenticated?
+          @authenticated
         end
 
         def shutdown(restart: false)
@@ -199,10 +267,10 @@ module Armagh
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else
-          if status == :ok
+          if status == :success
             [response['run_mode'], response]
           else
-            [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{response['message']}"]
+            [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{response}"]
           end
         end
 
@@ -225,7 +293,7 @@ module Armagh
 
             status, response = post_json("/workflow/#{workflow}/action/config.json", config)
 
-            raise "Unable to import action: #{response['message']}" unless status == :ok
+            raise "Unable to import action: #{response}" unless status == :success
             imported << file[:filename]
           end
           imported.to_json
@@ -264,13 +332,16 @@ module Armagh
         end
 
         def new_action_config(workflow, action)
-          params = get_defined_parameters(workflow, action)
+          params    = get_defined_parameters(workflow, action)
+          type      = params.delete(:type)
+          supertype = params.delete(:supertype)
           {
             workflow:           workflow,
             action:             action,
-            type:               params.delete(:type),
-            supertype:          params.delete(:supertype),
-            defined_parameters: params
+            type:               type,
+            supertype:          supertype,
+            defined_parameters: params,
+            test_callbacks:     get_action_test_callbacks(type)
           }
         end
 
@@ -424,11 +495,11 @@ module Armagh
               put_json("/workflow/#{workflow}/action/#{action}/config.json", new_config)
             end
 
-          if status == :ok && errors.empty?
-            :success
+          if status == :success && errors.empty?
+            status
           else
-            errors << response['message'] if response['message']
-            if response.has_key?('markup')
+            errors << response
+            if response.respond_to?(:has_key?) && response.has_key?('markup')
               config = format_action_config_for_gui(response['markup'])
               config.delete(:type)
               config.delete(:supertype)
@@ -468,7 +539,7 @@ module Armagh
 
         def invoke_action_test_callback(data)
           status, response = patch_json("/test/invoke_callback.json", data)
-          raise "Unable to invoke action test callback method #{data['method']} for action type #{data['type']}" unless status == :ok
+          raise "Unable to invoke action test callback method #{data['method']} for action type #{data['type']}" unless status == :success
           response
         end
 

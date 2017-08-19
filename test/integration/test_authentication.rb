@@ -34,9 +34,7 @@ class TestAuthentication < Test::Unit::TestCase
   def setup
     MongoSupport.instance.clean_database
     Armagh::Connection.setup_indexes
-
-    Armagh::Authentication::User.setup_default_users
-    Armagh::Authentication::Group.setup_default_groups
+    Armagh::Authentication.setup_authentication
   end
 
   def test_user

@@ -19,6 +19,14 @@ require_relative '../../lib/armagh/document/document'
 require_relative '../../lib/armagh/actions/workflow_set'
 require_relative '../../lib/armagh/logging'
 
+ARCHIVE_CONFIG = {
+  'sftp' => {
+    'host' => 'localhost',
+    'directory_path' => '/tmp/var/archive',
+    'username' => Etc.getpwuid(Process.uid).name
+  }
+}
+
 When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)"(, raw "([^"]*)")?$/) do |count, doc_type, state, document_id, content, meta, rawkeyword, raw|
   @logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')
   @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
@@ -48,13 +56,17 @@ And(/^I set all "([^"]*)" documents to have the following$/) do |collection, tab
 end
 
 And(/^the archive path is clean$/) do
-  FileUtils.rmtree ENV['ARMAGH_ARCHIVE_PATH']
+  archiver = Armagh::Utils::Archiver.find_or_create_config(Armagh::Connection.config, ARCHIVE_CONFIG)
+  FileUtils.rmtree archiver.sftp.directory_path
 end
 
 And(/^the a file containing "([^"]*)" should be archived$/) do |content|
   has_content = false
   now = Time.now.utc
-  archive_path = File.join(ENV['ARMAGH_ARCHIVE_PATH'], '%02d' % now.year, '%02d' % now.month, '%02d.0000' % now.day)
+
+  archiver = Armagh::Utils::Archiver.find_or_create_config(Armagh::Connection.config, ARCHIVE_CONFIG)
+  archive_path = File.join(archiver.sftp.directory_path, '%02d' % now.year, '%02d' % now.month, '%02d.0000' % now.day)
+
   Dir.glob(File.join(archive_path, '*')).each do |file|
     has_content = File.read(file).include? content
     break if has_content

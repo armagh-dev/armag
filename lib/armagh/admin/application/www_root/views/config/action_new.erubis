@@ -4,8 +4,8 @@
 <form method="post" class="uk-form uk-form-horizontal uk-container">
   <fieldset>
 
-    <dl class="uk-description-list-line">
-      <dt class="uk-margin-small-bottom">
+    <dl class="uk-description-list-line uk-margin-small-bottom">
+      <dt>
 
         <div class="uk-grid">
           <div class="uk-width-1-2">
@@ -30,9 +30,9 @@
       <dd>
 
         <div class="uk-grid">
-          <div class="uk-width-1-2">
+          <div class="uk-width-1-2 uk-margin-small-top">
 
-            <select name="action" class="uk-text-large" onchange="$(this).find('[value=\'\']').remove(); $('#next').removeAttr('disabled')" autofocus="true">
+            <select name="action" class="uk-text-large" onchange="select_action()" autofocus="true">
 
               {{ unless @data[:previous_action] }}
                 <option value="">...</option>
@@ -47,7 +47,7 @@
 
                   {{ @data[:defined_actions][type].each do |action_info| }}
 
-                    {{ action_name = action_info['name']  # also available, action_info['description'] }}
+                    {{ action_name = action_info['name'] }}
                     {{ selected = @data[:previous_action] == action_name ? 'selected' : '' }}
                     <option value="{{= action_name }}" {{= selected }}>{{= action_name.split('::').last }}</option>
 
@@ -70,9 +70,25 @@
         </div>
 
       </dd>
+      <dt description class="uk-margin-small-bottom" style="display:none;">
+        Description
+      </dt>
+      <dd description style="display:none;" class="uk-panel uk-panel-box uk-panel-secondary">
+
+        {{ @data[:defined_actions].each_value do |actions| }}
+          {{ actions.each do |action_info| }}
+
+            <description action="{{== action_info['name'] }}" style="display:none; font-family:monospace;">
+              {{= action_info['description'].strip.gsub(/\n{2,}/, '<br /><br />') }}
+            </description>
+
+          {{ end }}
+        {{ end }}
+
+      </dd>
     </dl>
 
-    <hr />
+    <hr class="uk-margin-top-remove" />
 
     <div class="uk-grid">
       <div class="uk-width-1-3">
@@ -95,8 +111,20 @@
   </fieldset>
 </form>
 
-<script>
-  if ($("select[name='action']").val()) {
-    $("#next").removeAttr('disabled')
+<script type="text/javascript">
+  $(document).ready(function() {
+    if ($("select[name='action']").val()) {
+      select_action()
+    }
+  })
+
+  function select_action() {
+    var action = $('select[name="action"]')
+    action.find('[value=""]').remove()
+    $('#next').removeAttr('disabled')
+    $('dd[description]').show()
+    $('dt[description]').show()
+    $('description').hide()
+    $('description[action="' + action.val() + '"]').show()
   }
 </script>

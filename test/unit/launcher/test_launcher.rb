@@ -44,11 +44,15 @@ class TestLauncher < Test::Unit::TestCase
 
     @launcher_config = mock('launcher_config')
     @agent_config = mock('agent_config')
+    @archiver_config = mock('archiver_config')
+    @authentication_config = mock('@authentication_config')
     lc = mock
     lc.stubs(:log_level).returns(Armagh::Logging::FATAL)
     @launcher_config.stubs(:launcher).returns(lc)
     Armagh::Launcher.stubs(:find_or_create_configuration).returns(@launcher_config)
     Armagh::Agent.stubs(:find_or_create_configuration).returns(@agent_config)
+    Armagh::Utils::Archiver.stubs(:find_or_create_configuration).returns(@archiver_config)
+    Armagh::Authentication::Configuration.stubs(:find_or_create_configuration).returns(@authentication_config)
 
     @workflow_set = mock('workflow_set')
     Armagh::Actions::WorkflowSet.stubs(:for_agent).returns(@workflow_set)
@@ -66,7 +70,6 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def mock_connection
-
     Armagh::Connection.stubs(:require_connection)
     Armagh::Connection.stubs(:config).returns(@config)
     Armagh::Connection.stubs(:ip).returns('10.10.10.10')
@@ -99,31 +102,31 @@ class TestLauncher < Test::Unit::TestCase
   def test_configure_with_defaults
     assert_configure( {}, 1, 60, 60, 'info' )
   end
-  
+
   def test_configure_set_num_agents_valid
     assert_configure( { 'launcher' => { 'num_agents' => 2 }}, 2, 60, 60, 'info' )
   end
-  
+
   def test_configure_set_num_agents_invalid
     assert_configure( { 'launcher' => { 'num_agents' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher num_agents: type validation failed: value 0 is non-positive' )
   end
-  
+
   def test_configure_set_checkin_frequency_valid
     assert_configure( { 'launcher' => { 'checkin_frequency' => 300 }}, 1, 300, 60, 'info' )
   end
-  
+
   def test_configure_set_checkin_frequency_invalid
     assert_configure( { 'launcher' => { 'checkin_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher checkin_frequency: type validation failed: value 0 is non-positive' )
   end
-  
+
   def test_configure_set_update_frequency_valid
     assert_configure( { 'launcher' => { 'update_frequency' => 300 }}, 1, 60, 300, 'info' )
   end
-  
+
   def test_configure_set_update_frequency_invalid
     assert_configure( { 'launcher' => { 'update_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher update_frequency: type validation failed: value 0 is non-positive' )
   end
-    
+
   def test_configure_set_log_level_valid
     assert_configure( { 'launcher' => { 'log_level' => 'debug' }}, 1, 60, 60, 'debug' )
   end
