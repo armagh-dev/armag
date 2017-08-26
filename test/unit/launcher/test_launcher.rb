@@ -108,7 +108,7 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def test_configure_set_num_agents_invalid
-    assert_configure( { 'launcher' => { 'num_agents' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher num_agents: type validation failed: value 0 is non-positive' )
+    assert_configure( { 'launcher' => { 'num_agents' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Group 'launcher' Parameter 'num_agents': type validation failed: value '0' is non-positive" )
   end
 
   def test_configure_set_checkin_frequency_valid
@@ -116,7 +116,7 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def test_configure_set_checkin_frequency_invalid
-    assert_configure( { 'launcher' => { 'checkin_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher checkin_frequency: type validation failed: value 0 is non-positive' )
+    assert_configure( { 'launcher' => { 'checkin_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Group 'launcher' Parameter 'checkin_frequency': type validation failed: value '0' is non-positive" )
   end
 
   def test_configure_set_update_frequency_valid
@@ -124,7 +124,7 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def test_configure_set_update_frequency_invalid
-    assert_configure( { 'launcher' => { 'update_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: launcher update_frequency: type validation failed: value 0 is non-positive' )
+    assert_configure( { 'launcher' => { 'update_frequency' => 0 }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Group 'launcher' Parameter 'update_frequency': type validation failed: value '0' is non-positive" )
   end
 
   def test_configure_set_log_level_valid
@@ -132,7 +132,7 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def test_configure_set_log_level_invalid
-    assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, 'Unable to create configuration Armagh::Launcher default: Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any' )
+    assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any" )
   end
 
   def test_checkin_running

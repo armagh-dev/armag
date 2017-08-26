@@ -526,9 +526,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expected_params =[
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, 'default'=>Armagh::Documents::DocSpec.new( "__COLLECT__", 'ready'), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
@@ -588,9 +588,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expected_action_config_params = [
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new( '__COLLECT__', 'ready' ), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new('__COLLECT__collect_freddocs_from_source', 'ready'), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("a_freddoc", 'ready'), "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("b_freddocs_aggr", "ready"), "valid_states"=>["ready", "working"], "options"=>nil},
@@ -610,9 +610,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_description_invalid
     bad_alice_in_db
     expected_action_config_params = [
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new("__COLLECT__", "ready"), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("__COLLECT__collect_alicedocs_from_source","ready"), "valid_state"=>"ready", "options"=>nil},
@@ -858,7 +858,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.create_user(fields)}
   end
 
-  def test_update_user
+  def test_update_user_by_id
     fields = {
         'username' => 'username',
         'password' => '12345',
@@ -875,13 +875,37 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
         name: fields['name'],
         email: fields['email']
     ).returns(user)
-    @api.update_user('id', fields)
+    @api.update_user_by_id('id', fields)
 
     Armagh::Authentication::User.expects(:update).returns(nil)
-    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID id not found.')){@api.update_user('id', fields)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID id not found.')){@api.update_user_by_id('id', fields)}
 
     Armagh::Authentication::User.expects(:update).raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.update_user('id', fields)}
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.update_user_by_id('id', fields)}
+  end
+
+  def test_update_user
+    fields = {
+      'username' => 'username',
+      'password' => '12345',
+      'name' => 'name',
+      'email' => 'email'
+    }
+
+    user = mock('user')
+
+    user.expects(:update).with(
+      username: fields['username'],
+      password: fields['password'],
+      name: fields['name'],
+      email: fields['email']
+    ).returns(user)
+    user.expects(:save)
+
+    @api.update_user(user, fields)
+
+    user.expects(:update).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.update_user(user, fields)}
   end
 
   def test_delete_user
@@ -1329,5 +1353,16 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     Armagh::Connection.unstub(:require_connection)
     Armagh::Connection.expects(:require_connection)
     Armagh::Admin::Application::API.send(:new)
+  end
+
+  def test_update_password
+    user = mock('user')
+    password = 'some_password'
+    user.expects(:password=).with(password)
+    user.expects(:save)
+    @api.update_password(user, password)
+
+    user.expects(:password=).raises(Armagh::Utils::Password::PasswordError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError){@api.update_password(user, 'pass')}
   end
 end

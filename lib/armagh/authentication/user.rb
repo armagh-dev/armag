@@ -118,10 +118,7 @@ module Armagh
         doc = find(id)
 
         if doc
-          doc.username = username
-          doc.password = password if password
-          doc.name = name
-          doc.email = email
+          doc.update(username: username, password: password, name: name, email: email)
           doc.save
         end
 
@@ -186,6 +183,14 @@ module Armagh
         @db_doc['roles'] ||= []
         @db_doc['groups'] ||= []
         @db_doc['auth_failures'] ||= 0
+      end
+
+      def update(username:, password:, name:, email:)
+        self.username = username
+        self.password = password if password
+        self.name = name
+        self.email = email
+        self
       end
 
       def refresh
@@ -260,8 +265,7 @@ module Armagh
 
       def password=(password)
         raise DirectoryError, 'No password stored for external users.' unless directory == Directory::INTERNAL
-        Authentication.config.refresh
-        Utils::Password.verify_strength(password, Authentication.config.authentication.min_password_length)
+        Utils::Password.verify_strength(password, hashed_password)
         @db_doc['hashed_password'] = Utils::Password.hash(password)
         @db_doc['password_timestamp'] = Time.now
         clear_password_reset
@@ -273,8 +277,7 @@ module Armagh
       end
 
       def reset_password
-        Authentication.config.refresh
-        random_password = Utils::Password.random_password(Authentication.config.authentication.min_password_length)
+        random_password = Utils::Password.random_password
         self.password = random_password
         mark_password_reset
         save

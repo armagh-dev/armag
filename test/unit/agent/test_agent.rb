@@ -24,6 +24,8 @@ require_relative '../../../lib/armagh/connection'
 
 require_relative '../../helpers/armagh_test'
 
+require 'fileutils'
+
 require 'mocha/test_unit'
 require 'test/unit'
 
@@ -79,6 +81,8 @@ class TestAgent < Test::Unit::TestCase
     }
     @default_agent = prep_an_agent('default', 'archive_config_name',{}, @agent_id)
     @state_coll = mock
+    @temp_dir = '/tmp/armagh_agent_test'
+    FileUtils.mkdir_p @temp_dir
     Armagh::Connection.stubs(:action_state).returns(@state_coll)
   end
 
@@ -96,6 +100,7 @@ class TestAgent < Test::Unit::TestCase
 
   def teardown
     @default_agent.stop if @default_agent
+    FileUtils.rm_rf @temp_dir
   end
 
   def setup_action(action_class, config_values={})
@@ -132,7 +137,7 @@ class TestAgent < Test::Unit::TestCase
         'agent' => {'log_level' => 'justbelowthesurface'}
       })
     }
-    assert_equal 'Unable to create configuration Armagh::Agent bad: Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any', e.message
+    assert_equal "Unable to create configuration for 'Armagh::Agent' named 'bad' because: \n    Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any", e.message
   end
 
   def test_start_with_config
@@ -173,7 +178,7 @@ class TestAgent < Test::Unit::TestCase
     })
     action_name = action.config.action.name
 
-    action.expects(:collect).with()
+    action.expects(:collect)
 
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
@@ -188,6 +193,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -224,6 +232,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_collection_history)
     doc.expects(:metadata).returns({})
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -264,6 +275,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -307,6 +321,9 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -367,6 +384,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:get_published_copy).returns(nil)
     doc.expects(:published_timestamp=)
     doc.expects(:display=)
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -464,6 +484,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:collection_task_ids).returns []
     doc.expects('published_id=').with(pub_doc.internal_id)
 
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
@@ -504,6 +527,9 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
@@ -528,6 +554,9 @@ class TestAgent < Test::Unit::TestCase
 
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(divider).at_least_once
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, divider).at_least_once
     @backoff_mock.expects(:reset).at_least_once
@@ -652,6 +681,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:finish_processing).at_least_once
     doc.expects(:metadata).never
 
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
@@ -711,6 +743,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:display=).never
     doc.expects(:mark_abort)
 
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
@@ -750,6 +785,9 @@ class TestAgent < Test::Unit::TestCase
     Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
@@ -781,6 +819,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:finish_processing).at_least_once
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once

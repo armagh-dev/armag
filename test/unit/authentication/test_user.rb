@@ -112,11 +112,19 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_update
-    existing_user = mock('existing user')
+    existing_user = create_user
     existing_user.expects(:username=).with('existing_user')
     existing_user.expects(:password=).with('testpassword')
     existing_user.expects(:name=).with('test user')
     existing_user.expects(:email=).with('test@email.com')
+
+    result = existing_user.update(username: 'existing_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
+    assert_equal existing_user, result
+  end
+
+  def test_update_class
+    existing_user = mock('existing user')
+    existing_user.expects(:update).with(username: 'existing_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
     existing_user.expects(:save)
     Armagh::Authentication::User.expects(:find).with('id').returns(existing_user)
 
@@ -467,9 +475,9 @@ class TestUser < Test::Unit::TestCase
 
     @config.expects(:refresh)
     @authentication_config.expects(:min_password_length).returns(10)
-    user.password = 'testpassword'
+    user.password = 'test_password'
 
-    assert_not_equal 'testpassword', user.hashed_password
+    assert_not_equal 'test_password', user.hashed_password
     assert_not_equal original_hashed, user.hashed_password
     assert_not_equal original_timestamp, user.password_timestamp
 
@@ -482,7 +490,7 @@ class TestUser < Test::Unit::TestCase
     e = Armagh::Authentication::User::DirectoryError.new 'No password stored for external users.'
 
     assert_raise(e){user.hashed_password}
-    assert_raise(e){user.password = 'testpassword'}
+    assert_raise(e){user.password = 'test_password_external_dir'}
     assert_raise(e){user.password_timestamp}
   end
 
@@ -493,11 +501,12 @@ class TestUser < Test::Unit::TestCase
     @config.expects(:refresh).times(3)
     @authentication_config.expects(:min_password_length).returns(min_length).times(3)
 
-    user.password = 'testpassword'
+    user.password = 'test_password_reset'
     old_hash = user.hashed_password
     assert_false user.required_password_reset?
     new_password = user.reset_password
     assert_not_equal(old_hash, user.hashed_password)
+    assert_false Armagh::Utils::Password.correct?(new_password, old_hash)
     assert_equal min_length, new_password.length
     assert_true user.required_password_reset?
   end

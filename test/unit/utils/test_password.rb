@@ -19,11 +19,18 @@ require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/armagh/utils/password'
 
 require 'test/unit'
+require 'mocha/test_unit'
 
 class TestPassword < Test::Unit::TestCase
   def setup
     @common_pass = 'computer'
     @password_length = 10
+
+    @config = mock('config')
+    @authentication_config = mock('authentication_config')
+    Armagh::Authentication.stubs(:config).returns(@config)
+    @config.stubs(:authentication).returns(@authentication_config)
+    @authentication_config.stubs(:min_password_length).returns(@password_length)
   end
 
   def test_hash
@@ -35,25 +42,45 @@ class TestPassword < Test::Unit::TestCase
   end
 
   def test_strength_not_string
+    @config.expects(:refresh)
     assert_raise(Armagh::Utils::Password::PasswordError.new('Password must be a string.')) do
-      Armagh::Utils::Password.verify_strength(123, @password_length)
+      Armagh::Utils::Password.verify_strength(123)
     end
   end
 
   def test_strength_too_short
+    @config.expects(:refresh)
     assert_raise(Armagh::Utils::Password::PasswordError.new("Password must contain at least #{@password_length} characters.")) do
-      Armagh::Utils::Password.verify_strength('a', @password_length)
+      Armagh::Utils::Password.verify_strength('a')
     end
   end
 
   def test_strength_strong
-    assert_true Armagh::Utils::Password.verify_strength('*3hfuH#&H#jdf#*FJ*J#JKJD(J#FKEJ FKSDJIEJR#98*#HF383hfisfhoE#*hf', @password_length)
+    @config.expects(:refresh)
+    assert_true Armagh::Utils::Password.verify_strength('*3hfuH#&H#jdf#*FJ*J#JKJD(J#FKEJ FKSDJIEJR#98*#HF383hfisfhoE#*hf')
   end
 
   def test_strength_common
-    assert_raise(Armagh::Utils::Password::PasswordError, 'Password is a common password.') do
-      Armagh::Utils::Password.verify_strength(@common_pass, @password_length)
+    @config.expects(:refresh)
+    @authentication_config.stubs(:min_password_length).returns(1)
+    assert_raise(Armagh::Utils::Password::PasswordError.new('Password is a common password.')) do
+      Armagh::Utils::Password.verify_strength(@common_pass)
     end
+  end
+
+  def test_strength_reuse
+    @config.expects(:refresh)
+    password = 'Jfij3fj8jf83hsjdfhksf83h#&&HDH@jh@'
+    hash = Armagh::Utils::Password.hash(password)
+    assert_raise(Armagh::Utils::Password::PasswordError.new('Password cannot be the same as the previous password.')) do
+      Armagh::Utils::Password.verify_strength password, hash
+    end
+  end
+
+  def test_strength_no_reuse
+    @config.expects(:refresh)
+    hash = Armagh::Utils::Password.hash('old_password_#&&HDH@jh@')
+    assert_true Armagh::Utils::Password.verify_strength 'new_password_#&&HDH@jh@', hash
   end
 
   def test_common
@@ -66,8 +93,9 @@ class TestPassword < Test::Unit::TestCase
 
   def test_random_password
     @password_length = 10
-    pwd = Armagh::Utils::Password.random_password(@password_length)
+    @config.expects(:refresh).twice
+    pwd = Armagh::Utils::Password.random_password
     assert_equal @password_length, pwd.length
-    assert_not_equal(pwd, Armagh::Utils::Password.random_password(@password_length))
+    assert_not_equal(pwd, Armagh::Utils::Password.random_password)
   end
 end

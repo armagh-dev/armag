@@ -292,7 +292,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       expected_markup = {
           'type' => 'Armagh::Launcher',
           'parameters' => [
-              {"name"=>"num_agents", "description"=>"Number of agents", "type"=>"positive_integer", "required"=>true, "default"=>1, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>"type validation failed: value BAD cannot be cast as an integer", "value"=>nil, "options"=>nil},
+              {"name"=>"num_agents", "description"=>"Number of agents", "type"=>"positive_integer", "required"=>true, "default"=>1, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>"type validation failed: value 'BAD' cannot be cast as an integer", "value"=>nil, "options"=>nil},
               {"name"=>"update_frequency", "description"=>"Configuration refresh rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60, "options"=>nil},
               {"name"=>"checkin_frequency", "description"=>"Status update rate (seconds)", "type"=>"positive_integer", "required"=>true, "default"=>60, "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>60, "options"=>nil},
               {"name"=>"log_level", "description"=>"Log level", "type"=>"populated_string", "required"=>true, "default"=>"info", "prompt"=>nil, "group"=>"launcher", "warning"=>nil, "error"=>nil, "value"=>"debug", "options"=>nil}
@@ -433,7 +433,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         'type' => 'Armagh::Authentication::Configuration',
         'parameters' => [
           {"default" => 3, "description" => "Maximum number of allowed failed login attempts before locking account.", "error" => nil, "group" => "authentication", "name" => "max_login_attempts", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => 5, "warning" => nil},
-          {"default" => 8, "description" => "Minimum length of a password.", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "authentication", "name" => "min_password_length", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
+          {"default" => 8, "description" => "Minimum length of a password.", "error" => "type validation failed: value 'BAD' cannot be cast as an integer", "group" => "authentication", "name" => "min_password_length", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
         ]}
 
       assert_equal'Invalid authentication config', failure_detail['message']
@@ -489,12 +489,12 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         'type' => 'Armagh::Utils::Archiver',
         'parameters' => [
           {"default" => nil, "description" => "SFTP host or IP", "error" => nil, "group" => "sftp", "name" => "host", "options" => nil, "prompt" => "host.example.com or 10.0.0.1", "required" => true, "type" => "populated_string", "value" => "localhost", "warning" => nil},
-          {"default" => 22, "description" => "SFTP port", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "sftp", "name" => "port", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil},
+          {"default" => 22, "description" => "SFTP port", "error" => "type validation failed: value 'BAD' cannot be cast as an integer", "group" => "sftp", "name" => "port", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil},
           {"default" => "./", "description" => "SFTP base directory path", "error" => nil, "group" => "sftp", "name" => "directory_path", "options" => nil, "prompt" => nil, "required" => true, "type" => "populated_string", "value" => "/tmp/var/archive", "warning" => nil},
           {"default" => nil, "description" => "SFTP user name", "error" => nil, "group" => "sftp", "name" => "username", "options" => nil, "prompt" => "user", "required" => true, "type" => "populated_string", "value" => @current_user, "warning" => nil},
           {"default" => nil, "description" => "SFTP user password", "error" => nil, "group" => "sftp", "name" => "password", "options" => nil, "prompt" => "password", "required" => false, "type" => "encoded_string", "value" => nil, "warning" => nil},
           {"default" => nil, "description" => "SSH Key (not filename!) for SFTP connection", "error" => nil, "group" => "sftp", "name" => "key", "options" => nil, "prompt" => "password", "required" => false, "type" => "string", "value" => nil, "warning" => nil},
-          {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => "type validation failed: value BAD cannot be cast as an integer", "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
+          {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => "type validation failed: value 'BAD' cannot be cast as an integer", "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
         ]}
 
       assert_equal'Invalid archive config', failure_detail['message']
@@ -1032,9 +1032,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_state"=>"ready", "options"=>nil},
@@ -1080,9 +1080,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
@@ -1109,9 +1109,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"ComtexCollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>true, "options"=>nil},
-              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"Comtex", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
@@ -1173,9 +1173,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestConsume',
           'supertype' => 'Armagh::Actions::Consume',
           'parameters' =>[
-              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
               {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
-              {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+              {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
               {"default"=>nil, "description"=>"Input doctype for this action", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc:published", "warning"=>nil, "valid_state"=>"published", "options"=>nil},
               {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "valid_states"=>[nil, "ready", "working"], "value"=>"alicedoc_out:ready", "warning"=>nil, "options"=>nil},
               {"error"=>nil, "group"=>"action"},
@@ -1203,13 +1203,13 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               'type' => 'Armagh::StandardActions::TWTestConsume',
               'supertype' => 'Armagh::Actions::Consume',
               'parameters' => [
-                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
                   {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
-                  {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"Input doctype for this action", "error"=>"type validation failed: value cannot be nil", "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>nil, "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc_out:ready", "warning"=>nil, "options"=>nil},
               ]},
-          'message' => 'Configuration has errors: Unable to create configuration Armagh::StandardActions::TWTestConsume new_alice_consume: input docspec: type validation failed: value cannot be nil'
+          'message' => "Configuration has errors: Unable to create configuration for 'Armagh::StandardActions::TWTestConsume' named 'new_alice_consume' because: \n    Group 'input' Parameter 'docspec': type validation failed: value cannot be nil"
       }}.sort{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
       assert_equal expected_result, result
     end
@@ -1257,8 +1257,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [{"error"=>nil, "group"=>"action"},
                            {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
-                           {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"ComtexCollectAction", "required"=>true, "type"=>"populated_string", "value"=>"collect_alicedocs_from_source", "warning"=>nil, "options"=>nil},
-                           {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"Comtex", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+                           {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"collect_alicedocs_from_source", "warning"=>nil, "options"=>nil},
+                           {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
                            {"error"=>nil, "group"=>"collect"},
                            {"default"=>true, "description"=>"Archive collected documents", "error"=>nil, "group"=>"collect", "name"=>"archive", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
                            {"default"=>nil, "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "error"=>nil, "group"=>"collect", "name"=>"schedule", "prompt"=>"*/15 * * * *", "required"=>false, "type"=>"populated_string", "value"=>"29 * * * *", "warning"=>nil, "options"=>nil},
@@ -1463,7 +1463,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 
-  def test_user
+  def test_user_admin
     user_id = nil
     user = {
         'username' => 'testuser',
@@ -1500,6 +1500,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     # Update
     user['name'] = 'Tester'
+    user.delete 'password'
     put "/user/#{user_id}.json", user.to_json do
       response = JSON.parse(last_response.body)
       assert last_response.ok?, response.to_s
@@ -2010,25 +2011,108 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_authenticate
+    expected = {
+      'auth_failures' => 0,
+      'disabled' => false,
+      'username' => @test_username
+    }
+
     get '/authenticate.json' do
       response = JSON.parse(last_response.body)
       assert last_response.ok?
-      assert_true response
+      thin_response = response.keep_if{|k, _v| expected.keys.include?(k)}
+      assert_equal expected, thin_response
+    end
+  end
+
+  def test_user
+    expected = {
+      'username' => @test_username,
+      'name' => 'Super Admin',
+      'email' => 'superadmin@example.com'
+    }
+
+    get '/user.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_nil response['password']
+      assert_nil response['hashed_password']
+      thin_response = response.keep_if{|k, _v| expected.keys.include?(k)}
+      assert_equal expected, thin_response
     end
 
-    authorize @test_username, 'invalid password'
-    get '/authenticate.json' do
+    # Change Name and password
+    changed = expected.dup
+    changed['name'] = 'New Name'
+    changed['password'] = 'newpassword'
+    put '/user.json', changed.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_nil response['password']
+      assert_nil response['hashed_password']
+      changed.delete('password')
+      thin_response = response.keep_if{|k, _v| changed.keys.include?(k)}
+      assert_equal changed, thin_response
+    end
+
+    get '/user.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal("Authentication failed for #{@test_username}.", response.dig('authentication_error_detail', 'message'))
+    end
+
+    authorize @test_username, 'newpassword'
+    get '/user.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_nil response['password']
+      assert_nil response['hashed_password']
+      thin_response = response.keep_if{|k, _v| changed.keys.include?(k)}
+      assert_equal changed, thin_response
+    end
+
+    authorize @test_username, 'invalid_password'
+    put '/user.json' do
       response = JSON.parse(last_response.body)
       assert last_response.client_error?
       assert_equal("Authentication failed for #{@test_username}.", response.dig('authentication_error_detail', 'message'))
     end
 
     authorize 'invalid_user', @test_password
-    get '/authenticate.json' do
+    put '/user.json' do
       response = JSON.parse(last_response.body)
       assert last_response.client_error?
       assert_equal('Authentication failed for invalid_user.', response.dig('authentication_error_detail', 'message'))
     end
+  end
+
+  def test_update_password
+    post '/update_password.json', {}.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal("A parameter named 'password' is missing but is required.", response.dig('client_error_detail', 'message'))
+    end
+
+    post '/update_password.json', {'password' => '(@u3jidJ*#JDHH@@!'}.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?
+      assert_true response
+    end
+
+    # Should fail because password was changed
+    post '/update_password.json', {'password' => '(!!!@u3jidJ*#JDHH@@!'}.to_json do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal("Authentication failed for #{@test_username}.", response.dig('authentication_error_detail', 'message'))
+    end
+
+    authorize @test_username, 'invalid password'
+    post '/update_password.json' do
+      response = JSON.parse(last_response.body)
+      assert last_response.client_error?
+      assert_equal("Authentication failed for #{@test_username}.", response.dig('authentication_error_detail', 'message'))
+    end
+
   end
 
   def test_role_permissions
@@ -2128,6 +2212,33 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     get("/user/#{user2.internal_id}.json") do
       response = JSON.parse(last_response.body)
       assert_true response.key?('authentication_error_detail'), "User 1 can get User 2 details: #{response}"
+    end
+
+    endpoints = [
+      lambda{get('/authenticate.json'){}},
+      lambda{get('/user.json'){}},
+    ]
+
+    endpoints.each do |lam|
+      file, line = lam.source_location
+      lam_src = File.readlines(file)[line-1].strip
+
+      authorize 'user1', 'password_1'
+      lam.call do
+        response = JSON.parse(last_response.body)
+        assert last_response.ok?, "Error in #{lam_src} with user1"
+        assert_equal 'user1', response['username']
+      end
+
+      authorize 'user2', 'password_2'
+      lam.call
+      response = JSON.parse(last_response.body)
+      assert last_response.ok?, "Error in #{lam_src} with user1"
+      assert_equal 'user2', response['username']
+
+      authorize 'user1', 'badpassword'
+      lam.call
+      assert last_response.client_error?, "Error in #{lam_src} incorrect password"
     end
   end
 end

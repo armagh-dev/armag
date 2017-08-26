@@ -337,7 +337,7 @@ end
 
 put '/user/:user_id.json' do
   rest_helper.handle_request(request, Authentication::Role::USER_ADMIN, params['user_id']) do |fields, _remote_user|
-    api.update_user(params['user_id'], fields)
+    api.update_user_by_id(params['user_id'], fields)
   end
 end
 
@@ -483,8 +483,27 @@ end
 #---------------------
 
 get '/authenticate.json' do
-  rest_helper.handle_request(request) do |_fields, _remote_user|
-    true
+  rest_helper.handle_request(request) do |_fields, remote_user|
+    remote_user
+  end
+end
+
+get '/user.json' do
+  rest_helper.handle_request(request) do |_fields, remote_user|
+    remote_user
+  end
+end
+
+put '/user.json' do
+  rest_helper.handle_request(request) do |fields, remote_user|
+    api.update_user(remote_user, fields)
+  end
+end
+
+post '/update_password.json' do
+  rest_helper.handle_request(request) do |fields, remote_user|
+    api.check_params(fields, 'password')
+    api.update_password(remote_user, fields['password'])
   end
 end
 

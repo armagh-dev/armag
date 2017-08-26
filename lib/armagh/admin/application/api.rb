@@ -33,6 +33,7 @@ require_relative '../../utils/action_helper'
 require_relative '../../agent/agent'
 require_relative '../../authentication/configuration'
 require_relative '../../utils/archiver'
+require_relative '../../utils/password'
 
 module Armagh
   module Admin
@@ -407,9 +408,17 @@ module Armagh
           raise APIClientError, e.message
         end
 
-        def update_user(id, fields)
+        def update_user_by_id(id, fields)
           user = Authentication::User.update(id: id, username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
           raise APIClientError.new("User with ID #{id} not found.") unless user
+          user
+        rescue Authentication::User::UserError, Armagh::Utils::Password::PasswordError => e
+          raise APIClientError, e.message
+        end
+
+        def update_user(user, fields)
+          user.update(username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
+          user.save
           user
         rescue Authentication::User::UserError, Armagh::Utils::Password::PasswordError => e
           raise APIClientError, e.message
@@ -636,6 +645,14 @@ module Armagh
           workflow_set = Actions::WorkflowSet.for_admin(Connection.config)
           workflow_set.trigger_collect(action_name)
         rescue Armagh::Actions::TriggerCollectError => e
+          raise APIClientError, e.message
+        end
+
+        def update_password(user, password)
+          user.password = password
+          user.save
+          true
+        rescue Authentication::User::UserError, Utils::Password::PasswordError => e
           raise APIClientError, e.message
         end
 

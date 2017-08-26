@@ -47,7 +47,7 @@ class TestAuthentication < Test::Unit::TestCase
     # Update nonexistent
     assert_nil Armagh::Authentication::User.update(id: BSONSupport.random_object_id, username: 'user2', password: 'testpassword', name: 'User2', email: 'user2@test.com')
     user = Armagh::Authentication::User.create(username: 'user2', password: 'testpassword', name: 'User2', email: 'user2@test.com')
-    assert_equal user, Armagh::Authentication::User.update(id: user.internal_id, username: 'user2', password: 'testpassword', name: 'User2', email: 'user2@test.com')
+    assert_equal user, Armagh::Authentication::User.update(id: user.internal_id, username: 'user2', password: 'testpassword2', name: 'User2', email: 'user2@test.com')
   end
 
   def test_group

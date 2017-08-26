@@ -347,7 +347,7 @@ class TestWorkflow < Test::Unit::TestCase
     end
     assert_true alice.actions_valid?, "bad action loaded on create; shouldn't happen"
     assert_true alice.valid?
-    assert_equal 'Configuration has errors: Unable to create configuration Armagh::StandardActions::TWTestCollect collect_alicedocs_from_source: output docspec: type validation failed: value cannot be nil', e.message
+    assert_equal "Configuration has errors: Unable to create configuration for 'Armagh::StandardActions::TWTestCollect' named 'collect_alicedocs_from_source' because: \n    Group 'output' Parameter 'docspec': type validation failed: value cannot be nil", e.message
   end
 
   def test_workflow_create_invalid_action_dup_name
@@ -604,7 +604,7 @@ class TestWorkflow < Test::Unit::TestCase
                 "error" => nil,
                 "group" => "action",
                 "name" => "name",
-                "prompt" => "ComtexCollectAction",
+                "prompt" => "<WORKFLOW-NAME>CollectAction",
                 "required" => true,
                 "type" => "populated_string",
                 "value" => nil,
@@ -634,7 +634,7 @@ class TestWorkflow < Test::Unit::TestCase
                 "error" => nil,
                 "group" => "action",
                 "name" => "name",
-                "prompt" => "ComtexCollectAction",
+                "prompt" => "<WORKFLOW-NAME>CollectAction",
                 "required" => true,
                 "type" => "populated_string",
                 "value" => "collect_alicedocs_from_source",

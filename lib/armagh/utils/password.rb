@@ -21,6 +21,8 @@ require 'set'
 
 require 'armagh/support/random'
 
+require_relative '../../armagh/authentication'
+
 module Armagh
   module Utils
     module Password
@@ -32,10 +34,13 @@ module Armagh
         Argon2::Password.create(password)
       end
 
-      def self.verify_strength(password, min_length)
+      def self.verify_strength(password, old_hashed = nil)
+        Authentication.config.refresh
+        min_length = Authentication.config.authentication.min_password_length
         raise PasswordError, 'Password must be a string.' unless password.is_a? String
         raise PasswordError, "Password must contain at least #{min_length} characters." if password.length < min_length
         raise PasswordError, 'Password is a common password.' if common? password
+        raise PasswordError, 'Password cannot be the same as the previous password.' if old_hashed && correct?(password, old_hashed)
         true
       end
 
@@ -46,11 +51,13 @@ module Armagh
       end
 
       def self.correct?(password, hash)
-        Argon2::Password.verify_password(password, hash)
+        Argon2::Password.verify_password(password.to_s, hash)
       end
 
-      def self.random_password(length)
-        Support::Random.random_str length
+      def self.random_password
+        Authentication.config.refresh
+        min_length = Authentication.config.authentication.min_password_length
+        Support::Random.random_str min_length
       end
     end
   end
