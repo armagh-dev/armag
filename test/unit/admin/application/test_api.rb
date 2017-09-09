@@ -526,6 +526,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expected_params =[
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
@@ -588,6 +589,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expected_action_config_params = [
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+        {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
@@ -615,6 +617,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+        {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new("__COLLECT__", "ready"), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("__COLLECT__collect_alicedocs_from_source","ready"), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>"type validation failed: value cannot be nil", "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("b_alicedocs_aggr_big", "ready"), "valid_states"=>["ready", "working"], "options"=>nil},
@@ -641,8 +644,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
             'workflow' => 'fred'
         },
         'collect' => {
-            'archive' => 'false',
-            'schedule' => '7 * * * *'
+          'archive' => 'false',
+          'schedule' => '7 * * * *',
+          'decompress' => 'false'
         },
         'input' => {
             'docspec' => '__COLLECT__collect_freddocs_from_source:ready'
