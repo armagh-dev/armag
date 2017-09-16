@@ -17,17 +17,14 @@
 # limitations under the License.
 #
 
-require 'bundler/setup'
-
 require 'sinatra'
-require 'thin'
+require 'puma'
 require 'json'
 
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
 require_relative '../lib/armagh/admin/application/api'
-require_relative '../lib/armagh/admin/application/thin_backend'
 require_relative '../lib/armagh/configuration/file_based_configuration'
 require_relative '../lib/armagh/connection'
 require_relative '../lib/armagh/logging'
@@ -55,6 +52,7 @@ configure do
 
   if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
     set :environment, :production
+    set :show_exceptions, false
   else
     set :environment, :development
     set :show_exceptions, :after_handler
@@ -62,7 +60,7 @@ configure do
 
   set :bind,   api.ip
   set :port,   api.port
-  set :server, "thin"
+  set :server, 'puma'
   set :root,   api.root_directory
   set :run,    true
   class << settings
@@ -71,7 +69,7 @@ configure do
 
       api = Admin::Application::API.instance
 
-      settings = { :backend => Admin::Application::ThinBackend }
+      settings = {}
       if api.using_ssl?
         settings.merge!( {
                              :private_key_file => api.key_filepath,
@@ -92,7 +90,7 @@ enable :sessions, :logging
 
 set :session_secret, 'arm-866w(c@n$f2pv+8sgg7&y_i#c+6!-d(u&f*dec7sp!ju*a%9*a'
 
-use Rack::CommonLogger, api.logger unless ENV['RACK_ENV'] == 'test'
+use Rack::CommonLogger, api.logger
 
 #------------------------------------------------------------------------------------------------
 #
@@ -112,19 +110,19 @@ end
 #------------------------------
 
 get '/agent_status.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request) do |_fields, _remote_user|
     api.get_agent_status
   end
 end
 
 get '/launcher_status.json' do
-  rest_helper.handle_request(request) do |fields|
+  rest_helper.handle_request(request) do |_fields, _remote_user|
     api.get_launcher_status
   end
 end
 
 get '/status.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_status
   end
 end
@@ -138,14 +136,14 @@ end
 
 # list of workflows with status
 get '/workflows.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflows
   end
 end
 
 # create new workflow
 post '/workflow/:workflow_name/new.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     workflow = api.create_workflow({'workflow' => {'name' => params['workflow_name']}})
     workflow.name
   end
@@ -153,28 +151,28 @@ end
 
 # status for existing workflow
 get '/workflow/:workflow_name/status.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflow_status(params['workflow_name'])
   end
 end
 
 # update workflow: run
 patch '/workflow/:workflow_name/run.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.run_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: finish
 patch '/workflow/:workflow_name/finish.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.finish_workflow(params['workflow_name'])
   end
 end
 
 # update workflow: stop
 patch '/workflow/:workflow_name/stop.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.stop_workflow(params['workflow_name'])
   end
 end
@@ -187,49 +185,50 @@ end
 
 # list of defined action classes
 get '/actions/defined.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_defined_actions
   end
 end
 
 # Trigger a collect
 patch '/actions/trigger_collect.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.trigger_collect(params['name'])
   end
 end
 
 # list of workflow actions with status
 get '/workflow/:workflow_name/actions.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflow_actions(params['workflow_name'])
   end
 end
 
 # status for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/status.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflow_action_status(params['workflow_name'], params['action_name'])
   end
 end
 
 # edit form for new workflow action
 get '/workflow/:workflow_name/action/config.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
-    api.new_workflow_action_config(params['workflow_name'],fields['type'] )
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.check_params(params, 'type')
+    api.new_workflow_action_config(params['workflow_name'], params['type'] )
   end
 end
 
 # edit form for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/description.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflow_action_description(params['workflow_name'], params['action_name'])
   end
 end
 
 # config for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/config.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_workflow_action_config(params['workflow_name'], params['action_name'])
   end
 end
@@ -251,7 +250,7 @@ end
 
 # get defined group test callbacks
 get '/test/:type/callbacks.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
     api.get_action_test_callbacks(params['type'])
   end
 end

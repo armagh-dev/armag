@@ -598,7 +598,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal Hash, result.class
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
-    assert_equal 10, result['parameters'].size
+    assert_equal 13, result['parameters'].size
     expected = {"default" => nil,
                 "description" => "Name of this action configuration",
                 "error" => nil,
@@ -628,7 +628,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal Hash, result.class
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
-    assert_equal 12, result['parameters'].size
+    assert_equal 15, result['parameters'].size
     expected = {"default" => nil,
                 "description" => "Name of this action configuration",
                 "error" => nil,

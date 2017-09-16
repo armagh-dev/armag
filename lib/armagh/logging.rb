@@ -15,9 +15,6 @@
 # limitations under the License.
 #
 #
-# Caution: Since this script is distributed as part of a gem, when run from PATH it wont be executed as part of a bundle (even with require 'bundler/setup')
-#            If any of the required need a specific version and there is a chance that multiple versions will be installed on the system, specify the gem version
-#            as part of the requirement as well as in the gemspec.
 
 require 'logging'
 require 'set'
@@ -122,8 +119,7 @@ module Armagh
       init_loggers
     end
 
-    private_class_method
-    def self.init_log_dir
+    private_class_method def self.init_log_dir
       @log_dir = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
       @log_dir.freeze
       unless File.directory?(@log_dir)
@@ -135,15 +131,13 @@ module Armagh
         end
       end
 
-      unless defined? LOG_DIR
-        @log_dir = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
-        @app_logfile = File.join(@log_dir, 'agents.log')
-        @app_admin_logfile = File.join(@log_dir, 'application_admin_api.log')
-        @app_resource_admin_logfile = File.join(@log_dir, 'resource_admin_api.log')
-        @mongo_logfile = File.join(@log_dir, 'mongo.log')
-        @mongo_admin_logfile = File.join(@log_dir, 'mongo_admin.log')
-        @gui_logfile = File.join(@log_dir, 'application_admin_gui.log')
-      end
+      @log_dir = ENV['ARMAGH_APP_LOG'] || '/var/log/armagh'
+      @app_logfile = File.join(@log_dir, 'agents.log')
+      @app_admin_logfile = File.join(@log_dir, 'application_admin_api.log')
+      @app_resource_admin_logfile = File.join(@log_dir, 'resource_admin_api.log')
+      @mongo_logfile = File.join(@log_dir, 'mongo.log')
+      @mongo_admin_logfile = File.join(@log_dir, 'mongo_admin.log')
+      @gui_logfile = File.join(@log_dir, 'application_admin_gui.log')
     end
 
     private_class_method def self.init_loggers

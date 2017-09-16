@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 #
-require 'bundler/setup'
+
 require_relative '../lib/armagh'
 
 Process.setproctitle(File.basename(__FILE__))

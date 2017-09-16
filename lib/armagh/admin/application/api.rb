@@ -69,7 +69,6 @@ module Armagh
 
         def initialize
           @logger = Logging.set_logger('Armagh::ApplicationAdminAPI')
-          @logger.level = Logging::ANY if ENV['RACK_ENV'] == 'test'
 
           Connection.require_connection(@logger)
 

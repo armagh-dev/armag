@@ -16,8 +16,6 @@
 # limitations under the License.
 #
 #
-require 'bundler/setup'
-
 require 'singleton'
 
 module Armagh

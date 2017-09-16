@@ -16,10 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require 'bundler/setup'
 
 require 'sinatra'
-require 'thin'
+require 'puma'
 
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
@@ -47,7 +46,7 @@ configure do
 
   set :bind,            gui.ip
   set :port,            gui.port
-  set :server,          'thin'
+  set :server,          'puma'
   set :root,            Proc.new { gui.root_directory }
   set :public_folder,   Proc.new { File.join(settings.root, 'public') }
   set :views,           Proc.new { File.join(settings.root, 'views') }

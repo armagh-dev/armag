@@ -1025,7 +1025,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_config
     good_alice_in_db
 
-    get '/workflow/alice/action/config.json', {'type' => 'Armagh::StandardActions::TWTestCollect'}.to_json do
+    get '/workflow/alice/action/config.json', {'type' => 'Armagh::StandardActions::TWTestCollect'} do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
       expected_result = {
@@ -1038,6 +1038,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>["auto", "7zip", "tar", "tgz", "zip"]},
+              {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_state"=>"ready", "options"=>nil},
               {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
               {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
@@ -1050,7 +1053,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_config_invalid_workflow
     good_alice_in_db
 
-    get '/workflow/fred/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' }.to_json do
+    get '/workflow/fred/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' } do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
       expected_result = {"client_error_detail"=>{"message"=>"Workflow fred not found", "markup"=>nil}}
@@ -1061,7 +1064,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_config_invalid_action_name
     good_alice_in_db
 
-    get '/workflow/alice/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' }.to_json do
+    get '/workflow/alice/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' } do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
       expected_result = {"client_error_detail"=>{"message"=>"Action class name Armagh::StandardActions::Nope not valid", "markup"=>nil}}
@@ -1087,6 +1090,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"]},
+              {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
               {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"], "options"=>nil},
               {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"], "options"=>nil},
@@ -1117,6 +1123,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
+              {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"]},
+              {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>"__COLLECT__:ready", "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>"__COLLECT__collect_alicedocs_from_source:ready", "valid_state"=>"ready", "options"=>nil},
               {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"a_alicedoc:ready", "valid_states"=>["ready", "working"], "options"=>nil},
               {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>"b_alicedocs_aggr_big:ready", "valid_states"=>["ready", "working"], "options"=>nil},
@@ -1143,7 +1152,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'collect' => {
               'schedule' => '7 * * * *',
               'archive' => 'false',
-              'decompress' => 'false'
+              'decompress' => 'false',
+              'extract' => 'false',
+              'extract_format' => 'auto'
           },
           'input' => {
               'docspec' => '__COLLECT__collect_alicedocs_from_source:ready'
@@ -1259,14 +1270,17 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       expected_result = {
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
-          'parameters' => [{"error"=>nil, "group"=>"action"},
-                           {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
-                           {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"collect_alicedocs_from_source", "warning"=>nil, "options"=>nil},
-                           {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
-                           {"error"=>nil, "group"=>"collect"},
-                           {"default"=>true, "description"=>"Archive collected documents", "error"=>nil, "group"=>"collect", "name"=>"archive", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
-                           {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-                           {"default"=>nil, "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "error"=>nil, "group"=>"collect", "name"=>"schedule", "prompt"=>"*/15 * * * *", "required"=>false, "type"=>"populated_string", "value"=>"29 * * * *", "warning"=>nil, "options"=>nil},
+          'parameters' => [{"error" => nil, "group" => "action"},
+                           {"default" => false, "description" => "Agents will run this configuration if active", "error" => nil, "group" => "action", "name" => "active", "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil, "options" => nil},
+                           {"default" => nil, "description" => "Name of this action configuration", "error" => nil, "group" => "action", "name" => "name", "prompt" => "<WORKFLOW-NAME>CollectAction", "required" => true, "type" => "populated_string", "value" => "collect_alicedocs_from_source", "warning" => nil, "options" => nil},
+                           {"default" => nil, "description" => "Workflow this action config belongs to", "error" => nil, "group" => "action", "name" => "workflow", "prompt" => "<WORKFLOW-NAME>", "required" => false, "type" => "populated_string", "value" => "alice", "warning" => nil, "options" => nil},
+                           {"error" => nil, "group" => "collect"},
+                           {"default" => true, "description" => "Archive collected documents", "error" => nil, "group" => "collect", "name" => "archive", "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil, "options" => nil},
+                           {"default" => false, "description" => "Decompress (gunzip) incoming documents", "error" => nil, "group" => "collect", "name" => "decompress", "options" => nil, "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil},
+                           {"default" => false, "description" => "Extract incoming archive files", "error" => nil, "group" => "collect", "name" => "extract", "options" => nil, "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil},
+                           {"default" => nil, "description" => "Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "error" => nil, "group" => "collect", "name" => "extract_filter", "options" => nil, "prompt" => "*.json", "required" => false, "type" => "populated_string", "value" => nil, "warning" => nil},
+                           {"default"=>"auto", "description"=> "The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "error"=>nil, "group"=>"collect", "name"=>"extract_format", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "required"=>true, "type"=>"populated_string", "value"=>"auto", "warning"=>nil},
+                           {"default" => nil, "description" => "Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "error" => nil, "group" => "collect", "name" => "schedule", "prompt" => "*/15 * * * *", "required" => false, "type" => "populated_string", "value" => "29 * * * *", "warning" => nil, "options" => nil},
                            {"default"=>"__COLLECT__:ready", "description"=>"The type of document this action accepts", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"__COLLECT__:ready", "warning"=>nil, "valid_state"=>"ready", "options"=>nil},
                            {"default"=>nil, "description"=>"The docspec of the default output from this action", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_a_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
                            {"default"=>nil, "description"=>"collected documents of second type", "error"=>nil, "group"=>"output", "name"=>"docspec2", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"new_b_docs:ready", "warning"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},

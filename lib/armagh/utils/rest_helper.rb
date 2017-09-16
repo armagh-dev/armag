@@ -38,7 +38,7 @@ module Armagh
           successful_result = yield params, remote_user
           respond_success( successful_result )
         rescue Armagh::Authentication::AuthenticationError => e
-          respond_authentication_exception(request, e)
+          respond_authentication_exception(e)
         rescue Admin::Application::APIClientError => e
           respond_client_exception(request, e)
         rescue => e
@@ -68,22 +68,22 @@ module Armagh
       end
 
       def parse_request(request)
-        body = request.body.string
-        body = "(#{body}}" unless body.empty?
-        @logger.debug "Handling request: #{request.request_method} #{request.url} #{body}"
-        body = (request.post? || request.put? || request.patch?) ? request.body.read : Rack::Utils.unescape(request.query_string)
+        body = request.body.read
+        @logger.debug "Handling request: #{request.request_method} #{request.url} [#{request.user_agent}] #{body}"
 
-        begin
-          request_hash = JSON.parse(body) unless body.nil? || body.empty?
-        rescue JSON::ParserError; end
+        request_hash = if (request.post? || request.put? || request.patch?) && body && !body.empty?
+                         JSON.parse(body)
+                       else
+                         {}
+                       end
 
-        request_hash ||= request.params unless request.params.empty?
-        request_hash ||= {}
+        raise 'Request body expected to be a JSON hash' unless request_hash.is_a? Hash
 
-        respond_client_error( 'Request body must be a hash') unless request_hash.is_a?( Hash )
         request_hash
+      rescue JSON::ParserError
+        respond_server_error(request, 'Invalid json body received')
       rescue => e
-        respond_server_exception( request, e )
+        respond_server_exception(request, e)
       end
 
       def respond_server_exception(request, exception)
@@ -102,17 +102,17 @@ module Armagh
       end
 
       def respond_client_exception(request, exception)
-        @logger.debug Logging::EnhancedException.new("Client Error: #{request.inspect}", exception)
+        @logger.error Logging::EnhancedException.new("Client Error: #{request.inspect}", exception)
         [400, JSON.pretty_generate( { 'client_error_detail' => { 'message' => exception.message, 'markup' => exception.markup }})]
       end
 
       def respond_client_error(request, message = 'Unspecified error in request', markup = nil )
-        @logger.debug "Client error in request #{request}.  Responding with: #{message}: #{markup}"
+        @logger.error "Client error in request #{request}.  Responding with: #{message}: #{markup}"
         [400, JSON.pretty_generate( { 'client_error_detail' => { 'message' => message, 'markup' => markup }})]
       end
 
-      def respond_authentication_exception(request, exception)
-        @logger.debug Logging::EnhancedException.new("Authentication error: #{request.inspect}",  exception)
+      def respond_authentication_exception(exception)
+        @logger.info "Authentication error: #{exception.message}"
         [401, JSON.pretty_generate({'authentication_error_detail' => {'message' => exception.message}})]
       end
     end

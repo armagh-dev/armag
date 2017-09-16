@@ -15,9 +15,6 @@
 # limitations under the License.
 #
 
-require 'rubygems'
-require 'bundler/setup'
-
 Dir.glob( File.join( __dir__, 'armagh/**/*.rb' )).each do |rb_file|
   require_relative rb_file
 end

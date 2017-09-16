@@ -58,7 +58,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'armagh-standard_actions', '< 2.0'
   spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
   spec.add_runtime_dependency 'sinatra', '~> 1.4'
-  spec.add_runtime_dependency 'thin', '~> 1.6'
+  spec.add_runtime_dependency 'puma', '~> 3.10'
   spec.add_runtime_dependency 'oj', '~> 2.14'
   spec.add_runtime_dependency 'argon2', '~> 1.1'
   spec.add_runtime_dependency 'mongo', '~> 2.4'

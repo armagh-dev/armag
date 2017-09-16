@@ -17,17 +17,14 @@
 # limitations under the License.
 #
 
-require 'bundler/setup'
-
 require 'sinatra'
-require 'thin'
+require 'puma'
 require 'json'
 
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
 require_relative '../lib/armagh/admin/resource/api.rb'
-require_relative '../lib/armagh/admin/resource/thin_backend.rb'
 require_relative '../lib/armagh/authentication'
 require_relative '../lib/armagh/configuration/file_based_configuration.rb'
 require_relative '../lib/armagh/connection'
@@ -56,6 +53,7 @@ configure do
 
   if ENV[ 'ARMAGH_ENV' ] == 'PRODUCTION'
     set :environment, :production
+    set :show_exceptions, false
   else
     set :environment, :development
     set :show_exceptions, :after_handler
@@ -63,7 +61,7 @@ configure do
 
   set :bind,   api.ip
   set :port,   api.port
-  set :server, "thin"
+  set :server, 'puma'
   set :root,   api.root_directory
   set :run,    true
   class << settings
@@ -72,7 +70,7 @@ configure do
 
       api = Admin::Resource::API.instance
 
-      settings = { :backend => Admin::Resource::ThinBackend }
+      settings = {}
       if api.using_ssl?
         settings.merge!( {
           :private_key_file => api.key_filepath,
