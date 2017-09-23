@@ -228,9 +228,24 @@ module Armagh
       end
 
       def run
-        raise(WorkflowActivationError, 'Workflow not valid') unless valid?
         raise(WorkflowActivationError, 'Wait for workflow to stop before restarting' ) unless run_mode == 'stop'
+        raise(WorkflowActivationError, 'Workflow not valid') unless valid?
         raise(WorkflowActivationError, unused_output_message) if has_unused_output?
+
+        callback_errors = []
+        @valid_action_configs.each do |action_config|
+          callback_error = action_config.test_and_return_errors
+          next if callback_error.empty?
+          error_string = ''
+          callback_error.each do |method, error|
+            error_string << ', ' unless error_string.empty?
+            error_string << "#{method}: #{error}"
+          end
+          error_string = "Action #{action_config.action.name.inspect} failed #{error_string}"
+          callback_errors << error_string
+        end
+        raise(WorkflowActivationError, callback_errors.join("\n")) unless callback_errors.empty?
+
         change_actions_active_status(true)
         @config.update_merge({'workflow'=>{'run_mode' => 'run'}})
 

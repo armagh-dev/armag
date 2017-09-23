@@ -19,10 +19,15 @@
 
 require 'irb'
 
+require_relative '../lib/armagh/environment.rb'
+Armagh::Environment.init
+
 require_relative '../lib/armagh'
 
 Process.setproctitle(File.basename(__FILE__))
 
 include Armagh
+
+Actions::GemManager.instance.activate_installed_gems( Armagh::Logging.set_logger('armagh_console'))
 
 IRB.start

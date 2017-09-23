@@ -23,8 +23,8 @@
       {{ uuid = SecureRandom.uuid }}
       <tr>
         <td>
+          <i class="uk-icon-sitemap"></i>
           <a href="/config/{{= workflow['name'] }}">
-            <i class="uk-icon-sitemap"></i>
             {{= workflow['name'] }}
           </a>
         </td>

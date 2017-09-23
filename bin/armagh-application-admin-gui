@@ -26,6 +26,7 @@ Armagh::Environment.init
 require 'armagh/support/templating'
 
 require_relative '../lib/armagh/admin/application/admin_gui.rb'
+require_relative '../lib/armagh/admin/application/www_root/models/user.rb'
 
 Process.setproctitle(File.basename(__FILE__))
 
@@ -56,6 +57,7 @@ end
 use Rack::CommonLogger, gui.logger
 
 helpers do
+
   def render(*page, **context)
     page.map! { |p| p.to_s }
     page = File.join(page)
@@ -92,7 +94,7 @@ helpers do
   end
 
   def authenticated?
-    !user.nil?
+    !user.nil? && !user.required_password_reset
   end
 
   def user
@@ -109,18 +111,24 @@ helpers do
 
   def sanitize_string(value)
     return value unless value.is_a?(String)
+    value.gsub!(/[&<>"'\/`=]/) do |char|
+      case char
+      when '&' then '&amp;'
+      when '<' then '&lt;'
+      when '>' then '&gt;'
+      when '"' then '&quot;'
+      when "'" then '&#39;'
+      when '/' then '&#x2F;'
+      when '`' then '&#x60;'
+      when '=' then '&#x3D;'
+      else char
+      end
+    end
+    value.strip!
     value
-      .gsub(/&/, '&amp;')
-      .gsub(/</, '&lt;')
-      .gsub(/>/, '&gt;')
-      .gsub(/"/, '&quot;')
-      .gsub(/'/, '&#39;')
-      .gsub(/\//, '&#x2F;')
-      .gsub(/`/, '&#x60;')
-      .gsub(/=/, '&#x3D;')
-      .strip
   end
-end
+
+end # helpers
 
 not_found do
   halt 404, render(:error, error: "404: <strong>#{request.path_info}</strong> does not exist" )
@@ -131,7 +139,7 @@ error do |e|
 end
 
 before do
-  pass if request.path_info[/^\/login/] || gui.authenticated?
+  pass if request.path_info[/^\/login/] || authenticated?
   redirect "/login?re=#{request.path_info}"
 end
 
@@ -144,43 +152,51 @@ get '/login' do
 end
 
 post '/login' do
-  if %w[username password].all? { |k| params.key? k }
+  action =
+    if %w(username password).all? { |k| params.key? k }
+      :login
+    elsif %w(old new con).all? { |k| params.key? k }
+      :change_password
+    end
+
+  case action
+  when :login
     username         = params['username']
     password         = params['password']
     status, response = gui.login(username, password)
+
     case status
     when :error
       session['user'] = nil
       halt render :login, error: response
-    when :change_password
-      session['change_password'] = {user_id:  response, username: username}
-      render :login, :change_password, notice: 'It seems this may be your first login. Please change your password using the form below.'
     when :success
-      session['user']       = response[:name] || username
-      session['user_id']    = response[:id]
-      session['user_roles'] = response[:roles]
-      redirect params['re']
+      user = User.new(response)
+      user.password = password
+      session['user'] = user
+      if user.required_password_reset
+        render :login, :change_password, notice: 'It seems this may be your first login. Please change your password using the form below.'
+      else
+        redirect params['re']
+      end
     end
-  elsif %w[old new con].all? { |k| params.key? k }
-    change_password  = session['change_password']
-    user_id          = change_password[:user_id]
-    username         = change_password[:username]
-    status, response = gui.change_password(user_id, username, params)
+
+  when :change_password
+    user = session['user']
+    params['username'] = user.username
+    status, response = gui.change_password(params)
+
     case status
     when :error
       render(:login, :change_password, error: response)
     when :success
-      session['change_password'] = nil
-      session['user']       = response['name'] || username
-      session['user_id']    = user_id
-      session['user_roles'] = response['roles']
+      user.required_password_reset = false
+      user.password = params['new']
       redirect params['re']
     end
   end
 end
 
 get '/logout' do
-  gui.logout
   session['user'] = nil
   redirect '/'
 end
@@ -198,15 +214,15 @@ end
 #
 
 get '/status' do
-  render :status, data: gui.get_status
+  render :status, data: gui.get_status(user)
 end
 
 patch '/restart' do
-  gui.shutdown(restart: true)
+  gui.shutdown(user, restart: true)
 end
 
 patch '/shutdown' do
-  gui.shutdown
+  gui.shutdown(user)
 end
 
 #
@@ -214,7 +230,7 @@ end
 #
 
 get '/logs' do
-  data = gui.get_logs(
+  data = gui.get_logs(user,
     page:   params['page'],
     limit:  params['limit'],
     sort:  {params['sort_col']=>params['sort_dir']},
@@ -230,11 +246,11 @@ end
 #
 
 get '/docs' do
-  render :docs, data: gui.get_doc_collections
+  render :docs, data: gui.get_doc_collections(user)
 end
 
 get '/docs/:collection' do
-  partial :docs, :doc, data: gui.get_doc(params)
+  partial :docs, :doc, data: gui.get_doc(user, params)
 end
 
 #
@@ -242,7 +258,7 @@ end
 #
 
 get '/config' do
-  render :config, :workflows, data: gui.get_workflows
+  render :config, :workflows, data: gui.get_workflows(user)
 end
 
 get '/config/new' do
@@ -254,7 +270,7 @@ post '/config/new' do
 
   halt render(:config, :workflow_new, error: 'Workflow name cannot be empty') if workflow.to_s.strip.empty?
 
-  status, response = gui.create_workflow(workflow)
+  status, response = gui.create_workflow(user, workflow)
   if status == :success
     redirect "/config/#{workflow}"
   else
@@ -267,13 +283,13 @@ get '/config/:workflow' do
   workflow = params['workflow']
   created  = params['created']
   updated  = params['updated']
-  data     = gui.get_workflow(workflow, created, updated)
+  data     = gui.get_workflow(user, workflow, created, updated)
   success  = "Successfully #{created ? 'created' : 'updated'} action <strong>#{created ? created : updated}</strong>." if created || updated
   render :config, :workflow_edit, data: data, success: success
 end
 
 get '/config/:workflow/new' do
-  render :config, :action_new, data: gui.new_workflow_action(params['workflow'], params['prev'], params['filter'])
+  render :config, :action_new, data: gui.new_workflow_action(user, params['workflow'], params['prev'], params['filter'])
 end
 
 post '/config/:workflow/new' do
@@ -281,24 +297,24 @@ post '/config/:workflow/new' do
 end
 
 post '/config/:workflow/import' do
-  gui.import_action_config(params)
+  gui.import_action_config(user, params)
 end
 
 get '/config/:workflow/export' do
   workflow = params['workflow']
   headers['Content-Type']        = 'application/json'
   headers['Content-Disposition'] = "attachment;filename=#{workflow}.json"
-  gui.export_workflow_config(workflow)
+  gui.export_workflow_config(user, workflow)
 end
 
 patch '/config/:workflow/:status_change' do
   workflow = params['workflow']
   if params['status_change'] == 'activate'
-    gui.activate_workflow(workflow)
+    gui.activate_workflow(user, workflow)
       .unshift(params['id'])
       .to_json
   else
-    gui.deactivate_workflow(workflow)
+    gui.deactivate_workflow(user, workflow)
       .unshift(params['id'])
       .to_json
   end
@@ -309,12 +325,12 @@ end
 #
 
 get '/config/:workflow/new/:action' do
-  render :config, :action_edit, data: gui.new_action_config(params['workflow'], params['action'])
+  render :config, :action_edit, data: gui.new_action_config(user, params['workflow'], params['action'])
 end
 
 post '/config/:workflow/new/:action' do
   workflow = params['workflow']
-  result   = gui.create_action_config(params)
+  result   = gui.create_action_config(user, params)
   if result == :success
     redirect "/config/#{workflow}?created=#{params['action-name']}"
   else
@@ -323,13 +339,13 @@ post '/config/:workflow/new/:action' do
 end
 
 get '/config/:workflow/edit/:action' do
-  render :config, :action_edit, data: gui.edit_workflow_action(params['workflow'], params['action'])
+  render :config, :action_edit, data: gui.edit_workflow_action(user, params['workflow'], params['action'])
 end
 
 put '/config/:workflow/edit/:action' do
   workflow = params['workflow']
   action   = params['action']
-  result   = gui.update_action_config(params)
+  result   = gui.update_action_config(user, params)
   if result == :success
     redirect "/config/#{workflow}?updated=#{action}"
   else
@@ -339,5 +355,5 @@ end
 
 patch '/config/test' do
   data = JSON.parse(request.body.read)
-  gui.invoke_action_test_callback(data)
+  gui.invoke_action_test_callback(user, data)
 end

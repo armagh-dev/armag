@@ -202,8 +202,19 @@ module Armagh
             else
               config = Utils::Archiver.create_configuration(Connection.config, Utils::Archiver::CONFIG_NAME, values, maintain_history: true)
             end
-          rescue Configh::ConfigInitError, Configh::ConfigValidationError
-            raise APIClientError.new('Invalid archive config', markup: Utils::Archiver.edit_configuration(values))
+
+            callback_error = config.test_and_return_errors
+            if callback_error.any?
+              error_string = ''
+              callback_error.each do |method, error|
+                error_string << ', ' unless error_string.empty?
+                error_string << "#{method}: #{error}"
+              end
+              raise Configh::ConfigValidationError, error_string
+            end
+
+          rescue Configh::ConfigInitError, Configh::ConfigValidationError => e
+            raise APIClientError.new("Invalid archive config. #{e}", markup: Utils::Archiver.edit_configuration(values))
           end
 
           config.serialize['values']

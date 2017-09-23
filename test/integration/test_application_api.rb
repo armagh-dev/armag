@@ -497,7 +497,12 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => "type validation failed: value 'BAD' cannot be cast as an integer", "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => nil, "warning" => nil}
         ]}
 
-      assert_equal'Invalid archive config', failure_detail['message']
+      assert_equal(
+        "Invalid archive config. Unable to create configuration for 'Armagh::Utils::Archiver' named 'default' because: \n" +
+        "    Group 'sftp' Parameter 'port': type validation failed: value 'BAD' cannot be cast as an integer\n" +
+        "    Group 'archive' Parameter 'max_archives_per_dir': type validation failed: value 'BAD' cannot be cast as an integer",
+        failure_detail['message']
+      )
       assert_equal expected_markup, failure_detail['markup']
     end
   end
@@ -528,10 +533,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           {"default" => nil, "description" => "SFTP user password", "error" => nil, "group" => "sftp", "name" => "password", "options" => nil, "prompt" => "password", "required" => false, "type" => "encoded_string", "value" => nil, "warning" => nil},
           {"default" => nil, "description" => "SSH Key (not filename!) for SFTP connection", "error" => nil, "group" => "sftp", "name" => "key", "options" => nil, "prompt" => "password", "required" => false, "type" => "string", "value" => nil, "warning" => nil},
           {"default" => 5000, "description" => "Maximum number archives to store per subdirectory.", "error" => nil, "group" => "archive", "name" => "max_archives_per_dir", "options" => nil, "prompt" => nil, "required" => true, "type" => "positive_integer", "value" => 100, "warning" => nil},
-          {"error" => "Unable to resolve host invalid.noragh.com.", "group" => "sftp"}
         ]}
 
-      assert_equal'Invalid archive config', failure_detail['message']
+      assert_equal'Invalid archive config. test_connection: Unable to resolve host invalid.noragh.com.', failure_detail['message']
       assert_equal expected_markup, failure_detail['markup']
     end
   end

@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-#
 # Copyright 2017 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#
-require_relative '../lib/armagh/environment.rb'
-Armagh::Environment.init
 
-require_relative '../lib/armagh'
+class User
+  attr_reader :id, :username, :name, :roles, :groups, :auth_failures, :directory, :password_timestamp, :permanent, :updated_timestamp, :created_timestamp, :last_login, :email, :disabled, :locked
+  attr_accessor :required_password_reset, :password
 
-Process.setproctitle(File.basename(__FILE__))
+  def initialize(fields)
+    fields.each { |field, value| self.instance_variable_set "@#{field}", value }
+  end
 
-Armagh::Launcher.new( 'default' ).run
+end

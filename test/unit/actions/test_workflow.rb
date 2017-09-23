@@ -422,6 +422,25 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal 'Wait for workflow to stop before restarting', e.message
   end
 
+  def test_run_with_callback_errors
+    good_alice_in_db
+    @alice.instance_variable_get(:@valid_action_configs).each_with_index do |action_config, index|
+      action_config.expects(:test_and_return_errors).once.returns('test_connection'=>"Some error #{index + 1}")
+    end
+    e = assert_raises Armagh::Actions::WorkflowActivationError do
+      @alice.run
+    end
+    expected = "Action \"collect_alicedocs_from_source\" failed test_connection: Some error 1\n" +
+      "Action \"consume_a_alicedoc_1\" failed test_connection: Some error 2\n" +
+      "Action \"consume_a_alicedoc_2\" failed test_connection: Some error 3\n" +
+      "Action \"consume_b_alicedoc_1\" failed test_connection: Some error 4\n" +
+      "Action \"divide_b_alicedocs\" failed test_connection: Some error 5\n" +
+      "Action \"publish_a_alicedocs\" failed test_connection: Some error 6\n" +
+      "Action \"publish_b_alicedocs\" failed test_connection: Some error 7\n" +
+      "Action \"split_b_alicedocs\" failed test_connection: Some error 8"
+    assert_equal expected, e.message
+  end
+
   def test_finish
     good_alice_in_db
     expect_alice_docs_in_db

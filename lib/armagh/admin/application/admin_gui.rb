@@ -17,6 +17,7 @@
 
 require 'singleton'
 require 'httpclient'
+require 'uri'
 require 'cgi'
 require 'json'
 
@@ -65,52 +66,52 @@ module Armagh
           File.join( __dir__, 'www_root' )
         end
 
-        private def get_json(relative_url, fields = {})
-          http_request(relative_url, :get, fields)
+        private def get_json(user, relative_url, fields = {})
+          http_request(user, relative_url, :get, fields)
         end
 
-        private def get_json_with_status(relative_url, fields = {})
-          http_request(relative_url, :get, fields, true)
+        private def get_json_with_status(user, relative_url, fields = {})
+          http_request(user, relative_url, :get, fields, true)
         end
 
-        private def post_json(relative_url, hash_or_json = {})
-          http_request(relative_url, :post, hash_or_json)
+        private def post_json(user, relative_url, hash_or_json = {})
+          http_request(user, relative_url, :post, hash_or_json)
         end
 
-        private def put_json(relative_url, hash_or_json = {})
-          http_request(relative_url, :put, hash_or_json)
+        private def put_json(user, relative_url, hash_or_json = {})
+          http_request(user, relative_url, :put, hash_or_json)
         end
 
-        private def patch_json(relative_url, hash_or_json = {})
-          http_request(relative_url, :patch, hash_or_json)
+        private def patch_json(user, relative_url, hash_or_json = {})
+          http_request(user, relative_url, :patch, hash_or_json)
         end
 
-        private def delete_json(relative_url, hash_or_json = {})
+        private def delete_json(user, relative_url, hash_or_json = {})
           raise NotImplementedError
         end
 
-        private def http_request(relative_url, method, data, get_with_status = false)
+        private def http_request(user, relative_url, method, data, get_with_status = false)
           relative_url.sub!(/^\//, '')
-          relative_url.gsub!(/\ /, '%20')
-          url    = "http://#{@ip}:#{@api_port}/#{relative_url}"
+          url    = URI.encode("http://#{@ip}:#{@api_port}/#{relative_url}")
           header = {'ContentType' => 'application/json'}
-          body   = data.is_a?(JSON) ? data : data.to_json
+          query  = data
+          json   = data.is_a?(JSON) ? data : data.to_json
 
           client = HTTPClient.new
-          client.set_auth(url, @username, @password)
+          client.set_auth(url, user.username, user.password)
 
           response =
             case method
             when :get
-              client.get(url,    body)
+              client.get(url, query)
             when :post
-              client.post(url,   body: body, header: header)
+              client.post(url, json, header: header)
             when :put
-              client.put(url,    body: body, header: header)
+              client.put(url, json, header: header)
             when :patch
-              client.patch(url,  body: body, header: header)
+              client.patch(url, json, header: header)
             when :delete
-              client.delete(url, body)
+              client.patch(url, query)
             else
               raise AdminGUIHTTPError, "Unrecognized HTTP method: #{method}"
             end
@@ -118,7 +119,7 @@ module Armagh
           begin
             json = JSON.parse(response.body)
           rescue JSON::ParserError
-            json = {'server_error_detail' => {'message' =>
+            json = {'server_error_detail'=>{'message'=>
               "API HTTP #{method} request to #{url} failed with status #{response.status} #{response.reason}"}}
           end
 
@@ -139,131 +140,90 @@ module Armagh
           end
         end
 
-        private def set_auth(username, password)
-          @username = username
-          @password = password
-        end
-
         private def authenticate(username, password)
-          set_auth(username, password)
-          get_json_with_status('/authenticate.json')
+          user = Struct.new(:username, :password).new(username, password)
+          get_json_with_status(user, '/authenticate.json')
         end
 
-        private def authenticate?(username, password)
+        private def authenticated?(username, password)
           authenticate(username, password).first == :success
         end
 
         def login(username, password)
           if username.strip.empty? || password.strip.empty?
-            logout
             [:error, 'Username and/or password cannot be blank.']
           else
-            status, response = authenticate(username, password)
-            if status == :success
-              response = get_json('/users.json')
-              user     = response.select { |match| match['username'] == username }.first
-              if user&.[]('required_password_reset')
-                [:change_password, user['id']]
-              else
-                @authenticated = true
-                [:success, {id: user['id'], name: user['name'], roles: user['roles']}]
-              end
-            else
-              logout
-              [:error, response]
-            end
+            authenticate(username, password)
           end
         end
 
-        def change_password(user_id, username, params)
-          old = params['old'].strip
-          new = params['new'].strip
-          con = params['con'].strip
+        def change_password(params)
+          username = params['username']
+          old      = params['old'].strip
+          new      = params['new'].strip
+          con      = params['con'].strip
 
           if old.empty? || new.empty? || con.empty?
             [:error, 'One or more required fields are blank.']
           elsif new != con
             [:error, 'New password does not match confirmation.']
-          elsif old == new # TODO move this check upstream into the API
-            [:error, 'New password cannot be the same as current.']
-          elsif !authenticate?(username, old)
+          elsif !authenticated?(username, old)
             [:error, 'Incorrect current password provided.']
           else
-            params = {
-              'user_id'  => user_id,
-              'username' => username,
-              'password' => new,
-              'name'     => 'Admin', # TODO admim doesn't have default name and email
-              'email'    => 'update_me@armagh.com'
-            }
-            status, response = put_json("/user/#{user_id}.json", params)
-            if status == :success
-              set_auth(username, new)
-              @authenticated = true
-              [:success, response]
-            else
-              [:error, response]
-            end
+            user = Struct.new(:username, :password).new(username, old)
+            fields = {'password' => new}
+            post_json(user, '/update_password.json', fields)
           end
         end
 
-        def logout
-          @authenticated = false
-          @username      = nil
-          @password      = nil
-        end
-
-        def authenticated?
-          @authenticated
-        end
-
-        def shutdown(restart: false)
+        def shutdown(user, restart: false)
+          raise 'Insufficient user permissions to perform this action.' unless user.roles.include? 'application_admin'
           `armaghd #{restart ? 'restart' : 'stop'}`
         end
 
-        def get_status
-          get_json('/status.json')
+        def get_status(user)
+          get_json(user, '/status.json')
         end
 
-        def get_workflows
-          get_json('/workflows.json')
+        def get_workflows(user)
+          get_json(user, '/workflows.json')
         end
 
-        def create_workflow(workflow)
-          post_json("/workflow/#{workflow}/new.json")
+        def create_workflow(user, workflow)
+          post_json(user, "/workflow/#{workflow}/new.json")
         end
 
-        def get_workflow(workflow, created, updated)
+        def get_workflow(user, workflow, created, updated)
           {
             workflow: workflow,
-            actions:  get_workflow_actions(workflow),
-            active:   workflow_active?(workflow),
+            actions:  get_workflow_actions(user, workflow),
+            active:   workflow_active?(user, workflow),
             created:  created,
             updated:  updated
           }
         end
 
-        private def get_workflow_actions(workflow)
-          get_json("/workflow/#{workflow}/actions.json")
+        private def get_workflow_actions(user, workflow)
+          get_json(user, "/workflow/#{workflow}/actions.json")
         end
 
-        private def workflow_active?(workflow)
-          status = get_json("/workflow/#{workflow}/status.json")
+        private def workflow_active?(user, workflow)
+          status = get_json(user, "/workflow/#{workflow}/status.json")
           status['run_mode'] != 'stop'
         end
 
-        def activate_workflow(workflow)
-          change_workflow_status(workflow, :activate)
+        def activate_workflow(user, workflow)
+          change_workflow_status(user, workflow, :activate)
         end
 
-        def deactivate_workflow(workflow)
-          change_workflow_status(workflow, :deactivate)
+        def deactivate_workflow(user, workflow)
+          change_workflow_status(user, workflow, :deactivate)
         end
 
-        private def change_workflow_status(workflow, status_change)
+        private def change_workflow_status(user, workflow, status_change)
           unchanged_status = status_change == :activate ? 'stop' : 'run'
           status, response =
-            patch_json("/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
+            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else
@@ -274,11 +234,11 @@ module Armagh
           end
         end
 
-        private def get_defined_actions
-          get_json('/actions/defined.json')
+        private def get_defined_actions(user)
+          get_json(user, '/actions/defined.json')
         end
 
-        def import_action_config(params)
+        def import_action_config(user, params)
           workflow = params['workflow']
           raise 'Missing files' unless params.has_key?('files')
           imported = []
@@ -291,7 +251,7 @@ module Armagh
             config['action']['active']   = false
             config['action']['workflow'] = workflow
 
-            status, response = post_json("/workflow/#{workflow}/action/config.json", config)
+            status, response = post_json(user, "/workflow/#{workflow}/action/config.json", config)
 
             raise "Unable to import action: #{response}" unless status == :success
             imported << file[:filename]
@@ -299,14 +259,14 @@ module Armagh
           imported.to_json
         end
 
-        def export_workflow_config(workflow)
+        def export_workflow_config(user, workflow)
           export  = {
             'workflow' => workflow,
             'actions'  => []
           }
-          actions = get_workflow_actions(workflow)
+          actions = get_workflow_actions(user, workflow)
           actions.each do |action|
-            config = get_action_config(workflow, action['name'])
+            config = get_action_config(user, workflow, action['name'])
             _export = {'type' => config[:type]}
             config.each do |group, params|
               next unless params.is_a?(Array)
@@ -321,18 +281,18 @@ module Armagh
           JSON.pretty_generate(export)
         end
 
-        def new_workflow_action(workflow, previous_action, filter)
+        def new_workflow_action(user, workflow, previous_action, filter)
           {
             workflow:        workflow,
-            active:          workflow_active?(workflow),
-            defined_actions: get_defined_actions,
+            active:          workflow_active?(user, workflow),
+            defined_actions: get_defined_actions(user),
             previous_action: previous_action,
             filter:          filter
           }
         end
 
-        def new_action_config(workflow, action)
-          params    = get_defined_parameters(workflow, action)
+        def new_action_config(user, workflow, action)
+          params    = get_defined_parameters(user, workflow, action)
           type      = params.delete(:type)
           supertype = params.delete(:supertype)
           {
@@ -341,7 +301,7 @@ module Armagh
             type:               type,
             supertype:          supertype,
             defined_parameters: params,
-            test_callbacks:     get_action_test_callbacks(type)
+            test_callbacks:     get_action_test_callbacks(user, type)
           }
         end
 
@@ -389,41 +349,41 @@ module Armagh
           formatted_config.sort_by { |k, _| k == 'action' ? 0 : 1 }.to_h
         end
 
-        private def get_defined_parameters(workflow, type)
+        private def get_defined_parameters(user, workflow, type)
           fields = {'type' => type}
-          config = get_json("/workflow/#{workflow}/action/config.json", fields)
+          config = get_json(user, "/workflow/#{workflow}/action/config.json", fields)
           format_action_config_for_gui(config)
         end
 
-        private def get_action_config(workflow, action)
-          config = get_json("/workflow/#{workflow}/action/#{action}/description.json")
+        private def get_action_config(user, workflow, action)
+          config = get_json(user, "/workflow/#{workflow}/action/#{action}/description.json")
           format_action_config_for_gui(config)
         end
 
-        def edit_workflow_action(workflow, action)
-          config = get_action_config(workflow, action)
+        def edit_workflow_action(user, workflow, action)
+          config = get_action_config(user, workflow, action)
           type   = config.delete(:type)
           {
-            locked:             workflow_active?(workflow),
+            locked:             workflow_active?(user, workflow),
             workflow:           workflow,
             action:             action,
             type:               type,
             supertype:          config.delete(:supertype),
             edit_action:        true,
             defined_parameters: config,
-            test_callbacks:     get_action_test_callbacks(type)
+            test_callbacks:     get_action_test_callbacks(user, type)
           }
         end
 
-        def create_action_config(data)
-          save_action_config(data, new_action: true)
+        def create_action_config(user, data)
+          save_action_config(user, data, new_action: true)
         end
 
-        def update_action_config(data)
-          save_action_config(data, new_action: false)
+        def update_action_config(user, data)
+          save_action_config(user, data, new_action: false)
         end
 
-        private def save_action_config(data, new_action:)
+        private def save_action_config(user, data, new_action:)
           data.delete('splat')
           data.delete('captures')
 
@@ -431,7 +391,7 @@ module Armagh
           action             = data.delete('action')
           type               = data.delete('type')
           docspec_groups     = %w(input output)
-          defined_parameters = get_defined_parameters(workflow, type)
+          defined_parameters = get_defined_parameters(user, workflow, type)
                                defined_parameters.delete(:type)
           supertype          = defined_parameters.delete(:supertype)
           defined_states     = {}
@@ -490,9 +450,9 @@ module Armagh
 
           status, response =
             if new_action
-              post_json("/workflow/#{workflow}/action/config.json", new_config)
+              post_json(user, "/workflow/#{workflow}/action/config.json", new_config)
             else
-              put_json("/workflow/#{workflow}/action/#{action}/config.json", new_config)
+              put_json(user, "/workflow/#{workflow}/action/#{action}/config.json", new_config)
             end
 
           if status == :success && errors.empty?
@@ -519,7 +479,7 @@ module Armagh
             end
 
             data = {
-              locked:             workflow_active?(workflow),
+              locked:             workflow_active?(user, workflow),
               workflow:           workflow,
               action:             action,
               type:               type,
@@ -527,23 +487,23 @@ module Armagh
               edit_action:        !new_action,
               defined_parameters: config,
               pending_values:     data,
-              test_callbacks:     get_action_test_callbacks(type)
+              test_callbacks:     get_action_test_callbacks(user, type)
             }
             [data, errors]
           end
         end
 
-        private def get_action_test_callbacks(type)
-          get_json("/test/#{type}/callbacks.json")
+        private def get_action_test_callbacks(user, type)
+          get_json(user, "/test/#{type}/callbacks.json")
         end
 
-        def invoke_action_test_callback(data)
-          status, response = patch_json("/test/invoke_callback.json", data)
+        def invoke_action_test_callback(user, data)
+          status, response = patch_json(user, "/test/invoke_callback.json", data)
           raise "Unable to invoke action test callback method #{data['method']} for action type #{data['type']}" unless status == :success
           response
         end
 
-        def get_logs(page:, limit:, sort:, filter:, hide:)
+        def get_logs(user, page:, limit:, sort:, filter:, hide:)
           # TODO move this to the API and create a modal
           errors = []
           page   = page.to_i
@@ -678,7 +638,7 @@ module Armagh
           }
         end
 
-        def get_doc_collections # TODO move this to the API
+        def get_doc_collections(user) # TODO move this to the API
           collections = {'armagh.failures' => 'Failures'}
           Connection.all_document_collections.each do |collection|
             id    = collection.namespace
@@ -688,7 +648,7 @@ module Armagh
           collections
         end
 
-        def get_doc(params) # TODO move this to the API and create a modal
+        def get_doc(user, params) # TODO move this to the API and create a modal
           query  = {}
           ts     = 'updated_timestamp'
           id     = params['collection']

@@ -66,7 +66,7 @@
               {{ if authenticated? }}
                 <a href="/logout">
                   <i class="uk-icon-user uk-icon-tiny"></i>
-                  <span class="uk-text-small">{{= user }}</span>
+                  <span class="uk-text-small">{{= user.name }}</span>
                 </a>
               {{ end }}
             </li>
