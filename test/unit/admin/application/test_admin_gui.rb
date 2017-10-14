@@ -167,6 +167,15 @@ module Armagh
           assert_equal [:error, expected], result
         end
 
+        def test_private_delete_json
+          response = mock('response')
+          response.stubs(:status).returns(200)
+          response.stubs(:body).returns({'message'=>'stuff'}.to_json)
+          HTTPClient.any_instance.expects(:delete).once.returns(response)
+          result = @admin_gui.send(:delete_json, @user, 'ok.url')
+          assert_equal [:success, 'stuff'], result
+        end
+
         def test_private_http_request_json_parse_error
           response = mock('response')
           response.stubs(:status).returns(200)
@@ -590,8 +599,8 @@ module Armagh
           assert_equal expected, result
         end
 
-        def test_import_action_config
-          response = [:success]
+        def test_import_workflow
+          response = [:success, 'hi, i am json']
           @admin_gui.expects(:post_json).once.returns(response)
           config = {
             'type'=>'Armagh::SomeAction',
@@ -603,109 +612,56 @@ module Armagh
           tempfile = mock('tempfile')
           tempfile.expects(:read).once.returns(config.to_json)
           params = {
-            'workflow'=>'workflow',
             'files'=>[
               {tempfile: tempfile, filename: 'filename'}
             ]
           }
-          result = @admin_gui.import_action_config(@user, params)
-          assert_equal %w(filename).to_json, result
+          assert_equal(
+            {'errors'=>[], 'imported'=>['hi, i am json']},
+            JSON.parse(@admin_gui.import_workflow(@user, params))
+          )
         end
 
-        def test_import_action_config_with_action_class_name
-          response = [:success]
-          @admin_gui.expects(:post_json).once.returns(response)
-          config = {
-            'action_class_name'=>'Armagh::SomeAction',
-            'action'=>{
-              'name'=>'name',
-              'active'=>true
-            }
-          }
-          tempfile = mock('tempfile')
-          tempfile.expects(:read).once.returns(config.to_json)
-          params = {
-            'workflow'=>'workflow',
-            'files'=>[
-              {tempfile: tempfile, filename: 'filename'}
-            ]
-          }
-          result = @admin_gui.import_action_config(@user, params)
-          assert_equal %w(filename).to_json, result
-        end
 
-        def test_import_action_config_missing_files
+        def test_import_workflow_missing_files
           e = assert_raise RuntimeError do
-            @admin_gui.import_action_config(@user, {})
+            @admin_gui.import_workflow(@user, {})
           end
-          assert_equal 'Missing files', e.message
+          assert_equal 'No JSON file(s) found to import.', e.message
         end
 
-        def test_import_action_config_mismatched_workflow
-          config = {
-            'action_class_name'=>'Armagh::SomeAction',
-            'action'=>{
-              'name'=>'name',
-              'active'=>true,
-              'workflow'=>'another'
-            }
-          }
+        def test_import_workflow_bad_json
           tempfile = mock('tempfile')
-          tempfile.expects(:read).once.returns(config.to_json)
+          tempfile.expects(:read).once.raises('some error')
           params = {
-            'workflow'=>'workflow',
             'files'=>[
               {tempfile: tempfile, filename: 'filename'}
             ]
           }
-          e = assert_raise RuntimeError do
-            @admin_gui.import_action_config(@user, params)
-          end
-          assert_equal 'Action belongs to a different workflow: another', e.message
+          assert_equal(
+            {'errors'=>['Unable to parse workflow JSON file "filename": some error'], 'imported'=>[]},
+            JSON.parse(@admin_gui.import_workflow(@user, params))
+          )
         end
 
-        def test_import_action_config_server_error
-          response = [:error, 'some error']
-          @admin_gui.expects(:post_json).once.returns(response)
-          config = {
-            'action_class_name'=>'Armagh::SomeAction',
-            'action'=>{
-              'name'=>'name',
-              'active'=>true
-            }
-          }
+        def test_import_workflow_server_error
           tempfile = mock('tempfile')
-          tempfile.expects(:read).once.returns(config.to_json)
+          tempfile.expects(:read).once.returns('{"json":"data"}')
           params = {
-            'workflow'=>'workflow',
             'files'=>[
               {tempfile: tempfile, filename: 'filename'}
             ]
           }
-          e = assert_raise RuntimeError do
-            @admin_gui.import_action_config(@user, params)
-          end
-          assert_equal 'Unable to import action: some error', e.message
+          @admin_gui.expects(:post_json).once.returns([:error, 'Unable to import workflow. some error'])
+          assert_equal(
+            {'errors'=>['Unable to import workflow file "filename". some error'], 'imported'=>[]},
+            JSON.parse(@admin_gui.import_workflow(@user, params))
+          )
         end
 
-        def test_export_workflow_config
-          actions = [{'name'=>'action'}]
-          @admin_gui.expects(:get_workflow_actions).once.returns(actions)
-          action = {'action'=>[{name:'name', value:'value'}], type:'Armagh::SomeType'}
-          @admin_gui.expects(:get_action_config).once.returns(action)
-          result = @admin_gui.export_workflow_config(@user, 'workflow')
-          expected = "{\n" +
-            "  \"workflow\": \"workflow\",\n" +
-            "  \"actions\": [\n" +
-            "    {\n" +
-            "      \"type\": \"Armagh::SomeType\",\n" +
-            "      \"action\": {\n" +
-            "        \"name\": \"value\"\n" +
-            "      }\n" +
-            "    }\n" +
-            "  ]\n" +
-            "}"
-          assert_equal expected, result
+        def test_export_workflow
+          @admin_gui.expects(:get_json).once.returns('json')
+          assert_equal 'json', @admin_gui.export_workflow(@user, 'workflow')
         end
 
         def test_new_workflow_action

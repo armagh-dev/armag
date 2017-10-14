@@ -1,0 +1,97 @@
+{
+  "workflow": {
+    "name": "Newsflow",
+    "exported": "2017-09-18 08:21:40 UTC",
+    "versions": {
+      "armagh": "0.5.1",
+      "actions": {
+        "standard": "0.5.1"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "Armagh::StandardActions::HTMLPublish",
+      "action": {
+        "name": "newsflow-publish"
+      },
+      "html": {
+        "exclude": "[\"<a.*?</a>\"]",
+        "ignore_cdata": "true",
+        "force_breaks": "false",
+        "unescape_html": "false",
+        "preserve_hyperlinks": "false"
+      },
+      "input": {
+        "docspec": "newsflow:ready"
+      },
+      "output": {
+        "docspec": "newsflow:published"
+      }
+    },
+    {
+      "type": "Armagh::StandardActions::RSSCollect",
+      "action": {
+        "name": "newsflow-collect"
+      },
+      "collect": {
+        "schedule": "*/10 * * * *",
+        "archive": "false",
+        "decompress": "false",
+        "extract": "false",
+        "extract_format": "auto"
+      },
+      "http": {
+        "url": "http://www.samplenews.org",
+        "method": "get",
+        "fields": "{}",
+        "headers": "{}",
+        "follow_redirects": "true",
+        "allow_https_to_http": "false",
+        "multiple_pages": "true",
+        "max_pages": "10"
+      },
+      "rss": {
+        "max_items": "100",
+        "link_field": "link",
+        "collect_link": "false",
+        "additional_fields": "[]",
+        "full_collect": "false",
+        "description_no_content": "false",
+        "passthrough": "false"
+      },
+      "input": {
+        "docspec": "__COLLECT__newsflow-collect:ready"
+      },
+      "output": {
+        "docspec": "newsflow:ready"
+      }
+    },
+    {
+      "type": "Armagh::StandardActions::TacballConsume",
+      "action": {
+        "name": "newsflow-tacball"
+      },
+      "tacball": {
+        "feed": "newsflow",
+        "source": "Newsflow",
+        "type": "NF",
+        "attach_orig_file": "false",
+        "docid_prefix": "4027",
+        "template": "none"
+      },
+      "sftp": {
+        "host": "localhost",
+        "port": "22",
+        "directory_path": "/var/spool/armagh/dataout/tac",
+        "duplicate_put_directory_paths": "[]",
+        "create_directory_path": "true",
+        "username": "armagh",
+        "maximum_transfer": "50"
+      },
+      "input": {
+        "docspec": "newsflow:published"
+      }
+    }
+  ]
+}

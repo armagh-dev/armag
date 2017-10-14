@@ -71,11 +71,14 @@ module Armagh
         body = request.body.read
         @logger.debug "Handling request: #{request.request_method} #{request.url} [#{request.user_agent}] #{body}"
 
-        request_hash = if (request.post? || request.put? || request.patch?) && body && !body.empty?
-                         JSON.parse(body)
-                       else
-                         {}
-                       end
+        return body if request.params['file'] || request.params['files']
+
+        request_hash =
+          if (request.post? || request.put? || request.patch?) && body && !body.empty?
+            JSON.parse(body)
+          else
+            {}
+          end
 
         raise 'Request body expected to be a JSON hash' unless request_hash.is_a? Hash
 

@@ -6,10 +6,27 @@
 <script type="text/javascript" src="/ui/js/components/datepicker.min.js"></script>
 
 {{
+  bad_count = 0
+  @data[:defined_parameters].each do |_group, params|
+    params.each do |param|
+      bad_count += 1 if param[:error]
+    end
+  end
+}}
+{{ unless bad_count.zero? }}
+  <div class="uk-alert uk-alert-danger uk-margin-top-remove" data-uk-alert>
+    <a href="" class="uk-alert-close uk-close"></a>
+    <i class="uk-icon-exclamation-circle uk-icon-small uk-margin-small-right"></i>
+    <strong>{{= bad_count }}</strong> parameter{{= bad_count > 1 ? 's are' : ' is' }} not valid and {{= bad_count > 1 ? 'have' : 'has' }} been identified below.
+  </div>
+{{ end }}
+
+{{
   selected_action = @data[:type]
   edit_action     = @data[:edit_action]
   locked_fields   = %w(action-name action-active action-workflow)
   locked_fields  -= %w(action-name) unless edit_action
+  hidden_fields   = %w(action-active action-workflow)
 
   %w(input output).each do |docspec|
     next unless @data[:defined_parameters][docspec]
@@ -33,7 +50,7 @@
                                          @data[:supertype],
                                        '</span>',
                                        '<span class="uk-text-small uk-margin-left" title="Workflow">',
-                                         '<i class="uk-icon-sitemap"></i>',
+                                         '<i class="uk-icon-sitemap uk-text-success"></i>',
                                          "<a href='/config/#{@data[:workflow]}'>",
                                            @data[:workflow],
                                          '</a>',
@@ -107,7 +124,7 @@
                 param_invalid  = param[:error] ? 'uk-form-danger' : nil
               }}
 
-              <dt class="uk-margin-small-bottom {{= 'uk-hidden' if param_id == 'action-active' }}">
+              <dt class="uk-margin-small-bottom {{= 'uk-hidden' if hidden_fields.include? param_id }}">
                 <div class="uk-grid">
                   <div class="uk-width-1-2">
 
@@ -134,7 +151,7 @@
                   </div>
                 </div>
               </dt>
-              <dd {{= 'class="uk-hidden"' if param_id == 'action-active' }}">
+              <dd {{= 'class="uk-hidden"' if hidden_fields.include? param_id }}">
                 <div class="uk-grid">
                   <div class="uk-width-1-2">
 

@@ -254,7 +254,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     expect_fred_docs_in_db
 
-    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}, {"name"=>"fred", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}, {"name"=>"fred", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true}]
 
     assert_equal expected_result, @api.get_workflows
   end
@@ -288,7 +288,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_fred_in_db
 
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
     assert_equal expected_result, @api.get_workflow_status( 'alice' )
   end
 
@@ -312,7 +312,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     wf = @api.create_workflow( { 'workflow' => { 'name' => test_wf_name }})
     assert_equal test_wf_name, wf.name
-    expected_response = {"name"=>test_wf_name, "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_response = {"name"=>test_wf_name, "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
     assert_equal expected_response,@api.get_workflow_status( test_wf_name )
   end
 
@@ -416,6 +416,277 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_equal 'finish', wf_status['run_mode']
   end
 
+  def test_import_workflow
+    data = {
+      'workflow'=>{'name'=>'workflow'},
+      'actions'=>[
+        {
+          'type'=>'type',
+          'action'=>{'name'=>'name'},
+          'group'=>{'param'=>'value'}
+        }
+      ]
+    }
+    @api.expects(:get_workflows).twice.returns([], [{'name'=>'workflow'}])
+    @api.expects(:get_workflow_actions).once.returns([])
+    @api.expects(:create_workflow).once
+    @api.expects(:create_workflow_action_config).once
+    assert_equal(
+       {'actions'=>['name'], 'workflow'=>{'name'=>'workflow'}},
+       @api.import_workflow(data)
+    )
+  end
+
+  def test_import_workflow_missing_data
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow('')
+    end
+    assert_equal 'Unable to import workflow. Missing JSON data.', e.message
+  end
+
+  def test_import_workflow_missing_name
+    data = {'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Missing {"workflow": {"name": "<name_goes_here>"}} section.', e.message
+  end
+
+  def test_import_workflow_empty_name
+    data = {'workflow'=>{'name'=>''},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Workflow name cannot be blank.', e.message
+  end
+
+  def test_import_workflow_not_stopped
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    wf = mock('wf')
+    wf.expects(:status).once.returns({'run_mode'=>'run'})
+    @api.expects(:get_workflows).once.returns([{'name'=>'test'}])
+    @api.expects(:with_workflow).with('test').once.yields(wf)
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Workflow "test" is still running.', e.message
+  end
+
+  def test_import_workflow_create_workflow_error
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once.raises('some error')
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Failed to create workflow "test": some error', e.message
+  end
+
+  def test_import_workflow_action_missing_type_and_name
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'action'=>{}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. One or more actions are missing both type and name.', e.message
+  end
+
+  def test_import_workflow_action_missing_type
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Action "name" is missing type.', e.message
+  end
+
+  def test_import_workflow_action_missing_name
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type'}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Action type "type" is missing name.', e.message
+  end
+
+  def test_import_workflow_create_workflow_action_error
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    @api.expects(:create_workflow_action_config).once.raises('some error')
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Action "name" was unable to be created: some error', e.message
+  end
+
+  def test_import_workflow_action_exists_not_part_of_import
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    @api.expects(:get_workflow_actions).once.with('test').returns([{'name'=>'name'}, {'name'=>'extra'}])
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. The following actions exist for "test" but are not part of the import: extra', e.message
+  end
+
+  def test_import_workflow_update_workflow_action_config
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).twice.returns([], [{'name'=>'test'}])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    @api.expects(:get_workflow_actions).once.with('test').returns([{'name'=>'name'}])
+    @api.expects(:update_workflow_action_config).once
+    assert_equal(
+      {'actions'=>['name'], 'workflow'=>{'name'=>'test'}},
+      @api.import_workflow(data)
+    )
+  end
+
+  def test_import_workflow_update_workflow_action_config_with_error
+    data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
+    @api.expects(:get_workflows).once.returns([])
+    @api.expects(:create_workflow).with('workflow'=>{'name'=>'test'}).once
+    @api.expects(:get_workflow_actions).once.with('test').returns([{'name'=>'name'}])
+    @api.expects(:update_workflow_action_config).once.raises('some error')
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.import_workflow(data)
+    end
+    assert_equal 'Unable to import workflow. Action "name" was unable to be updated: some error', e.message
+  end
+
+  def test_export_workflow
+    @api.expects(:get_workflows).once.returns([{'name'=>'test'}])
+    @api.expects(:get_workflow_actions).with('test').once.returns([{'name'=>'name'}])
+    @api.expects(:get_workflow_action_config).with('test', 'name').once.returns({
+      'type'=>'type',
+      'action'=>{
+        'name'=>'name',
+        'active'=>true,
+        'workflow'=>'test'
+      },
+      'group'=>{
+        'param'=>'value'
+      }
+    })
+    Time.any_instance.expects(:utc).once.returns('<timestamp>')
+    Armagh::Status::LauncherStatus.expects(:find_all).once.returns(nil)
+    assert_equal(
+      "{\n" +
+      "  \"workflow\": {\n" +
+      "    \"name\": \"test\",\n" +
+      "    \"exported\": \"<timestamp>\",\n" +
+      "    \"versions\": \"none available\"\n" +
+      "  },\n" +
+      "  \"actions\": [\n" +
+      "    {\n" +
+      "      \"type\": \"type\",\n" +
+      "      \"action\": {\n" +
+      "        \"name\": \"name\"\n" +
+      "      },\n" +
+      "      \"group\": {\n" +
+      "        \"param\": \"value\"\n" +
+      "      }\n" +
+      "    }\n" +
+      "  ]\n" +
+      "}",
+      @api.export_workflow('test')
+    )
+  end
+
+  def test_export_workflow_all
+    @api.expects(:get_workflows).once.returns([{'name'=>'test1'}, {'name'=>'test2'}])
+    @api.expects(:get_workflow_actions).with('test1').once.returns([{'name'=>'name1'}])
+    @api.expects(:get_workflow_actions).with('test2').once.returns([{'name'=>'name2'}])
+    @api.expects(:get_workflow_action_config).with('test1', 'name1').once.returns({
+      'type'=>'type1',
+      'action'=>{
+        'name'=>'name1',
+        'active'=>true,
+        'workflow'=>'test1'
+      },
+      'group'=>{
+        'param'=>'value'
+      }
+    })
+    @api.expects(:get_workflow_action_config).with('test2', 'name2').once.returns({
+      'type'=>'type2',
+      'action'=>{
+        'name'=>'name2',
+        'active'=>true,
+        'workflow'=>'test2'
+      },
+      'group'=>{
+        'param'=>'value'
+      }
+    })
+    Time.any_instance.expects(:utc).twice.returns('<timestamp>')
+    Armagh::Status::LauncherStatus.expects(:find_all).twice.returns(nil)
+    assert_equal(
+      "[\n" +
+      "  {\n" +
+      "    \"workflow\": {\n" +
+      "      \"name\": \"test1\",\n" +
+      "      \"exported\": \"<timestamp>\",\n" +
+      "      \"versions\": \"none available\"\n" +
+      "    },\n" +
+      "    \"actions\": [\n" +
+      "      {\n" +
+      "        \"type\": \"type1\",\n" +
+      "        \"action\": {\n" +
+      "          \"name\": \"name1\"\n" +
+      "        },\n" +
+      "        \"group\": {\n" +
+      "          \"param\": \"value\"\n" +
+      "        }\n" +
+      "      }\n" +
+      "    ]\n" +
+      "  },\n" +
+      "  {\n" +
+      "    \"workflow\": {\n" +
+      "      \"name\": \"test2\",\n" +
+      "      \"exported\": \"<timestamp>\",\n" +
+      "      \"versions\": \"none available\"\n" +
+      "    },\n" +
+      "    \"actions\": [\n" +
+      "      {\n" +
+      "        \"type\": \"type2\",\n" +
+      "        \"action\": {\n" +
+      "          \"name\": \"name2\"\n" +
+      "        },\n" +
+      "        \"group\": {\n" +
+      "          \"param\": \"value\"\n" +
+      "        }\n" +
+      "      }\n" +
+      "    ]\n" +
+      "  }\n" +
+      "]",
+      @api.export_workflow
+    )
+  end
+
+  def test_export_workflow_missing_workflow
+    @api.expects(:get_workflows).once.returns([{'name'=>'test2'}])
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.export_workflow('test')
+    end
+    assert_equal 'Unable to export workflow "test": Workflow does not exist.', e.message
+  end
+
+  def test_export_workflow_invalid_config
+    @api.expects(:get_workflows).once.returns([{'name'=>'test'}])
+    @api.expects(:get_workflow_actions).with('test').once.returns([{'name'=>'name'}])
+    @api.expects(:get_workflow_action_config).with('test', 'name').once.returns(nil)
+    Armagh::Status::LauncherStatus.expects(:find_all).once.returns(nil)
+    e = assert_raise Armagh::Admin::Application::APIClientError do
+      @api.export_workflow('test')
+    end
+    assert_equal 'Unable to export workflow "test": Action "name" is invalid and will not export.', e.message
+  end
+
   def test_get_workflow_actions
     good_alice_in_db
     actions = nil
@@ -465,7 +736,6 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     end
     assert_equal 'Workflow guessagain not found', e.message
   end
-
 
   def test_get_workflow_action_status
     good_alice_in_db

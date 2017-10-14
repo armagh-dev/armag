@@ -34,6 +34,7 @@ require 'mocha/test_unit'
 require 'rack/test'
 require 'fileutils'
 require 'etc'
+require 'digest/md5'
 
 require 'mongo'
 
@@ -541,7 +542,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_actions_defined
-
     get '/actions/defined.json' do
       assert last_response.ok?
       all_actions = JSON.parse( last_response.body )
@@ -551,9 +551,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_workflows
-
     good_alice_in_db
-    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}]
 
     get '/workflows.json' do
       assert last_response.ok?
@@ -564,8 +563,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow
     good_alice_in_db
-
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
     get '/workflow/alice/status.json' do
       result = JSON.parse(last_response.body)
       assert last_response.ok?
@@ -575,7 +573,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_doesnt_exist
     good_alice_in_db
-
     get '/workflow/nope/status.json' do
       assert last_response.client_error?
       expected_result = {"client_error_detail"=>{"message"=>"Workflow nope not found", "markup"=>nil}}
@@ -587,9 +584,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_run
     good_alice_in_db
     expect_alice_docs_in_db
-
-    expected_result = {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
-
+    expected_result = {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
     patch '/workflow/alice/run.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -601,9 +596,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     expect_alice_docs_in_db
     @alice.run
-
-    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
-
+    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
     patch '/workflow/alice/finish.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -613,9 +606,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_workflow_finish_not_running
-
     good_alice_in_db
-
     expected_result = { 'client_error_detail' => { 'message' => 'Workflow not running', 'markup' => nil }}
     patch '/workflow/alice/finish.json' do
       assert last_response.client_error?
@@ -625,14 +616,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_workflow_stop
-
     good_alice_in_db
     expect_no_alice_docs_in_db
-
     @alice.run
     @alice.finish
-
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0}
+    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -642,13 +630,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   # NOTE:  If workflow is running and you send "stop", it's treated like you sent "finish"
   def test_get_workflow_stop_running
-
     good_alice_in_db
     expect_alice_docs_in_db
-
     @alice.run
-
-    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41}
+    expected_result = {"name"=>"alice", "run_mode"=>"finish", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -657,13 +642,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_workflow_stop_documents_exist
-
     good_alice_in_db
     expect_alice_docs_in_db
-
     @alice.run
     @alice.finish
-
     expected_result = { 'client_error_detail' => { 'message' => 'Cannot stop - 41 documents still processing', 'markup' => nil }}
     patch '/workflow/alice/stop.json' do
       assert last_response.client_error?
@@ -672,11 +654,74 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     end
   end
 
-  def test_get_workflow_actions_stopped
+  private def read_workflow_fixture(*filenames)
+    data = ''
+    filenames.each do |filename|
+      data.strip!
+      data << ",\n  " unless data.empty?
+      _data = File.read(File.expand_path('.', File.join('test', 'fixtures', filename)))
+      _data.gsub!(/\n/, "\n  ") if filenames.size > 1
+      data << _data
+    end
+    data.strip!
+    filenames.size == 1 ? data : "[\n  #{data}\n]"
+  end
 
+  private def import_workflow_fixture(filename)
+    post '/workflow/import.json', read_workflow_fixture(filename)
+  end
+
+  private def scrub_workflow_timestamp_and_versions(data)
+    data.gsub!(/(\"workflow\": {\n\s+\"name\": \"\w+\",\n\s+\"exported\": ).+?(,\n\s+\"versions\": ).+?(,\n\s+\"actions\": \[)/m, '\1<timestamp>\2<versions>\3')
+    data
+  end
+
+  def test_import_workflow
+    import_workflow_fixture 'testflow.json'
+    assert_equal(
+      {"actions"=>["testflow-publish", "testflow-collect", "testflow-tacball"],
+       "workflow"=>
+        {"docs_count"=>0,
+         "failed_docs_count"=>0,
+         "name"=>"Testflow",
+         "published_pending_consume_docs_count"=>0,
+         "retired"=>false,
+         "run_mode"=>"stop",
+         "unused_output_docspec_check"=>true,
+         "working_docs_count"=>0,
+         "valid"=>true}},
+      JSON.parse(last_response.body)
+    )
+    wf_set = Armagh::Actions::WorkflowSet.for_admin(Connection.config)
+    assert_equal(
+      [{'name'=>'Testflow', 'run_mode'=>'stop', 'retired'=>false, 'unused_output_docspec_check'=>true, 'working_docs_count'=>0, 'failed_docs_count'=>0, 'published_pending_consume_docs_count'=>0, 'docs_count'=>0, 'valid'=>true}],
+      wf_set.list_workflows
+    )
+  end
+
+  def test_export_workflow
+    filename = 'newsflow.json'
+    import_workflow_fixture(filename)
+    get '/workflow/NEWSFLOW/export.json'
+    assert_equal(
+      scrub_workflow_timestamp_and_versions(read_workflow_fixture(filename)),
+      scrub_workflow_timestamp_and_versions(JSON.parse(last_response.body))
+    )
+  end
+
+  def test_export_workflows_all
+    import_workflow_fixture('newsflow.json')
+    import_workflow_fixture('testflow.json')
+    get '/workflow/export.json'
+    assert_equal(
+      scrub_workflow_timestamp_and_versions(read_workflow_fixture('newsflow.json', 'testflow.json')),
+      scrub_workflow_timestamp_and_versions(JSON.parse(last_response.body)),
+    )
+  end
+
+  def test_get_workflow_actions_stopped
     good_alice_in_db
     db_time_approx = Time.now.to_f
-
     expected_residual_result = [{"active"=>false,
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
@@ -754,11 +799,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
 
   def test_get_workflow_actions_running
-
     good_alice_in_db
     @alice.run
     db_time_approx = Time.now.to_f
-
     expected_residual_result = [{"active"=>true,
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
@@ -836,12 +879,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_workflow_actions_finishing
-
     good_alice_in_db
     @alice.run
     @alice.finish
     db_time_approx = Time.now.to_f
-
     expected_residual_result = [{"active"=>false,
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
@@ -923,7 +964,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     Connection.config.find_one_and_update( { 'name' => 'collect_alicedocs_from_source' },
                                            { '$set' => { 'values.input.docspec' => '5' }} )
     db_time_approx = Time.now.to_f
-
     expected_residual_result = [
         {"active"=>false,
          "input_docspec"=>"",
@@ -1006,7 +1046,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_action_status_bad_workflow
     good_alice_in_db
-
     get '/workflow/nope/action/nuhuh/status.json' do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
@@ -1017,7 +1056,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_action_status_bad_action
     good_alice_in_db
-
     get '/workflow/alice/action/nuhuh/status.json' do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
@@ -1028,7 +1066,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   # gets a blank edit form for the action type
   def test_get_workflow_action_config
     good_alice_in_db
-
     get '/workflow/alice/action/config.json', {'type' => 'Armagh::StandardActions::TWTestCollect'} do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -1056,7 +1093,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_action_config_invalid_workflow
     good_alice_in_db
-
     get '/workflow/fred/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' } do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
@@ -1067,7 +1103,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_action_config_invalid_action_name
     good_alice_in_db
-
     get '/workflow/alice/action/config.json', { 'type' => 'Armagh::StandardActions::Nope' } do
       assert last_response.client_error?
       result = JSON.parse( last_response.body )
@@ -1078,9 +1113,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   #edit form for existing action
   def test_get_workflow_description_existing_action
-
     good_alice_in_db
-
     get '/workflow/alice/action/collect_alicedocs_from_source/description.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -1110,10 +1143,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   #can't get an edit form for an action unless the workflow is stopped
   def test_get_workflow_description_running
-
     good_alice_in_db
     @alice.run
-
     get '/workflow/alice/action/collect_alicedocs_from_source/description.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -1143,7 +1174,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow_config_existing_action
     good_alice_in_db
-
     get '/workflow/alice/action/collect_alicedocs_from_source/config.json' do
       assert last_response.ok?
       result = JSON.parse(last_response.body)
@@ -1178,7 +1208,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   #submit a form to create a NEW action
   def test_post_workflow_action_config
-
     good_alice_in_db
     consume_values = Armagh::StandardActions::TWTestConsume.make_config_values(
         action_name: 'new_alice_consume', input_doctype: 'alicedoc', output_doctype: 'alicedoc_out' )
@@ -1207,7 +1236,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_post_workflow_action_config_bad_config
-
     good_alice_in_db
     consume_values = Armagh::StandardActions::TWTestConsume.make_config_values(
         action_name: 'new_alice_consume', input_doctype: 'alicedoc', output_doctype: 'alicedoc_out' )
@@ -1235,10 +1263,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   end
 
   def test_post_workflow_action_config_running
-
     good_alice_in_db
     @alice.run
-
     consume_values = Armagh::StandardActions::TWTestConsume.make_config_values(
         action_name: 'new_alice_consume', input_doctype: 'alicedoc', output_doctype: 'alicedoc_out' )
     fields = consume_values.merge({ 'type' => 'Armagh::StandardActions::TWTestConsume'})
@@ -1253,9 +1279,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   #submit a form to update an EXISTING action
   def test_put_workflow_action_config_existing
-
     good_alice_in_db
-
     new_values = {
         'action' => { 'name' => 'collect_alicedocs_from_source' },
         'collect' => { 'schedule' => '29 * * * *', 'archive' => false },
@@ -1265,7 +1289,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
             'docspec2' => Armagh::Documents::DocSpec.new( 'new_b_docs', 'ready' )
         }
     }
-
 
     put '/workflow/alice/action/collect_alicedocs_from_source/config.json', new_values.to_json  do
       assert last_response.ok?
@@ -1320,7 +1343,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_documents_error
     e = RuntimeError.new('Bad')
-
     @api.expects(:user_has_document_role)
     @api.expects(:get_documents).raises(e)
     get '/documents.json', {type: 'type'} do
@@ -1361,7 +1383,6 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_document_error
     e = RuntimeError.new('Bad')
-
     @api.expects(:user_has_document_role)
     @api.expects(:get_document).raises(e)
     get '/document.json', {type: 'type', id: 'id'} do

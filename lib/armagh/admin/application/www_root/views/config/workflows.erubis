@@ -1,42 +1,85 @@
-<div id="status-change-errors"></div>
+<script type="text/javascript" src="/ui/js/components/upload.min.js"></script>
+
+{{ bad_count = @data.select { |wf| !wf['valid'] }.size }}
+{{ unless bad_count.zero? }}
+  <div class="uk-alert uk-alert-danger uk-margin-top-remove" data-uk-alert>
+    <a href="" class="uk-alert-close uk-close"></a>
+    <i class="uk-icon-exclamation-circle uk-icon-small uk-margin-small-right"></i>
+    <strong>{{= bad_count }}</strong> workflow{{= bad_count > 1 ? 's are' : ' is' }} not valid and {{= bad_count > 1 ? 'have' : 'has' }} been identified below.
+  </div>
+{{ end }}
+
+<div id="status-change-errors">
+</div>
 
 {{= partial :header, data: {title: 'Workflows', subtitle: "#{@data.size} defined"} }}
 
-<table class="uk-table uk-table-hover uk-table-condensed">
-  <thead>
-    <tr class="uk-text-small">
-      <th>Workflow</th>
-      <th>Working</th>
-      <th>Failed</th>
-      <th>Pending Consume</th>
-      <th>Published</th>
-      <th>
-        <label style="cursor: pointer;">
-          <input id="select-all" type="checkbox" onchange="select_all(this.checked)">
-          Status
-        </label>
-      </th>
-    </tr>
-  </thead>
-  <tbody>
-    {{ @data&.each do |workflow| }}
-      {{ uuid = SecureRandom.uuid }}
-      <tr>
-        <td>
-          <i class="uk-icon-sitemap"></i>
-          <a href="/config/{{= workflow['name'] }}">
-            {{= workflow['name'] }}
-          </a>
-        </td>
-        <td id="count-woreking-{{= uuid }}">{{= workflow['working_docs_count'] }}</td>
-        <td id="count-failed-{{= uuid }}">{{= workflow['failed_docs_count'] }}</td>
-        <td id="count-pending-{{= uuid }}">{{= workflow['published_pending_consume_docs_count'] }}</td>
-        <td id="count-docs-{{= uuid }}">{{= workflow['docs_count'] }}</td>
-        <td>
-          <input id="workflow-{{= uuid }}" type="hidden" value="{{= workflow['name'] }}">
-          <input id="active-status-{{= uuid }}" type="hidden" value="{{= workflow['run_mode'] }}">
-          <label style="cursor: pointer;">
-            <input id="select-workflow-{{= uuid }}" type="checkbox" onchange="select_workflow(this)">
+{{ if !@data || @data.empty? }}
+
+  <div class="uk-panel uk-panel-box uk-margin-bottom">
+    No workflows have been defined yet.
+  </div>
+
+{{ else }}
+
+  <style>
+    table th:first-child,
+    table td:first-child {
+      width: 5px;
+      padding-right: 0px;
+    }
+    table td:last-child {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    table tr {
+      cursor: default;
+    }
+  </style>
+
+  <table class="uk-table uk-table-hover uk-table-condensed">
+    <thead>
+      <tr class="uk-text-small">
+        <th>
+          <input id="select-all" type="checkbox" onclick="this.checked = !this.checked">
+        </th>
+        <th>Workflow</th>
+        <th>Working</th>
+        <th>Failed</th>
+        <th>Pending Consume</th>
+        <th>Published</th>
+        <th>State</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      {{ @data.each do |workflow| }}
+        {{ uuid = SecureRandom.uuid }}
+        {{ valid = workflow['valid'] }}
+
+        <tr>
+          <td>
+            <input id="select-workflow-{{= uuid }}" type="checkbox" onclick="this.checked = !this.checked">
+          </td>
+          <td>
+            {{ if valid }}
+              <i class="uk-icon-sitemap uk-text-success"></i>
+            {{ else }}
+              <i class="uk-icon-exclamation-circle uk-text-danger"></i>
+            {{ end }}
+            <a href="/config/{{= workflow['name'] }}" onclick="select_workflow($('#select-workflow-{{= uuid }}').prop('checked', !$('#select-workflow-{{= uuid }}').prop('checked')))" {{= 'class="uk-text-danger"' unless valid }}>
+              {{= workflow['name'] }}
+            </a>
+          </td>
+          <td id="count-working-{{= uuid }}">{{= workflow['working_docs_count'] }}</td>
+          <td id="count-failed-{{= uuid }}">{{= workflow['failed_docs_count'] }}</td>
+          <td id="count-pending-{{= uuid }}">{{= workflow['published_pending_consume_docs_count'] }}</td>
+          <td id="count-docs-{{= uuid }}">{{= workflow['docs_count'] }}</td>
+          <td>
+            <input id="workflow-{{= uuid }}" type="hidden" value="{{= workflow['name'] }}">
+            <input id="active-status-{{= uuid }}" type="hidden" value="{{= workflow['run_mode'] }}">
             <span id="status-icon-{{= uuid }}">
               {{ case workflow['run_mode'] }}
               {{ when 'run' }}
@@ -53,43 +96,209 @@
                 Unknown
               {{ end }}
             </span>
-          </label>
-        </td>
-      </tr>
-    {{ end }}
-  </tbody>
-</table>
+          </td>
+        </tr>
+
+      {{ end }}
+
+    </tbody>
+  </table>
+
+{{ end }}
 
 <div class="uk-grid">
   <div class="uk-width-1-3">
-    <a href="/config/new" class="uk-button">New Workflow</a>
+
+    <div id="workflow-options" class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}" style="pointer-events:none;">
+      <button id="workflow-dropdown" class="uk-button" disabled>
+        <label>None Selected</label>
+        <i class="uk-icon-caret-down"></i>
+      </button>
+      <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom uk-dropdown-close">
+        <ul class="uk-nav uk-nav-dropdown" style="text-align:left;">
+
+          <li id="workflow-run-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
+            <i class="uk-icon-rocket uk-margin-small-right"></i>
+            Run
+          </li>
+          <li id="workflow-run-enabled" style="display:none;">
+            <a onclick="activate()">
+              <i class="uk-icon-rocket uk-margin-small-right"></i>
+              Run
+            </a>
+          </li>
+
+          <li id="workflow-stop-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
+            <i class="uk-icon-hand-stop-o uk-margin-small-right"></i>
+            Stop
+          </li>
+          <li id="workflow-stop-enabled" style="display:none;">
+            <a onclick="deactivate()">
+              <i class="uk-icon-hand-stop-o uk-margin-small-right"></i>
+              Stop
+            </a>
+          </li>
+
+          <li class="uk-nav-divider"></li>
+
+          <li id="workflow-export-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
+            <i class="uk-icon-upload uk-margin-small-right"></i>
+            Export
+          </li>
+          <li id="workflow-export-enabled" style="display:none;">
+            <a onclick="export_workflows()">
+              <i class="uk-icon-upload uk-margin-small-right"></i>
+              Export
+            </a>
+          </li>
+
+        </ul>
+      </div>
+    </div>
+
   </div>
   <div class="uk-width-1-3 uk-text-center">
-    <a href="" class="uk-button">
-      <i class="uk-icon-refresh"></i>
-      Refresh
+
+    <a href="/config/new" class="uk-button">
+      New Workflow
     </a>
+    <button class="uk-button uk-margin-small-left" data-uk-modal="{target:'#import-modal'}">
+      <i class="uk-icon-download"></i>
+      Import
+    </button>
+
   </div>
   <div class="uk-width-1-3 uk-text-right">
-
-    <span id="activate-deactivate-hint" class="uk-text-muted">
-      <i class="uk-icon-thumb-tack"></i>
-      Select workflow(s) to (de)activate
-    </span>
-    <button id="activate" class="uk-button uk-button-success" style="display: none;" onclick="activate()">
-      Activate
-    </button>
-    <button id="deactivate" class="uk-button uk-button-danger" style="display: none;" onclick="deactivate()">
-      Deactivate
-    </button>
 
   </div>
 </div>
 
-<script>
+<div id="import-modal" class="uk-modal">
+  <div class="uk-modal-dialog">
+    <button class="uk-modal-close uk-close"></button>
+    <div class="uk-modal-header">
+      <h3>Import Workflow(s)</h3>
+    </div>
+    <div id="upload-drop" class="uk-placeholder uk-text-center">
+      <i class="uk-icon-cloud-upload uk-icon-medium uk-text-muted uk-margin-small-right"></i>
+      Drop one or more JSON workflow files here or
+      <a class="uk-form-file">
+        select one
+        <input id="upload-select" type="file">
+      </a>
+    </div>
+    <div id="progressbar" class="uk-progress uk-hidden">
+      <div class="uk-progress-bar" style="width: 0%;">0%</div>
+    </div>
+    <div class="uk-modal-footer uk-text-right">
+      <button id="import-close" class="uk-button uk-modal-close">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+  $(function() {
+    var progressbar = $("#progressbar"),
+        bar         = progressbar.find(".uk-progress-bar"),
+        settings    = {
+          action: "/config/import",
+          allow: "*.json",
+          single: false,
+          loadstart: function() {
+            bar.css("width", "0%").text("0%")
+            progressbar.removeClass("uk-hidden")
+          },
+          progress: function(percent) {
+            percent = Math.ceil(percent)
+            bar.css("width", percent + "%").text(percent + "%")
+          },
+          allcomplete: function(response) {
+            bar.css("width", "100%").text("100%")
+            setTimeout(function() {
+              progressbar.addClass("uk-hidden")
+            }, 250)
+
+            response = JSON.parse(response)
+            var message = '',
+                success = response['imported'].length > 0,
+                error   = response['errors'].length > 0
+
+            if (success && error) {
+              message =
+                '<p class="uk-text-large">' +
+                  '<i class="uk-icon-exclamation-triangle uk-text-warning uk-icon-small uk-margin-small-right"></i>' +
+                  'Import partially complete.' +
+                '</p>'
+            } else if (success) {
+              message =
+                '<p class="uk-text-large">' +
+                  '<i class="uk-icon-check uk-text-success uk-icon-small uk-margin-small-right"></i>' +
+                  'Import complete.' +
+                '</p>'
+            } else if (error) {
+              message =
+                '<p class="uk-text-large">' +
+                  '<i class="uk-icon-exclamation-triangle uk-text-danger uk-icon-small uk-margin-small-right"></i>' +
+                  'Import failed.' +
+                '</p>'
+            }
+
+            response['imported'].forEach(function(item) {
+              message += '<p class="uk-text-success">Successfully imported <strong>' + item['workflow']['name'] + '</strong> with the following actions: <i>' + item['actions'].join(', ') + '</i>.</p>'
+            })
+
+            response['errors'].forEach(function(item) {
+              message += '<p class="uk-text-danger">' + item + '</p>'
+            })
+
+            var modal = UIkit.modal.alert(message)
+            modal.on({
+              'hide.uk.modal': function() {
+                if (success) {
+                  location.reload()
+                  /* $('#import-close').click() */
+                }
+                reset_import_file_upload(settings)
+              }
+            })
+          }
+        }
+
+    var select = UIkit.uploadSelect($("#upload-select"), settings),
+        drop   = UIkit.uploadDrop($("#upload-drop"), settings)
+  })
+
+  function reset_import_file_upload(settings) {
+    $('#upload-select').val('')
+    select = UIkit.uploadSelect($("#upload-select"), settings)
+    drop   = UIkit.uploadDrop($("#upload-drop"), settings)
+  }
+
   $(document).ready(function() {
+    $('table tr').each(function(_index, tr) {
+      var chk = $(tr).find('th:first-child, td:first-child').find('input[type="checkbox"]'),
+          id  = chk.prop('id')
+      tr.onclick = function() {
+        chk.prop('checked', !chk.prop('checked'))
+        if (id == 'select-all') {
+          select_all(chk.prop('checked'))
+        } else {
+          select_workflow(chk)
+        }
+      }
+    })
     update_toggle_buttons()
   })
+
+  function click_add_new_action_type(link) {
+    var url = $(link).attr('url')
+    if ($("#new-action").attr("disabled")) {
+      UIkit.modal.alert("Please stop this workflow before adding new actions to it.")
+      return false
+    } else {
+      location.href = url
+    }
+  }
 
   function select_all(checked) {
     var chks = $("input[id^='select-workflow']")
@@ -103,12 +312,17 @@
 
   function select_workflow(chk) {
     $(chk).prop('checked', chk.checked)
-    var id = $(chk).prop('id').replace(/select-workflow-/, '')
+    var id  = $(chk).prop('id').replace(/select-workflow-/, ''),
+        all = $('input[id^="select-workflow"]:checked').length == {{= @data.size }}
     $("#toggle-status-" + id).prop('disabled', chk.checked)
-    if (chk.checked != $("#select-all").checked) {
-      $("#select-all").prop('checked', false)
-    }
+    $("#select-all").prop('checked', all)
     update_toggle_buttons()
+  }
+
+  function toggle_workflow_select(id) {
+    var chk = $('#select-workflow-' + id)
+    chk.prop('checked', !chk.prop('checked'))
+    select_workflow(chk)
   }
 
   function update_toggle_buttons() {
@@ -127,23 +341,46 @@
       }
     })
 
+    var dropdown = $('#workflow-dropdown')
+
+    if (any_checked) {
+      dropdown.prop('disabled', false)
+      dropdown.find('label').html(cks.length + ' Selected')
+      $('#workflow-options').css('pointer-events', 'auto')
+    } else {
+      dropdown.prop('disabled', true)
+      dropdown.find('label').html('None Selected')
+      $('#workflow-options').css('pointer-events', 'none')
+    }
 
     if (!any_checked) {
-      $("#activate").hide()
-      $("#deactivate").hide()
-      $("#activate-deactivate-hint").show()
+      $('#workflow-run-disabled').show()
+      $('#workflow-run-enabled').hide()
+      $('#workflow-stop-disabled').show()
+      $('#workflow-stop-enabled').hide()
+      $('#workflow-export-disabled').show()
+      $('#workflow-export-enabled').hide()
     } else if (any_active && any_inactive) {
-      $("#activate").show()
-      $("#deactivate").show()
-      $("#activate-deactivate-hint").hide()
+      $('#workflow-run-disabled').hide()
+      $('#workflow-run-enabled').show()
+      $('#workflow-stop-disabled').hide()
+      $('#workflow-stop-enabled').show()
+      $('#workflow-export-disabled').hide()
+      $('#workflow-export-enabled').show()
     } else if (any_active) {
-      $("#activate").hide()
-      $("#deactivate").show()
-      $("#activate-deactivate-hint").hide()
+      $('#workflow-run-disabled').show()
+      $('#workflow-run-enabled').hide()
+      $('#workflow-stop-disabled').hide()
+      $('#workflow-stop-enabled').show()
+      $('#workflow-export-disabled').hide()
+      $('#workflow-export-enabled').show()
     } else if (any_inactive) {
-      $("#deactivate").hide()
-      $("#activate").show()
-      $("#activate-deactivate-hint").hide()
+      $('#workflow-run-disabled').hide()
+      $('#workflow-run-enabled').show()
+      $('#workflow-stop-disabled').show()
+      $('#workflow-stop-enabled').hide()
+      $('#workflow-export-disabled').hide()
+      $('#workflow-export-enabled').show()
     }
   }
 
@@ -152,7 +389,7 @@
   }
 
   function deactivate() {
-    UIkit.modal.confirm("Deactivate selected workflows?", function() {
+    UIkit.modal.confirm("Stop selected workflow(s)?", function() {
       toggle_selected_workflows(false)
     })
   }
@@ -164,12 +401,15 @@
     } else {
       status = "deactivate"
     }
+
     var cks = $("input[id^='select-workflow']:checked")
-    localStorage['workflow-status-change'] = cks.length
+    localStorage['workflow-status-change-counter'] = cks.length
+    $('#status-change-errors').html('')
+
     cks.each(function(_index, chk) {
-      var id = $(chk).prop('id').replace(/select-workflow-/, '')
-      var wf = $("#workflow-" + id).val()
-      var st = $("#active-status-" + id).val()
+      var id = $(chk).prop('id').replace(/select-workflow-/, ''),
+          wf = $("#workflow-" + id).val(),
+          st = $("#active-status-" + id).val()
 
       if ((activating && st != 'stop') || (!activating && st == 'stop')) {
         update_request_status()
@@ -183,13 +423,13 @@
           update_status_change(data)
           update_request_status()
         },
-        error:   function(request, status, error) {
+        error: function(request, status, error) {
           update_request_status()
           $("#status-change-errors").html(
             '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
               '<a href="" class="uk-alert-close uk-close"></a>' +
-                '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
-                'Unable to change status for one or more workflows: ' + error +
+              '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
+              'Unable to change status for one or more workflows: ' + error +
             '</div>'
           )
         }
@@ -199,9 +439,9 @@
   }
 
   function update_request_status() {
-    localStorage['workflow-status-change'] -= 1
-    if (localStorage['workflow-status-change'] <= 0) {
-      localStorage.removeItem('workflow-status-change')
+    localStorage['workflow-status-change-counter'] -= 1
+    if (localStorage['workflow-status-change-counter'] <= 0) {
+      localStorage.removeItem('workflow-status-change-counter')
       update_toggle_buttons()
     }
   }
@@ -213,7 +453,7 @@
         data   = data[2]
 
     if ($.type(data) === 'string' && data.match("^Unable")) {
-      $("#status-change-errors").html(
+      $("#status-change-errors").append(
         '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
           '<a href="" class="uk-alert-close uk-close"></a>' +
           '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
@@ -244,5 +484,17 @@
     $("count-failed-" + id).val(data["failed_docs_count"])
     $("count-pending-" + id).val(data["published_pending_consume_docs_count"])
     $("count-docs-" + id).val(data["docs_count"])
+  }
+
+  function export_workflows() {
+    var workflows = $('input[id^="select-workflow"]:checked')
+
+    workflows.each(function(_index, chk) {
+      var id        = chk.id.replace(/^select-workflow-/, ''),
+          workflow  = $('#workflow-' + id).val(),
+          timestamp = Math.floor(Date.now() / 1000)
+          url       = '/config/' + workflow + '/export?ts=' + timestamp
+      window.open(url)
+    })
   }
 </script>

@@ -5076,10 +5076,10 @@ select.uk-form-width-mini {
 }
 .uk-badge {
   display: inline-block;
-  padding: 0 5px;
+  padding: 0px 2px 2px 2px;
   background: #575757;
   font-size: 10px;
-  font-weight: bold;
+  font-weight: normal;
   line-height: 14px;
   color: #ffffff;
   text-align: center;
@@ -5090,7 +5090,7 @@ select.uk-form-width-mini {
   background-origin: border-box;
   background-image: -webkit-linear-gradient(top, #9d9d9d, #282828);
   background-image: linear-gradient(to bottom, #9d9d9d, #282828);
-  border-radius: 2px;
+  border-radius: 5px;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 a.uk-badge:hover {

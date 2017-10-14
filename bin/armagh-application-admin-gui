@@ -296,15 +296,15 @@ post '/config/:workflow/new' do
   redirect "/config/#{params['workflow']}/new/#{params['action']}"
 end
 
-post '/config/:workflow/import' do
-  gui.import_action_config(user, params)
+post '/config/import' do
+  gui.import_workflow(user, params)
 end
 
 get '/config/:workflow/export' do
   workflow = params['workflow']
   headers['Content-Type']        = 'application/json'
   headers['Content-Disposition'] = "attachment;filename=#{workflow}.json"
-  gui.export_workflow_config(user, workflow)
+  gui.export_workflow(user, workflow)
 end
 
 patch '/config/:workflow/:status_change' do

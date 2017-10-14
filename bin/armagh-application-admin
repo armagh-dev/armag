@@ -177,6 +177,20 @@ patch '/workflow/:workflow_name/stop.json' do
   end
 end
 
+# import workflow
+post '/workflow/import.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.import_workflow(fields)
+  end
+end
+
+# export workflow
+get '/workflow/?:workflow_name?/export.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.export_workflow(params['workflow_name'])
+  end
+end
+
 #------------------------------
 #
 # workflow actions

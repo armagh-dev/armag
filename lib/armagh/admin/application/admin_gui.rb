@@ -66,12 +66,12 @@ module Armagh
           File.join( __dir__, 'www_root' )
         end
 
-        private def get_json(user, relative_url, fields = {})
-          http_request(user, relative_url, :get, fields)
+        private def get_json(user, relative_url, query = {})
+          http_request(user, relative_url, :get, query)
         end
 
-        private def get_json_with_status(user, relative_url, fields = {})
-          http_request(user, relative_url, :get, fields, true)
+        private def get_json_with_status(user, relative_url, query = {})
+          http_request(user, relative_url, :get, query, true)
         end
 
         private def post_json(user, relative_url, hash_or_json = {})
@@ -86,8 +86,8 @@ module Armagh
           http_request(user, relative_url, :patch, hash_or_json)
         end
 
-        private def delete_json(user, relative_url, hash_or_json = {})
-          raise NotImplementedError
+        private def delete_json(user, relative_url, query = {})
+          http_request(user, relative_url, :delete, query)
         end
 
         private def http_request(user, relative_url, method, data, get_with_status = false)
@@ -111,7 +111,7 @@ module Armagh
             when :patch
               client.patch(url, json, header: header)
             when :delete
-              client.patch(url, query)
+              client.delete(url, query)
             else
               raise AdminGUIHTTPError, "Unrecognized HTTP method: #{method}"
             end
@@ -135,7 +135,7 @@ module Armagh
               raise AdminGUIHTTPError, json if status == :error
               json
             end
-          when :post, :put, :patch
+          when :post, :put, :patch, :delete
             [status, json]
           end
         end
@@ -238,47 +238,35 @@ module Armagh
           get_json(user, '/actions/defined.json')
         end
 
-        def import_action_config(user, params)
-          workflow = params['workflow']
-          raise 'Missing files' unless params.has_key?('files')
+        def import_workflow(user, params)
+          errors   = []
           imported = []
-          params['files'].each do |file|
-            config = file[:tempfile].read
-            config = JSON.parse(config)
-            wf     = config.dig('action', 'workflow')
-            raise "Action belongs to a different workflow: #{wf}" if wf && wf != workflow
-            config['type'] = config.delete('action_class_name') if config['action_class_name']
-            config['action']['active']   = false
-            config['action']['workflow'] = workflow
+          files    = params['files']
+          raise 'No JSON file(s) found to import.' unless files&.any?
 
-            status, response = post_json(user, "/workflow/#{workflow}/action/config.json", config)
+          files.each do |file|
+            begin
+              data = JSON.parse(file[:tempfile].read)
+            rescue => e
+              errors << "Unable to parse workflow JSON file #{file[:filename].inspect}: #{e}"
+              next
+            end
 
-            raise "Unable to import action: #{response}" unless status == :success
-            imported << file[:filename]
+            status, response = post_json(user, '/workflow/import.json', data)
+
+            if status == :success
+              imported << response
+            else
+              response.sub!(/^(Unable to import )workflow\./, "\\1workflow file #{file[:filename].inspect}.")
+              errors << response
+            end
           end
-          imported.to_json
+
+          {'imported'=>imported, 'errors'=>errors}.to_json
         end
 
-        def export_workflow_config(user, workflow)
-          export  = {
-            'workflow' => workflow,
-            'actions'  => []
-          }
-          actions = get_workflow_actions(user, workflow)
-          actions.each do |action|
-            config = get_action_config(user, workflow, action['name'])
-            _export = {'type' => config[:type]}
-            config.each do |group, params|
-              next unless params.is_a?(Array)
-              _export[group] ||= {}
-              params.each do |param|
-                next if param[:value].nil?
-                _export[group][param[:name]] = param[:name] == 'active' ? true : param[:value]
-              end
-            end
-            export['actions'] << _export
-          end
-          JSON.pretty_generate(export)
+        def export_workflow(user, workflow)
+          get_json(user, "/workflow/#{workflow}/export.json")
         end
 
         def new_workflow_action(user, workflow, previous_action, filter)

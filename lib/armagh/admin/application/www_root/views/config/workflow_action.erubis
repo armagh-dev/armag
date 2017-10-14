@@ -27,16 +27,22 @@
   {{ supertype = action['supertype'].split('::').last }}
   {{ next unless @data[:supertypes].include?(supertype) }}
   {{ available.delete(supertype) }}
+  {{ modified = true if [@data[:created], @data[:updated]].include?(action['name']) }}
+  {{ invalid  = !action['valid'] }}
+  {{ border =
+       if invalid || modified
+         %Q{style="border-left:3px solid #{invalid ? '#d85030' : '#659f13'};"}
+       else
+         ''
+       end }}
 
-  <a class="uk-panel uk-panel-hover uk-text-center uk-margin-top-remove" href="/config/{{= @data[:workflow] }}/edit/{{= action['name'] }}">
-
-    {{ modified = true if [@data[:created], @data[:updated]].include?(action['name']) }}
+  <a class="uk-panel uk-panel-hover uk-text-center uk-margin-top-remove" href="/config/{{= @data[:workflow] }}/edit/{{= action['name'] }}" {{= border }}>
 
     <div class="uk-margin-small-bottom">
-      <i class="uk-icon-{{= get_icon_from_supertype(supertype) }} uk-icon-small {{= modified ? 'uk-text-success' : '' }}"></i>
+      <i class="uk-icon-{{= get_icon_from_supertype(supertype) }} uk-icon-small {{= invalid ? 'uk-text-danger' : (modified ? 'uk-text-success' : '') }}"></i>
     </div>
 
-    <div class="uk-text-bold {{= modified ? 'uk-text-success' : 'uk-text-primary' }}">
+    <div class="uk-text-bold {{= invalid ? 'uk-text-danger' : (modified ? 'uk-text-success' : 'uk-text-primary') }}">
       {{== action['name'] }}
     </div>
 

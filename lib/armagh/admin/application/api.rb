@@ -271,6 +271,121 @@ module Armagh
           raise APIClientError.new( e.message )
         end
 
+        def import_workflow(data)
+          error_prefix = 'Unable to import workflow.'
+          raise APIClientError, "#{error_prefix} Missing JSON data." unless [Hash, Array].include? data.class
+
+          raise APIClientError, %Q{#{error_prefix} Missing {"workflow": {"name": "<name_goes_here>"}} section.} unless data.is_a?(Hash) && data.key?('workflow') && data['workflow'].is_a?(Hash) && data['workflow'].key?('name')
+
+          wf_name = data.dig('workflow', 'name')
+          raise APIClientError, "#{error_prefix} Workflow name cannot be blank." if  wf_name.to_s.strip.empty?
+
+          if get_workflows.map { |wf| wf['name'].downcase }.include? wf_name.downcase
+            with_workflow(wf_name) do |wf|
+              raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != 'stop'
+            end
+          else
+            begin
+              create_workflow('workflow'=>{'name'=>wf_name})
+            rescue => e
+              raise APIClientError, "#{error_prefix} Failed to create workflow #{wf_name.inspect}: #{e}"
+            end
+          end
+
+          raise APIClientError, "#{error_prefix} Workflow JSON data missing actions." if !data['actions'].is_a?(Array) || data['actions'].empty?
+
+          data['actions'].each do |action|
+            action_name = action.dig('action', 'name')
+            action_type = action['type']
+
+            if action_name.to_s.strip.empty? && action_type.to_s.strip.empty?
+              raise APIClientError, "#{error_prefix} One or more actions are missing both type and name."
+            elsif action_name.to_s.strip.empty?
+              raise APIClientError, "#{error_prefix} Action type #{action_type.inspect} is missing name."
+            elsif action_type.to_s.strip.empty?
+              raise APIClientError, "#{error_prefix} Action #{action_name.inspect} is missing type."
+            end
+          end
+
+          begin
+            existing_actions = get_workflow_actions(wf_name)&.map { |a| a['name'] }
+          rescue
+            existing_actions = []
+          end
+
+          # TODO ARM-759 retire any existing workflow actions that are not part of the import
+          import_actions = data['actions'].map { |a| a.dig('action', 'name') }
+          extra_actions  = existing_actions.map { |a| a.downcase } - import_actions.map { |a| a.downcase }
+          raise APIClientError, "#{error_prefix} The following actions exist for #{wf_name.inspect} but are not part of the import: #{extra_actions.sort.join(', ')}" unless extra_actions.empty?
+
+          data['actions'].each do |action|
+            action_name = action.dig('action', 'name')
+            action_type = action.delete('type')
+
+            action['action']['active']   = false
+            action['action']['workflow'] = wf_name
+
+            if existing_actions.include? action_name.downcase
+              begin
+                action['type'] = action_type
+                update_workflow_action_config(wf_name, action_name, action)
+              rescue => e
+                raise APIClientError, "#{error_prefix} Action #{action_name.inspect} was unable to be updated: #{e}"
+              end
+            else
+              begin
+                create_workflow_action_config(wf_name, action_type, action)
+              rescue => e
+                raise APIClientError, "#{error_prefix} Action #{action_name.inspect} was unable to be created: #{e}"
+              end
+            end
+          end
+
+          {
+            'workflow' => get_workflows.find { |wf| wf['name'].downcase == wf_name.downcase },
+            'actions'  => import_actions
+          }
+        end
+
+        def export_workflow(wf_name = nil)
+          output = []
+
+          wfs_to_export =
+            if wf_name
+              _wf_name = get_workflows.find { |wf| wf['name'].downcase == wf_name.downcase }
+              raise APIClientError, 'Workflow does not exist.' unless _wf_name
+              [_wf_name['name']]
+            else
+              get_workflows.map { |wf| wf['name'] }
+            end
+
+          wfs_to_export.each do |wf|
+            wf_output = {
+              'workflow' => {
+                'name'     => wf,
+                'exported' => Time.now.utc,
+                'versions' => Armagh::Status::LauncherStatus.find_all(raw: true)&.first&.[]('versions') || 'none available'
+              },
+              'actions' => []
+            }
+            get_workflow_actions(wf).each do |action|
+              config = get_workflow_action_config(wf, action['name'])
+              raise "Action #{action['name'].inspect} is invalid and will not export." unless config
+              config['action'].delete('active')
+              config['action'].delete('workflow')
+              _config = {'type' => config.delete('type')}
+              _config.merge! config
+              wf_output['actions'] << _config
+            end
+
+            output << wf_output
+          end
+
+          JSON.pretty_generate(output.size == 1 ? output.first : output)
+        rescue => e
+          raise APIClientError, "Unable to export workflow #{wf_name.inspect}: #{e}"
+        end
+
         def get_action_super(type)
           raise "Action type must be a Class.  Was a #{type}." unless type.is_a?(Class)
           Utils::ActionHelper.get_action_super(type)

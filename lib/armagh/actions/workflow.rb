@@ -322,14 +322,20 @@ module Armagh
 
       def status
         working_docs_count, failed_docs_count, published_pending_consume_docs_count = doc_counts
-        { 'name' => @name,
+
+        valid = true
+        action_statuses.each { |action| valid = false unless action['valid'] }
+
+        {
+          'name' => @name,
           'run_mode' => run_mode,
           'retired' => retired,
           'unused_output_docspec_check' => unused_output_docspec_check,
           'working_docs_count' => working_docs_count,
           'failed_docs_count'  => failed_docs_count,
           'published_pending_consume_docs_count' => published_pending_consume_docs_count,
-          'docs_count' => working_docs_count + failed_docs_count + published_pending_consume_docs_count
+          'docs_count' => working_docs_count + failed_docs_count + published_pending_consume_docs_count,
+          'valid' => valid
         }
       end
 

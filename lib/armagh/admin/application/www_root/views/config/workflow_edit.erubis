@@ -1,4 +1,11 @@
-<script type="text/javascript" src="/ui/js/components/upload.min.js"></script>
+{{ bad_count = @data[:actions].select { |action| !action['valid'] }.size }}
+{{ unless bad_count.zero? }}
+  <div class="uk-alert uk-alert-danger uk-margin-top-remove" data-uk-alert>
+    <a href="" class="uk-alert-close uk-close"></a>
+    <i class="uk-icon-exclamation-circle uk-icon-small uk-margin-small-right"></i>
+    <strong>{{= bad_count }}</strong> action{{= bad_count > 1 ? 's are' : ' is' }} not valid and {{= bad_count > 1 ? 'have' : 'has' }} been identified below.
+  </div>
+{{ end }}
 
 {{= partial :header, data: {title:    @data[:workflow],
                             subtitle: 'Edit Workflow'} }}
@@ -30,88 +37,10 @@
     <a href="/config" class="uk-button">Back</a>
   </div>
   <div class="uk-width-2-5 uk-text-right">
-    <button id="import-action" class="uk-button uk-margin-left" data-uk-modal="{target:'#import-modal'}" {{= disabled }}>Import</button>
-    <form method="get" action="/config/{{= @data[:workflow] }}/export" style="display: inline;">
-      <button id="export-workflow" class="uk-button uk-margin-small-left">Export</button>
-    </form>
-  </div>
-</div>
-
-<div id="import-modal" class="uk-modal">
-  <div class="uk-modal-dialog">
-    <button class="uk-modal-close uk-close"></button>
-    <div class="uk-modal-header">
-      <h3>Import</h3>
-    </div>
-    <div id="upload-drop" class="uk-placeholder uk-text-center">
-      <i class="uk-icon-cloud-upload uk-icon-medium uk-text-muted uk-margin-small-right"></i>
-      Drop one or more JSON action config files here or
-      <a class="uk-form-file">
-        select one
-        <input id="upload-select" type="file">
-      </a>
-    </div>
-    <div id="progressbar" class="uk-progress uk-hidden">
-      <div class="uk-progress-bar" style="width: 0%;">0%</div>
-    </div>
-    <div class="uk-modal-footer uk-text-right">
-      <button id="import-close" class="uk-button uk-modal-close">Cancel</button>
-    </div>
   </div>
 </div>
 
 <script>
-  $(function() {
-    var progressbar = $("#progressbar"),
-        bar         = progressbar.find(".uk-progress-bar"),
-        settings    = {
-          action: "/config/{{= @data[:workflow] }}/import",
-          allow: "*.json",
-          single: false,
-          loadstart: function() {
-            bar.css("width", "0%").text("0%")
-            progressbar.removeClass("uk-hidden")
-          },
-          progress: function(percent) {
-            percent = Math.ceil(percent)
-            bar.css("width", percent + "%").text(percent + "%")
-          },
-          allcomplete: function(response) {
-            var pattern = /<div id="summary">[\s\S]+?<h2>([\s\S]+?)<\/h2>/,
-                match   = pattern.exec(response),
-                error   = match ? match[1] : ""
-            if (error) {
-              UIkit.modal.alert(
-                'Import failed, please check your JSON and try again.' +
-                '<div class="uk-text-danger uk-margin-top">' +
-                  '<i class="uk-icon-exclamation-triangle uk-margin-small-right"></i>' +
-                  error +
-                '</div>'
-              )
-            }
-            bar.css("width", "100%").text("100%")
-            setTimeout(function() {
-              progressbar.addClass("uk-hidden")
-            }, 250)
-            if (!error) {
-              UIkit.modal.alert(
-                'Import completed:' +
-                '<div class="uk-text-success uk-margin-top">' +
-                  JSON.parse(response).join("<br />") +
-                '</div>'
-              )
-              setTimeout('location.reload()', 2000)
-            }
-          },
-          error: function(error) {
-            UIkit.modal.alert("Import failed, please check your JSON and try again. " + error)
-          }
-        }
-
-    var select = UIkit.uploadSelect($("#upload-select"), settings),
-        drop   = UIkit.uploadDrop($("#upload-drop"), settings)
-  })
-
   function click_add_new_action_type(link) {
     var url = $(link).attr('url')
     if ($("#new-action").attr("disabled")) {
