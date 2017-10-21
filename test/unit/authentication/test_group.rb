@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+require_relative '../../helpers/armagh_test'
 require_relative '../../helpers/bson_support'
 require_relative '../../helpers/coverage_helper'
 require_relative '../../../lib/armagh/connection'

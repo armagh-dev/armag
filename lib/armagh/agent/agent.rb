@@ -296,16 +296,16 @@ module Armagh
           if current_action
             begin
               exec_id = @current_doc.document_id || @current_doc.internal_id
-              @logger.debug "Executing #{name} on document '#{exec_id}'."
+              @logger.info "Executing #{name} on document '#{exec_id}'."
               start = Time.now
               Dir.mktmpdir do |tmp_dir|
                 Dir.chdir(tmp_dir) do
                   execute_action(current_action, @current_doc)
                 end
               end
-              @logger.debug "Execution of #{name} on document '#{exec_id}' completed in #{Time.now-start} seconds."
+              @logger.info "Execution of #{name} on document '#{exec_id}' completed in #{Time.now-start} seconds."
             rescue AbortDocument
-              @logger.debug "Action #{name} on document '#{exec_id}' was aborted by the action."
+              @logger.info "Action #{name} on document '#{exec_id}' was aborted by the action."
               @current_doc.mark_abort
             rescue Documents::Errors::DocumentSizeError, Documents::Errors::DocumentRawSizeError => e
               Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}' on '#{@current_doc.document_id}'")

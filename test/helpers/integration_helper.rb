@@ -1,5 +1,7 @@
 require 'test/unit'
 
+require_relative 'armagh_test'
+
 require_relative 'mongo_support'
 
 Test::Unit.at_start do

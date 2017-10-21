@@ -17,6 +17,7 @@
 
 require 'test/unit'
 require 'mocha/test_unit'
+require_relative '../armagh_test'
 require_relative '../../../lib/armagh/logging'
 
 module ArmaghTest

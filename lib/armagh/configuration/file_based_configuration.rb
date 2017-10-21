@@ -27,6 +27,8 @@ module Armagh
       CONFIG_DIRS = [ '/etc/armagh', File.join( __dir__, '..') ].collect{|p| File.absolute_path(p)}
 
       def self.filepath
+        return ENV['ARMAGH_CONFIG_FILE'] if ENV['ARMAGH_CONFIG_FILE'] && File.file?(ENV['ARMAGH_CONFIG_FILE'])
+
         CONFIG_DIRS.each do |dir|
           fp = File.join( dir, 'armagh_env.json' )
           return fp if File.file?( fp )

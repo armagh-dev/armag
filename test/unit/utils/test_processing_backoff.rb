@@ -16,11 +16,10 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-
+require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/utils/processing_backoff'
 require 'test/unit'
 

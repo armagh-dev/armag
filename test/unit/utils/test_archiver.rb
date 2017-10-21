@@ -16,7 +16,7 @@
 #
 require_relative '../../helpers/coverage_helper'
 
-require_relative '../../helpers/armagh_test'
+require_relative '../../helpers/armagh_test/logger'
 require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 

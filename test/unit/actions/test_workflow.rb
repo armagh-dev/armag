@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test/logger'
 require 'test/unit'
 require 'mocha/test_unit'
 

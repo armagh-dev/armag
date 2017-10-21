@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test'
 require_relative '../../helpers/bson_support'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/authentication/user'

@@ -16,13 +16,12 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test/logger'
 
 require_relative '../../../lib/armagh/agent/agent'
 require_relative '../../../lib/armagh/document/document'
 require_relative '../../../lib/armagh/logging'
 require_relative '../../../lib/armagh/connection'
-
-require_relative '../../helpers/armagh_test'
 
 require 'fileutils'
 

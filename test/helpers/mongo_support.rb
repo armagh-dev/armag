@@ -26,8 +26,8 @@ class MongoSupport
 
   include Singleton
 
-  DATABASE_NAME = 'armagh' unless defined? DATABASE_NAME
-  ADMIN_DATABASE_NAME = 'armagh_admin' unless defined? ADMIN_DATABASE_NAME
+  DATABASE_NAME = 'armagh-test' unless defined? DATABASE_NAME
+  ADMIN_DATABASE_NAME = 'armagh_admin-test' unless defined? ADMIN_DATABASE_NAME
 
   HOST = '127.0.0.1' unless defined? HOST
   PORT = '27017' unless defined? PORT

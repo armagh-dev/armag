@@ -16,15 +16,16 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test'
 
 require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
-require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/configuration/file_based_configuration.rb'
 require 'test/unit'
 require 'mocha/test_unit'
 require 'fakefs/safe'
+require 'tempfile'
 
 class TestFileBasedConfiguration < Test::Unit::TestCase
 
@@ -41,11 +42,27 @@ class TestFileBasedConfiguration < Test::Unit::TestCase
     Oj.stubs(:load).returns result
   end
 
+  def test_filepath_env
+    file = Tempfile.new('file')
+    path = file.path
+    tmp = ENV['ARMAGH_CONFIG_FILE']
+    ENV['ARMAGH_CONFIG_FILE'] = path
+    assert_equal(path, FileBasedConfiguration.filepath)
+  ensure
+    ENV['ARMAGH_CONFIG_FILE'] = tmp
+    file.unlink
+  end
+
   def test_filepath_default
+    tmp = ENV['ARMAGH_CONFIG_FILE']
+    ENV['ARMAGH_CONFIG_FILE'] = nil
+
     path = FileBasedConfiguration.filepath
     assert_true File.exists? path
     default_config_path = File.absolute_path(File.join(File.dirname(__FILE__), '..', '..', '..', 'lib', 'armagh', 'armagh_env.json'))
     assert_equal(default_config_path, path)
+  ensure
+    ENV['ARMAGH_CONFIG_FILE'] = tmp
   end
 
   def test_filepath_etc

@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test'
 
 require_relative '../../../lib/armagh/authentication/role'
 

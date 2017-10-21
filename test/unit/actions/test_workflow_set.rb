@@ -16,6 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
+require_relative '../../helpers/armagh_test'
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -23,8 +24,7 @@ require_relative '../../helpers/workflow_generator_helper'
 require_relative '../../../lib/armagh/actions/workflow_set'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/document/document'
-require_relative '../../helpers/armagh_test'
-require_relative '../../helpers/armagh_test'
+
 
 require 'armagh/actions'
 

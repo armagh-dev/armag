@@ -19,6 +19,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 require_relative '../../../helpers/coverage_helper'
+require_relative '../../../helpers/armagh_test'
 require_relative '../../../../lib/armagh/admin/application/admin_gui'
 
 module Armagh
