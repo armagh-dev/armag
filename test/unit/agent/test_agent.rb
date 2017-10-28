@@ -69,6 +69,7 @@ class TestAgent < Test::Unit::TestCase
     @config_store = []
     @backoff_mock = mock('backoff')
     @current_doc_mock = mock('current_doc')
+    @current_doc_mock.stubs( document_id:'current_id' )
     @running = true
     @agent_id = 'agent_id'
     @archive_config_values = {
@@ -93,8 +94,44 @@ class TestAgent < Test::Unit::TestCase
     agent.instance_variable_set(:@backoff, @backoff_mock)
     agent.instance_variable_set(:@current_doc, @current_doc_mock)
     agent.instance_variable_set(:@running, @running)
-    agent.instance_variable_set(:@uuid, id)
     agent
+  end
+
+  def prep_working_doc( new_document: false)
+    doc = mock('document')
+    doc.stubs( internal_id: 'internal_id', document_id: 'id', new_document?: new_document )
+    doc
+  end
+
+  def set_expectations_on_new_doc( doc, type: nil, state: nil, pending_actions: [], content: nil, raw: nil, metadata: nil, expect_update_from_action_document: true )
+    docspec = Armagh::Documents::DocSpec.new( type, state )
+    @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
+
+    doc.expects( :document_id= ).with( doc.document_id)
+    doc.expects( :type= ).with( type )
+    doc.expects( :state= ).with( state )
+    doc.expects( :pending_actions= ).with(pending_actions)
+    doc.expects( :to_action_document ).returns(Armagh::Documents::ActionDocument.new(document_id: doc.document_id,
+                                                                                     content: content,
+                                                                                     raw: raw,
+                                                                                     title: nil,
+                                                                                     metadata: metadata,
+                                                                                     docspec: docspec,
+                                                                                     source: nil,
+                                                                                     copyright: nil,
+                                                                                     document_timestamp: nil ))
+
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(doc.document_id, type, state, @default_agent ).yields(doc)
+
+    if expect_update_from_action_document
+      doc.expects(:update_from_draft_action_document).with do |action_doc|
+        assert_equal(content, action_doc.content)
+        assert_equal(raw, action_doc.raw)
+        assert_equal(metadata, action_doc.metadata)
+        assert_equal(docspec, action_doc.docspec)
+        true
+      end
+    end
   end
 
   def teardown
@@ -179,9 +216,10 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -189,7 +227,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
@@ -218,9 +255,10 @@ class TestAgent < Test::Unit::TestCase
       define_method(:collect, proc {@caller.instance_variable_set(:@num_creates, 3)})
     end
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -228,7 +266,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_collection_history)
     doc.expects(:metadata).returns({})
 
@@ -261,17 +298,16 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
-
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
@@ -307,18 +343,18 @@ class TestAgent < Test::Unit::TestCase
                                                        document_timestamp: nil)
     action.expects(:split).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
                :raw => 'new', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
     doc.expects(:mark_delete)
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -342,7 +378,7 @@ class TestAgent < Test::Unit::TestCase
       'output' => {'docspec' => output_docspec}
     })
     action_name = action.config.action.name
-    pending_actions = %w(one two)
+    pending_actions = [ 'one', 'two' ]
 
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
                                                        content: {'old' => 'content'},
@@ -355,13 +391,14 @@ class TestAgent < Test::Unit::TestCase
                                                        document_timestamp: nil)
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
                :raw => 'action', :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
                :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
                :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
 
@@ -377,10 +414,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:add_items_to_pending_actions).with(pending_actions)
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
-    doc.expects(:get_published_copy).returns(nil)
+    doc.expects(:get_published_copy_read_only).returns(nil)
     doc.expects(:published_timestamp=)
     doc.expects(:display=)
 
@@ -419,7 +455,7 @@ class TestAgent < Test::Unit::TestCase
     action.expects(:publish).with(action_doc)
 
     doc = stub(:document_id => 'document_id',
-               :pending_actions => [action_name],
+               :pending_actions => [],
                :content => {'content' => true},
                :raw => 'action',
                :metadata => {'meta' => true},
@@ -455,7 +491,8 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
 
@@ -471,10 +508,9 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:add_items_to_pending_actions).with(pending_actions)
     doc.expects(:delete).never
     doc.expects(:mark_publish).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:dev_errors).returns({}).at_least_once
     doc.expects(:ops_errors).returns({}).at_least_once
-    doc.expects(:get_published_copy).returns(pub_doc)
+    doc.expects(:get_published_copy_read_only).returns(pub_doc)
     doc.expects(:published_timestamp=)
     doc.expects(:display=).with(action_doc.display)
 
@@ -511,19 +547,19 @@ class TestAgent < Test::Unit::TestCase
                                                              document_timestamp: nil)
     action.expects(:consume).with(published_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
                :raw => 'raw', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
     doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
 
     doc.expects(:metadata=).with published_doc.metadata
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -549,9 +585,10 @@ class TestAgent < Test::Unit::TestCase
     })
     action_name = divider.config.action.name
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(divider).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -579,9 +616,9 @@ class TestAgent < Test::Unit::TestCase
 
     pending_actions = [action_name]
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
-
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false )
+    doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     collection = mock(name: 'published_collection')
@@ -592,7 +629,6 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
 
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
@@ -601,10 +637,9 @@ class TestAgent < Test::Unit::TestCase
 
     @logger.expects(:warn).with("Error executing action 'testc' on 'document_id'.  See document (in the published_collection collection) for details.")
 
-
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
+    Thread.new { @default_agent.send(:run)  }
     sleep THREAD_SLEEP_TIME
 
     assert_equal([action_name], pending_actions)
@@ -624,8 +659,9 @@ class TestAgent < Test::Unit::TestCase
     pending_actions = [action_name]
 
     doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     collection = mock(name: 'documents')
@@ -636,7 +672,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
     doc.expects(:dev_errors).returns({})
 
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:mark_delete)
     doc.expects(:metadata).returns({})
 
@@ -665,9 +700,10 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort')
     action.expects(:collect).raises(e)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
@@ -677,7 +713,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:metadata).never
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -715,13 +750,15 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort')
     action.expects(:publish).raises(e)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
                :raw => 'action', :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
                :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
                :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
+    doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:document_id=, action_doc.document_id).never
@@ -734,7 +771,6 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:add_pending_actions).with(pending_actions).never
     doc.expects(:delete).never
     doc.expects(:mark_publish).never
-    doc.expects(:finish_processing).never
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
     doc.expects(:get_published_copy).never
@@ -775,13 +811,14 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :raw => 'raw', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
+    doc.stubs(:delete_pending_actions_if).yields( action_name )
     doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:finish_processing).never
     doc.expects(:mark_abort)
 
     doc.expects(:metadata=).never
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -807,15 +844,15 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).then.yields(nil).returns(false).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.stubs(:document_id).returns('doc_id')
     doc.expects(:add_dev_error)
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
@@ -840,8 +877,9 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_with_work_no_action_exists
     action_name = 'action_name'
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name])
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc = stub(:document_id => 'document_id', :pending_actions => [])
+    doc.stubs(:delete_pending_actions_if).yields( action_name )
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
     doc.expects(:add_ops_error).at_least_once
     doc.stubs(:error?).returns(false)
     @backoff_mock.expects(:reset).at_least_once
@@ -860,7 +898,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_run_no_work
-    Armagh::Document.expects(:get_for_processing).returns(nil).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).returns(false).at_least_once
 
     @default_agent.expects(:report_status).with(nil, nil).at_least_once
     @backoff_mock.expects(:interruptible_backoff).at_least_once
@@ -878,16 +916,16 @@ class TestAgent < Test::Unit::TestCase
     action = 'Not an action'
     action_name = 'action_name'
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
                :raw => nil, :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [], :error? => false)
 
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
 
     doc.expects(:dev_errors).returns({})
     doc.expects(:ops_errors).returns({})
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).then.yields(nil).returns(false).at_least_once
 
     @logger.expects(:dev_error).with("#{action} is not an action.")
 
@@ -904,7 +942,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_run_unexpected_error
     exception = RuntimeError.new 'Exception'
-    Armagh::Document.expects(:get_for_processing).raises(exception)
+    Armagh::Document.expects(:get_one_for_processing_locked).raises(exception)
 
     Armagh::Logging.expects(:dev_error_exception).with do |_logger, e, msg|
       assert_equal exception, e
@@ -965,22 +1003,22 @@ class TestAgent < Test::Unit::TestCase
     @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
 
     @default_agent.instance_variable_set(:'@current_action', action)
-    Armagh::Document.expects(:create).with(type: 'DocumentType',
-                                           content: 'content',
-                                           raw: 'raw',
-                                           metadata: 'metadata',
-                                           pending_actions: [],
-                                           state: Armagh::Documents::DocState::WORKING,
-                                           document_id: 'id',
-                                           new: true,
-                                           collection_task_ids: [],
-                                           document_timestamp: nil,
-                                           source: source,
-                                           title: nil,
-                                           copyright: nil,
-                                           logger: @logger,
-                                           archive_files: [],
-                                           display: nil)
+    Armagh::Document.expects(:create_one_unlocked).with(
+        { 'type' => 'DocumentType',
+          'content' => 'content',
+          'raw' => 'raw',
+          'metadata' => 'metadata',
+          'pending_actions' => [],
+          'state' => Armagh::Documents::DocState::WORKING,
+          'document_id' =>'id',
+          'collection_task_ids' => [],
+          'archive_files' => [],
+          'title' => nil,
+          'copyright' => nil,
+          'document_timestamp' => nil,
+          'display' => nil,
+          'source' => source }
+    )
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
                                                        content: 'content',
                                                        raw: 'raw',
@@ -1017,7 +1055,7 @@ class TestAgent < Test::Unit::TestCase
     @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
     initial_error = Armagh::Connection::DocumentUniquenessError.new('message')
 
-    Armagh::Document.expects(:create).raises(initial_error)
+    Armagh::Document.expects(:create_one_unlocked).raises(initial_error)
 
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: 'content', raw: 'raw', metadata: 'metadata',
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: source,
@@ -1034,7 +1072,7 @@ class TestAgent < Test::Unit::TestCase
     @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
     initial_error = Armagh::Connection::DocumentSizeError.new('message')
 
-    Armagh::Document.expects(:create).raises(initial_error)
+    Armagh::Document.expects(:create_one_unlocked).raises(initial_error)
 
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id', content: 'content', raw: nil, metadata: 'metadata',
                                                        docspec: Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING), source: source,
@@ -1046,15 +1084,11 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_edit_document
-    doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Document).returns(true)
-    @current_doc_mock.expects(:document_id).returns('current_id')
-    id = 'id'
 
+    doc = prep_working_doc( new_document: false )
     @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
 
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
-
     new_content = {'new content' => true}
     new_raw = 'raw'
     new_meta = {'new meta' => true}
@@ -1062,7 +1096,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:clear_pending_actions)
     doc.expects(:add_pending_actions).with([])
-    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: id, content: {'content' => true},
+    doc.expects(:to_action_document).returns(Armagh::Documents::ActionDocument.new(document_id: doc.document_id, content: {'content' => true},
                                                                                    raw: 'raw',
                                                                                    metadata: {'meta' => true},
                                                                                    docspec: old_docspec,
@@ -1078,10 +1112,10 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(new_docspec, action_doc.docspec)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(doc.document_id, old_docspec.type, old_docspec.state, @default_agent ).yields(doc)
 
     executed_block = false
-    @default_agent.edit_document(id, old_docspec) do |doc|
+    @default_agent.edit_document(doc.document_id, old_docspec) do |doc|
       assert_equal(Armagh::Documents::ActionDocument, doc.class)
       assert_false doc.new_document?
       doc.metadata = new_meta
@@ -1113,27 +1147,18 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_edit_document_new
-    doc = mock('document')
-    @current_doc_mock.expects(:document_id).returns('current_id')
-    doc.expects(:internal_id=)
 
-    @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
-
-    id = 'id'
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     content = {'new content' => true}
     raw = 'new raw'
     meta = {'new meta' => true}
 
-    doc.expects(:save).returns nil
-
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
-    Armagh::Document.expects(:from_action_document).returns doc
-
+    doc = prep_working_doc( new_document: true )
+    set_expectations_on_new_doc( doc, type: 'DocumentType', state: Armagh::Documents::DocState::WORKING,
+                                      pending_actions: [], content: content, raw: raw, metadata: meta )
     executed_block = false
-    @default_agent.edit_document(id, docspec) do |doc|
+    @default_agent.edit_document(doc.document_id, docspec) do |doc|
       assert_equal(Armagh::Documents::ActionDocument, doc.class)
-      assert_true doc.new_document?
       doc.metadata = meta
       doc.content = content
       doc.raw = raw
@@ -1146,7 +1171,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_type
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Document).returns(true)
+    doc.expects(:new_document?).returns(false)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -1163,7 +1188,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(id, old_docspec.type, old_docspec.state, @default_agent).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1176,7 +1201,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_same_state
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Document).returns(true)
+    doc.expects(:new_document?).returns(false)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -1196,7 +1221,7 @@ class TestAgent < Test::Unit::TestCase
       assert_equal(docspec, action_doc.docspec)
       true
     end
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(id, docspec.type, docspec.state, @default_agent).yields(doc)
 
     @default_agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -1205,7 +1230,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_w_p
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Document).returns(true)
+    doc.expects(:new_document?).returns(false)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -1222,7 +1247,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(id, old_docspec.type, old_docspec.state, @default_agent ).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1235,7 +1260,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_edit_document_change_state_r_w
     doc = mock('document')
-    doc.expects(:is_a?).with(Armagh::Document).returns(true)
+    doc.expects(:new_document?).returns(false)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
@@ -1252,7 +1277,7 @@ class TestAgent < Test::Unit::TestCase
                                                                                    copyright: nil,
                                                                                    document_timestamp: nil))
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(doc)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).with(id, old_docspec.type, old_docspec.state, @default_agent ).yields(doc)
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1270,10 +1295,17 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('ChangedType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    content = {'new content' => true}
+    raw = 'new raw'
+    meta = {'new meta' => true}
+
+    doc = prep_working_doc( new_document: true )
+    set_expectations_on_new_doc( doc, type: 'DocumentType', state: Armagh::Documents::DocState::WORKING,
+                                 pending_actions: [], content: content, raw: raw, metadata: meta,
+                                 expect_update_from_action_document: false )
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
-      @default_agent.edit_document(id, old_docspec) do |doc|
+      @default_agent.edit_document(doc.document_id, old_docspec) do |doc|
         doc.docspec = new_docspec
       end
     end
@@ -1282,18 +1314,18 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_edit_document_new_same_state
-    doc = mock('document')
-    doc.expects(:internal_id=)
     @current_doc_mock.expects(:document_id).returns('current_id')
     id = 'id'
 
-    @workflow_set.expects(:actions_names_handling_docspec).returns([]).at_least_once
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
+    content = {'new content' => true}
+    raw = 'new raw'
+    meta = {'new meta' => true}
 
-    doc.expects(:save).returns
+    doc = prep_working_doc( new_document: true )
+    set_expectations_on_new_doc( doc, type: 'DocumentType', state: Armagh::Documents::DocState::WORKING,
+                                  pending_actions: [], content: content, raw: raw, metadata: meta )
 
-    Armagh::Document.expects(:modify_or_create).with(id, docspec.type, docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
-    Armagh::Document.expects(:from_action_document).returns doc
 
     @default_agent.edit_document(id, docspec) do |doc|
       doc.docspec = docspec
@@ -1307,7 +1339,14 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    content = {'new content' => true}
+    raw = 'new raw'
+    meta = {'new meta' => true}
+
+    doc = prep_working_doc( new_document: true )
+    set_expectations_on_new_doc( doc, type: 'DocumentType', state: Armagh::Documents::DocState::WORKING,
+                                 pending_actions: [], content: content, raw: raw, metadata: meta,
+                                 expect_update_from_action_document: false )
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1325,7 +1364,15 @@ class TestAgent < Test::Unit::TestCase
     old_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
     new_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).with(id, old_docspec.type, old_docspec.state, @running, @default_agent.uuid, @logger).yields(nil)
+    content = {'new content' => true}
+    raw = 'new raw'
+    meta = {'new meta' => true}
+
+    doc = prep_working_doc( new_document: true )
+    set_expectations_on_new_doc( doc, type: 'DocumentType', state: Armagh::Documents::DocState::READY,
+                                 pending_actions: [], content: content, raw: raw, metadata: meta,
+                                 expect_update_from_action_document: false )
+
 
     e = assert_raise(Armagh::Documents::Errors::DocSpecError) do
       @default_agent.edit_document(id, old_docspec) do |doc|
@@ -1342,7 +1389,7 @@ class TestAgent < Test::Unit::TestCase
     initial_error = Armagh::Connection::DocumentUniquenessError.new('message')
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).raises(initial_error)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).raises(initial_error)
 
     assert_raise(Armagh::Documents::Errors::DocumentUniquenessError.new(initial_error.message)) do
       @default_agent.edit_document('id', docspec) do |doc|
@@ -1357,7 +1404,7 @@ class TestAgent < Test::Unit::TestCase
     initial_error = Armagh::Connection::DocumentSizeError.new('message')
     docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::WORKING)
 
-    Armagh::Document.expects(:modify_or_create).raises(initial_error)
+    Armagh::Document.expects(:with_new_or_existing_locked_document).raises(initial_error)
 
     assert_raise(Armagh::Documents::Errors::DocumentSizeError.new(initial_error.message)) do
       @default_agent.edit_document('id', docspec) do |doc|
@@ -1384,7 +1431,7 @@ class TestAgent < Test::Unit::TestCase
     pub_action_doc = mock
     doc.expects(:to_published_document).returns(pub_action_doc)
 
-    Armagh::Document.expects(:find).returns(doc)
+    Armagh::Document.expects(:find_one_by_document_id_type_state_read_only).returns(doc)
     assert_equal(pub_action_doc, @default_agent.get_existing_published_document(action_doc))
   end
 
@@ -1398,7 +1445,7 @@ class TestAgent < Test::Unit::TestCase
                                                        title: nil,
                                                        copyright: nil,
                                                        document_timestamp: nil)
-    Armagh::Document.expects(:find).returns(nil)
+    Armagh::Document.expects(:find_one_by_document_id_type_state_read_only).returns(nil)
     assert_nil @default_agent.get_existing_published_document(action_doc)
   end
 
@@ -1572,19 +1619,19 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :raw => 'raw',
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
                :dev_errors => [], :ops_errors => [], :error? => false
     )
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).then.yields(nil).returns(false).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:add_ops_error)
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
 
     @backoff_mock.expects(:reset).at_least_once
 
@@ -1611,19 +1658,19 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true}, :raw => 'raw',
+    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
                :dev_errors => [], :ops_errors => [], :error? => false
     )
 
-    Armagh::Document.expects(:get_for_processing).returns(doc).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).then.yields(nil).returns(false).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
 
     doc.expects(:add_ops_error)
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     doc.expects(:raw=, [ '(nil)' ]).with(nil).at_least_once
-    doc.expects(:finish_processing).at_least_once
 
     @backoff_mock.expects(:reset).at_least_once
 

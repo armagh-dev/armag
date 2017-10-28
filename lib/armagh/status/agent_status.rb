@@ -16,129 +16,56 @@
 #
 
 require_relative '../connection'
-require_relative '../utils/db_doc_helper'
+require_relative '../document/base_document/document'
+require_relative '../document/base_document/delegated_attributes'
 
 module Armagh
   module Status
-    class AgentStatus < Connection::DBDoc
+    class AgentStatus < BaseDocument::Document
+
+      delegated_attr_accessor :signature
+      delegated_attr_accessor :hostname
+      delegated_attr_accessor :status
+      delegated_attr_accessor :task
+      delegated_attr_accessor :running_since
+      delegated_attr_accessor :idle_since
+
       def self.default_collection
         Connection.agent_status
       end
 
-      def self.report(id:, hostname:, status:, task:, running_since:, idle_since:)
-        agent_status = new
-        agent_status.internal_id = id
-        agent_status.hostname = hostname
-        agent_status.status = status
-        agent_status.task = task
-        agent_status.running_since = running_since
-        agent_status.idle_since = idle_since
-        agent_status.last_updated = Time.now
-        agent_status.save
-        agent_status
+      def self.report(signature:, hostname:, status:, task:, running_since:, idle_since:)
+        upsert_one( { 'signature' => signature },
+                    { 'signature' => signature,
+                      'hostname' => hostname,
+                      'status' => status,
+                      'task' => task,
+                      'running_since' => running_since,
+                      'idle_since' => idle_since
+                    }
+        )
       end
 
-      def self.delete(id)
-        db_delete({'_id' => id})
+       def self.find_all( raw: false )
+        docs = find_many( {} )
+        docs.collect!{ |d| d.to_hash } if raw
+        docs
       rescue => e
-        raise Connection.convert_mongo_exception(e, id: id, type_class: self.class)
+        raise Connection.convert_mongo_exception(e, natural_key: "#{self.class}")
       end
 
-      def self.find(id, raw: false)
-        db_status = self.db_find_one('_id' => id)
-        raw ? db_status : new(db_status)
+      def self.find_all_by_hostname(hostname, raw: false )
+        docs = find_many( { 'hostname' => hostname })
+        docs.collect!{ |d| d.to_hash } if raw
+        docs
       rescue => e
-        raise Connection.convert_mongo_exception(e, id: id, type_class: self.class)
+        raise Connection.convert_mongo_exception(e, natural_key: "#{self.class} #{hostname}" )
       end
 
-      def self.find_all(raw: false)
-        db_statuses = self.db_find({}).to_a.compact
-
-        if raw
-          statuses = db_statuses
-        else
-          statuses = []
-          db_statuses.each do |status|
-            statuses << new(status)
-          end
-        end
-
-        statuses
-      rescue => e
-        raise Connection.convert_mongo_exception(e, type_class: self.class)
+      def self.delete( signature )
+        super( { 'signature' => signature })
       end
 
-      def self.find_all_by_hostname(hostname, raw: false)
-        db_agent_statuses = self.db_find({'hostname' => hostname}).to_a.compact
-
-        if raw
-          agent_statuses = db_agent_statuses
-        else
-          agent_statuses = []
-          db_agent_statuses.each do |agent_status|
-            agent_statuses << new(agent_status)
-          end
-        end
-
-        agent_statuses
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: hostname, type_class: self.class)
-      end
-
-      def save
-        Utils::DBDocHelper.clean_model(self)
-        self.class.db_replace({'_id' => internal_id}, @db_doc)
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
-      end
-
-      def hostname=(hostname)
-        @db_doc['hostname'] = hostname
-      end
-
-      def hostname
-        @db_doc['hostname']
-      end
-
-      def status=(status)
-        @db_doc['status'] = status
-      end
-
-      def status
-        @db_doc['status']
-      end
-
-      def task=(task)
-        @db_doc['task'] = task
-      end
-
-      def task
-        @db_doc['task']
-      end
-
-      def running_since=(running_since)
-        @db_doc['running_since'] = running_since
-      end
-
-      def running_since
-        @db_doc['running_since']
-      end
-
-      def idle_since=(idle_since)
-        @db_doc['idle_since'] = idle_since
-      end
-
-      def idle_since
-        @db_doc['idle_since']
-      end
-
-      def last_updated=(last_updated)
-        @db_doc['last_updated'] = last_updated
-      end
-
-      def last_updated
-        @db_doc['last_updated']
-      end
     end
   end
 end

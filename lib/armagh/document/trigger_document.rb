@@ -14,17 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+require 'armagh/support/random'
 
-require 'bson'
+require_relative 'document'
 
-module BSONSupport
-  def self.random_object_id
-    BSON::ObjectId.from_data(Random.new.bytes(12))
-  end
+module Armagh
+  class TriggerDocument < Document
 
-  def self.random_object_ids(count)
-    ids = []
-    count.times {ids << random_object_id}
-    ids
+    def self.ensure_one_exists(state:, type:, pending_actions:)
+
+      unless find_one_read_only( { 'type' => type, 'state' => state })
+        create_one_unlocked(
+            {
+                'document_id' => Armagh::Support::Random.random_id,
+                'type' => type,
+                'state' => state,
+                'pending_actions' => pending_actions
+            }
+        )
+      end
+    end
   end
 end

@@ -38,6 +38,9 @@ class TestIndexing < Test::Unit::TestCase
     MongoSupport.instance.clean_database
     Armagh::Connection.clear_indexed_doc_collections
     Armagh::Connection.setup_indexes
+    @agent = Object.new
+    def @agent.signature() 'iami'; end
+    def @agent.running?() true; end
   end
 
   def get_index_stats(collection, index_name)
@@ -48,18 +51,27 @@ class TestIndexing < Test::Unit::TestCase
 
   def create_documents(state)
     4_000.times { |i| create_document("id_#{i}", 'TestDocument', state) }
+    Armagh::Document.force_unlock_all_in_collection_held_by @agent
+    Armagh::Document.force_unlock_all_in_collection_held_by @agent, collection: Armagh::Connection.documents('TestDocument')
   end
 
   def create_document(id, type = 'TestDocument', state = Armagh::Documents::DocState::READY)
-    Armagh::Document.create(type: type,
-                            content: {},
-                            raw: nil,
-                            metadata: {},
-                            pending_actions: ['action'],
-                            state: state,
-                            document_id: id,
-                            collection_task_ids: [],
-                            document_timestamp: nil)
+    doc = Armagh::Document.create_one_locked(
+        {
+            type: type,
+            content: {},
+            metadata: {},
+            pending_actions: ['action'],
+            state: Armagh::Documents::DocState::READY,
+            document_id: id
+        },
+        @agent,
+        lock_hold_duration: 3
+    )
+    unless state == Armagh::Documents::DocState::READY
+      doc.state = state
+      doc.save( true, @agent )
+    end
   end
 
   def test_config_idx
@@ -88,7 +100,9 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing('test_agent')
+    Armagh::Document.get_one_for_processing_locked(@agent) do |d|
+      sleep 1
+    end
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -102,7 +116,8 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.get_for_processing('test_agent')
+    Armagh::Document.get_one_for_processing_locked(@agent) do |d|
+    end
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')
     new_ops = index_stats['accesses']['ops']
@@ -116,7 +131,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find('id', 'TestDocument', Armagh::Documents::DocState::READY)
+    Armagh::Document.find_one_by_document_id_type_state_read_only('id', 'TestDocument', Armagh::Documents::DocState::READY)
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -130,7 +145,7 @@ class TestIndexing < Test::Unit::TestCase
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
+    Armagh::Document.find_one_by_document_id_type_state_read_only('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED)
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -166,13 +181,13 @@ class TestIndexing < Test::Unit::TestCase
     assert_equal(initial_ops + 1, new_ops)
   end
 
-  def test_find_or_create_and_lock_idx
+  def test_find_one_locked_idx
     create_documents Armagh::Documents::DocState::READY
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::READY, 'test-agent')
+    Armagh::Document.find_one_by_document_id_type_state_locked('id_0', 'TestDocument', Armagh::Documents::DocState::READY, @agent)
 
     index_stats = get_index_stats(Armagh::Connection.documents, 'document_ids')
     new_ops = index_stats['accesses']['ops']
@@ -180,13 +195,13 @@ class TestIndexing < Test::Unit::TestCase
     assert_equal(initial_ops + 1, new_ops)
   end
 
-  def test_find_or_create_and_lock_idx_published
+  def test_find_one_locked_published
     create_documents Armagh::Documents::DocState::PUBLISHED
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     initial_ops = index_stats['accesses']['ops']
 
-    Armagh::Document.find_or_create_and_lock('id', 'TestDocument', Armagh::Documents::DocState::PUBLISHED, 'test-agent')
+    Armagh::Document.find_one_by_document_id_type_state_locked('id_0', 'TestDocument', Armagh::Documents::DocState::PUBLISHED, @agent)
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'published_document_ids')
     new_ops = index_stats['accesses']['ops']

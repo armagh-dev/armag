@@ -64,8 +64,8 @@ Then(/^the valid reported status should contain agents with statuses$/) do |tabl
 
   seen_statuses = []
   agent_statuses.each do |details|
-    assert_not_empty(details['_id'])
-    assert_in_delta(start_time, details['last_updated'], 10, 'Incorrect agent last_updated time')
+    assert_not_empty(details['signature'])
+    assert_in_delta(start_time, details['updated_timestamp'], 10, 'Incorrect agent last_updated time')
 
     agent_status = details['status']
 

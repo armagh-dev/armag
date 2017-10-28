@@ -18,7 +18,6 @@
 require 'set'
 
 require_relative 'configuration/file_based_configuration'
-require_relative 'connection/db_doc'
 require_relative 'connection/mongo_error_handler'
 require_relative 'connection/mongo_connection'
 require_relative 'connection/mongo_admin_connection'
@@ -181,23 +180,20 @@ module Armagh
       if published_collection?(collection)
         collection.indexes.create_one({'document_id' => 1},
                                       unique: true,
-                                      partial_filter_expression: {'document_id' => {'$exists' => true}},
+                                      partial_filter_expression: {'document_id' => {'$exists' => true} },
                                       name: 'published_document_ids')
       else
         collection.indexes.create_one({'document_id' => 1, 'type' => 1},
                                       unique: true,
-                                      partial_filter_expression: {'document_id' => {'$exists' => true}},
+                                      partial_filter_expression: {'document_id' => {'$exists' => true} },
                                       name: 'document_ids')
-
       end
 
       # Unlocked documents pending work
-      collection.indexes.create_one({'pending_work' => 1, 'locked' => 1, 'updated_timestamp' => 1},
+      collection.indexes.create_one({'pending_work' => 1, 'updated_timestamp' => 1},
                                     name: 'pending_unlocked',
-                                    partial_filter_expression: {
-                                      'pending_work' => {'$exists' => true},
-                                      'locked' => false
-                                    })
+                                    partial_filter_expression: { 'pending_work' => {'$exists' => true }, '_locked' => false }
+      )
     rescue => e
       raise IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
     end

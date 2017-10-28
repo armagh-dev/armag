@@ -103,17 +103,17 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def agent_statuses
     [
-        {'_id' => 'agent-1', 'hostname' => 'host1', 'status' => 'running', 'running_since' => Time.at(0), 'last_updated' => Time.at(1000)},
-        {'_id' => 'agent-2', 'hostname' => 'host1', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000), 'task' => {'document' => 'doc1', 'action' => 'action1'}},
-        {'_id' => 'agent-1', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(0), 'last_updated' => Time.at(1000)},
-        {'_id' => 'agent-2', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000)}
+        {'_id' => '1', 'signature' => 'agent-1', 'hostname' => 'host1', 'status' => 'running', 'running_since' => Time.at(0), 'last_updated' => Time.at(1000)},
+        {'_id' => '2', 'signature' => 'agent-2', 'hostname' => 'host1', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000), 'task' => {'document' => 'doc1', 'action' => 'action1'}},
+        {'_id' => '3', 'signature' => 'agent-3', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(0), 'last_updated' => Time.at(1000)},
+        {'_id' => '4', 'signature' => 'agent-4', 'hostname' => 'host2', 'status' => 'idle', 'idle_since' => Time.at(100), 'last_updated' => Time.at(1000)}
     ]
   end
 
   def launcher_statuses
     [
-        {'_id' => 'host1', 'status' => 'running', 'versions' => {'armagh' => '1.0.0', 'actions' => {'standard' => '1.0.1', 'armagh_test' => '1.0.2'}}, 'last_updated' => Time.at(1000)},
-        {'_id' => 'host2', 'status' => 'running', 'versions' => {'armagh' => '2.0.0', 'actions' => {'standard' => '2.0.1', 'armagh_test' => '2.0.2'}}, 'last_updated' => Time.at(1000)}
+        {'_id' => '1', 'hostname' => 'host1', 'status' => 'running', 'versions' => {'armagh' => '1.0.0', 'actions' => {'standard' => '1.0.1', 'armagh_test' => '1.0.2'}}, 'last_updated' => Time.at(1000)},
+        {'_id' => '2', 'hostname' => 'host2', 'status' => 'running', 'versions' => {'armagh' => '2.0.0', 'actions' => {'standard' => '2.0.1', 'armagh_test' => '2.0.2'}}, 'last_updated' => Time.at(1000)}
     ]
   end
 
@@ -183,17 +183,20 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_status
     expected = [
         {
-            '_id' => 'host1',
+            '_id' => '1',
+            'hostname' => 'host1',
             'agents' => [
                 {
-                    '_id' => 'agent-1',
+                    '_id' => '1',
+                    'signature' => 'agent-1',
                     'hostname' => 'host1',
                     'last_updated' => Time.at(1000),
                     'running_since' => Time.at(0),
                     'status' => 'running'
                 },
                 {
-                    '_id' => 'agent-2',
+                    '_id' => '2',
+                    'signature' => 'agent-2',
                     'hostname' => 'host1',
                     'idle_since' => Time.at(100),
                     'last_updated' => Time.at(1000),
@@ -215,16 +218,19 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
             }
         },
         {
-            '_id' => 'host2',
+            '_id' => '2',
+            'hostname' => 'host2',
             'agents' => [
                 {
-                    '_id' => 'agent-1',
+                    '_id' => '3',
+                    'signature' => 'agent-3',
                     'hostname' => 'host2',
                     'idle_since' => Time.at(0),
                     'last_updated' => Time.at(1000),
                     'status' => 'idle'},
                 {
-                    '_id' => 'agent-2',
+                    '_id' => '4',
+                    'signature' => 'agent-4',
                     'hostname' => 'host2',
                     'idle_since' => Time.at(100),
                     'last_updated' => Time.at(1000),
@@ -254,7 +260,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     expect_fred_docs_in_db
 
-    expected_result = [{"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}, {"name"=>"fred", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true}]
+    expected_result = [{"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}, {"name"=>"fred", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true}]
 
     assert_equal expected_result, @api.get_workflows
   end
@@ -288,7 +294,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_fred_in_db
 
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
     assert_equal expected_result, @api.get_workflow_status( 'alice' )
   end
 
@@ -312,7 +318,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     wf = @api.create_workflow( { 'workflow' => { 'name' => test_wf_name }})
     assert_equal test_wf_name, wf.name
-    expected_response = {"name"=>test_wf_name, "run_mode"=>"stop", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+    expected_response = {"name"=>test_wf_name, "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
     assert_equal expected_response,@api.get_workflow_status( test_wf_name )
   end
 
@@ -354,7 +360,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     expect_alice_docs_in_db
     wf = @api.get_workflow_status('alice')
-    assert_equal 'run', wf['run_mode']
+    assert_equal Armagh::Actions::Workflow::RUNNING, wf['run_mode']
   end
 
   def test_finish_workflow
@@ -369,7 +375,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     expect_alice_docs_in_db
     wf = @api.get_workflow_status('alice')
-    assert_equal 'finish', wf['run_mode']
+    assert_equal Armagh::Actions::Workflow::FINISHING, wf['run_mode']
   end
 
   def test_stop_workflow
@@ -395,7 +401,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       @api.stop_workflow('alice')
     end
     wf_status = @api.get_workflow_status('alice')
-    assert_equal 'finish', wf_status['run_mode']
+    assert_equal Armagh::Actions::Workflow::FINISHING, wf_status['run_mode']
   end
 
   def test_stop_workflow_docs_still
@@ -413,7 +419,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     expect_alice_docs_in_db
     wf_status = @api.get_workflow_status('alice')
-    assert_equal 'finish', wf_status['run_mode']
+    assert_equal Armagh::Actions::Workflow::FINISHING, wf_status['run_mode']
   end
 
   def test_import_workflow
@@ -463,7 +469,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_import_workflow_not_stopped
     data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
     wf = mock('wf')
-    wf.expects(:status).once.returns({'run_mode'=>'run'})
+    wf.expects(:status).once.returns({'run_mode'=>Armagh::Actions::Workflow::RUNNING})
     @api.expects(:get_workflows).once.returns([{'name'=>'test'}])
     @api.expects(:with_workflow).with('test').once.yields(wf)
     e = assert_raise Armagh::Admin::Application::APIClientError do
@@ -1072,10 +1078,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_invoke_action_test_callback
     type_class = mock('type_class')
-    mod = mock('module')
-    mod.expects(:method).once.returns('blah')
-    mod.expects(:create_configuration).once.returns('config')
-    type_class.expects(:included_modules).once.returns([mod])
+    type_class.expects(:defined_parameters).returns([])
+    type_class.expects(:create_configuration).once.returns('config')
+    type_class.expects(:method).once.with('config').returns('ok')
     @api.expects(:get_action_class_from_type).once.returns(type_class)
     data = {
       'type'   => 'type_class',
@@ -1083,15 +1088,13 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       'method' => 'method'
     }
     result = @api.invoke_action_test_callback(data)
-    assert_equal 'blah', result
+    assert_equal 'ok', result
   end
 
   def test_invoke_action_test_callback_failed_to_instantiate_test_config
     type_class = mock('type_class')
-    mod = mock('module')
-    mod.stubs(:method).returns('blah')
-    mod.expects(:create_configuration).once.raises(RuntimeError.new('some error'))
-    type_class.expects(:included_modules).once.returns([mod])
+    type_class.expects(:defined_parameters).returns([])
+    type_class.expects(:create_configuration).once.raises(RuntimeError.new('some error'))
     @api.expects(:get_action_class_from_type).once.returns(type_class)
     data = {
       'type'   => 'type_class',
@@ -1100,6 +1103,31 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     }
     result = @api.invoke_action_test_callback(data)
     assert_equal 'Failed to instantiate test configuration: some error', result
+  end
+
+  def test_invoke_action_test_callback_encode_password
+    type_class = mock('type_class')
+    param = mock('param')
+    param.expects(:name).twice.returns('password')
+    param.expects(:type).once.returns('encoded_string')
+    type_class.expects(:defined_parameters).returns([param])
+    Configh::DataTypes::EncodedString.expects(:from_plain_text).once.with('plain text').returns('encoded')
+    type_class.expects(:create_configuration).once.with(
+      [],
+      'test_callback',
+      {'group'=>{'password'=>'encoded'}},
+      test_callback_group: 'group'
+    ).returns('config')
+    type_class.expects(:method).once.with('config').returns('ok')
+    @api.expects(:get_action_class_from_type).once.returns(type_class)
+    data = {
+      'type'   => 'type_class',
+      'group'  => 'group',
+      'method' => 'method',
+      'test_config' => {'password'=>'plain text'}
+    }
+    result = @api.invoke_action_test_callback(data)
+    assert_equal 'ok', result
   end
 
   def test_get_users
@@ -1113,13 +1141,13 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_get_user
     user = mock
-    Armagh::Authentication::User.expects(:find).with('id').returns(user)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('id').returns(user)
     assert_equal(user, @api.get_user('id'))
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.get_user('none')}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_user('error')}
   end
 
@@ -1154,7 +1182,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     user = mock('user')
 
     Armagh::Authentication::User.expects(:update).with(
-        id: 'id',
+        internal_id: 'id',
         username: fields['username'],
         password: fields['password'],
         name: fields['name'],
@@ -1196,13 +1224,13 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_delete_user
     user = mock
     user.expects(:delete)
-    Armagh::Authentication::User.expects(:find).with('id').returns(user)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('id').returns(user)
     assert_true@api.delete_user('id')
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.delete_user('none')}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_user('error')}
   end
 
@@ -1213,11 +1241,11 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group.stubs(:name).returns('Group123')
     group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
 
     user.expects(:join_group).with(group)
     user.expects(:save)
@@ -1226,7 +1254,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_join_group('none', 'group_id', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_join_group('user_id', 'none', @remote_user)}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_join_group('error', 'group_id', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER])
@@ -1246,11 +1274,11 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
     user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(4)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
 
     user.expects(:leave_group).with(group)
     user.expects(:save)
@@ -1259,7 +1287,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_leave_group('none', 'group_id', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.user_leave_group('user_id', 'none', @remote_user)}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_leave_group('error', 'group_id', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER])
@@ -1278,10 +1306,10 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     user.stubs(:all_roles).returns({'self' => []})
     role = Armagh::Authentication::Role::USER_ADMIN
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(4)
     Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     user.expects(:add_role).with(role)
@@ -1291,7 +1319,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_add_role('none', 'role_key', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_add_role('user_id', 'none', @remote_user)}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_add_role('error', 'role_key', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER])
@@ -1310,10 +1338,10 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'group' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(4)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(4)
     Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     user.expects(:remove_role).with(role)
@@ -1323,7 +1351,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.user_remove_role('none', 'role_key', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.user_remove_role('user_id', 'none', @remote_user)}
 
-    Armagh::Authentication::User.expects(:find).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::User::UserError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_remove_role('error', 'role_key', @remote_user)}
 
     user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'group' => [Armagh::Authentication::Role::USER_ADMIN]})
@@ -1342,7 +1370,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     user = mock('user')
     user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(3)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(3)
 
     user.expects(:reset_password).returns(expected)
     assert_equal expected,@api.user_reset_password('user_id', @remote_user)
@@ -1355,36 +1383,36 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new("Cannot reset password for user_id. The user has the following roles, which you don't have: Resource Admin.")){@api.user_reset_password('user_id', @remote_user)}
   end
 
-  def test_user_lock
+  def test_user_lock_out
     user = mock('user')
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).twice
 
-    user.expects(:lock).returns(true)
+    user.expects(:lock_out).returns(true)
     user.expects(:save)
-    assert_true @api.user_lock('user_id')
+    assert_true @api.user_lock_out('user_id')
 
-    user.expects(:lock).raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_lock('user_id')}
+    user.expects(:lock_out).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_lock_out('user_id')}
   end
 
-  def test_user_unlock
+  def test_user_remove_lock_out
     user = mock('user')
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).twice
 
-    user.expects(:unlock).returns(true)
+    user.expects(:remove_lock_out).returns(true)
     user.expects(:save)
-    assert_true @api.user_unlock('user_id')
+    assert_true @api.user_remove_lock_out('user_id')
 
-    user.expects(:unlock).raises(Armagh::Authentication::User::UserError.new('boom'))
-    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_unlock('user_id')}
+    user.expects(:remove_lock_out).raises(Armagh::Authentication::User::UserError.new('boom'))
+    assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.user_remove_lock_out('user_id')}
   end
 
   def test_user_enable
     user = mock('user')
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).twice
 
     user.expects(:enable).returns(true)
     user.expects(:save)
@@ -1397,7 +1425,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_user_disable
     user = mock('user')
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).twice
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).twice
 
     user.expects(:disable).returns(true)
     user.expects(:save)
@@ -1418,13 +1446,13 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_get_group
     group = mock
-    Armagh::Authentication::Group.expects(:find).with('id').returns(group)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('id').returns(group)
     assert_equal(group, @api.get_group('id'))
 
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.get_group('none')}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.get_group('error')}
   end
 
@@ -1467,13 +1495,14 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def test_group_add_role
+    Armagh::Connection.stubs( :all_published_collections ).returns( [] )
     group = mock 'group'
     role = Armagh::Authentication::Role::USER
 
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
     Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(2)
 
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     group.expects(:add_role).with(role)
@@ -1483,7 +1512,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_role('none', 'role_key', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_add_role('group_id', 'none', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_role('error', 'role_key', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN])
@@ -1494,10 +1523,10 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group = mock 'group'
     role = Armagh::Authentication::Role::USER
 
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
     Armagh::Authentication::Role.expects(:find).with('role_key').returns(role).times(2)
 
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
     Armagh::Authentication::Role.expects(:find).with('none').returns(nil)
 
     group.expects(:remove_role).with(role)
@@ -1507,7 +1536,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_role('none', 'role_key', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new("Role 'none' not found.")){@api.group_remove_role('group_id', 'none', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_role('error', 'role_key', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN])
@@ -1521,11 +1550,11 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group.stubs(:name).returns('Group123')
     group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(5)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(5)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
 
     group.expects(:add_user).with(user)
     group.expects(:save)
@@ -1534,7 +1563,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_add_user('none', 'user_id', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_add_user('group_id', 'none', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_add_user('error', 'user_id', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER])
@@ -1554,11 +1583,11 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
     user.stubs(:all_roles).returns({'self' => [Armagh::Authentication::Role::USER_ADMIN], 'Group123' => [Armagh::Authentication::Role::RESOURCE_ADMIN]})
 
-    Armagh::Authentication::User.expects(:find).with('user_id').returns(user).times(5)
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group).times(3)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('user_id').returns(user).times(5)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group).times(3)
 
-    Armagh::Authentication::User.expects(:find).with('none').returns(nil)
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::User.expects(:find_one_by_internal_id).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
 
     group.expects(:remove_user).with(user)
     group.expects(:save)
@@ -1567,7 +1596,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.group_remove_user('none', 'user_id', @remote_user)}
     assert_raise(Armagh::Admin::Application::APIClientError.new('User with ID none not found.')){@api.group_remove_user('group_id', 'none', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.group_remove_user('error', 'user_id', @remote_user)}
 
     set_remote_user_roles([Armagh::Authentication::Role::USER])
@@ -1585,16 +1614,16 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     group = mock('group')
     group.expects(:delete)
     group.stubs(:roles).returns([Armagh::Authentication::Role::USER_ADMIN])
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
-    assert_true@api.delete_group('group_id', @remote_user)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group)
+    assert_true @api.delete_group('group_id', @remote_user)
 
-    Armagh::Authentication::Group.expects(:find).with('none').returns(nil)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('none').returns(nil)
     assert_raise(Armagh::Admin::Application::APIClientError.new('Group with ID none not found.')){@api.delete_group('none', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('error').raises(Armagh::Authentication::Group::GroupError.new('boom'))
     assert_raise(Armagh::Admin::Application::APIClientError.new('boom')){@api.delete_group('error', @remote_user)}
 
-    Armagh::Authentication::Group.expects(:find).with('group_id').returns(group)
+    Armagh::Authentication::Group.expects(:find_one_by_internal_id).with('group_id').returns(group)
     set_remote_user_roles([Armagh::Authentication::Role::USER])
     assert_raise(Armagh::Admin::Application::APIClientError.new("Unable to remove group group_id. Doing so would remove the following roles, which you don't have: User Admin.")){@api.delete_group('group_id', @remote_user)}
   end

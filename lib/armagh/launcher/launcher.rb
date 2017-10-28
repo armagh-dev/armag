@@ -133,8 +133,8 @@ module Armagh
     end
 
     def reconcile_agents
-      reported_agents = Status::AgentStatus.find_all_by_hostname(@hostname).collect{|a| a.internal_id}
-      running_agents = @agents.values.collect{|a| a.uuid}
+      reported_agents = Status::AgentStatus.find_all_by_hostname(@hostname).collect{|a| a.signature}
+      running_agents = @agents.values.collect{|a| a.signature}
 
       reported_not_running = reported_agents - running_agents
       running_not_reported = running_agents - reported_agents
@@ -180,11 +180,12 @@ module Armagh
 
     def kill_agents(num_agents, signal = :INT)
       return if num_agents == 0
+
       Thread.new{ @logger.any "Killing #{num_agents} agent(s)." }.join
       num_agents.times do
         pid = @agents.keys.first
         next unless pid
-        agent_id = @agents[pid].uuid
+        agent_id = @agents[pid].signature
 
         Thread.new{ @logger.any "Killing #{agent_id}." }.join
         Process.kill(signal, pid)
@@ -206,12 +207,14 @@ module Armagh
       @agents.each do |pid, agent|
         wait_pid, status = Process.waitpid2(pid, Process::WNOHANG)
         if wait_pid
-          @logger.error "Agent #{agent.uuid} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
+          @logger.error "Agent #{agent.signature} (PID: #{pid}) terminated with exit code #{status}. Restarting it"
           num_dead_agents += 1
-          agent_id = @agents[pid].uuid
+          agent_id = @agents[pid].signature
           @agents.delete(pid)
           remove_agent_status(agent_id)
-          Document.force_unlock(agent_id)
+          Connection.all_document_collections.each do |coll|
+            Document.force_unlock_all_in_collection_held_by(agent_id, collection:coll)
+          end
         end
       end
 
@@ -219,18 +222,18 @@ module Armagh
     end
 
     def start_agent_in_process
-      agent = Agent.new( @agent_config, @archive_config,@workflow_set, @hostname )
+      agent = Agent.new( @agent_config, @archive_config, @workflow_set, @hostname )
 
       pid = Process.fork do
-        Process.setproctitle("armagh-#{agent.uuid}")
+        Process.setproctitle("#{agent.signature}")
         TERM_SIGNALS.each do |signal|
           trap(signal) {agent.stop}
         end
         begin
           agent.start unless @shutdown
-          @logger.info "Agent #{agent.uuid} terminated"
+          @logger.info "Agent #{agent.signature} terminated"
         rescue => e
-          Logging.dev_error_exception(@logger, e, "Could not start agent #{agent.uuid}")
+          Logging.dev_error_exception(@logger, e, "Could not start agent #{agent.signature}")
         end
       end
 

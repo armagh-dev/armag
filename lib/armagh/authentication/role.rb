@@ -20,7 +20,7 @@ require_relative '../connection'
 module Armagh
   module Authentication
     class Role
-      attr_reader :name, :description, :key
+      attr_reader :name, :internal_id, :description
 
       class << self
         protected :new
@@ -40,8 +40,11 @@ module Armagh
       end
 
       def self.find(role_key)
-        all.each {|r| return r if r.key == role_key}
-        nil
+        all.find{ |r| r.internal_id == role_key }
+      end
+
+      def self.get(role_key)
+        find(role_key)
       end
 
       def self.find_from_published_doctype(doctype)
@@ -55,8 +58,8 @@ module Armagh
 
       def initialize(name:, description:, key:, published_collection_role: false)
         @name = name
+        @internal_id = key
         @description = description
-        @key = key
         @published_collection_role = published_collection_role
       end
 
@@ -65,18 +68,18 @@ module Armagh
       end
 
       def ==(other)
-        other.is_a?(Role) && @key == other.key
+        other.is_a?(Role) && @internal_id == other.internal_id
       end
 
       def hash
-        @key.hash
+        @internal_id.hash
       end
 
       def to_hash
         {
             'name' => @name,
             'description' => @description,
-            'key' => @key,
+            'internal_id' => @internal_id,
             'published_collection_role' => @published_collection_role
         }
 

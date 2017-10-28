@@ -22,11 +22,14 @@ require_relative 'role'
 require_relative 'user'
 
 require_relative '../connection'
-require_relative '../utils/db_doc_helper'
+require_relative '../document/base_document/document'
 
 module Armagh
   module Authentication
-    class Group < Connection::DBDoc
+
+    class User < BaseDocument::Document; end
+
+    class Group < BaseDocument::Document
 
       class GroupError < StandardError; end
       class PermanentError < GroupError; end
@@ -34,6 +37,29 @@ module Armagh
       class DescriptionError < GroupError; end
       class RoleError < GroupError; end
       class UserError < GroupError; end
+
+      delegated_attr_accessor :name, validates_with: :clean_name
+      delegated_attr_accessor :description, validates_with: :clean_description
+      delegated_attr_accessor :directory
+      delegated_attr_accessor_array :users, references_class: User
+      delegated_attr_accessor_array :roles, references_class: Role
+      delegated_attr_accessor :permanent
+
+      alias_method :add_role, :add_item_to_roles
+      alias_method :remove_role, :remove_item_from_roles
+      alias_method :remove_all_roles, :clear_roles
+
+      def clean_name(name)
+        raise NameError, 'Name must be a nonempty string.' unless name.is_a?(String) && !name.empty?
+        lowercase = name.downcase
+        raise NameError, 'Name can only contain alphabetic, numeric, and underscore characters.' if lowercase =~ /\W/
+        lowercase
+      end
+
+      def clean_description(description)
+        raise DescriptionError, 'Description must be a nonempty string.' unless description.is_a?(String) && !description.empty?
+        description
+      end
 
       def self.default_collection
         Connection.groups
@@ -47,13 +73,14 @@ module Armagh
       end
 
       private_class_method def self.setup_group(name, description)
-        group = find_name(name)
+        group = find_by_name(name)
 
         if group.nil?
-          group = new()
-          group.name = name
-          group.description = description
-          group.directory = Directory::INTERNAL
+          group = new({
+              'name' => name,
+              'description' => description,
+              'directory' => Directory::INTERNAL
+          })
           group.mark_permanent
         end
 
@@ -90,18 +117,17 @@ module Armagh
 
       def self.create(name:, description:, directory: Directory::INTERNAL)
         # TODO When directory is LDAP, copy the details from the LDAP server into this  (ARM-213)
-        new_group = new
-        new_group.name = name
-        new_group.description = description
-        new_group.directory = directory
-        new_group.save
-        new_group
+        create_one({
+            'name' => name,
+            'description' => description,
+            'directory' => directory
+        })
       rescue Connection::DocumentUniquenessError
         raise NameError, "A group with name '#{name}' already exists."
       end
 
       def self.update(id:, name:, description:)
-        doc = find(id)
+        doc = get(id)
 
         if doc
           doc.name = name
@@ -112,121 +138,32 @@ module Armagh
         doc
       end
 
-      def self.find(id)
-        id = BSON::ObjectId.from_string(id.to_s)
-        group = self.db_find_one({'_id' => id})
-        group ? new(group) : nil
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: id, type_class: self.class)
-      end
-
-      def self.find_name(name)
-        group = self.db_find_one({'name' => name})
-        group ? new(group) : nil
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: name, type_class: self.class)
+      def self.find_by_name(name)
+        find_one( { 'name' => name })
       end
 
       def self.find_all(ids = nil)
-        if ids
-          ids = Array(ids).collect{|id| BSON::ObjectId.from_string(id)}
-          db_groups = self.db_find({'_id' => {'$in' => ids}}).to_a.compact
-        else
-          db_groups = self.db_find({}).to_a.compact
-        end
-
-        groups = []
-
-        db_groups.each do |db_group|
-          groups << new(db_group)
-        end
-
-        groups
+        qualifier = {}
+        qualifier['_id' ] = { '$in' => ids.collect{ |id|  id.is_a?(String) ? BSON::ObjectId.from_string(id) : id }} if ids
+        find_many( qualifier ).to_a.compact
       rescue => e
-        raise Connection.convert_mongo_exception(e, id: ids.join(', '), type_class: self.class)
-      end
-
-      def initialize(image = {})
-        image['_id'] = image['id'] unless image.key? '_id'
-        image.delete('id')
-
-        super
-        @db_doc['roles'] ||= []
-        @db_doc['users'] ||= []
-      end
-
-      def refresh
-        @db_doc = self.class.db_find_one({'_id' => internal_id})
-        Utils::DBDocHelper.restore_model(self)
-        @db_doc
-      end
-
-      def save
-        self.mark_timestamp
-
-        Utils::DBDocHelper.clean_model(self)
-
-        if internal_id
-          self.class.db_replace({'_id' => internal_id}, @db_doc)
-        else
-          self.internal_id = self.class.db_create(@db_doc)
-        end
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
+        raise Connection.convert_mongo_exception(e, natural_key: "#{self.class} #{(ids||[]).join(', ')}" )
       end
 
       def delete
         raise PermanentError, 'Cannot delete a permanent account.' if permanent?
         users.each {|u| remove_user(u)}
-        self.class.db_delete({'_id' => internal_id})
+        super
         true
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
-      end
-
-      def name
-        @db_doc['name']
-      end
-
-      def name=(name)
-        raise NameError, 'Name must be a nonempty string.' unless name.is_a?(String) && !name.empty?
-        lowercase = name.downcase
-        raise NameError, 'Name can only contain alphabetic, numeric, and underscore characters.' if lowercase =~ /\W/
-        @db_doc['name'] = lowercase
-      end
-
-      def description
-        @db_doc['description']
-      end
-
-      def description=(description)
-        raise DescriptionError, 'Description must be a nonempty string.' unless description.is_a?(String) && !description.empty?
-        @db_doc['description'] = description
-      end
-
-      def directory
-        @db_doc['directory']
-      end
-
-      def directory=(directory)
-        @db_doc['directory'] = directory
-      end
-
-      def users
-        if @db_doc['users'].empty?
-          []
-        else
-          User.find_all(@db_doc['users'])
-        end
       end
 
       def has_user?(user)
-        @db_doc['users'].include? user.internal_id.to_s
+        users.include? user
       end
 
       def add_user(user, reciprocate: true)
         return if has_user? user
-        @db_doc['users'] << user.internal_id.to_s
+        add_item_to_users user
         if reciprocate
           user.join_group(self, reciprocate: false)
           user.save
@@ -235,7 +172,7 @@ module Armagh
 
       def remove_user(user, reciprocate: true)
         if has_user?(user)
-          @db_doc['users'].delete user.internal_id.to_s
+          remove_item_from_users user
 
           if reciprocate
             user.leave_group(self, reciprocate: false)
@@ -244,37 +181,6 @@ module Armagh
         else
           raise UserError, "User '#{user.username}' is not a member of '#{name}'."
         end
-      end
-
-      def add_role(role)
-        role_key = role.key
-        @db_doc['roles'] << role_key unless @db_doc['roles'].include? role_key
-      end
-
-      def remove_role(role)
-        if has_role? role
-          @db_doc['roles'].delete role.key
-        else
-          raise RoleError, "Group '#{name}' does not have a direct role of '#{role.key}'."
-        end
-      end
-
-      def remove_all_roles
-        @db_doc['roles'].clear
-      end
-
-      def roles
-        roles = []
-        missing_keys = []
-
-        @db_doc['roles'].each do |role_key|
-          role = Role.find(role_key)
-          role ? roles << role : missing_keys << role_key
-        end
-
-        missing_keys.each { |key| @db_doc['roles'].delete key}
-        roles.uniq!
-        roles
       end
 
       def has_role?(role)
@@ -290,11 +196,11 @@ module Armagh
       end
 
       def permanent?
-        @db_doc['permanent'] || false
+        permanent || false
       end
 
       def mark_permanent
-        @db_doc['permanent'] = true
+        self.permanent = true
       end
 
       def ==(other)
@@ -302,7 +208,7 @@ module Armagh
       end
 
       def hash
-        internal_id.hash
+        internal_id.to_s.hash
       end
 
       def eql?(other)
@@ -311,12 +217,11 @@ module Armagh
 
       def to_json(options = {})
         hash = to_hash
-        hash['id'] = hash['_id'].nil? ? nil : hash['_id'].to_s
-        hash.delete('_id')
+        hash['users'] ||= []
+        hash['users'].collect!{ |u| u.to_s }
         hash.to_json(options)
       end
 
-      alias_method :id, :internal_id
     end
   end
 end

@@ -15,19 +15,21 @@
 # limitations under the License.
 #
 
+require 'armagh/support/encoding'
+
 module Armagh
-  module Utils
-    class DBDocHelper
+  module BaseDocument
+    module ContentCleanup
+
       DOT_REPLACEMENT = '~!p!~'
       DOLLAR_REPLACEMENT = '~!d!~'
 
-      def self.clean_model(model)
-        clean_hash(model.db_doc)
+      def self.clean_image( image )
+        clean_hash( image )
       end
 
-      def self.restore_model(model, raw: false)
-        hash = raw ? model : model.db_doc
-        restore_hash(hash)
+      def self.restore_image( image )
+        restore_hash( image )
       end
 
       private_class_method
@@ -92,6 +94,11 @@ module Armagh
       def self.restore_array(array)
         array.each{|v| restore(v)}
       end
+
+      def self.fix_encoding( proposed_encoding, target, logger: nil )
+        Armagh::Support::Encoding.fix_encoding(target, proposed_encoding: proposed_encoding, logger: logger || @logger)
+      end
+
     end
   end
 end

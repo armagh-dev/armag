@@ -209,7 +209,7 @@ module Armagh
 
         private def workflow_active?(user, workflow)
           status = get_json(user, "/workflow/#{workflow}/status.json")
-          status['run_mode'] != 'stop'
+          status['run_mode'] != Actions::Workflow::STOPPED
         end
 
         def activate_workflow(user, workflow)
@@ -221,9 +221,9 @@ module Armagh
         end
 
         private def change_workflow_status(user, workflow, status_change)
-          unchanged_status = status_change == :activate ? 'stop' : 'run'
+          unchanged_status = status_change == :activate ? Actions::Workflow::STOPPED : Actions::Workflow::RUNNING
           status, response =
-            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
+            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? Actions::Workflow::RUNNING : Actions::Workflow::STOPPED}.json")
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else
@@ -486,9 +486,8 @@ module Armagh
         end
 
         def invoke_action_test_callback(user, data)
-          status, response = patch_json(user, "/test/invoke_callback.json", data)
-          raise "Unable to invoke action test callback method #{data['method']} for action type #{data['type']}" unless status == :success
-          response
+          _status, response = patch_json(user, "/test/invoke_callback.json", data)
+          [response ? :error : :success, response].to_json
         end
 
         def get_logs(user, page:, limit:, sort:, filter:, hide:)

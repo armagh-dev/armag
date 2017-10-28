@@ -56,14 +56,14 @@ class MongoSupport
 
   def start_mongo(arguments = nil)
     if arguments
-      cmd = "#{@mongod_exec} #{arguments}"
+      @mongod_run_cmd = "#{@mongod_exec} #{arguments}".strip
     else
-      cmd = @mongod_exec
+      @mongod_run_cmd = @mongod_exec
     end
 
     unless running?
       File.truncate(OUT_PATH, 0) if File.file? OUT_PATH
-      @mongo_pid = Process.spawn(cmd, out: OUT_PATH, err: OUT_PATH)
+      @mongo_pid = Process.spawn(@mongod_run_cmd, out: OUT_PATH, err: OUT_PATH)
     end
 
     stop = Time.now + MAX_LAUNCH_TIME
@@ -101,7 +101,7 @@ class MongoSupport
 
   def running?
     running = false
-    running = `ps -p #{@mongo_pid} -o command=`.strip == @mongod_exec if @mongo_pid
+    running = `ps -p #{@mongo_pid} -o command=`.strip == @mongod_run_cmd if @mongo_pid
     running
   end
 

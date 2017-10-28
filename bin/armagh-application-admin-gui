@@ -111,7 +111,7 @@ helpers do
 
   def sanitize_string(value)
     return value unless value.is_a?(String)
-    value.gsub!(/[&<>"'\/`=]/) do |char|
+    value.gsub!(/<br ?\/?>|[&<>"'\/`=]/i) do |char|
       case char
       when '&' then '&amp;'
       when '<' then '&lt;'

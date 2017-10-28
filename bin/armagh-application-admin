@@ -400,15 +400,15 @@ get '/user/:user_id/reset_password.json' do
   end
 end
 
-get '/user/:user_id/lock.json' do
+get '/user/:user_id/lock_out.json' do
   rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
-    api.user_lock(params['user_id'])
+    api.user_lock_out(params['user_id'])
   end
 end
 
-get '/user/:user_id/unlock.json' do
+get '/user/:user_id/remove_lock_out.json' do
   rest_helper.handle_request(request, Authentication::Role::USER_ADMIN) do |_fields, _remote_user|
-    api.user_unlock(params['user_id'])
+    api.user_remove_lock_out(params['user_id'])
   end
 end
 

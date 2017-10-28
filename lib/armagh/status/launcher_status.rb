@@ -16,102 +16,37 @@
 #
 
 require_relative '../connection'
-require_relative '../utils/db_doc_helper'
+require_relative '../document/base_document/document'
 
 module Armagh
   module Status
-    class LauncherStatus < Connection::DBDoc
+    class LauncherStatus < BaseDocument::Document
+
+      delegated_attr_accessor :hostname
+      delegated_attr_accessor :versions
+      delegated_attr_accessor :status
+      delegated_attr_accessor :started, validates_with: :utcize_ts
+
       def self.default_collection
         Connection.launcher_status
       end
 
       def self.report(hostname:, status:, versions:, started:)
-        launcher_status = new
-        launcher_status.hostname = hostname
-        launcher_status.status = status
-        launcher_status.versions = versions
-        launcher_status.last_updated = Time.now.utc
-        launcher_status.started = started
-        launcher_status.save
-        launcher_status
-      end
-
-      def self.delete(hostname)
-        self.db_delete({'_id' => hostname})
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: hostname, type_class: self.class)
-      end
-
-      def self.find(id, raw: false)
-        db_status = self.db_find_one('_id' => id)
-        raw ? db_status : new(db_status)
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: id, type_class: self.class)
+        upsert_one(
+            { 'hostname' => hostname },
+            { 'hostname' => hostname,
+              'status' => status,
+              'versions' => versions,
+              'started' => started }
+        )
       end
 
       def self.find_all(raw: false)
-        db_statuses = self.db_find({}).to_a.compact
-
-        if raw
-          statuses = db_statuses
-        else
-          statuses = []
-          db_statuses.each do |status|
-            statuses << new(status)
-          end
-        end
-
-        statuses
-      rescue => e
-        raise Connection.convert_mongo_exception(e, type_class: self.class)
+        docs = find_many({})
+        docs.collect!{ |d| d.to_hash } if raw
+        docs
       end
 
-      def save
-        Utils::DBDocHelper.clean_model(self)
-        self.class.db_replace({'_id' => internal_id}, @db_doc)
-      rescue => e
-        raise Connection.convert_mongo_exception(e, id: internal_id, type_class: self.class)
-      end
-
-      def hostname=(hostname)
-        self.internal_id = hostname
-      end
-
-      def hostname
-        self.internal_id
-      end
-
-      def status=(status)
-        @db_doc['status'] = status
-      end
-
-      def status
-        @db_doc['status']
-      end
-
-      def versions=(versions)
-        @db_doc['versions'] = versions
-      end
-
-      def versions
-        @db_doc['versions']
-      end
-
-      def last_updated=(last_updated)
-        @db_doc['last_updated'] = last_updated
-      end
-
-      def last_updated
-        @db_doc['last_updated']
-      end
-
-      def started=(started)
-        @db_doc['started'] = started
-      end
-
-      def started
-        @db_doc['started']
-      end
     end
   end
 end

@@ -41,9 +41,15 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   Armagh::Document.version.merge! APP_VERSION
 
   count.to_i.times do
-    Armagh::Document.create(type: doc_type, content: content, raw: raw, metadata: meta,
-                            pending_actions: pending_actions, state: state, document_id: document_id, document_timestamp: nil, collection_task_ids: [], new: true)
+    d = Armagh::Document.create_one_unlocked(type: doc_type, content: content, raw: raw, metadata: meta,
+                            pending_actions: pending_actions, state: Armagh::Documents::DocState::READY, document_id: document_id, document_timestamp: nil, collection_task_ids: [])
+    unless state == Armagh::Documents::DocState::READY
+      d.state = state
+      d.save
+    end
   end
+
+  docs = Armagh::Document.find_many_read_only({}).to_a
 end
 
 And(/^I set all "([^"]*)" documents to have the following$/) do |collection, table|

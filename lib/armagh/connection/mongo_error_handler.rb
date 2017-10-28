@@ -22,20 +22,14 @@ require_relative '../connection'
 
 module Armagh
   module Connection
-    def self.convert_mongo_exception(e, id: nil, type_class: nil)
-      if id
-        document_string = "#{type_class.name.split('::').last} #{id}"
-        unexpected_msg = "An unexpected connection error occurred from #{document_string}: #{e.message}."
-      else
-        document_string = 'Document'
-        unexpected_msg = "An unexpected connection error occurred: #{e.message}."
-      end
+    def self.convert_mongo_exception(e, natural_key: 'Document')
+      unexpected_msg = "An unexpected connection error occurred from #{natural_key}: #{e.message}."
       case e
         when Mongo::Error::MaxBSONSize
-          DocumentSizeError.new("#{document_string} is too large.  Consider using a divider or splitter to break up the document.")
+          DocumentSizeError.new("#{natural_key} is too large.  Consider using a divider or splitter to break up the document.")
         when Mongo::Error::OperationFailure
           if e.message =~ /^E11000/
-            DocumentUniquenessError.new("Unable to create #{document_string}.  This document already exists.")
+            DocumentUniquenessError.new("Unable to create #{natural_key}.  This document already exists.")
           else
             ConnectionError.new(unexpected_msg)
           end

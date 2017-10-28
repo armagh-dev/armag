@@ -107,7 +107,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     assert_equal 1, MongoSupport.instance.get_mongo_documents('documents').to_a.length
     doc1 =  MongoSupport.instance.get_mongo_documents('documents').first
 
-    assert_false doc1['locked']
+    assert_false doc1['_locked']
     assert_equal(['collect_action'], doc1['pending_actions'])
     assert_include(doc1['type'], 'collect_action')
 

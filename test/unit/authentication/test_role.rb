@@ -41,7 +41,7 @@ class TestRole < Test::Unit::TestCase
     end
 
     published = (actual - Armagh::Authentication::Role::PREDEFINED_ROLES).first
-    assert_equal('doc_PublishedDocumentTypes_user', published.key)
+    assert_equal('doc_PublishedDocumentTypes_user', published.internal_id)
     assert_true published.published_collection_role?
   end
 
@@ -64,13 +64,13 @@ class TestRole < Test::Unit::TestCase
 
     Armagh::Connection.expects(:all_published_collections).returns([doc_collection])
     role = Armagh::Authentication::Role.find_from_published_doctype(doctype)
-    assert_equal(Armagh::Authentication::Role.key_from_published_doctype(doctype),role.key)
+    assert_equal(Armagh::Authentication::Role.key_from_published_doctype(doctype),role.internal_id)
   end
 
   def test_find
     Armagh::Connection.stubs(:all_published_collections).returns([])
     assert_nil Armagh::Authentication::Role.find('invalid')
-    assert_equal Armagh::Authentication::Role::APPLICATION_ADMIN, Armagh::Authentication::Role.find(Armagh::Authentication::Role::APPLICATION_ADMIN.key)
+    assert_equal Armagh::Authentication::Role::APPLICATION_ADMIN, Armagh::Authentication::Role.find(Armagh::Authentication::Role::APPLICATION_ADMIN.internal_id)
   end
 
   def test_equal
@@ -86,7 +86,7 @@ class TestRole < Test::Unit::TestCase
     expected = {
         'name' => role.name,
         'description' => role.description,
-        'key' => role.key,
+        'internal_id' => role.internal_id,
         'published_collection_role' => role.published_collection_role?
     }.to_json
     assert_equal(expected, Armagh::Authentication::Role::APPLICATION_ADMIN.to_json)

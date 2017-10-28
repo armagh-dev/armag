@@ -413,6 +413,21 @@
   <input id="modal-list-hash"   type="hidden" />
 </div>
 
+<div id="modal-test-callback" class="uk-modal">
+  <div class="uk-modal-dialog">
+    <div class="uk-margin uk-text-center">
+      <div class="uk-panel uk-panel-box uk-text-bold uk-margin-bottom">
+        Please wait while the test callback is running...
+      </div>
+      <div id="modal-test-callback-details">
+      </div>
+      <div class="uk-margin uk-margin-bottom-remove">
+        <i class="uk-icon-circle-o-notch uk-icon-spin uk-icon-large uk-text-success"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="text/javascript">
   $(document).ready(function() {
     $("#autoform").on("keyup keypress", function(e) {
@@ -710,8 +725,24 @@
   }
 
   function invoke_action_test_callback(group, klass, method) {
-    var params = $("[name^='" + group + "-']"),
+    $('#modal-test-callback-details').html(
+      '<div>' +
+        '<span class="uk-text-muted uk-text-small uk-margin-small-right">Group:</span>' +
+        group.toUpperCase() +
+      '<br />' +
+        '<span class="uk-text-muted uk-text-small uk-margin-small-right">Class:</span>' +
+        klass +
+      '<br />' +
+        '<span class="uk-text-muted uk-text-small uk-margin-small-right">Method:</span>' +
+        method +
+      '</div>'
+    )
+
+    var modal       = UIkit.modal('#modal-test-callback', {'keyboard':false, 'bgclose':false, 'center':true}),
+        params      = $("[name^='" + group + "-']"),
         test_config = {}
+
+    modal.show()
 
     params.each(function() {
       var param = $(this),
@@ -752,13 +783,17 @@
       data: JSON.stringify(data),
       contentType: 'application/json',
       success: function(data, text) {
-        var result = ''
-        if (data) {
+        var data     = JSON.parse(data),
+            error    = data[0] == 'error',
+            response = data[1],
+            result   = ''
+
+        if (error) {
           result = '<div class="uk-text-danger uk-text-bold uk-text-large uk-margin-bottom">' +
                      '<i class="uk-icon-times-circle uk-margin-small-right"></i>' +
                      'Test failed!' +
                    '</div>' +
-                   data
+                   response
         } else {
           result = '<div class="uk-text-success uk-text-bold uk-text-large uk-margin-bottom">' +
                      '<i class="uk-icon-check uk-margin-small-right"></i>' +
@@ -773,12 +808,23 @@
                    '</span>' +
                    ' without any errors.'
         }
-        UIkit.modal.alert(result)
-        disable_callback_buttons(false)
+
+        var alert = UIkit.modal.alert(result)
+        alert.on({
+          'hide.uk.modal': function() {
+            modal.hide()
+            disable_callback_buttons(false)
+          }
+        })
       },
       error: function(request, status, error) {
-        UIkit.modal.alert('Failed to invoke test callback: <div class="uk-text-danger uk-text-bold">' + error + '</div>')
-        disable_callback_buttons(false)
+        var alert = UIkit.modal.alert('Failed to invoke test callback: <div class="uk-text-danger uk-text-bold">' + error + '</div>')
+        alert.on({
+          'hide.uk.modal': function() {
+            modal.hide()
+            disable_callback_buttons(false)
+          }
+        })
       }
     })
   }

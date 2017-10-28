@@ -15,19 +15,20 @@
 # limitations under the License.
 #
 
-require_relative '../utils/db_doc_helper'
 require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
-require_relative '../connection'
+require_relative 'base_document/document'
+require_relative 'base_document/locking_crud'
 
 require 'armagh/documents'
 require 'armagh/support/encoding'
-require 'armagh/support/random'
 
 require 'bson'
 
 module Armagh
-  class Document < Connection::DBDoc
+  class Document < BaseDocument::Document
+    include BaseDocument::LockingCRUD
+
     class DocumentMarkError < StandardError;
     end
 
@@ -40,14 +41,13 @@ module Armagh
     end
 
     attr_accessor :published_id
-    delegated_attr_accessor       :document_id
     delegated_attr_accessor       :version
     delegated_attr_accessor       :title
     delegated_attr_accessor       :copyright
-    delegated_attr_accessor       :published_timestamp, after_return: :get_ts_utc
+    delegated_attr_accessor       :published_timestamp, validates_with: :utcize_ts
     delegated_attr_accessor_array :collection_task_ids
     delegated_attr_accessor       :source
-    delegated_attr_accessor       :document_timestamp,  after_return: :get_ts_utc
+    delegated_attr_accessor       :document_timestamp,  validates_with: :utcize_ts
     delegated_attr_accessor       :display
     delegated_attr_accessor       :content
     delegated_attr_accessor       :metadata
@@ -62,9 +62,7 @@ module Armagh
     delegated_attr_accessor       :pending_work
 
     alias_method :add_dev_error, :add_error_to_dev_errors
-    alias_method :remove_dev_error, :remove_error_from_dev_errors
     alias_method :add_ops_error, :add_error_to_ops_errors
-    alias_method :remove_ops_error, :remove_error_from_ops_errors
 
     def validate_raw(raw)
       if raw.is_a?(String)
@@ -90,63 +88,6 @@ module Armagh
       end
     end
 
-    def self.create(type:,
-      content:,
-      raw:,
-      metadata:,
-      pending_actions:,
-      state:,
-      document_id:,
-      title: nil,
-      copyright: nil,
-      source: nil,
-      collection_task_ids:,
-      archive_files: [],
-      document_timestamp:,
-      display: nil,
-      new: false,
-      version: {},
-      logger: nil)
-      doc = Document.new
-      doc.type = type
-      doc.content = content
-      doc.raw = raw
-      doc.metadata = metadata
-      doc.document_id = document_id
-      doc.add_items_to_pending_actions pending_actions
-      doc.state = state
-      doc.title = title if title
-      doc.copyright = copyright if copyright
-      doc.source = source.to_hash if source
-      doc.add_items_to_collection_task_ids collection_task_ids
-      doc.add_items_to_archive_files archive_files
-      doc.document_timestamp = document_timestamp if document_timestamp
-      doc.display = display if display
-      doc.version = version
-      doc.save(new: new, logger: logger)
-      doc
-    end
-
-    def self.create_trigger_document(state:, type:, pending_actions:)
-      now = Time.now
-      doc = Document.new
-      doc.document_id = Armagh::Support::Random.random_id
-      doc.type = type
-      doc.state = state
-      doc.add_items_to_pending_actions pending_actions
-      doc.metadata = {}
-      doc.content = {}
-      doc.raw = nil 
-      doc.created_timestamp = now
-      doc.updated_timestamp = now
-
-
-      # Not using create because we want to not allow an insertion if one already exists
-      db_update({'type' => type, 'state' => state}, doc.db_doc)
-    rescue => e
-      raise Connection.convert_mongo_exception(e, id: doc.document_id, type_class: self)
-    end
-
     def self.from_action_document(action_doc, pending_actions = [])
       doc = Document.new
       doc.update_from_draft_action_document(action_doc)
@@ -154,25 +95,13 @@ module Armagh
       doc
     end
 
-    # Returns document if found, internal_id if it didn't exist, throws :already_locked when doc exists but locked already
-    def self.find_or_create_and_lock(document_id, type, state, agent_id)
-      begin
-        db_doc = db_find_and_update({'document_id' => document_id, 'locked' => false, 'type' => type}, {'locked' => true}, collection(type, state))
-      rescue => e
-        e = Connection.convert_mongo_exception(e, id: document_id, type_class: self)
-        throw(:already_locked, true) if e.is_a? Connection::DocumentUniquenessError
-        raise e
-      end
-
-      if db_doc['pending_actions']
-        db_doc['locked'] = agent_id
-        doc = Document.new(db_doc)
-      else
-        # The document doesn't exist
-        doc = db_doc['_id']
-      end
-
-      doc
+    def self.with_new_or_existing_locked_document( document_id, type, state, caller=self.class.default_locking_agent, **other)
+      super( { 'document_id' => document_id, 'type' => type },
+             {'document_id' => document_id, 'type' => type, 'state' => state},
+             caller,
+             collection: self.collection( type, state ),
+             **other
+      )
     end
 
     def self.count_incomplete_by_doctype( pub_type_names = nil )
@@ -202,121 +131,53 @@ module Armagh
       counts
     end
 
-    def self.find_documents(doc_type, begin_ts, end_ts, start_index, max_returns)
-      options = {}
-      ts_options = {}
-      ts_options['$gte'] = begin_ts if begin_ts
-      ts_options['$lte'] = end_ts if end_ts
-      options['document_timestamp'] = ts_options unless ts_options.empty?
+    def self.find_many_by_ts_range_read_only(doc_type, begin_ts, end_ts, page_number, page_size)
+      qualifier = {}
+      ts_qualifier = {}
+      ts_qualifier['$gte'] = begin_ts if begin_ts
+      ts_qualifier['$lte'] = end_ts if end_ts
+      qualifier['document_timestamp'] = ts_qualifier unless ts_qualifier.empty?
 
-      skip = start_index || 0
-      limit = max_returns || 20
+      paging = { page_number: page_number || 0, page_size: page_size || 20}
 
-      db_find(options, collection(doc_type, Documents::DocState::PUBLISHED)).sort('document_timestamp' => -1).skip(skip).limit(limit)
+      find_many_read_only(qualifier,
+                          collection: collection(doc_type, Documents::DocState::PUBLISHED),
+                          sort_rule: { 'document_timestamp' => -1 },
+                          paging: paging )
     end
 
-    def self.find(document_id, type, state, raw: false)
-      db_doc = db_find_one({'document_id' => document_id, 'type' => type}, collection(type, state))
-      if raw
-        Utils::DBDocHelper.restore_model(db_doc, raw: true)
-        return db_doc
-      else
-        db_doc ? Document.new(db_doc) : nil
-      end
-    rescue => e
-      raise Connection.convert_mongo_exception(e, id: document_id, type_class: self)
+    def self.find_one_by_document_id_type_state_locked(document_id, type, state, caller=default_locking_agent )
+      find_one_by_document_id_locked( document_id, caller, collection: collection(type, state))
     end
 
-    def self.failures(raw: false)
-      if raw
-        documents = Connection.failures.find.to_a
-        documents.each{|d| Utils::DBDocHelper.restore_model(d, raw: true)}
-      else
-        documents = []
-        Connection.failures.find.each do |db_doc|
-          documents << Document.new(db_doc)
+    def self.find_one_by_document_id_type_state_read_only( document_id, type, state )
+      find_one_by_document_id_read_only( document_id, collection: collection( type, state ))
+    end
+
+    def self.find_all_failures_read_only
+      find_many_read_only( {}, collection: Connection.failures )
+    end
+
+    def self.get_one_for_processing_locked( caller=default_locking_agent, **other_args )
+      Connection.all_document_collections.each do |collection|
+        begin
+          doc = find_one_locked( { 'pending_work' => true }, caller, collection: collection, oldest: true, lock_wait_duration: 0, **other_args )
+          if doc
+            yield doc
+            doc.save( true, caller )
+            return true
+          end
+        rescue Armagh::BaseDocument::LockTimeoutError => e
+          # ignore and move on to next collect
         end
       end
-
-      documents
-    end
-
-    def self.get_for_processing(agent_id)
-      Connection.all_document_collections.each do |collection|
-        db_doc = collection.find_one_and_update({'pending_work' => true, 'locked' => false}, {'$set' => {'locked' => agent_id}}, {return_document: :after, sort: {'updated_timestamp' => 1}})
-
-        return Document.new(db_doc) if db_doc
-      end
-
-      nil
-    rescue => e
-      raise Connection.convert_mongo_exception(e)
+      return false
     end
 
     def self.exists?(document_id, type, state)
-      db_find_one({'document_id' => document_id, 'type' => type}, collection(type, state)) != nil
+      find_one_read_only({'document_id' => document_id, 'type' => type}, collection: collection(type, state)) != nil
     rescue => e
-      raise Connection.convert_mongo_exception(e, id: document_id, type_class: self)
-    end
-
-    # Blocking Modify/Create.  If a doc with the id exists but is locked, wait until it's unlocked.
-    def self.modify_or_create(document_id, type, state, running, agent_id, logger = nil)
-      raise LocalJumpError.new 'No block given' unless block_given?
-
-      backoff = Utils::ProcessingBackoff.new
-      backoff.logger = logger
-      doc = nil
-
-      until doc
-        already_locked = catch(:already_locked) do
-          doc = find_or_create_and_lock(document_id, type, state, agent_id)
-          false
-        end
-
-        unless doc.is_a? Document
-          if already_locked
-            logger.info "Document '#{document_id}' already locked for editing.  Backing off." if logger
-            backoff.interruptible_backoff {!running}
-          else
-            # The document doesn't even exist - dont keep trying
-            break
-          end
-        end
-      end
-
-      begin
-        yield doc
-      rescue => e
-        if doc.is_a? Document
-          unlock(document_id, type, state) # Unlock - don't apply changes
-        else
-          delete(document_id, type, state) # This was a new document.  Delete the locked placeholder.
-        end
-        raise e
-      end
-
-      doc.finish_processing(logger) if doc.is_a? Document
-      nil
-    end
-
-    def self.delete(document_id, type, state)
-      db_delete({'document_id': document_id}, collection(type, state))
-    rescue => e
-      raise Connection.convert_mongo_exception(e, id: document_id, type_class: self)
-    end
-
-    def self.unlock(document_id, type, state)
-      db_find_and_update({'document_id': document_id, 'type' => type}, {'locked' => false}, collection(type, state))
-    rescue => e
-      raise Connection.convert_mongo_exception(e, id: document_id, type_class: self)
-    end
-
-    def self.force_unlock(agent_id)
-      Connection.all_document_collections.each do |collection|
-        collection.update_many({'locked' => agent_id}, {'$set' => {'locked' => false}})
-      end
-    rescue => e
-      raise Connection.convert_mongo_exception(e)
+      raise Connection.convert_mongo_exception(e, natural_key: "#{self.name.split("::").last} #{document_id}" )
     end
 
     def self.collection(type = nil, state = nil)
@@ -324,46 +185,15 @@ module Armagh
       Connection.documents(type_collection)
     end
 
-    def initialize(image = {})
+    def initialize(image = {}, **args)
       @pending_delete = false
       @pending_publish = false
       @pending_collection_history = false
       @abort = false
-
-      h = {
-        'metadata' => {},
-        'content' => {},
-        'raw' => nil,
-        'type' => nil,
-        'locked' => false,
-        'pending_actions' => [],
-        'dev_errors' => {},
-        'ops_errors' => {},
-        'created_timestamp' => nil,
-        'updated_timestamp' => nil,
-        'title' => nil,
-        'copyright' => nil,
-        'published_timestamp' => nil,
-        'collection_task_ids' => [],
-        'archive_files' => [],
-        'source' => {},
-        'document_timestamp' => nil,
-        'version' => {},
-        'display' => nil
-      }
-      h.merge! image
-
-      super(h)
-    end
-
-
-    def locked?
-      # only return true or false
-      @db_doc['locked'] != false
-    end
-
-    def locked_by
-      @db_doc['locked'] || nil
+      super(image, args)
+      self.metadata ||= {}
+      self.source = Armagh::Documents::Source.new( **Hash[ self.source.collect{ |k,v| [ k.to_sym, v ]} ]) if self.source.is_a?(Hash)
+      self.pending_actions ||= []
     end
 
     def clear_errors
@@ -383,68 +213,53 @@ module Armagh
       pending_work ? true : false
     end
 
-    def finish_processing(logger)
-      @db_doc['locked'] = false
-      update_pending_work
-      save(logger: logger)
-    end
+    def save( unlock = true, caller = self.class.default_locking_agent )
 
-    def save(new: false, logger: nil)
-      self.mark_timestamp
-      self.version = self.class.version
-      self.collection_task_ids.uniq!
-      self.archive_files.uniq!
-
-      if error?
-        self.error = true
+      if !error? && ((@abort && !published?) || @pending_delete)
+        delete
       else
-        delete_error
-      end
 
-      fix_encoding( source['encoding'], logger: logger)
-      clean_model
+        self.version = self.class.version
+        self.collection_task_ids.uniq!
+        self.archive_files.uniq!
+        error? ? self.error = true : delete_error
 
-      delete_orig = false
+        save_to_collection = case
+                            when (error? && !published?)     then Connection.failures
+                            when @pending_publish            then Connection.documents(type)
+                            when @pending_collection_history then Connection.collection_history
+                            when published?                  then Connection.documents(type)
+                            else                                  Connection.documents
+                          end
 
-      if @abort && !published?
-        delete_orig = true
-        save_collection = nil
-      elsif error? && !published?
-        save_collection = Connection.failures
-        delete_orig = true
-      elsif @pending_publish
-        save_collection = Connection.documents(type)
-        delete_orig = true
-      elsif @pending_collection_history
-        save_collection = Connection.collection_history
-        delete_orig = true
-      elsif @pending_delete
-        delete_orig = true
-        save_collection = nil
-      elsif published?
-        save_collection = Connection.documents(type)
-      else
-        save_collection = Connection.documents
-      end
-
-      if save_collection
-        if new || self.internal_id.nil?
-          self.internal_id = self.class.db_create(@db_doc, save_collection)
-        else
-          if @pending_publish && @published_id
-            self.class.db_replace({'document_id': document_id}, @db_doc.merge({'_id' => @published_id}), save_collection)
-          else
-            self.class.db_replace({'_id': self.internal_id}, @db_doc, save_collection)
-          end
+        save_options = {}
+        save_options[ :in_collection ] = save_to_collection if @_collection != save_to_collection
+        if @pending_publish && @published_id
+          save_options[ :with_internal_id ] = @published_id
+          save_options[ :replacing ] = true
         end
-      end
 
-      self.class.db_delete({'_id': self.internal_id}) if delete_orig
+        source_object_memo = self.source
+        @image = Support::Encoding.fix_encoding(@image, proposed_encoding: self.source&.encoding )
+        self.source = self.source.to_hash if self.source.is_a?( Armagh::Documents::Source )
+        super( unlock, caller, **save_options )
+        self.source = source_object_memo
+      end
 
       clear_marks
       @published_id = nil
+
+      self
     rescue => e
-      raise Connection.convert_mongo_exception(e, id: document_id, type_class: self.class)
+      raise Connection.convert_mongo_exception(e, natural_key: natural_key)
+    end
+
+    def to_hash
+      source_object_memo = self.source
+      self.source = self.source.to_hash  if self.source.is_a?( Armagh::Documents::Source )
+      hash_result = super
+      self.source = source_object_memo
+      hash_result
     end
 
     def ready?
@@ -459,37 +274,43 @@ module Armagh
       state == Documents::DocState::PUBLISHED
     end
 
-    def get_published_copy
-      self.class.find(document_id, type, Documents::DocState::PUBLISHED)
+    def get_published_copy_read_only
+      self.class.find_one_by_document_id_type_state_read_only(document_id, type, Documents::DocState::PUBLISHED)
+    end
+
+    def self.get_published_copy_read_only( document_id, type )
+      find_one_by_document_id_type_state_read_only(document_id, type, Documents::DocState::PUBLISHED)
     end
 
     def to_action_document
-      docspec = Documents::DocSpec.new(type, state)
-      Documents::ActionDocument.new(document_id: document_id.deep_copy,
-                                    title: title.deep_copy,
-                                    copyright: copyright.deep_copy,
-                                    content: content.deep_copy,
-                                    raw: raw.deep_copy,
-                                    metadata: metadata.deep_copy,
-                                    docspec: docspec,
-                                    source: Armagh::Documents::Source.from_hash(source.deep_copy),
-                                    document_timestamp: document_timestamp,
-                                    display: display.deep_copy)
+      Documents::ActionDocument.new(
+          document_id: document_id.deep_copy,
+          title: title.deep_copy,
+          copyright: copyright.deep_copy,
+          content: (content.deep_copy || {}),
+          raw: raw.deep_copy,
+          metadata: metadata.deep_copy,
+          docspec: Documents::DocSpec.new(type, state),
+          source: source,
+          document_timestamp: document_timestamp,
+          display: display.deep_copy,
+          new: (internal_id.nil? || (updated_timestamp == created_timestamp) )
+      )
     end
 
     def to_published_document
-      docspec = Documents::DocSpec.new(type, state)
-      Documents::PublishedDocument.new(document_id: document_id.deep_copy,
-                                       title: title.deep_copy,
-                                       copyright: copyright.deep_copy,
-                                       content: content.deep_copy,
-                                       raw: raw.deep_copy,
-                                       metadata: metadata.deep_copy,
-                                       docspec: docspec.deep_copy,
-                                       source: Armagh::Documents::Source.from_hash(source.deep_copy),
-                                       document_timestamp: document_timestamp,
-                                       display: display.deep_copy)
-
+      Documents::PublishedDocument.new(
+          document_id: document_id.deep_copy,
+          title: title.deep_copy,
+          copyright: copyright.deep_copy,
+          content: content.deep_copy,
+          raw:raw.deep_copy,
+          metadata: metadata.deep_copy,
+          docspec: Documents::DocSpec.new(type, state),
+          source: source,
+          document_timestamp: document_timestamp,
+          display: display.deep_copy
+      )
     end
 
     def update_from_draft_action_document(action_doc)
@@ -497,7 +318,7 @@ module Armagh
       self.content = action_doc.content
       self.raw = action_doc.raw
       self.metadata = action_doc.metadata
-      self.source = action_doc.source.to_hash
+      self.source = action_doc.source
       self.title = action_doc.title
       self.copyright = action_doc.copyright
       self.document_timestamp = action_doc.document_timestamp

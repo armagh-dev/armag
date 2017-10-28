@@ -58,7 +58,7 @@ Feature: Actions Execution
       | content             | nil                                                      |
       | raw                 | BSON::Binary.new('collected content')                    |
       | state               | 'ready'                                                  |
-      | locked              | false                                                    |
+      | _locked             | false                                                    |
       | error               | nil                                                      |
       | pending_work        | nil                                                      |
       | version             | APP_VERSION                                              |
@@ -72,7 +72,7 @@ Feature: Actions Execution
       | content             | nil                                                         |
       | raw                 | BSON::Binary.new('content-for-dividing')                    |
       | state               | 'ready'                                                     |
-      | locked              | false                                                       |
+      | _locked             | false                                                       |
       | error               | nil                                                         |
       | pending_work        | nil                                                         |
       | version             | APP_VERSION                                                 |
@@ -88,7 +88,7 @@ Feature: Actions Execution
       | content         | {'doesnt_matter' => true} |
       | raw             | nil                       |
       | state           | 'ready'                   |
-      | locked          | false                     |
+      | _locked         | false                     |
       | error           | nil                       |
       | pending_work    | nil                       |
       | version         | APP_VERSION               |
@@ -170,7 +170,7 @@ Feature: Actions Execution
       | content             | nil                                                      |
       | raw                 | BSON::Binary.new('collected content')                    |
       | state               | 'ready'                                                  |
-      | locked              | false                                                    |
+      | _locked             | false                                                    |
       | error               | nil                                                      |
       | pending_work        | nil                                                      |
       | version             | APP_VERSION                                              |
@@ -197,7 +197,7 @@ Feature: Actions Execution
     When I insert 1 "SplitDocument" with a "ready" state, document_id "123", content "{'doesnt_matter' => true}", metadata "{'doesnt_matter' => true}"
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
-    And  I should see a "SplitOutputDocument" in "documents" with the following
+    And  I should see a "SplitOutputDocument" with document_id "split_1" in "documents" with the following
       | document_id     | 'split_1'                                                    |
       | metadata        | {'touched_by' => ['block_1', 'block_3'], 'new' => 'block_1'} |
       | pending_actions | []                                                           |
@@ -205,11 +205,11 @@ Feature: Actions Execution
       | ops_errors      | {}                                                           |
       | content         | {'text_1' => 'text_content_1', 'text_3' => 'text_content_3'} |
       | state           | 'working'                                                    |
-      | locked          | false                                                        |
+      | _locked         | false                                                        |
       | error           | nil                                                          |
       | pending_work    | nil                                                          |
       | version         | APP_VERSION                                                  |
-    And  I should see a "SplitOutputDocument" in "documents" with the following
+    And  I should see a "SplitOutputDocument" with document_id "split_2" in "documents" with the following
       | document_id     | 'split_2'                                         |
       | metadata        | {'touched_by' => ['block_2'], 'new' => 'block_2'} |
       | pending_actions | []                                                |
@@ -217,7 +217,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                |
       | content         | {'text_2' => 'text_content_2'}                    |
       | state           | 'working'                                         |
-      | locked          | false                                             |
+      | _locked         | false                                             |
       | error           | nil                                               |
       | pending_work    | nil                                               |
       | version         | APP_VERSION                                       |
@@ -251,7 +251,7 @@ Feature: Actions Execution
       | content             | {'content' => 'some content'} |
       | raw                 | nil                           |
       | state               | 'published'                   |
-      | locked              | false                         |
+      | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |
@@ -290,7 +290,7 @@ Feature: Actions Execution
       | metadata        | {'orig_meta' => 'old published metadata', 'new_meta' => 'new metadata'}     |
       | content         | {'orig_content' => 'old published content', 'new_content' => 'new content'} |
       | state           | 'published'                                                                 |
-      | locked          | false                                                                       |
+      | _locked         | false                                                                       |
       | error           | nil                                                                         |
       | pending_work    | nil                                                                         |
       | version         | APP_VERSION                                                                 |
@@ -325,7 +325,7 @@ Feature: Actions Execution
       | metadata            | {'meta' => 'some meta'}       |
       | content             | {'content' => 'some content'} |
       | state               | 'published'                   |
-      | locked              | false                         |
+      | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |
@@ -361,7 +361,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                           |
       | content         | {'text_1' => 'text_content_1', 'text_3' => 'text_content_3'} |
       | state           | 'working'                                                    |
-      | locked          | false                                                        |
+      | _locked         | false                                                        |
       | error           | nil                                                          |
       | pending_work    | nil                                                          |
       | version         | APP_VERSION                                                  |
@@ -373,7 +373,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                |
       | content         | {'text_2' => 'text_content_2'}                    |
       | state           | 'working'                                         |
-      | locked          | false                                             |
+      | _locked         | false                                             |
       | error           | nil                                               |
       | pending_work    | nil                                               |
       | version         | APP_VERSION                                       |
@@ -411,7 +411,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                                                                                                                                  |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                      |
       | state           | 'ready'                                                                                                                                                                                                             |
-      | locked          | false                                                                                                                                                                                                               |
+      | _locked         | false                                                                                                                                                                                                               |
       | error           | true                                                                                                                                                                                                                |
       | pending_work    | nil                                                                                                                                                                                                                 |
       | version         | APP_VERSION                                                                                                                                                                                                         |
@@ -443,7 +443,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                           |
       | content         | {'text' => 'incoming content'}                                                                               |
       | state           | 'ready'                                                                                                      |
-      | locked          | false                                                                                                        |
+      | _locked         | false                                                                                                        |
       | error           | true                                                                                                         |
       | pending_work    | nil                                                                                                          |
       | version         | APP_VERSION                                                                                                  |
@@ -475,7 +475,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                          |
       | content         | {'content' => 'published content'}                                                                          |
       | state           | 'published'                                                                                                 |
-      | locked          | false                                                                                                       |
+      | _locked         | false                                                                                                       |
       | error           | true                                                                                                        |
       | pending_work    | nil                                                                                                         |
       | version         | APP_VERSION                                                                                                 |
@@ -507,7 +507,7 @@ Feature: Actions Execution
       | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything'}]} |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                |
       | state           | 'ready'                                                                                                                                                                                                                                       |
-      | locked          | false                                                                                                                                                                                                                                         |
+      | _locked         | false                                                                                                                                                                                                                                         |
       | error           | true                                                                                                                                                                                                                                          |
       | pending_work    | nil                                                                                                                                                                                                                                           |
       | version         | APP_VERSION                                                                                                                                                                                                                                   |
@@ -538,7 +538,7 @@ Feature: Actions Execution
       | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document split_123 is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
       | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                           |
       | state        | 'ready'                                                                                                                                                                                                                                                  |
-      | locked       | false                                                                                                                                                                                                                                                    |
+      | _locked      | false                                                                                                                                                                                                                                                    |
       | error        | true                                                                                                                                                                                                                                                     |
       | pending_work | nil                                                                                                                                                                                                                                                      |
       | version      | APP_VERSION                                                                                                                                                                                                                                              |
@@ -570,7 +570,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                                                                                                                                                                    |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                        |
       | state           | 'ready'                                                                                                                                                                                                                                               |
-      | locked          | false                                                                                                                                                                                                                                                 |
+      | _locked         | false                                                                                                                                                                                                                                                 |
       | error           | true                                                                                                                                                                                                                                                  |
       | pending_work    | nil                                                                                                                                                                                                                                                   |
       | version         | APP_VERSION                                                                                                                                                                                                                                           |
@@ -603,7 +603,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                        |
       | content         | {'text' => 'incoming content'}                                                                            |
       | state           | 'ready'                                                                                                   |
-      | locked          | false                                                                                                     |
+      | _locked         | false                                                                                                     |
       | error           | true                                                                                                      |
       | pending_work    | nil                                                                                                       |
       | version         | APP_VERSION                                                                                               |
@@ -615,7 +615,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                     |
       | content         | {'existing_content' => 'some content'} |
       | state           | 'working'                              |
-      | locked          | false                                  |
+      | _locked         | false                                  |
       | error           | nil                                    |
       | pending_work    | nil                                    |
     And the logs should contain "ERROR"
@@ -645,7 +645,7 @@ Feature: Actions Execution
       | ops_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |
       | state           | 'ready'                                        |
-      | locked          | false                                          |
+      | _locked         | false                                          |
       | error           | true                                           |
       | pending_work    | nil                                            |
       | version         | APP_VERSION                                    |
@@ -677,7 +677,7 @@ Feature: Actions Execution
       | dev_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |
       | state           | 'ready'                                        |
-      | locked          | false                                          |
+      | _locked         | false                                          |
       | error           | true                                           |
       | pending_work    | nil                                            |
       | version         | APP_VERSION                                    |
@@ -710,7 +710,7 @@ Feature: Actions Execution
       | metadata            | {'meta' => 'some meta'}       |
       | content             | {'content' => 'some content'} |
       | state               | 'published'                   |
-      | locked              | false                         |
+      | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |
@@ -751,7 +751,7 @@ Feature: Actions Execution
       | content             | {'orig_content' => 'old published content', 'new_content' => 'new content'} |
       | raw                 | nil                                                                         |
       | state               | 'published'                                                                 |
-      | locked              | false                                                                       |
+      | _locked             | false                                                                       |
       | error               | nil                                                                         |
       | pending_work        | nil                                                                         |
       | version             | APP_VERSION                                                                 |
@@ -792,7 +792,7 @@ Feature: Actions Execution
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consume_1'                                                                     |
       | state               | 'ready'                                                                         |
-      | locked              | false                                                                           |
+      | _locked             | false                                                                           |
       | error               | nil                                                                             |
       | pending_work        | nil                                                                             |
       | version             | APP_VERSION                                                                     |
@@ -803,7 +803,7 @@ Feature: Actions Execution
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consume_2'                                                 |
       | state               | 'ready'                                                     |
-      | locked              | false                                                       |
+      | _locked             | false                                                       |
       | error               | nil                                                         |
       | pending_work        | nil                                                         |
       | version             | APP_VERSION                                                 |
@@ -814,7 +814,7 @@ Feature: Actions Execution
     And I should see a "Document" in "documents.Document" with the following
       | document_id         | 'split_1'                                                   |
       | state               | 'published'                                                 |
-      | locked              | false                                                       |
+      | _locked             | false                                                       |
       | error               | nil                                                         |
       | pending_work        | nil                                                         |
       | version             | APP_VERSION                                                 |
@@ -827,7 +827,7 @@ Feature: Actions Execution
     And I should see a "Document" in "documents.Document" with the following
       | document_id         | 'split_2'                                        |
       | state               | 'published'                                      |
-      | locked              | false                                            |
+      | _locked             | false                                            |
       | failure             | nil                                              |
       | pending_work        | nil                                              |
       | version             | APP_VERSION                                      |
@@ -840,7 +840,7 @@ Feature: Actions Execution
     And I should see a "CollectedDocument" in "documents" with the following
       | document_id         | nil                                                      |
       | state               | 'ready'                                                  |
-      | locked              | false                                                    |
+      | _locked             | false                                                    |
       | error               | nil                                                      |
       | pending_work        | nil                                                      |
       | version             | APP_VERSION                                              |
@@ -856,40 +856,11 @@ Feature: Actions Execution
       | ops_errors      | {}                                                                                                                                               |
       | content         | {'doesnt_matter' => true}                                                                                                                        |
       | state           | 'ready'                                                                                                                                          |
-      | locked          | false                                                                                                                                            |
+      | _locked         | false                                                                                                                                            |
       | error           | nil                                                                                                                                              |
       | pending_work    | nil                                                                                                                                              |
       | version         | APP_VERSION                                                                                                                                      |
     And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
-
-  Scenario: Republishing a document with a newer armagh version updates the version in the document
-    Given armagh isn't already running
-    And mongo is running
-    And mongo is clean
-    When armagh's "launcher" config is
-      | num_agents        | 1     |
-      | checkin_frequency | 1     |
-      | log_level         | debug |
-    And armagh's "agent" config is
-      | log_level | debug |
-    And armagh's workflow config is "test_actions"
-    And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}"
-    And I set all "documents.PublishDocument" documents to have the following
-      | version | 'old_version' |
-    Then  I should see a "PublishDocument" in "documents.PublishDocument" with the following
-      | document_id | '123'         |
-      | version     | 'old_version' |
-    And I run armagh
-    And I wait until there are agents with the statuses
-      | idle |
-    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new meta'}"
-    And I should see an agent with a status of "running" within 60 seconds
-    And I should see an agent with a status of "idle" within 60 seconds
-    And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
-      | document_id | '123'       |
-      | version     | APP_VERSION |
-    And the logs should contain "Test Publish Running"
-    And the logs should not contain "ERROR"
 
   Scenario: Add a new collect task id and archive file for updating a document
     Given armagh isn't already running
@@ -969,7 +940,7 @@ Feature: Actions Execution
       | ops_errors   | {}                                                                |
       | content      | {'text' => 'incoming content'}                                    |
       | state        | 'ready'                                                           |
-      | locked       | false                                                             |
+      | _locked      | false                                                             |
       | error        | true                                                              |
       | pending_work | nil                                                               |
       | version      | APP_VERSION                                                       |
@@ -999,7 +970,7 @@ Feature: Actions Execution
     Then I should see 1 "PublishDocument" documents in the "documents.PublishDocument" collection
     And  I should see a "PublishDocument" in "documents.PublishDocument" with the following
       | document_id | '123'            |
-      | locked      | false            |
+      | _locked     | false            |
       | title       | 'Document Title' |
     And the logs should contain 2 "Test Long Publish Running"
     And the logs should contain 1 "Test Long Publish Finished"
@@ -1030,7 +1001,7 @@ Feature: Actions Execution
       | content             | {'content' => 'some content'} |
       | raw                 | nil                           |
       | state               | 'published'                   |
-      | locked              | false                         |
+      | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |
@@ -1038,7 +1009,7 @@ Feature: Actions Execution
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consumed'                    |
       | state               | 'ready'                       |
-      | locked              | false                         |
+      | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |

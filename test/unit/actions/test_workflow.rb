@@ -99,7 +99,10 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_check_run_mode
-    %w(run finish stop).each do |mode|
+    modes = [ Armagh::Actions::Workflow::RUNNING,
+              Armagh::Actions::Workflow::FINISHING,
+              Armagh::Actions::Workflow::STOPPED ]
+    modes.each do |mode|
       cc = mock('candidate_config')
       wf = mock('workflow')
       wf.expects(:run_mode).once.returns(mode)
@@ -111,12 +114,15 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_check_run_mode_error
+    modes = [ Armagh::Actions::Workflow::RUNNING,
+              Armagh::Actions::Workflow::FINISHING,
+              Armagh::Actions::Workflow::STOPPED ]
     cc = mock('candidate_config')
     wf = mock('workflow')
     wf.expects(:run_mode).once.returns('unknown')
     cc.expects(:workflow).once.returns(wf)
     result = Armagh::Actions::Workflow.check_run_mode(cc)
-    assert_equal 'run_mode must be one of: ["run", "finish", "stop"]', result
+    assert_equal "run_mode must be one of: #{modes}", result
   end
 
   def test_workflow_create
@@ -125,7 +131,7 @@ class TestWorkflow < Test::Unit::TestCase
       alice = Armagh::Actions::Workflow.create(@config_store, 'alice' )
     end
     assert_equal 'alice',alice.name
-    assert_equal 'stop',alice.run_mode
+    assert_equal Armagh::Actions::Workflow::STOPPED,alice.run_mode
     assert_equal false,alice.retired
     assert_equal true,alice.unused_output_docspec_check
     assert_empty alice.valid_action_configs
@@ -143,15 +149,15 @@ class TestWorkflow < Test::Unit::TestCase
   def test_edit_configuration
     result = Armagh::Actions::Workflow.edit_configuration({}, creating_in: @workflow_set)
     expected = {"parameters" =>
-                    [{"default" => "stop",
-                      "description" => "run, finish, or stop",
+                    [{"default" => Armagh::Actions::Workflow::STOPPED,
+                      "description" => "#{Armagh::Actions::Workflow::RUNNING}, #{Armagh::Actions::Workflow::FINISHING}, or #{Armagh::Actions::Workflow::STOPPED}",
                       "error" => nil,
                       "group" => "workflow",
                       "name" => "run_mode",
                       "prompt" => nil,
                       "required" => true,
                       "type" => "string",
-                      "value" => "stop",
+                      "value" => Armagh::Actions::Workflow::STOPPED,
                       "warning" => nil,
                       "options" => nil},
                      {"default" => false,
@@ -202,7 +208,7 @@ class TestWorkflow < Test::Unit::TestCase
 
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
     assert_equal 'alice',stored_alice.name
-    assert_equal 'stop',stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::STOPPED,stored_alice.run_mode
     assert_equal false,stored_alice.retired
     assert_equal true,stored_alice.unused_output_docspec_check
     assert_empty stored_alice.valid_action_configs
@@ -404,10 +410,10 @@ class TestWorkflow < Test::Unit::TestCase
     expect_no_alice_docs_in_db
 
     @alice.run
-    assert_equal 'run', @alice.run_mode
+    assert_equal Armagh::Actions::Workflow::RUNNING, @alice.run_mode
     assert_equal [true], @alice.valid_action_configs.collect{ |ac| ac.action.active }.uniq
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
-    assert_equal 'run', stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::RUNNING, stored_alice.run_mode
   end
 
   def test_run_while_finishing
@@ -450,7 +456,7 @@ class TestWorkflow < Test::Unit::TestCase
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
     expect_alice_docs_in_db
     stored_alice.finish
-    assert_equal 'finish', stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::FINISHING, stored_alice.run_mode
     collects, non_collects = stored_alice.valid_action_configs.partition{ |ac| ac.__type < Armagh::Actions::Collect }
     assert_equal [false], collects.collect{ |ac| ac.action.active }.uniq
     assert_equal [true], non_collects.collect{ |ac| ac.action.active }.uniq
@@ -464,7 +470,7 @@ class TestWorkflow < Test::Unit::TestCase
 
     @alice.stop
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
-    assert_equal 'finish', stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::FINISHING, stored_alice.run_mode
     @alice.stop
 
     expect_no_alice_docs_in_db
@@ -475,11 +481,11 @@ class TestWorkflow < Test::Unit::TestCase
       @alice.stop
     end
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
-    assert_equal 'stop', stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::STOPPED, stored_alice.run_mode
     assert_equal [false], stored_alice.valid_action_configs.collect{ |ac| ac.action.active }.uniq
 
     stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
-    assert_equal 'stop',stored_alice.run_mode
+    assert_equal Armagh::Actions::Workflow::STOPPED, stored_alice.run_mode
   end
 
   def test_stop_docs_processing
@@ -493,7 +499,7 @@ class TestWorkflow < Test::Unit::TestCase
       @alice.stop
     end
     assert_equal 'Cannot stop - 41 documents still processing', e.message
-    assert_equal 'finish', @alice.run_mode
+    assert_equal Armagh::Actions::Workflow::FINISHING, @alice.run_mode
   end
 
   def test_valid_action_config_status

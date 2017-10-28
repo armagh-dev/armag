@@ -119,7 +119,7 @@ module Armagh
           launchers = get_launcher_status
 
           launchers.each do |launcher|
-            launcher['agents'] = agents.find_all {|agent| agent['hostname'] == launcher['_id']}
+            launcher['agents'] = agents.find_all {|agent| agent['hostname'] == launcher['hostname']}
           end
 
           launchers
@@ -282,7 +282,7 @@ module Armagh
 
           if get_workflows.map { |wf| wf['name'].downcase }.include? wf_name.downcase
             with_workflow(wf_name) do |wf|
-              raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != 'stop'
+              raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != Actions::Workflow::STOPPED
             end
           else
             begin
@@ -478,37 +478,36 @@ module Armagh
           method      = data['method'].to_sym
           test_config = {group => data['test_config']}
 
-          mod  = nil
-          mods = type_class.included_modules
-          mods.each do |m|
-            if m.respond_to?(method)
-              mod = m
-              break
-            end
+          defined_params = type_class.defined_parameters
+          encoded_params = defined_params.select { |p| p.type == 'encoded_string' }
+          encoded_params.each do |p|
+            plain_value = test_config.dig(group, p.name)
+            next unless plain_value
+            encoded_value = Configh::DataTypes::EncodedString.from_plain_text(plain_value)
+            test_config[group][p.name] = encoded_value
           end
-          return "Test callback method #{method} does not exist for action type #{type}" unless mod
 
           begin
-            config = mod.create_configuration([], 'test', test_config)
+            config = type_class.create_configuration([], 'test_callback', test_config, test_callback_group: group)
           rescue => e
             return "Failed to instantiate test configuration: #{e.message}"
           end
 
-          mod.send(method, config)
+          type_class.send(method, config)
         end
 
         def get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
           Document
-              .find_documents( doc_type, begin_ts, end_ts, start_index, max_returns )
+              .find_many_by_ts_range_read_only( doc_type, begin_ts, end_ts, start_index, max_returns )
               .to_a
         end
 
         def get_document( doc_id, doc_type )
-          Document.find( doc_id, doc_type, Documents::DocState::PUBLISHED, raw: true )
+          Document.find_one_by_document_id_type_state_read_only( doc_id, doc_type, Documents::DocState::PUBLISHED ).to_hash
         end
 
         def get_failed_documents
-          Document.failures(raw: true)
+          Document.find_all_failures_read_only.collect{ |d| d.to_hash }
         end
 
         def get_version
@@ -534,7 +533,7 @@ module Armagh
         end
 
         def update_user_by_id(id, fields)
-          user = Authentication::User.update(id: id, username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
+          user = Authentication::User.update(internal_id: id, username: fields['username'], password: fields['password'], name: fields['name'], email: fields['email'])
           raise APIClientError.new("User with ID #{id} not found.") unless user
           user
         rescue Authentication::User::UserError, Armagh::Utils::Password::PasswordError => e
@@ -634,18 +633,18 @@ module Armagh
           raise APIClientError, e.message
         end
 
-        def user_lock(user_id)
+        def user_lock_out(user_id)
           user = find_user user_id
-          user.lock
+          user.lock_out
           user.save
           true
         rescue Authentication::User::UserError => e
           raise APIClientError, e.message
         end
 
-        def user_unlock(user_id)
+        def user_remove_lock_out(user_id)
           user = find_user user_id
-          user.unlock
+          user.remove_lock_out
           user.save
           true
         rescue Authentication::User::UserError => e
@@ -782,13 +781,13 @@ module Armagh
         end
 
         private def find_user(user_id)
-          user = Authentication::User.find(user_id)
+          user = Authentication::User.find_one_by_internal_id(user_id)
           raise APIClientError.new("User with ID #{user_id} not found.") unless user
           user
         end
 
         private def find_group(group_id)
-          group = Authentication::Group.find(group_id)
+          group = Authentication::Group.find_one_by_internal_id(group_id)
           raise APIClientError.new("Group with ID #{group_id} not found.") unless group
           group
         end

@@ -39,12 +39,15 @@ def not_empty
   :not_empty
 end
 
-When(/^I should see a "([^"]*)" in "([^"]*)" with the following$/) do |doc_type, collection, table|
+When(/^I should see a "([^"]*)"( with document_id "([^"]*)")* in "([^"]*)" with the following$/) do |doc_type, doc_id_phrase, given_doc_id, collection, table|
+
   doc_info = table.rows_hash
   found_matching_doc = false
   doc_problems = {}
 
-  MongoSupport.instance.get_mongo_documents(collection).each do |doc|
+  docs_in_db = given_doc_id ? MongoSupport.instance.find_document( collection, { 'document_id' => given_doc_id}) : MongoSupport.instance.get_mongo_documents(collection)
+
+  docs_in_db.each do |doc|
     if doc['type'] == doc_type
       doc_id = doc['_id']
       doc_problems[doc_id] = {}

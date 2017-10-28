@@ -30,6 +30,12 @@ class TestUser < Test::Unit::TestCase
 
   def setup
     mock_mongo
+    @config.expects(:refresh).twice
+    @authentication_config.stubs(:min_password_length).returns(10).twice
+    @users.expects(:find).with({ 'username' => 'admin' }).returns( mock(limit: []))
+    @users.expects(:insert_one).returns(mock(inserted_ids:[ 'a1' ]))
+    @users.expects(:find).with({ 'username' => '__dummy_user__' }).returns( mock(limit: []))
+    @users.expects(:insert_one).returns(mock(inserted_ids:[ 'd1' ]))
     Armagh::Authentication::User.setup_default_users
   end
 
@@ -42,6 +48,9 @@ class TestUser < Test::Unit::TestCase
     @connection.stubs(:[]).with('users').returns(@users)
     @users.stubs(:replace_one)
 
+    @groups = mock('groups')
+    @connection.stubs(:[]).with('groups').returns(@groups)
+
     @config = mock('config')
     @authentication_config = mock('authentication_config')
     Armagh::Authentication.stubs(:config).returns(@config)
@@ -52,7 +61,7 @@ class TestUser < Test::Unit::TestCase
     Armagh::Authentication::User.stubs(:find_username).with(Armagh::Authentication::User::ADMIN_USERNAME).returns(@admin_user)
 
     @dummy_user = mock('dummy_user')
-    @dummy_user.stubs({save: nil, db_doc: {'attempted_usernames' => {}}})
+    @dummy_user.stubs({save: nil, attempted_usernames: {}} )
     Armagh::Authentication::User.stubs(:find_username).with(Armagh::Authentication::User::DUMMY_USERNAME).returns(@dummy_user)
 
     @admin_connection = mock('admin_connection')
@@ -63,12 +72,18 @@ class TestUser < Test::Unit::TestCase
     Armagh::Connection::MongoAdminConnection.stubs(:instance).returns(admin_instance)
   end
 
-  def create_user
-    Armagh::Authentication::User.any_instance.stubs(:save)
+  def create_user(id = 123, username: 'testuser')
+    @users.expects(:insert_one).returns( mock( inserted_ids: [ id ] ))
     @config.expects(:refresh)
     @authentication_config.expects(:min_password_length).returns(10)
-    user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
+    user = Armagh::Authentication::User.create(username: username, password: 'testpassword', name: 'Test User', email: 'test@user.com')
     user
+  end
+
+  def create_group(id = 123, name=nil )
+    group_name = name || "group_#{id}"
+    @groups.expects(:insert_one).returns( mock(inserted_ids: [ id ]))
+    Armagh::Authentication::Group.create(name: group_name, description: 'group description')
   end
 
   def test_default_collection
@@ -80,11 +95,11 @@ class TestUser < Test::Unit::TestCase
     @config.expects(:refresh).twice
     @authentication_config.expects(:min_password_length).returns(10).twice
 
-    Armagh::Authentication::User.expects(:find_username).with(Armagh::Authentication::User::ADMIN_USERNAME).returns(nil)
-    Armagh::Authentication::User.expects(:db_create).with(has_entry('username', Armagh::Authentication::User::ADMIN_USERNAME))
+    Armagh::Authentication::User.expects(:find_by_username).with(Armagh::Authentication::User::ADMIN_USERNAME).returns(nil)
+    @users.expects(:insert_one).with(has_entry('username', Armagh::Authentication::User::ADMIN_USERNAME)).returns(mock(inserted_ids:['admin']))
 
-    Armagh::Authentication::User.expects(:find_username).with(Armagh::Authentication::User::DUMMY_USERNAME).returns(nil)
-    Armagh::Authentication::User.expects(:db_create).with(has_entry('username', Armagh::Authentication::User::DUMMY_USERNAME))
+    Armagh::Authentication::User.expects(:find_by_username).with(Armagh::Authentication::User::DUMMY_USERNAME).returns(nil)
+    @users.expects(:insert_one).with(has_entry('username', Armagh::Authentication::User::DUMMY_USERNAME)).returns(mock(inserted_ids:['dummy']))
 
     Armagh::Authentication::User.setup_default_users
   end
@@ -92,7 +107,9 @@ class TestUser < Test::Unit::TestCase
   def test_create
     @config.expects(:refresh).twice
     @authentication_config.expects(:min_password_length).returns(10).twice
-    Armagh::Authentication::User.expects(:db_create).times(3)
+    @users.expects(:insert_one).returns(mock(inserted_ids:[1]))
+    @users.expects(:insert_one).returns(mock(inserted_ids:[2]))
+    @users.expects(:insert_one).returns(mock(inserted_ids:[3]))
 
     user = Armagh::Authentication::User.create(username: 'testuser', password: 'testpassword', name: 'Test User', email: 'test@user.com')
     assert_not_empty user.hashed_password
@@ -123,65 +140,32 @@ class TestUser < Test::Unit::TestCase
     assert_equal existing_user, result
   end
 
-  def test_update_class
-    existing_user = mock('existing user')
-    existing_user.expects(:update).with(username: 'existing_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
-    existing_user.expects(:save)
-    Armagh::Authentication::User.expects(:find).with('id').returns(existing_user)
-
-    user = Armagh::Authentication::User.update(id: 'id', username: 'existing_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
-    assert_equal existing_user, user
-
-
-    Armagh::Authentication::User.expects(:find).with('new_id').returns(nil)
-    assert_nil Armagh::Authentication::User.update(id: 'new_id', username: 'new_user', password: 'testpassword', name: 'test user', email: 'test@email.com')
-  end
-
-  def test_find_username
+  def test_find_by_username
     result = {'username' => 'testuser'}
-    Armagh::Authentication::User.expects(:db_find_one).with({'username' => 'username'}).returns(result).twice
-    Armagh::Authentication::User.unstub(:find_username)
-    assert_equal('testuser', Armagh::Authentication::User.find_username('username').username)
-    assert_equal('testuser', Armagh::Authentication::User.find_username('UsErNaMe').username)
+    find_result = mock
+    find_result.expects(:limit).returns([result]).twice
+    @users.stubs(:find).with({'username' => 'testuser'}).returns(find_result).twice
+    Armagh::Authentication::User.unstub(:find_by_username)
+    assert_equal('testuser', Armagh::Authentication::User.find_by_username('testuser').username)
+    assert_equal('testuser', Armagh::Authentication::User.find_by_username('TeStUser').username)
   end
 
-  def test_find_username_none
-    Armagh::Authentication::User.unstub(:find_username)
-    Armagh::Authentication::User.expects(:db_find_one).returns(nil)
-    assert_nil Armagh::Authentication::User.find_username('username')
+  def test_find_by_username_none
+    Armagh::Authentication::User.unstub(:find_by_username)
+    @users.expects(:find).returns(mock(limit:[]))
+    assert_nil Armagh::Authentication::User.find_by_username('username')
   end
 
   def test_find_username_error
-    Armagh::Authentication::User.unstub(:find_username)
+    Armagh::Authentication::User.unstub(:find_by_username)
     e = Mongo::Error.new('error')
-    Armagh::Authentication::User.expects(:db_find_one).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find_username('username')}
+    @users.expects(:find).raises(e)
+    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find_by_username('username')}
   end
 
-  def test_find
-    id = BSONSupport.random_object_id
-    result = {'username' => 'testuser'}
-    Armagh::Authentication::User.expects(:db_find_one).with({'_id' => id}).returns(result)
-    user = Armagh::Authentication::User.find(id)
-    assert_equal('testuser', user.username)
-  end
-
-  def test_find_none
-    id = BSONSupport.random_object_id
-    Armagh::Authentication::User.expects(:db_find_one).returns(nil)
-    assert_nil Armagh::Authentication::User.find(id)
-  end
-
-  def test_find_error
-    id = BSONSupport.random_object_id
-    e = Mongo::Error.new('error')
-    Armagh::Authentication::User.expects(:db_find_one).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find(id)}
-  end
-
-  def test_find_all
-    result = [{'username' => 'testuser1'}, nil, {'username' => 'testuser3'}, {'username' => 'testuser4'}, ]
-    Armagh::Authentication::User.expects(:db_find).with({}).returns(result)
+   def test_find_all
+    result = [ create_user(1, username:'testuser1'), nil, create_user(3, username:'testuser3'), create_user(4, username:'testuser4'), ]
+    Armagh::Authentication::User.expects(:find_many).returns(result)
     users = Armagh::Authentication::User.find_all
     assert_equal 3, users.length
 
@@ -196,8 +180,8 @@ class TestUser < Test::Unit::TestCase
 
   def test_find_all_subset
     ids = BSONSupport.random_object_ids(4)
-    result = [{'username' => 'testuser1'}, nil, {'username' => 'testuser3'}, {'username' => 'testuser4'}, ]
-    Armagh::Authentication::User.expects(:db_find).with({'_id' => {'$in' => ids}}).returns(result)
+    result = [{'username' => 'testuser1'}, nil, {'username' => 'testuser3'}, {'username' => 'testuser4'} ]
+    @users.expects(:find).with({'_id' => {'$in' => ids}}).returns(result)
 
     users = Armagh::Authentication::User.find_all(ids)
     assert_equal 3, users.length
@@ -213,23 +197,24 @@ class TestUser < Test::Unit::TestCase
 
   def test_find_all_none
     ids = BSONSupport.random_object_ids(4)
-    Armagh::Authentication::User.expects(:db_find).returns([])
+    Armagh::Authentication::User.expects(:find_many).returns([])
     assert_empty Armagh::Authentication::User.find_all(ids)
   end
 
   def test_find_all_error
     e = Mongo::Error.new('error')
-    Armagh::Authentication::User.expects(:db_find).raises(e)
+    @users.expects(:find).raises(e)
 
     ids = BSONSupport.random_object_ids 4
 
-    assert_raise(Armagh::Connection::ConnectionError) {Armagh::Authentication::User.find_all(ids)}
+    assert_raise(Armagh::Connection::ConnectionError) {
+      Armagh::Authentication::User.find_all(ids)}
   end
 
   def test_class_authenticate
     user = mock('user')
     user.expects(:authenticate).with('testpassword').returns(true)
-    Armagh::Authentication::User.expects(:find_username).returns(user)
+    Armagh::Authentication::User.expects(:find_by_username).returns(user)
     result = Armagh::Authentication::User.authenticate('testuser', 'testpassword')
     assert_equal user, result
   end
@@ -242,7 +227,7 @@ class TestUser < Test::Unit::TestCase
     user = Armagh::Authentication::User.send(:new)
     user.stubs(:save)
     e = Armagh::Authentication::AuthenticationError.new('Account Locked')
-    Armagh::Authentication::User.stubs(:find_username).returns(user)
+    Armagh::Authentication::User.stubs(:find_by_username).returns(user)
     max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
         Armagh::Authentication::User.authenticate('testuser', 'testpassword')
@@ -255,21 +240,18 @@ class TestUser < Test::Unit::TestCase
   def test_class_authenticate_bad_username
     max_tries = 3
     @config.stubs(:refresh)
-    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
+    @authentication_config.expects(:max_login_attempts).returns(max_tries).times(6)
 
-    Armagh::Authentication::User.stubs(:find_username).returns(nil)
-    @dummy_user.stubs(:unlock)
-    @dummy_user.stubs(:enable)
-    @dummy_user.stubs(:authenticate).with('testpassword').returns(true)
-    @dummy_user.expects(:lock)
+   Armagh::Authentication::User.stubs(:find_by_username).returns(nil)
 
+    dummy_user = Armagh::Authentication::User.instance_variable_get( :@dummy_user )
     max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for testuser.')) {
         Armagh::Authentication::User.authenticate('testuser', 'testpassword')
       }
     end
 
-    assert_equal({'testuser' => 3}, @dummy_user.db_doc['attempted_usernames'])
+    assert_equal({'testuser' => 3}, dummy_user.attempted_usernames)
   end
 
   def test_class_authenticate_dummy_username
@@ -277,17 +259,16 @@ class TestUser < Test::Unit::TestCase
     @config.stubs(:refresh)
     @authentication_config.expects(:max_login_attempts).returns(max_tries).times(3)
 
-    @dummy_user.stubs(:authenticate).returns(true) # lets even pretend it's a valid password
-    @dummy_user.stubs(:unlock)
-    @dummy_user.stubs(:enable)
-    @dummy_user.expects(:lock)
+    dummy_user = Armagh::Authentication::User.instance_variable_get( :@dummy_user )
+    Armagh::Authentication::User.stubs( :find_by_username ).with('__dummy_user__' ).returns( dummy_user)
+    dummy_user.stubs(:authenticate).returns(true) # lets even pretend it's a valid password
     max_tries.times do
       assert_raise(Armagh::Authentication::AuthenticationError.new('Authentication failed for __dummy_user__.')) {
         Armagh::Authentication::User.authenticate(Armagh::Authentication::User::DUMMY_USERNAME, 'testpassword')
       }
     end
 
-    assert_equal({Armagh::Authentication::User::DUMMY_USERNAME => 3}, @dummy_user.db_doc['attempted_usernames'])
+    assert_equal({Armagh::Authentication::User::DUMMY_USERNAME => 3}, dummy_user.attempted_usernames)
   end
 
   def test_authenticate
@@ -322,11 +303,11 @@ class TestUser < Test::Unit::TestCase
     user = create_user
     assert_equal 0, user.auth_failures
     max_tries.times do |i|
-      assert_false user.locked?
+      assert_false user.locked_out?
       user.authenticate('bad')
       assert_equal i+1, user.auth_failures
     end
-    assert_true user.locked?
+    assert_true user.locked_out?
   end
 
   def test_authentication_lockout_permanent
@@ -338,25 +319,25 @@ class TestUser < Test::Unit::TestCase
     user.mark_permanent
 
     max_tries.times do |i|
-      assert_false user.locked?
+      assert_false user.locked_out?
       user.authenticate('bad')
       assert_equal i+1, user.auth_failures
     end
-    assert_false user.locked?
+    assert_false user.locked_out?
   end
 
   def test_authentication_locked
     user = create_user
-    assert_false user.locked?
-    user.lock
-    assert_true user.locked?
+    assert_false user.locked_out?
+    user.lock_out
+    assert_true user.locked_out?
 
     @config.expects(:refresh)
     e = Armagh::Authentication::AuthenticationError.new('Account Locked')
     assert_raise(e){user.authenticate('testpassword')}
 
-    user.unlock
-    assert_false user.locked?
+    user.remove_lock_out
+    assert_false user.locked_out?
     assert_nothing_raised{user.authenticate('testpassword')}
   end
 
@@ -377,18 +358,18 @@ class TestUser < Test::Unit::TestCase
 
   def test_refresh
     user = create_user
-    db_doc = user.db_doc.dup
-    user.db_doc['some temp thing'] = 'blah'
-    Armagh::Authentication::User.expects(:db_find_one).with('_id' => user.internal_id).returns db_doc
-    assert_not_equal db_doc, user.db_doc
-    user.refresh
-    assert_equal db_doc, user.db_doc
+    user2 = create_user
+    user2.username = 'fred'
+    @users.expects(:find).with({'_id' => user.internal_id}).returns(mock(limit: [user.instance_variable_get(:@image)]))
+    assert_not_same user2, user
+    user2.refresh
+    assert_equal user2, user
   end
 
   def test_save_new
     id = '123'
     user = Armagh::Authentication::User.send(:new)
-    Armagh::Authentication::User.expects(:db_create).with(user.db_doc).returns(id)
+    @users.expects(:insert_one).with(has_entries(user.instance_variable_get(:@image))).returns(mock(inserted_ids:[id]))
     assert_nil user.internal_id
     user.save
     assert_equal id, user.internal_id
@@ -398,31 +379,29 @@ class TestUser < Test::Unit::TestCase
 
   def test_save_update
     id = '123'
-    created_timestamp = Time.now - 10
-    user = Armagh::Authentication::User.send(:new, {'_id' => id, 'created_timestamp' => created_timestamp, 'updated_timestamp' => created_timestamp})
-    Armagh::Authentication::User.expects(:db_replace).with({'_id' => id}, user.db_doc).returns(id)
-    assert_equal created_timestamp, user.created_timestamp
-    assert_equal created_timestamp, user.updated_timestamp
+    user = Armagh::Authentication::User.send(:new)
+    @users.expects(:insert_one).with(has_entries(user.instance_variable_get(:@image))).returns(mock(inserted_ids:[id]))
     user.save
-    assert_equal created_timestamp, user.created_timestamp
-    assert_true created_timestamp < user.updated_timestamp
-    assert_in_delta(Time.now, user.updated_timestamp, 1)
+    sleep 1
+    user.save
+    assert user.updated_timestamp > user.created_timestamp
+    assert_in_delta 1, user.updated_timestamp-user.created_timestamp, 0.5
   end
 
   def test_save_no_timestamps
     id = '123'
     user = Armagh::Authentication::User.send(:new)
-    Armagh::Authentication::User.expects(:db_create).with(user.db_doc).returns(id)
+    @users.expects(:insert_one).with(has_entries(user.instance_variable_get(:@image))).returns(mock(inserted_ids:[id]))
+    assert_nil user.internal_id
     user.save(update_timestamps: false)
     assert_nil user.updated_timestamp
     assert_nil user.created_timestamp
-
   end
 
   def test_assert_save_error
     e = Mongo::Error.new('error')
     user = Armagh::Authentication::User.send(:new)
-    Armagh::Authentication::User.expects(:db_create).raises(e)
+    @users.expects(:insert_one).raises(e)
 
     assert_raise(Armagh::Connection::ConnectionError){user.save}
   end
@@ -430,18 +409,17 @@ class TestUser < Test::Unit::TestCase
   def test_delete
     id = '123'
     group = mock('group')
-    user = create_user
-    user.internal_id = id
+    user = create_user(id)
     user.expects(:groups).returns([group])
     user.expects(:leave_group).with(group)
-    Armagh::Authentication::User.expects(:db_delete).with('_id' => id)
+    @users.expects(:delete_one).with('_id' => id)
     user.delete
   end
 
   def test_delete_error
     e = Mongo::Error.new('error')
     user = create_user
-    Armagh::Authentication::User.expects(:db_delete).raises(e)
+    @users.expects(:delete_one).raises(e)
     assert_raise(Armagh::Connection::ConnectionError){user.delete}
   end
 
@@ -449,7 +427,7 @@ class TestUser < Test::Unit::TestCase
     user = create_user
     user.mark_permanent
     assert_raise(Armagh::Authentication::User::PermanentError){user.delete}
-    assert_raise(Armagh::Authentication::User::PermanentError){user.lock}
+    assert_raise(Armagh::Authentication::User::PermanentError){user.lock_out}
     assert_raise(Armagh::Authentication::User::PermanentError){user.disable}
   end
 
@@ -540,37 +518,31 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_groups
-    groups_collection = mock('groups')
-    @connection.stubs(:[]).with('groups').returns(groups_collection)
 
-    Armagh::Authentication::Group.any_instance.stubs(:save)
-    group1 = Armagh::Authentication::Group.create(name: 'group_1', description: 'test group')
-    group2 = Armagh::Authentication::Group.create(name: 'group_2', description: 'test group')
-    group3 = Armagh::Authentication::Group.create(name: 'group_3', description: 'test group')
-    group1.internal_id = 'id1'
-    group2.internal_id = 'id2'
-    group3.internal_id = 'id3'
+    group1 = create_group('id1', 'group_1')
+    group2 = create_group('id2', 'group_2')
+    group3 = create_group('id3', 'group_3')
     user = create_user
 
     group1.expects(:add_user).with(user, reciprocate: false)
     group2.expects(:add_user).with(user, reciprocate: false)
     group3.expects(:add_user).with(user, reciprocate: false)
 
+    @groups.stubs(:replace_one)
+
     user.join_group group1
     user.join_group group2
     user.join_group group3
 
     result = [group1, group2, group3]
-    args = [group1.internal_id, group2.internal_id, group3.internal_id]
-
-    Armagh::Authentication::Group.expects(:find_all).with(args).returns result
     assert_equal result, user.groups
 
     assert_true user.member_of? group1
     assert_true user.member_of? group2
     assert_true user.member_of? group3
 
-    assert_false user.member_of? Armagh::Authentication::Group.create(name: 'another_group', description: 'test group')
+    other_group = create_group('other')
+    assert_false user.member_of? other_group
 
     group3.expects(:remove_user).with(user, reciprocate: false)
     user.leave_group group3
@@ -579,8 +551,7 @@ class TestUser < Test::Unit::TestCase
 
     user.join_group group1
 
-    Armagh::Authentication::Group.expects(:find_all).with(%w(id1 id2))
-    user.groups
+    assert_equal [group1,group2], user.groups
   end
 
   def test_roles
@@ -595,9 +566,7 @@ class TestUser < Test::Unit::TestCase
     user.add_role role1
     user.add_role role2
 
-    assert_equal %w(role_1 some_doc), user.instance_variable_get(:@db_doc)['roles']
-    Armagh::Authentication::Role.expects(:find).with(role1.key).returns(role1).at_least_once
-    Armagh::Authentication::Role.expects(:find).with(role2.key).returns(role2).at_least_once
+    assert_equal ['Role 1','specific doc'], user.roles.collect{|r| r.name }
 
     assert_true user.has_role? role1
     assert_true user.has_role? role2
@@ -608,26 +577,19 @@ class TestUser < Test::Unit::TestCase
     assert_false user.has_role? role2
 
     user.add_role Armagh::Authentication::Role::USER
-    Armagh::Authentication::Role.expects(:find).with(Armagh::Authentication::Role::USER.key).returns(Armagh::Authentication::Role::USER).at_least_once
     assert_true user.has_role? role2
 
     user.remove_all_roles
     assert_empty user.roles
+    assert_equal [], user.remove_role( role1)
 
-    assert_raise(Armagh::Authentication::User::RoleError.new("User 'testuser' does not have a direct role of 'role_1'.")){user.remove_role(role1)}
   end
 
   def test_roles_of_groups
-    groups_collection = mock('group_collection')
-    @connection.stubs(:[]).with('groups').returns(groups_collection)
     user = create_user
-
-    Armagh::Authentication::Group.any_instance.stubs(:save)
-    group = Armagh::Authentication::Group.create(name: 'group_1', description: 'test group')
-
+    group = create_group
     group.stubs(:roles).returns [Armagh::Authentication::Role::USER_ADMIN]
-
-    user.stubs(:groups).returns([group])
+    @groups.stubs(:replace_one)
 
     group.expects(:add_user).with(user, reciprocate: false)
     user.join_group group
@@ -644,40 +606,53 @@ class TestUser < Test::Unit::TestCase
   end
 
   def test_equality
-    user1 = create_user
-    user1.internal_id = 'id1'
-    user2 = create_user
-    user2.internal_id = 'id2'
+    user1 = create_user( 'id1')
+    user2 = create_user( 'id2' )
+    user2a = create_user( 'id2' )
 
     assert_false user1 == user2
     assert_false user1.eql? user2
     assert_not_equal user1.hash, user2.hash
 
-    user2.internal_id = user1.internal_id
 
-    assert_true user1 == user2
-    assert_true user1.eql? user2
-    assert_equal user1.hash, user2.hash
+    assert_true user2 == user2a
+    assert_true user2.eql? user2a
+    assert_equal user2.hash, user2a.hash
   end
 
   def test_to_hash
     user1 = create_user
-    hash = user1.db_doc.dup
-    hash['disabled'] = false
-    hash['locked'] = false
-    hash['permanent'] = false
-    assert_equal hash, user1.to_hash
+    expected_result = {
+        "directory"=>"internal",
+        "username"=>"testuser",
+        "name"=>"Test User",
+        "email"=>"test@user.com",
+        "disabled"=>false,
+        "auth_failures"=>0,
+        "locked_out"=>false,
+        "groups"=>[],
+        "roles"=>[],
+        "internal_id"=>123}
+
+    residual = user1.to_hash.delete_if{ |k| /timestamp/ =~ k || k == 'hashed_password' }
+    assert_equal expected_result, residual
   end
 
   def test_to_json
     user1 = create_user
-    hash = user1.db_doc.dup
-    hash['disabled'] = false
-    hash['locked'] = false
-    hash['permanent'] = false
-    hash['id'] = hash['_id']
-    hash.delete('_id')
-    hash.delete('hashed_password')
-    assert_equal(hash.to_json, user1.to_json)
+    expected_result = {
+        "directory"=>"internal",
+        "username"=>"testuser",
+        "name"=>"Test User",
+        "email"=>"test@user.com",
+        "disabled"=>false,
+        "auth_failures"=>0,
+        "locked_out"=>false,
+        "groups"=>[],
+        "roles"=>[],
+        "internal_id"=>123}
+
+    residual = JSON.parse( user1.to_json ).delete_if{ |k| /timestamp/ =~ k || k == 'hashed_password' }
+    assert_equal expected_result, residual
   end
 end

@@ -43,11 +43,6 @@ class TestAuthentication < Test::Unit::TestCase
     assert_raise(Armagh::Authentication::User::UsernameError.new("A user with username 'user1' already exists.")){
       Armagh::Authentication::User.create(username: 'user1', password: 'anotherpassword', name: 'duplicate', email: 'duplicate@test.com')
     }
-
-    # Update nonexistent
-    assert_nil Armagh::Authentication::User.update(id: BSONSupport.random_object_id, username: 'user2', password: 'testpassword', name: 'User2', email: 'user2@test.com')
-    user = Armagh::Authentication::User.create(username: 'user2', password: 'testpassword', name: 'User2', email: 'user2@test.com')
-    assert_equal user, Armagh::Authentication::User.update(id: user.internal_id, username: 'user2', password: 'testpassword2', name: 'User2', email: 'user2@test.com')
   end
 
   def test_group
@@ -56,11 +51,6 @@ class TestAuthentication < Test::Unit::TestCase
     assert_raise(Armagh::Authentication::Group::NameError.new("A group with name 'group1' already exists.")){
       Armagh::Authentication::Group.create(name: 'group1', description: 'Test Group 2')
     }
-
-    # Update nonexistent
-    assert_nil Armagh::Authentication::Group.update(id: BSONSupport.random_object_id, name: 'group2', description: 'Test Group')
-    group = Armagh::Authentication::Group.create(name: 'group2', description: 'test group')
-    assert_equal group, Armagh::Authentication::Group.update(id: group.internal_id, name: 'group2', description: 'test group')
   end
 
   def test_user_group_membership
@@ -89,8 +79,8 @@ class TestAuthentication < Test::Unit::TestCase
 
     user1.delete
     group1.refresh
-    assert_false group1.has_user? user1
 
+    assert_false group1.has_user? user1
     assert_true user2.member_of? group1
     group1.delete
     user2.refresh

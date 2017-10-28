@@ -22,6 +22,8 @@ require_relative '../../../helpers/coverage_helper'
 require_relative '../../../helpers/armagh_test'
 require_relative '../../../../lib/armagh/admin/application/admin_gui'
 
+require 'armagh/actions/workflow'
+
 module Armagh
   module Admin
     module Application
@@ -304,10 +306,10 @@ module Armagh
         def test_create_workflow
           response = mock('response')
           response.stubs(:status).returns(200)
-          expected = {'workflow'=>{'run_mode'=>'stop'}}
+          expected = {'workflow'=>{'run_mode'=>Actions::Workflow::STOPPED}}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:post).once.returns(response)
-          assert_equal [:success, {'run_mode'=>'stop'}], @admin_gui.create_workflow(@user, 'workflow')
+          assert_equal [:success, {'run_mode'=>Actions::Workflow::STOPPED}], @admin_gui.create_workflow(@user, 'workflow')
         end
 
         def test_get_workflow
@@ -335,7 +337,7 @@ module Armagh
         def test_private_workflow_active?
           response = mock('response')
           response.stubs(:status).returns(200)
-          expected = {'workflow'=>{'run_mode'=>'run'}}
+          expected = {'workflow'=>{'run_mode'=>Actions::Workflow::RUNNING}}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
           assert_true @admin_gui.send(:workflow_active?, @user, 'workflow')
@@ -352,41 +354,41 @@ module Armagh
 
         def test_activate_workflow
           response = {
-            'run_mode' => 'run'
+            'run_mode' => Actions::Workflow::RUNNING
           }
           @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          assert_equal ['run', response], result
+          assert_equal [Actions::Workflow::RUNNING, response], result
         end
 
         def test_activate_workflow_failure
           response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          expected = ['stop', "Unable to activate workflow dummy: #{response}"]
+          expected = [Actions::Workflow::STOPPED, "Unable to activate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 
         def test_activate_workflow_unexpected_error
           @admin_gui.expects(:patch_json).once.raises(RuntimeError, 'unexpected error')
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          assert_equal ["stop", "Unable to activate workflow dummy: unexpected error"], result
+          assert_equal [Actions::Workflow::STOPPED, "Unable to activate workflow dummy: unexpected error"], result
         end
 
         def test_deactivate_workflow
           response = {
-            'run_mode' => 'stop'
+            'run_mode' => Actions::Workflow::STOPPED
           }
           @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.deactivate_workflow(@user, 'dummy')
-          assert_equal ['stop', response], result
+          assert_equal [Actions::Workflow::STOPPED, response], result
         end
 
         def test_deactivate_workflow_failure
           response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.deactivate_workflow(@user, 'dummy')
-          expected = ['run', "Unable to deactivate workflow dummy: #{response}"]
+          expected = [Actions::Workflow::RUNNING, "Unable to deactivate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 
@@ -705,7 +707,19 @@ module Armagh
           assert_equal callbacks, result
         end
 
-        def test_invoke_action_test_callback
+        def test_invoke_action_test_callback_success
+          data = {
+            'type'   => 'Armagh::Some::Type',
+            'group'  => 'group',
+            'method' => 'method'
+          }
+          response = nil
+          @admin_gui.expects(:patch_json).once.returns([:success, response])
+          result = @admin_gui.invoke_action_test_callback(@user, data)
+          assert_equal ['success', response], JSON.parse(result)
+        end
+
+        def test_invoke_action_test_callback_failure
           data = {
             'type'   => 'Armagh::Some::Type',
             'group'  => 'group',
@@ -714,7 +728,7 @@ module Armagh
           response = 'some callback error'
           @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.invoke_action_test_callback(@user, data)
-          assert_equal response, result
+          assert_equal ['error', response], JSON.parse(result)
         end
 
         private def mock_log_connection

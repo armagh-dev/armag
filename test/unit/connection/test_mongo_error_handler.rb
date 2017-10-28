@@ -49,7 +49,7 @@ class TestMongoErrorHandler < Test::Unit::TestCase
   end
 
   def test_convert_with_id
-    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'), id: 'document_id', type_class: self.class)
+    e = Armagh::Connection.convert_mongo_exception(Mongo::Error::MaxBSONSize.new('size'), natural_key: 'TestMongoErrorHandler document_id')
     assert_equal 'TestMongoErrorHandler document_id is too large.  Consider using a divider or splitter to break up the document.', e.message
   end
 end

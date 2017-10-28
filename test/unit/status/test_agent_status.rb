@@ -30,8 +30,13 @@ class TestAgentStatus < Test::Unit::TestCase
   end
 
   def create_agent_status
-    Armagh::Status::AgentStatus.any_instance.stubs(:save)
-    agent_status = Armagh::Status::AgentStatus.report(id: nil, hostname: nil, status: nil, task: nil, running_since: nil, idle_since: nil)
+    @agent_status_coll = mock
+    Armagh::Connection.stubs( :agent_status ).returns( @agent_status_coll )
+    @agent_status_coll.stubs( :replace_one ).with(){ |qual, values, options|
+      @values = values
+      @values['_id'] = 'id'
+    }.returns( @values )
+    agent_status = Armagh::Status::AgentStatus.report(signature: nil, hostname: nil, status: nil, task: nil, running_since: nil, idle_since: nil)
     agent_status
   end
 
@@ -40,11 +45,10 @@ class TestAgentStatus < Test::Unit::TestCase
   end
 
   def test_report
-    Armagh::Status::AgentStatus.any_instance.expects(:save)
-    agent_status = Armagh::Status::AgentStatus.report(id: 'id', hostname: 'hostname', status: 'status', task: 'task', running_since: Time.at(0), idle_since: Time.at(10_000))
+    agent_status = Armagh::Status::AgentStatus.report(signature: 'agent-007', hostname: 'hostname', status: 'status', task: 'task', running_since: Time.at(0), idle_since: Time.at(10_000))
     assert_kind_of(Armagh::Status::AgentStatus, agent_status)
 
-    assert_equal 'id', agent_status.internal_id
+    assert_equal 'agent-007', agent_status.signature
     assert_equal 'hostname', agent_status.hostname
     assert_equal 'status', agent_status.status
     assert_equal 'task', agent_status.task
@@ -52,73 +56,39 @@ class TestAgentStatus < Test::Unit::TestCase
     assert_equal Time.at(10_000), agent_status.idle_since
   end
 
-  def test_delete
-    id = 'id'
-    Armagh::Status::AgentStatus.expects(:db_delete).with('_id' => id)
-    Armagh::Status::AgentStatus.delete(id)
-
-    e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_delete).raises(e)
-    assert_raise(e){Armagh::Status::AgentStatus.delete(id)}
-  end
-
-  def test_find
-    id = 'id'
-    Armagh::Status::AgentStatus.expects(:db_find_one).with('_id' => id).returns({})
-    result = Armagh::Status::AgentStatus.find(id)
-    assert_kind_of(Armagh::Status::AgentStatus, result)
-
-    e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_find_one).raises(e)
-    assert_raise(e){Armagh::Status::AgentStatus.find(id)}
-
-    expected = {'some' => 'value'}
-    Armagh::Status::AgentStatus.expects(:db_find_one).with('_id' => id).returns(expected)
-    result = Armagh::Status::AgentStatus.find(id, raw: true)
-    assert_equal(expected, result)
-  end
-
   def test_find_all
-    Armagh::Status::AgentStatus.expects(:db_find).with({}).returns([{}, {}, {}])
+    @agent_status_coll.expects(:find).with({}).returns([{}, {}, {}])
     results = Armagh::Status::AgentStatus.find_all
     assert_equal 3, results.length
     results.each {|r| assert_kind_of(Armagh::Status::AgentStatus, r)}
 
     e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_find).raises(e)
+    @agent_status_coll.expects(:find).raises(e)
     assert_raise(e){Armagh::Status::AgentStatus.find_all}
 
-    expected = [{'some' => 'value'}, {'another' => 'value'}]
-    Armagh::Status::AgentStatus.expects(:db_find).returns(expected)
-    result = Armagh::Status::AgentStatus.find_all(raw: true)
+    expected = [{'internal_id'=> 'id1', 'status' => 'value'}, {'internal_id' => 'id2', 'task' => 'value'}]
+    returned = expected.collect{ |h| h1=h.dup; h1['_id']=h1['internal_id']; h1.delete 'internal_id'; h1 }
+    @agent_status_coll.expects(:find).returns(returned)
+    result = Armagh::Status::AgentStatus.find_all( raw: true )
     assert_equal(expected, result)
   end
 
   def test_find_all_by_hostname
     hostname = 'name'
-    Armagh::Status::AgentStatus.expects(:db_find).with({'hostname' => hostname}).returns([{}, {}, {}])
+    @agent_status_coll.expects(:find).with({ 'hostname' => hostname }).returns([{}, {}, {}])
     results = Armagh::Status::AgentStatus.find_all_by_hostname(hostname)
     assert_equal 3, results.length
     results.each {|r| assert_kind_of(Armagh::Status::AgentStatus, r)}
 
     e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_find).raises(e)
+    @agent_status_coll.expects(:find).raises(e)
     assert_raise(e){Armagh::Status::AgentStatus.find_all_by_hostname(hostname)}
 
-    expected = [{'some' => 'value'}, {'another' => 'value'}]
-    Armagh::Status::AgentStatus.expects(:db_find).with({'hostname' => hostname}).returns(expected)
-    results = Armagh::Status::AgentStatus.find_all_by_hostname(hostname, raw: true)
+    expected = [{'internal_id'=> 'id1', 'status' => 'value'}, {'internal_id' => 'id2', 'task' => 'value'}]
+    returned = expected.collect{ |h| h1=h.dup; h1['_id']=h1['internal_id']; h1.delete 'internal_id'; h1 }
+    @agent_status_coll.expects(:find).with({'hostname' => hostname }).returns(returned)
+    results = Armagh::Status::AgentStatus.find_all_by_hostname(hostname, raw:true)
     assert_equal(expected, results)
-  end
-
-  def test_save
-    Armagh::Status::AgentStatus.any_instance.unstub(:save)
-    Armagh::Status::AgentStatus.expects(:db_replace).with({'_id' => @agent_status.internal_id}, @agent_status.db_doc)
-    @agent_status.save
-
-    e = RuntimeError.new('boom')
-    Armagh::Status::AgentStatus.expects(:db_replace).raises(e)
-    assert_raise(e){@agent_status.save}
   end
 
   def test_hostname
@@ -151,8 +121,4 @@ class TestAgentStatus < Test::Unit::TestCase
     assert_equal idle_since, @agent_status.idle_since
   end
 
-  def test_last_updated
-    assert_kind_of(Time, @agent_status.last_updated)
-    assert_in_delta(Time.now, @agent_status.last_updated, 1)
-  end
 end

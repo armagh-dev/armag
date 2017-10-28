@@ -21,7 +21,7 @@ require 'armagh/support/cron'
 
 require_relative 'interruptible_sleep'
 require_relative '../actions/workflow_set'
-require_relative '../document/document'
+require_relative '../document/trigger_document'
 require_relative '../logging'
 
 module Armagh
@@ -57,7 +57,7 @@ module Armagh
         @logger.debug "Triggering #{config.action.name} collection"
         docspec = config.input.docspec
         pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
-        Document.create_trigger_document(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
+        TriggerDocument.ensure_one_exists(state: docspec.state, type: docspec.type, pending_actions: pending_actions)
       rescue => e
         Logging.ops_error_exception(@logger, e, 'Document insertion failed.')
       end

@@ -46,7 +46,6 @@ module Armagh
           @doc_class = doc.class
           doc.metadata['field'] = true
           doc.content = {'DRAFT CONTENT' => true}
-          @doc_was_new = doc.new_document?
         end
       end
     end
@@ -96,35 +95,34 @@ class TestEditCallback < Test::Unit::TestCase
 
   def test_edit_new
     @splitter.doc_id = 'non_existing_doc_id'
-    assert_nil Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
+    assert_nil Armagh::Document.find_one_by_document_id_type_state_read_only(@splitter.doc_id, @output_type, @output_state)
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
                                                        content: {},
                                                        raw: nil,
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
-                                                       source: {},
+                                                       source: nil,
                                                        document_timestamp: nil,
                                                        title: nil,
                                                        copyright: nil)
     @splitter.split(action_doc)
 
     assert_equal(Armagh::Documents::ActionDocument, @splitter.doc_class)
-    assert_true(@splitter.doc_was_new)
 
-    doc = Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find_one_by_document_id_type_state_read_only(@splitter.doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)
     assert_equal(@splitter.doc_id, doc.document_id)
     assert_equal({'DRAFT CONTENT' => true}, doc.content)
     assert_equal({'field' => true}, doc.metadata)
-    assert_false doc.locked?
+    assert_false doc.locked_by_anyone?
   end
 
   def test_edit_existing
     doc_id = 'existing_doc_id'
-    assert_nil Armagh::Document.find(doc_id, @output_type, @output_state)
-    Armagh::Document.create(type: @output_type,
+    assert_nil Armagh::Document.find_one_by_document_id_type_state_read_only(doc_id, @output_type, @output_state)
+    Armagh::Document.create_one_unlocked(type: @output_type,
                             content:{'content' => 123},
                             raw: 'raw',
                             metadata: {'draft_meta' => 'bananas'},
@@ -133,9 +131,9 @@ class TestEditCallback < Test::Unit::TestCase
                             document_id: doc_id,
                             collection_task_ids: [],
                             document_timestamp: nil)
-    doc = Armagh::Document.find(doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find_one_by_document_id_type_state_read_only(doc_id, @output_type, @output_state)
     assert_not_nil doc
-    assert_false doc.locked?
+    assert_false doc.locked_by_anyone?
 
     @splitter.doc_id = doc_id
     action_doc = Armagh::Documents::ActionDocument.new(document_id: 'triggering_id',
@@ -143,19 +141,19 @@ class TestEditCallback < Test::Unit::TestCase
                                                        raw: nil,
                                                        metadata: {},
                                                        docspec: Armagh::Documents::DocSpec.new('TriggerDocument', Armagh::Documents::DocState::READY),
-                                                       source: {},
+                                                       source: nil,
                                                        document_timestamp: nil,
                                                        title: nil,
                                                        copyright: nil, new: true)
     @splitter.split(action_doc)
 
-    doc = Armagh::Document.find(@splitter.doc_id, @output_type, @output_state)
+    doc = Armagh::Document.find_one_by_document_id_type_state_read_only(@splitter.doc_id, @output_type, @output_state)
     assert_not_nil doc
     assert_equal(@output_type, doc.type)
     assert_equal(@output_state, doc.state)
     assert_equal(@splitter.doc_id, doc.document_id)
     assert_equal({'DRAFT CONTENT' => true}, doc.content)
     assert_equal({'field' => true, 'draft_meta' => 'bananas'}, doc.metadata)
-    assert_false doc.locked?
+    assert_false doc.locked_by_anyone?
   end
 end

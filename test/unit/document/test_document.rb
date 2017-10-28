@@ -18,10 +18,12 @@
 require_relative '../../helpers/coverage_helper'
 require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/document/document'
+require_relative '../../../lib/armagh/document/trigger_document'
 
 require 'armagh/documents/doc_state'
 
 require 'bson'
+require 'time'
 
 require 'test/unit'
 require 'mocha/test_unit'
@@ -31,44 +33,31 @@ class TestDocument < Test::Unit::TestCase
   def setup
     @documents = mock('documents')
     @internal_id = 'internal_id'
-    mock_document_insert(@internal_id)
     Armagh::Connection.stubs(:documents).returns(@documents)
     Armagh::Connection.stubs(:all_document_collections).returns([@documents])
+    @agent = mock
+    @agent.stubs( signature: 'agent-1', running?: true )
 
-    @doc = Armagh::Document.create(type: 'testdoc',
-                           content: {'content' => true},
-                           raw: 'raw',
-                           metadata: {'meta' => true},
-                           pending_actions: [],
-                           state: Armagh::Documents::DocState::WORKING,
-                           document_id: 'id',
-                           collection_task_ids: [],
-                           document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc)
+    Armagh::Document.default_locking_agent = @agent
+    Armagh::TriggerDocument.default_locking_agent = @agent
+
+    mock_insert_one( @internal_id )
+    @doc = Armagh::Document.create_one_locked(
+        { 'type' => 'testdoc',
+          'content' => {'content' => true},
+          'raw' => 'raw',
+          'metadata' => {'meta' => true},
+          'state' => Armagh::Documents::DocState::WORKING,
+          'document_id' => 'id',
+          'document_timestamp' => Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
+          'source' => Armagh::Documents::Source.new( )
+        },
+        @agent
+    )
   end
 
-  def mock_document_insert(id)
-    insertions = stub(inserted_ids: [id])
-    @documents.stubs(insert_one: insertions)
-  end
-
-  def mock_replace
-    Armagh::Document.stubs(db_replace: nil)
-  end
-
-  def mock_delete
-    Armagh::Document.stubs(db_delete: nil)
-  end
-
-  def mock_find_one(result)
-    Armagh::Document.stubs(db_find_one: result)
-  end
-
-  def mock_find_and_update(result)
-    Armagh::Document.stubs(db_find_and_update: result)
-  end
-
-  def mock_document_update_one
-    @documents.stubs(:update_one => nil)
+  def mock_insert_one( id )
+    @documents.stubs( insert_one: mock( inserted_ids: [ id ]))
   end
 
   def test_new
@@ -78,43 +67,42 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_create_with_id
-    mock_replace
-    doc = Armagh::Document.create(type: 'testdoc',
-                          content: {'content' => true},
-                          raw: 'raw',
-                          metadata: {'meta' => true},
-                          pending_actions: [],
-                          state: Armagh::Documents::DocState::WORKING,
-                          document_id: 'id',
-                          collection_task_ids: [],
-                          document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
-                          archive_files: ['whatever'],
+
+    mock_insert_one( 'id2' )
+
+    doc2 = Armagh::Document.create_one_locked(
+        { type: 'testdoc',
+          content: {'content' => true},
+          raw: 'raw',
+          metadata: {'meta' => true},
+          state: Armagh::Documents::DocState::WORKING,
+          document_id: 'id',
+          document_timestamp: Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
+          archive_files: ['whatever']
+        }
     )
 
-    assert_equal('testdoc', doc.type)
-    assert_equal({'content' => true}, doc.content)
-    assert_equal('raw', doc.raw)
-    assert_equal({'meta' => true}, doc.metadata)
-    assert_equal('id', doc.document_id)
-    assert_equal(['whatever'], doc.archive_files)
-    assert_equal(@internal_id, doc.internal_id)
+    assert_equal('testdoc', doc2.type)
+    assert_equal({'content' => true}, doc2.content)
+    assert_equal('raw', doc2.raw)
+    assert_equal({'meta' => true}, doc2.metadata)
+    assert_equal('id', doc2.document_id)
+    assert_equal(['whatever'], doc2.archive_files)
+    assert_equal('id2', doc2.internal_id)
   end
 
   def test_create_trigger_document
-    expected_qualifier = {'type' => 'type', 'state' => 'ready'}
-    expected_values = {'metadata' => {}, 'content' => {}, 'raw' => nil, 'type' => 'type', 'locked' => false, 'pending_actions' => [],
-                       'dev_errors' => {}, 'ops_errors' => {}, 'title' => nil, 'copyright' => nil, 'published_timestamp' => nil,
-                       'collection_task_ids' => [], 'archive_files' => [], 'source' => {}, 'document_timestamp' => nil,
-                       'display' => nil, 'state' => 'ready'}
+    expected_values = { 'type' => 'type',  'state' => 'ready'}
 
-    Armagh::Document.expects(:db_update).with(expected_qualifier, has_entries(expected_values))
-    Armagh::Document.create_trigger_document(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])
+    @documents.expects(:insert_one).with(has_entries(expected_values)).returns( mock( inserted_ids: [ 'internal_id ']))
+    Armagh::TriggerDocument.default_locking_agent = @agent
+    Armagh::TriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])
   end
 
   def test_create_trigger_document_error
     e = RuntimeError.new('error')
-    Armagh::Document.expects(:db_update).raises(e)
-    assert_raise(e) { Armagh::Document.create_trigger_document(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: []) }
+    @documents.expects(:insert_one).raises(e)
+    assert_raise(e) { Armagh::TriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])     }
   end
 
   def test_from_action_document
@@ -157,49 +145,80 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(document_timestamp, doc.document_timestamp)
   end
 
-  def test_find
-    mock_find_one({'document_id' => 'docid'})
-    doc = Armagh::Document.find('docid', 'testdoc', Armagh::Documents::DocState::READY)
-    assert_equal('docid', doc.document_id)
+  def test_find_many_read_only_by_ts_range
+    doc_type = 'reportdoc'
+    doc_state = 'ready'
+    end_ts = Time.now
+    begin_ts = end_ts - 86400
+    page_number = 2
+    page_size = 50
+
+    report_collection = mock
+    Armagh::Connection.stubs( :documents).with(doc_type).returns( report_collection)
+
+    Armagh::Document
+        .expects(:find_many_read_only)
+        .with(
+            { 'document_timestamp' => { '$gte' => begin_ts, '$lte' => end_ts }},
+            collection: report_collection,
+            sort_rule: { 'document_timestamp' => -1 },
+            paging: { page_number: 2, page_size: 50 }
+        )
+    .returns( [@doc])
+
+    docs = Armagh::Document.find_many_by_ts_range_read_only( doc_type, begin_ts, end_ts, page_number, page_size )
+    assert_equal [@doc], docs
   end
 
-  def test_find_none
-    mock_find_one(nil)
-    doc = Armagh::Document.find('id', 'testdoc', Armagh::Documents::DocState::WORKING)
-    assert_nil(doc)
+  def test_find_one_by_document_id_type_state_locked
+    doc_type = 'reportdoc'
+    report_collection = mock
+    Armagh::Connection.stubs(:documents).with(doc_type).returns( report_collection)
+    Armagh::Document
+        .expects(:find_one_by_document_id_locked)
+        .with( 'id', @agent, collection: report_collection )
+        .returns( @doc )
+
+    doc = Armagh::Document.find_one_by_document_id_type_state_locked( 'id', doc_type, 'published' )
+    assert_equal 'id', doc.document_id
   end
 
-  def test_find_error
-    e = Mongo::Error.new('error')
-    Armagh::Document.expects(:db_find_one).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.find('id', 'testdoc', Armagh::Documents::DocState::WORKING) }
+  def test_find_one_by_document_id_type_state_read_only
+    doc_type = 'reportdoc'
+    report_collection = mock
+    Armagh::Connection.stubs(:documents).with(doc_type).returns( report_collection)
+    Armagh::Document
+        .expects(:find_one_by_document_id_read_only)
+        .with( 'id', collection: report_collection )
+        .returns( @doc )
+
+    doc = Armagh::Document.find_one_by_document_id_type_state_read_only( 'id', doc_type, 'published' )
+    assert_equal 'id', doc.document_id
   end
 
-  def test_find_raw
-    expected = {'document_id' => 'docid'}
-    mock_find_one(expected)
-    Armagh::Utils::DBDocHelper.expects(:restore_model).with(expected, raw: true)
-    found = Armagh::Document.find('docid', 'testdoc', Armagh::Documents::DocState::READY, raw: true)
-    assert_equal(expected, found)
-  end
-
-  def test_get_for_processing
-    @documents.stubs(:find_one_and_update => {'document_id' => 'docid'})
-    doc = Armagh::Document.get_for_processing('agent-123')
-    assert_equal('docid', doc.document_id)
+  def test_get_one_for_processing_locked
+    Armagh::Document
+        .expects(:find_one_locked)
+        .with({'pending_work'=>true}, @agent, collection: @documents, oldest: true, lock_wait_duration: 0 )
+        .returns( @doc)
+    @doc.expects(:save)
+    res = Armagh::Document.get_one_for_processing_locked do |doc|
+      assert_equal('id', doc.document_id)
+    end
+    assert_true res
   end
 
   def test_get_for_processing_error
     e = Mongo::Error.new('error')
     @documents.expects(:find_one_and_update).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.get_for_processing('agent-123') }
+    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.get_one_for_processing_locked }
   end
 
   def test_exists?
-    mock_find_one(1)
+    Armagh::Document.expects( :find_one_read_only ).returns( @doc )
     assert_true Armagh::Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING)
 
-    mock_find_one(nil)
+    Armagh::Document.expects( :find_one_read_only ).returns( nil )
     assert_false Armagh::Document.exists?('test', 'testdoc', Armagh::Documents::DocState::WORKING)
   end
 
@@ -259,7 +278,7 @@ class TestDocument < Test::Unit::TestCase
 
       assert_kind_of(Time, db_details['timestamp'])
 
-      @doc.remove_error_from_dev_errors(name)
+      @doc.remove_action_from_dev_errors(name)
       assert_false(@doc.dev_errors.has_key?(name))
     end
 
@@ -303,7 +322,7 @@ class TestDocument < Test::Unit::TestCase
 
       assert_kind_of(Time, db_details['timestamp'])
 
-      @doc.remove_error_from_ops_errors(name)
+      @doc.remove_action_from_ops_errors(name)
       assert_false(@doc.ops_errors.has_key?(name))
     end
 
@@ -357,45 +376,9 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(doc_id, @doc.document_id)
 
     assert_not_equal(internal, @doc.internal_id)
-    @doc.internal_id = internal
-    assert_equal(internal, @doc.internal_id)
-  end
-
-  def test_timestamps
-    mock_replace
-    doc = Armagh::Document.create(type: 'testdoc',
-                          content: {'content' => true},
-                          raw: nil,
-                          metadata: {'meta' => true},
-                          pending_actions: [],
-                          state: Armagh::Documents::DocState::WORKING,
-                          document_id: 'id',
-                          collection_task_ids: [],
-                          document_timestamp: Time.now)
-    assert_in_delta(Time.now, doc.created_timestamp, 1)
-    assert_equal(doc.created_timestamp, doc.updated_timestamp)
-
-    sleep 1
-    created_timestamp = doc.created_timestamp
-    doc.content = 'New draft content'
-    doc.save
-    assert_equal(created_timestamp, doc.created_timestamp)
-    assert_not_equal(doc.created_timestamp, doc.updated_timestamp)
-    assert_true(doc.created_timestamp < doc.updated_timestamp)
-
-    t = Time.now
-    assert_not_equal(t, doc.published_timestamp)
-    doc.published_timestamp = t
-    assert_equal(doc.published_timestamp, t)
-
-    assert_not_equal(t, doc.created_timestamp)
-    doc.created_timestamp = t
-    assert_equal(doc.created_timestamp, t)
-
-    update = t + 100
-    assert_not_equal(update, doc.created_timestamp)
-    doc.updated_timestamp = update
-    assert_equal(doc.updated_timestamp, update)
+    assert_raises Armagh::BaseDocument::NoChangesAllowedError.new( "only the database can set internal_id" ) do
+      @doc.internal_id = internal
+    end
   end
 
   def test_collection_task_ids
@@ -403,13 +386,6 @@ class TestDocument < Test::Unit::TestCase
     @doc.add_item_to_collection_task_ids 1
     @doc.add_item_to_collection_task_ids 2
     assert_equal([1, 2], @doc.collection_task_ids)
-  end
-
-  def test_finish_processing
-    logger = mock('logger')
-    mock_replace
-    @doc.finish_processing(logger)
-    assert_false @doc.locked?
   end
 
   def test_state
@@ -444,128 +420,22 @@ class TestDocument < Test::Unit::TestCase
     assert_true @doc.published?
   end
 
-  def test_modify_or_create_new
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    mock_find_and_update({'_id' => 'id', 'locked' => true})
-    mock_delete
-    block_executed = false
-
-    Armagh::Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
-      assert_kind_of(String, doc)
-      block_executed = true
-    end
-
-    assert_true block_executed
-  end
-
-  def test_modify_or_create_existing
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    mock_find_and_update({'_id' => id, 'content' => {'doc content' => true}, 'metadata' => {'meta' => true}, 'type' => type, 'state' => state})
-    mock_replace
-    block_executed = false
-
-    Armagh::Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
-      assert_not_nil doc
-      block_executed = true
-    end
-
-    assert_true block_executed
-  end
-
-  def test_modify_or_create_locked
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    Armagh::Document.expects(:db_find_and_update).raises(Mongo::Error::OperationFailure, 'E11000 duplicate key error').at_least_once
-
-    # Have to bail out of the infinite loop somehow
-    e = RuntimeError.new
-    Armagh::Utils::ProcessingBackoff.any_instance.expects(:interruptible_backoff).raises(e)
-
-    block_executed = false
-
-    assert_raise(e) do
-      Armagh::Document.modify_or_create(id, type, state, false, 'agent-123') do |doc|
-        block_executed = true
-      end
-    end
-
-    assert_false block_executed
-  end
-
-  def test_modify_or_create_unexpected_error
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    Armagh::Document.expects(:db_find_and_update).raises(Mongo::Error::OperationFailure, 'Unknown')
-
-    block_executed = false
-
-    assert_raise(Armagh::Connection::ConnectionError.new('An unexpected connection error occurred from Document docid: Unknown.')) do
-      Armagh::Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
-        block_executed = true
-      end
-    end
-
-    assert_false block_executed
-  end
-
-  def test_modify_or_create_no_block
-    assert_raise(LocalJumpError) do
-      Armagh::Document.modify_or_create('id', 'type', Armagh::Documents::DocState::WORKING, true, 'agent-123')
-    end
-  end
-
-  def test_modify_or_create_new_error
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    Armagh::Document.expects(:db_delete)
-    mock_find_and_update({'_id' => 'docid', 'locked' => 'true'})
-
-    e = RuntimeError.new 'Error'
-    assert_raise(e) do
-      Armagh::Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
-        raise e
-      end
-    end
-  end
-
-  def test_modify_or_create_existing_error
-    id = 'docid'
-    type = 'testdoc'
-    state = Armagh::Documents::DocState::WORKING
-    mock_find_and_update({'_id' => id, 'content' => {'doc content' => true}, 'metadata' => {'doc meta' => true}, 'type' => type, 'state' => state, 'pending_actions' => []})
-    Armagh::Document.expects(:unlock)
-
-    e = RuntimeError.new 'Error'
-    assert_raise(e) do
-      Armagh::Document.modify_or_create(id, type, state, true, 'agent-123') do |doc|
-        raise e
-      end
-    end
-  end
-
-  def test_delete
-    Armagh::Document.expects(:db_delete).with({document_id: '123'}, @documents)
-    Armagh::Document.delete('123', 'type', 'state')
-  end
-
-  def test_delete_error
-    e = Mongo::Error.new('error')
-    Armagh::Document.expects(:db_delete).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.delete('123', 'type', 'state') }
-  end
-
-  def test_get_published_copy
-    pub_copy = {'document_id' => 'id'}
-    mock_find_one pub_copy
-    found = @doc.get_published_copy
-    assert_equal('id', found.document_id)
+  def test_get_published_copy_read_only
+    mock_insert_one( 4 )
+    pdoc = Armagh::Document.create_one_locked(
+        { 'type' => 'testdoc',
+          'content' => {'content' => true},
+          'raw' => 'raw',
+          'metadata' => {'meta' => true},
+          'state' => Armagh::Documents::DocState::PUBLISHED,
+          'document_id' => 'other',
+          'document_timestamp' => Time.new(2016, 1, 1, 0, 0, 0, 0).utc
+        },
+        @agent
+    )
+    Armagh::Document.expects(:find_one_read_only).returns(pdoc)
+    found = @doc.get_published_copy_read_only
+    assert_equal('other', found.document_id)
   end
 
   def test_to_draft_action_document
@@ -585,7 +455,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.metadata, pub_doc.metadata)
     assert_equal(@doc.state, pub_doc.docspec.state)
     assert_equal(@doc.type, pub_doc.docspec.type)
-    assert_equal(@doc.source, pub_doc.source.to_hash.delete_if { |k, v| v.nil? })
+    assert_equal(@doc.source, pub_doc.source.to_hash.dup.delete_if { |k, v| v.nil? })
   end
 
   def test_update_from_draft_action_document
@@ -631,114 +501,53 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(document_timestamp, @doc.document_timestamp)
   end
 
-  def test_locked?
-    assert_false @doc.locked?
-    @doc.instance_variable_get(:@db_doc)['locked'] = 'Some-agent'
-    assert_true @doc.locked?
-  end
 
-  def test_locked_by
-    agent_name = 'agent-name'
-    assert_nil @doc.locked_by
-    @doc.instance_variable_get(:@db_doc)['locked'] = agent_name
-    assert_equal(agent_name, @doc.locked_by)
-  end
+  def assert_changes_collection_on_save( target_connection_method, connection_arg, mark_method, mark_variable )
+    if target_connection_method
+      new_collection = mock
+      if connection_arg
+        Armagh::Connection.expects( target_connection_method ).with(connection_arg).returns(new_collection)
+      else
+        Armagh::Connection.expects( target_connection_method ).returns( new_collection )
+      end
+      new_collection.expects(:insert_one).once.returns( mock( inserted_ids: ['internal_id']))
+    end
+    @documents.expects(:delete_one).returns( mock( deleted_count: 1 ))
 
-  def test_publish_save
-    testdoc_collection = mock
-    raw_bson = BSON::Binary.new(@doc.raw)
-    Armagh::Connection.expects(:documents).with('testdoc').returns(testdoc_collection)
+    if mark_variable && mark_method
+      assert_false @doc.instance_variable_get(mark_variable)
+      @doc.send(mark_method)
+      assert_true @doc.instance_variable_get(mark_variable)
+    end
 
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
-                       'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
-                       'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
-                       'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
-                       'document_id' => @doc.document_id, 'state' => @doc.state, 'version' => @doc.version}
-
-    Armagh::Document.expects(:db_replace).with({:document_id => 'id'}, has_entries(expected_values), testdoc_collection)
-    Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
-
-    Armagh::Support::Encoding.expects(:fix_encoding).returns(@doc.instance_variable_get(:@db_doc))
-
-    assert_false @doc.instance_variable_get(:@pending_publish)
-    @doc.mark_publish
-    assert_true @doc.instance_variable_get(:@pending_publish)
-    @doc.published_id = 123
     @doc.save
-    assert_false @doc.instance_variable_get(:@pending_publish)
-    assert_nil @doc.published_id
+    assert_false @doc.instance_variable_get(mark_variable) if mark_variable && mark_method
   end
 
   def test_archive_save
-    archive_collection = mock
-    raw_bson = BSON::Binary.new(@doc.raw)
-    Armagh::Connection.expects(:collection_history).returns(archive_collection)
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
-                       'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
-                       'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
-                       'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
-                       'document_id' => @doc.document_id, 'state' => @doc.state, 'version' => @doc.version, '_id' => @doc.internal_id}
-    Armagh::Document.expects(:db_replace).with({'_id': @internal_id}, has_entries(expected_values), archive_collection)
-    Armagh::Document.expects(:db_delete).with({'_id': @internal_id})
-
-    assert_false @doc.instance_variable_get(:@pending_collection_history)
-    @doc.mark_collection_history
-    assert_true @doc.instance_variable_get(:@pending_collection_history)
-    @doc.save
-    assert_false @doc.instance_variable_get(:@pending_collection_history)
+    assert_changes_collection_on_save( :collection_history, nil, :mark_collection_history, :@pending_collection_history )
   end
 
   def test_delete_save
-    Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
-
-    assert_false @doc.instance_variable_get(:@pending_delete)
-    @doc.mark_delete
-    assert_true @doc.instance_variable_get(:@pending_delete)
-    @doc.save
-    assert_false @doc.instance_variable_get(:@pending_delete)
+    assert_changes_collection_on_save( nil, nil, :mark_delete, :@pending_delete )
   end
 
-  def test_published_save
-    @documents.expects(:replace_one)
-
-    doc = Armagh::Document.create(type: 'testdoc',
-                          content: {'content' => true},
-                          raw: nil,
-                          metadata: {'meta' => true},
-                          pending_actions: [],
-                          state: Armagh::Documents::DocState::PUBLISHED,
-                          document_id: 'docid',
-                          collection_task_ids: [],
-                          document_timestamp: Time.now)
-    doc.save
-  end
-
-  def test_failed_action_save
-    failures = mock('failures')
-    raw_bson = BSON::Binary.new(@doc.raw)
-    Armagh::Connection.expects(:failures).returns(failures)
-    Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
-
-    expected_values = {'metadata' => @doc.metadata, 'content' => @doc.content, 'raw' => raw_bson, 'type' => @doc.type,
-                       'locked' => @doc.locked?, 'pending_actions' => @doc.pending_actions, 'dev_errors' => @doc.dev_errors,
-                       'ops_errors' => @doc.ops_errors, 'collection_task_ids' => @doc.collection_task_ids,
-                       'archive_files' => @doc.archive_files, 'source' => @doc.source, 'document_timestamp' => @doc.document_timestamp,
-                       'document_id' => @doc.document_id, 'state' => @doc.state, 'version' => @doc.version, '_id' => @doc.internal_id}
-
-    Armagh::Document.expects(:db_replace).with({:_id => 'internal_id'}, has_entries(expected_values), failures)
-
-    @doc.add_error_to_dev_errors('test_action', 'Failure Details')
-    @doc.save
+  def test_publish_save
+    assert_changes_collection_on_save( :documents, 'testdoc', :mark_publish, :@pending_publish )
   end
 
   def test_abort_save
-    Armagh::Document.expects(:db_delete).with({'_id': @doc.internal_id})
-    @doc.mark_abort
-    @doc.save
+    assert_changes_collection_on_save( nil, nil, :mark_abort, :@abort )
+  end
+
+  def test_failed_action_save
+    @doc.add_error_to_dev_errors( 'test_action', 'Failure Details' )
+    assert_changes_collection_on_save( :failures, nil, nil, nil )
   end
 
   def test_abort_save_published
-    @documents.expects(:replace_one)
+    replace_results = mock( modified_count: 1 )
+    @documents.expects(:replace_one).returns( replace_results )
     @doc.state = Armagh::Documents::DocState::PUBLISHED
     @doc.mark_abort
     @doc.save
@@ -748,18 +557,13 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(Mongo::Error::MaxBSONSize)
 
     error = assert_raise(Armagh::Connection::DocumentSizeError) do
-      Armagh::Document.create(type: 'testdoc',
+      Armagh::Document.create_one_locked(type: 'testdoc',
                       content: {'content' => true},
-                      raw: nil,
                       metadata: {'meta' => true},
-                      pending_actions: [],
                       state: Armagh::Documents::DocState::PUBLISHED,
                       document_id: 'id',
-                      new: true,
-                      collection_task_ids: [],
                       document_timestamp: Time.now)
     end
-
 
     assert_equal "Document id is too large.  Consider using a divider or splitter to break up the document.", error.message
   end
@@ -768,16 +572,13 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(Mongo::Error::OperationFailure.new('E11000 Some context'))
 
     error = assert_raise(Armagh::Connection::DocumentUniquenessError) do
-      Armagh::Document.create(type: 'testdoc',
-                      content: {'content' => true},
-                      raw: nil,
-                      metadata: {'meta' => true},
-                      pending_actions: [],
-                      state: Armagh::Documents::DocState::PUBLISHED,
-                      document_id: 'id',
-                      new: true,
-                      collection_task_ids: [],
-                      document_timestamp: Time.now)
+      Armagh::Document.create_one_locked(
+          { 'type' => 'testdoc',
+            'content' => {'content' => true},
+            'metadata' => {'meta' => true},
+            'state' => Armagh::Documents::DocState::PUBLISHED,
+            'document_id' => 'id',
+            'document_timestamp' => Time.now } )
     end
 
     assert_equal 'Unable to create Document id.  This document already exists.', error.message
@@ -788,15 +589,11 @@ class TestDocument < Test::Unit::TestCase
     @documents.expects(:insert_one).raises(error)
 
     assert_raise(Armagh::Connection::ConnectionError.new('An unexpected connection error occurred from Document id: Something.')) do
-      Armagh::Document.create(type: 'testdoc',
+      Armagh::Document.create_one_locked(type: 'testdoc',
                       content: {'content' => true},
-                      raw: nil,
                       metadata: {'meta' => true},
-                      pending_actions: [],
                       state: Armagh::Documents::DocState::PUBLISHED,
                       document_id: 'id',
-                      new: true,
-                      collection_task_ids: [],
                       document_timestamp: Time.now)
     end
   end
@@ -809,7 +606,7 @@ class TestDocument < Test::Unit::TestCase
   end
 
   def test_version
-    mock_replace
+    @documents.expects(:replace_one).returns( mock( modified_count: 1))
     version = '12345abcdefh'
     Armagh::Document.version['armagh'] = version
     @doc.save
@@ -827,69 +624,38 @@ class TestDocument < Test::Unit::TestCase
     assert_true @doc.ops_errors.empty?
   end
 
-  def test_unlock
-    Armagh::Document.expects(:db_find_and_update).with(
-      {'document_id': 'id','type' => 'type'}, {'locked' => false}, @documents)
-    Armagh::Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED)
-  end
 
-  def test_unlock_error
-    e = Mongo::Error.new('error')
-    Armagh::Document.expects(:db_find_and_update).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.unlock('id', 'type', Armagh::Documents::DocState::PUBLISHED) }
-  end
-
-  def test_force_unlock
-    @documents.expects(:update_many).with({'locked' => 'agent_id'},{'$set' => {'locked' => false}})
-    Armagh::Document.force_unlock('agent_id')
-  end
-
-  def test_force_unlock_error
-    e = Mongo::Error.new('error')
-    @documents.expects(:update_many).raises(e)
-    assert_raise(Armagh::Connection::ConnectionError) { Armagh::Document.force_unlock('id') }
-  end
-
-  def test_failures
+  def test_find_all_failures_read_only
     failures = mock('failures')
     failures.stubs(:find => [{'document_id' => 'fail id'}])
     Armagh::Connection.stubs(:failures).returns(failures)
 
-    found_failures = Armagh::Document.failures()
+    found_failures = Armagh::Document.find_all_failures_read_only
     assert_equal 1, found_failures.length
     assert_kind_of Armagh::Document, found_failures.first
     assert_equal 'fail id', found_failures.first.document_id
   end
 
-  def test_raw_failures
-    results = [{'document_id' => 'raw fail id'}]
-    failures = mock('failures')
-    failures.stubs(:find => results)
-    Armagh::Connection.stubs(:failures).returns(failures)
-    Armagh::Utils::DBDocHelper.expects(:restore_model).with(results.first, raw: true)
-    assert_equal(results, Armagh::Document.failures(raw: true))
-  end
-
   def test_to_json
     expected = {
-      metadata: @doc.metadata,
+      type: @doc.type,
       content: @doc.content,
       raw: BSON::Binary.new(@doc.raw),
-      type: @doc.type,
-      locked: @doc.locked?,
+      metadata: @doc.metadata,
+      state: @doc.state,
+      document_id: @doc.document_id,
+      document_timestamp: @doc.document_timestamp,
+      source: @doc.source&.to_hash,
+      _locked: @doc.instance_variable_get(:@image)[ '_locked'],
       pending_actions: @doc.pending_actions,
       dev_errors: @doc.dev_errors,
       ops_errors: @doc.ops_errors,
-      created_timestamp: @doc.created_timestamp,
-      updated_timestamp: @doc.updated_timestamp,
+      version: @doc.version,
       collection_task_ids: @doc.collection_task_ids,
       archive_files: @doc.archive_files,
-      source: @doc.source,
-      document_timestamp: @doc.document_timestamp,
-      version: @doc.version,
-      document_id: @doc.document_id,
-      state: @doc.state,
-      _id: @doc.internal_id
+      updated_timestamp: @doc.updated_timestamp,
+      created_timestamp: @doc.created_timestamp,
+      internal_id: @doc.internal_id
     }.to_json
     assert_equal(expected, @doc.to_json)
   end

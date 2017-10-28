@@ -207,8 +207,8 @@ class TestWorkflowSet < Test::Unit::TestCase
     end
 
     expected = [
-      {"name"=>"alice", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true},
-      {"name"=>"fred", "run_mode"=>"run", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+      {"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::RUNNING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true},
+      {"name"=>"fred", "run_mode"=>Armagh::Actions::Workflow::RUNNING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
     ]
 
     expect_alice_docs_in_db
