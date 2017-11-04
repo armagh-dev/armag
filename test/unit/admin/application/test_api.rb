@@ -249,7 +249,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     @api.expects(:get_agent_status).returns(agent_statuses)
     @api.expects(:get_launcher_status).returns(launcher_statuses)
-    
+
 
     assert_equal expected, @api.get_status
   end
@@ -806,7 +806,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
         {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, 'default'=>Armagh::Documents::DocSpec.new( "__COLLECT__", 'ready'), "valid_state"=>"ready", "options"=>nil},
@@ -872,7 +872,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
         {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto"},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new( '__COLLECT__', 'ready' ), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new('__COLLECT__collect_freddocs_from_source', 'ready'), "valid_state"=>"ready", "options"=>nil},
@@ -894,7 +894,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_description_invalid
     bad_alice_in_db
     expected_action_config_params = [
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
         {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},

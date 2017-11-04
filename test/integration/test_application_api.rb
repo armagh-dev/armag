@@ -1110,7 +1110,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
@@ -1158,7 +1158,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
@@ -1189,7 +1189,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [
-              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>CollectAction", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+              {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>true, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
@@ -1258,7 +1258,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestConsume',
           'supertype' => 'Armagh::Actions::Consume',
           'parameters' =>[
-              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+              {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"example-collect (Warning: Cannot be changed once set)", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
               {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
               {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
               {"default"=>nil, "description"=>"Input doctype for this action", "error"=>nil, "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc:published", "warning"=>nil, "valid_state"=>"published", "options"=>nil},
@@ -1287,7 +1287,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               'type' => 'Armagh::StandardActions::TWTestConsume',
               'supertype' => 'Armagh::Actions::Consume',
               'parameters' => [
-                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"<WORKFLOW-NAME>CollectAction", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
+                  {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"example-collect (Warning: Cannot be changed once set)", "required"=>true, "type"=>"populated_string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
                   {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>false, "type"=>"populated_string", "value"=>"alice", "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"Input doctype for this action", "error"=>"type validation failed: value cannot be nil", "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>nil, "warning"=>nil, "options"=>nil},
@@ -1336,7 +1336,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'supertype' => 'Armagh::Actions::Collect',
           'parameters' => [{"error" => nil, "group" => "action"},
                            {"default" => false, "description" => "Agents will run this configuration if active", "error" => nil, "group" => "action", "name" => "active", "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil, "options" => nil},
-                           {"default" => nil, "description" => "Name of this action configuration", "error" => nil, "group" => "action", "name" => "name", "prompt" => "<WORKFLOW-NAME>CollectAction", "required" => true, "type" => "populated_string", "value" => "collect_alicedocs_from_source", "warning" => nil, "options" => nil},
+                           {"default" => nil, "description" => "Name of this action configuration", "error" => nil, "group" => "action", "name" => "name", "prompt" => "example-collect (Warning: Cannot be changed once set)", "required" => true, "type" => "populated_string", "value" => "collect_alicedocs_from_source", "warning" => nil, "options" => nil},
                            {"default" => nil, "description" => "Workflow this action config belongs to", "error" => nil, "group" => "action", "name" => "workflow", "prompt" => "<WORKFLOW-NAME>", "required" => false, "type" => "populated_string", "value" => "alice", "warning" => nil, "options" => nil},
                            {"error" => nil, "group" => "collect"},
                            {"default" => true, "description" => "Archive collected documents", "error" => nil, "group" => "collect", "name" => "archive", "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil, "options" => nil},

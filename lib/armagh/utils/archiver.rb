@@ -46,7 +46,6 @@ module Armagh
       define_constant name: 'duplicate_put_directory_paths', value: [], group: 'sftp'
       define_constant name: 'filename_pattern', value: nil, group: 'sftp'
       define_constant name: 'maximum_transfer', value: 10_000_000, group: 'sftp'
-      define_constant name: 'create_directory_path', value: true, group: 'sftp'
 
       def self.find_or_create_config(config_store, values = {})
         config_values = {'sftp' => DEFAULT_CONFIG}.deep_merge(values)

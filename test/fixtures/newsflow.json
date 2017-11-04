@@ -85,7 +85,6 @@
         "port": "22",
         "directory_path": "/var/spool/armagh/dataout/tac",
         "duplicate_put_directory_paths": "[]",
-        "create_directory_path": "true",
         "username": "armagh",
         "maximum_transfer": "50"
       },

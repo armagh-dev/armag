@@ -224,6 +224,11 @@ Feature: Actions Execution
     And I should see 0 "SplitDocument" documents in the "documents" collection
     And the logs should contain "Test Split Running"
     And the logs should not contain "ERROR"
+    And I should see a Document in "log" with the following
+      | message          | Test Split Running |
+      | workflow         | test_workflow      |
+      | action           | test_split         |
+      | action_supertype | Split              |
 
   Scenario: Have a document for a publisher
     Given armagh isn't already running
