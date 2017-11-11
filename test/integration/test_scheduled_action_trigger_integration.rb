@@ -23,7 +23,7 @@ Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 require_relative '../helpers/armagh_test/logger'
-require_relative '../../lib/armagh/utils/collection_trigger'
+require_relative '../../lib/armagh/utils/scheduled_action_trigger'
 
 require 'armagh/actions'
 
@@ -74,6 +74,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
   include ArmaghTest
 
   def setup
+    ENV['TZ'] = 'UTC'
     @logger = mock_logger
     MongoSupport.instance.clean_database
     @config_store = []
@@ -84,12 +85,12 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     @collect_config = Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'collect_action', collected_doctype: 'collect_type')
     Armagh::StandardActions::SplitActionForTest.make_test_config(workflow: @wf, action_name: 'split_action', input_doctype: 'incoming_split', output_doctype: 'outgoing_split')
 
-    @collection_trigger = Armagh::Utils::CollectionTrigger.new(@workflow_set)
+    @scheduled_action_trigger = Armagh::Utils::ScheduledActionTrigger.new(@workflow_set)
     @wf.run
   end
 
   def teardown
-    @collection_trigger.stop if @collection_trigger.running?
+    @scheduled_action_trigger.stop if @scheduled_action_trigger.running?
   end
 
   def wait_for_documents(seconds)
@@ -102,7 +103,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
 
   def test_triggered_collect
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a
-    @collection_trigger.trigger_individual_collection @collect_config
+    @scheduled_action_trigger.trigger_individual_action @collect_config
 
     assert_equal 1, MongoSupport.instance.get_mongo_documents('documents').to_a.length
     doc1 =  MongoSupport.instance.get_mongo_documents('documents').first
@@ -111,7 +112,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     assert_equal(['collect_action'], doc1['pending_actions'])
     assert_include(doc1['type'], 'collect_action')
 
-    @collection_trigger.trigger_individual_collection @collect_config
+    @scheduled_action_trigger.trigger_individual_action @collect_config
     assert_equal 1, MongoSupport.instance.get_mongo_documents('documents').to_a.length
     doc2 =  MongoSupport.instance.get_mongo_documents('documents').first
     assert_equal(doc1, doc2)
@@ -123,18 +124,17 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     sleep 61 - sec if sec >= 55
     sleep 1 if sec < 1
 
-    @collection_trigger.start
+    @scheduled_action_trigger.start
     wait_for_documents(70)
 
-    MongoSupport.instance.clean_database
+    MongoSupport.instance.drop_collection( 'documents' )
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a
     wait_for_documents(60)
-    @collection_trigger.stop
+    @scheduled_action_trigger.stop
   end
 
   def test_collection_config_change
     MongoSupport.instance.clean_database
-    @wf.finish
     @wf.stop
     @config_store.clear
 
@@ -142,10 +142,9 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     @wf.run
     @workflow_set.refresh
 
-    @collection_trigger.start
+    @scheduled_action_trigger.start
 
     sleep 62
-    @wf.finish
     @wf.stop
     Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'change_collect2', collected_doctype: 'collect_type')
     @wf.run

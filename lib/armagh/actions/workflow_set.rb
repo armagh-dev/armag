@@ -18,6 +18,8 @@
 #
 require 'configh'
 require_relative 'workflow'
+require_relative 'utility_actions/utility_action'
+require_relative 'utility_actions/db_cleanup_utility_action'
 
 module Armagh
   module Actions
@@ -29,7 +31,7 @@ module Armagh
 
     class WorkflowSet
       include Configh::Configurable
-      attr_reader :action_config_named, :action_configs_handling_docspec, :collect_action_configs, :last_timestamp
+      attr_reader :action_config_named, :action_configs_handling_docspec, :collect_action_configs, :utility_action_configs, :last_timestamp
 
       def self.for_admin(config_store)
         new(config_store, :admin)
@@ -48,6 +50,7 @@ module Armagh
         @action_config_named = {}
         @action_configs_handling_docspec = {}
         @collect_action_configs = []
+        @utility_action_configs = []
         @last_timestamp = nil
         refresh
       end
@@ -77,6 +80,7 @@ module Armagh
           @action_config_named.clear
           @action_configs_handling_docspec.clear
           @collect_action_configs.clear
+          @utility_action_configs.clear
 
           reload_all(exclude_retired: exclude_retired)
           @workflows.values.select( &:valid? ).each do |wf|
@@ -88,7 +92,15 @@ module Armagh
                 @collect_action_configs << action_config if action_config.__type < Actions::Collect
               end
             end
-           end
+          end
+          @utility_action_configs = Actions::UtilityAction.find_or_create_all_configurations( Connection.config )
+          @utility_action_configs.each do |utility_config|
+            if utility_config.action.active
+              @action_config_named[ utility_config.action.name ] = utility_config
+              @action_configs_handling_docspec[ utility_config.input.docspec ] ||= []
+              @action_configs_handling_docspec[ utility_config.input.docspec ] << utility_config
+            end
+          end
           @last_timestamp = last_timestamp
           return true
         end
@@ -97,6 +109,10 @@ module Armagh
 
       def list_workflows
         @workflows.values.collect(&:status)
+      end
+
+      def get_stopping_workflows
+        @workflows.values.find_all{ |wf| wf.stopping? }
       end
 
       def create_workflow(config_values)
@@ -151,10 +167,21 @@ module Armagh
         raise TriggerCollectError.new("Action #{action_name} is not an active action.") if action_config.nil?
         raise TriggerCollectError.new("Action #{action_name} is not a collect action.") unless action_config.__type < Armagh::Actions::Collect
 
-        trigger = Utils::CollectionTrigger.new(self)
-        trigger.trigger_individual_collection(action_config)
+        trigger = Utils::ScheduledActionTrigger.new(self)
+        trigger.trigger_individual_action(action_config)
         true
       end
+
+      def try_to_move_stopping_workflows_to_stopped
+        get_stopping_workflows.each do |wf|
+          begin
+            wf.stop
+          rescue WorkflowDocumentsInProcessError => e
+            # do nothing
+          end
+        end
+      end
+
     end
   end
 end

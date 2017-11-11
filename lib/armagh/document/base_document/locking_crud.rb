@@ -71,7 +71,7 @@ module Armagh
                                                   lock_wait_duration: default_lock_wait_duration,
                                                   lock_hold_duration: default_lock_hold_duration )
           doc = find_or_create_one_locked( qualifier, values_on_create, caller, collection:collection, lock_wait_duration: lock_wait_duration, lock_hold_duration: lock_hold_duration )
-          return false unless doc  # TODO: should never happen.  find_or_create_one_locked will return a doc or raise a timeout / error
+          return false unless doc
           yield doc
           doc.save( true, caller )
           true
@@ -81,8 +81,8 @@ module Armagh
           raise NoMethodError, "Create_one not available in locking documents.  Use create_one_locked or create_one_unlocked."
         end
 
-        def create_one_unlocked(values, collection: self.default_collection )
-          new( unlocked_values(values), collection:collection ).save( true )
+        def create_one_unlocked(values, collection: self.default_collection, **other_args )
+          new( unlocked_values(values), collection:collection, **other_args ).save( true )
         end
 
         def find( *args )
@@ -134,17 +134,24 @@ module Armagh
         def force_unlock_all_in_collection_held_by( agent, collection: self.default_collection )
           agent_signature = agent.is_a?( String ) ? agent : agent.signature
           collection.update_many(
-              { '_locked.by' => agent_signature, '_locked.until' => { '$gt' => Time.now }},
+              { '_locked.by' => agent_signature, '_locked.until' => { '$gt' => Time.now.utc }},
+              { '$set' => { '_locked' => false }}
+          )
+        end
+
+        def force_reset_expired_locks( collection: self.default_collection )
+          collection.update_many(
+              { '_locked.until' => { '$lt' => Time.now.utc }},
               { '$set' => { '_locked' => false }}
           )
         end
 
         def interruptible_wait_loop_with_timeout( caller, lock_wait_duration: default_lock_wait_duration )
           backoff = Utils::ProcessingBackoff.new( lock_wait_duration / 2 )
-          wait_until = Time.now + lock_wait_duration
+          wait_until = Time.now.utc + lock_wait_duration
           loop do
             yield
-            raise LockTimeoutError, "Timed out waiting for document to unlock" if Time.now > wait_until
+            raise LockTimeoutError, "Timed out waiting for document to unlock" if Time.now.utc > wait_until
             backoff.interruptible_backoff{ !caller.running? }
           end
         end
@@ -156,7 +163,7 @@ module Armagh
         end
 
         def locked_values( values, caller = default_locking_agent, lock_hold_duration: default_lock_hold_duration )
-          values.merge({ '_locked' => { 'by' => caller.signature, 'until' => Time.now + lock_hold_duration }}) if valid_locking_agent?(caller)
+          values.merge({ '_locked' => { 'by' => caller.signature, 'until' => Time.now.utc + lock_hold_duration }}) if valid_locking_agent?(caller)
         end
 
         def unlocked_values( values )
@@ -168,11 +175,11 @@ module Armagh
         end
 
         def unlocked_or_my_qualifier( qualifier, caller = default_locking_agent )
-          { '$and' => [ qualifier, { '$or' => [ { '_locked' => false }, { '_locked.by' => caller&.signature }, { '_locked.until' => { '$lt'=> Time.now }}]}] } if valid_locking_agent?(caller)
+          { '$and' => [ qualifier, { '$or' => [ { '_locked' => false }, { '_locked.by' => caller&.signature }, { '_locked.until' => { '$lt'=> Time.now.utc }}]}] } if valid_locking_agent?(caller)
         end
 
         def lock_expired_qualifier( qualifier, caller = default_locking_agent )
-          { '$and' => [ qualifier, { '$or' => [ { '_locked' => false }, { '_locked.by' => caller&.signature }, { '_locked.until' => { '$lt'=> Time.now }}]}] } if valid_locking_agent?(caller)
+          { '$and' => [ qualifier, { '$or' => [ { '_locked' => false }, { '_locked.by' => caller&.signature }, { '_locked.until' => { '$lt'=> Time.now.utc }}]}] } if valid_locking_agent?(caller)
         end
 
         def create_one_locked(values, caller=default_locking_agent, collection: self.default_collection, lock_hold_duration:default_lock_hold_duration )
@@ -201,7 +208,10 @@ module Armagh
                      collection: self.default_collection,
                      lock_wait_duration: default_lock_wait_duration,
                      lock_hold_duration: default_lock_hold_duration,
-                     oldest: false  )
+                     oldest: false,
+                     **other_args
+        )
+
           options = { return_document: :after }
           options.merge!( { sort: { updated_timestamp: 1}  }) if oldest
           image = collection.find_one_and_update(
@@ -220,7 +230,7 @@ module Armagh
               }
             end
           end
-          image ? new( image, collection: collection ) : nil
+          image ? new( image, collection: collection, **other_args ) : nil
         rescue => e
           raise Armagh::Connection.convert_mongo_exception( e)
         end
@@ -298,7 +308,7 @@ module Armagh
       end
 
       def locked_by_anyone?
-        @image['_locked'].is_a?(Hash) ? @image['_locked']&.[]('until') > Time.now : false
+        @image['_locked'].is_a?(Hash) ? @image['_locked']&.[]('until') > Time.now.utc : false
       end
 
       def locked_by_me_until( me )

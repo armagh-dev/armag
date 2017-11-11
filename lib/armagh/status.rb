@@ -18,6 +18,12 @@
 require_relative 'status/agent_status'
 require_relative 'status/launcher_status'
 
+
+## WARNING!!
+##
+## Changing these values on an existing system will invalidate configurations and import scripts.
+## Avoid changing these values.
+##
 module Armagh
   module Status
     RUNNING = 'running'.freeze

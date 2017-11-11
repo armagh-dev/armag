@@ -42,6 +42,8 @@ module ArmaghTest
 
     logger.stubs(:level=)
     Armagh::Logging.stubs(:set_logger).returns(logger)
+    Armagh::Logging.stubs(:set_details)
+    Armagh::Logging.stubs(:clear_details)
     logger
   end
 end

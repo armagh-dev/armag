@@ -252,28 +252,40 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
       )
 
     when 'minute_collect'
+
+      # in real life, don't set a divider output and a regular output to the same doctype.  just doing that
+      # to expedite the test writing.
       @workflow.create_action_config(
           'Armagh::CustomActions::TestCollect',
           {
               'action' => {'name' => 'test_collect'},
               'collect' => {'archive' => false, 'schedule' => '* * * * *'},
               'output' => {
-                  'docspec' => Armagh::Documents::DocSpec.new('CollectedDocument', Armagh::Documents::DocState::READY),
-                  'divide_collected_document' => Armagh::Documents::DocSpec.new('IntermediateDocument', Armagh::Documents::DocState::READY)
+                  'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY),
+                  'divide_collected_document' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)
               }
+          }
+      )
+
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublish',
+          {
+              'action' => {'name' => 'test_publish'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
           }
       )
 
     when 'long_collect'
       if @workflow.running?
-        @workflow.finish
 
         retry_count = 0
         begin
           @workflow.stop
-        rescue Armagh::Actions::WorkflowActivationError
-          if retry_count < 3
-            sleep 30
+        rescue Armagh::Actions::WorkflowDocumentsInProcessError
+          retry_count += 1
+          if retry_count <= 4
+            sleep 35
             retry
           else
             raise
@@ -397,20 +409,64 @@ When(/^armagh's workflow config is "([^"]*)"$/) do |config|
     )
 
   when 'publish_abort'
+    @workflow.create_action_config(
+      'Armagh::CustomActions::TestPublishAbort',
+      {
+        'action' => {'name' => 'test_publish_abort'},
+        'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
+        'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
+      }
+    )
+
+  when 'twenty_docs_slow'
       @workflow.create_action_config(
-        'Armagh::CustomActions::TestPublishAbort',
-        {
-          'action' => {'name' => 'test_publish_abort'},
-          'input' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::READY)},
-          'output' => {'docspec' => Armagh::Documents::DocSpec.new('PublishDocument', Armagh::Documents::DocState::PUBLISHED)}
-        }
+          'Armagh::CustomActions::TestCollectTwenty',
+          {
+              'action' => {'name' => 'test_collect-twenty'},
+              'collect' => {'archive' => false, 'schedule' => '* * * * *'},
+              'output' => {
+                  'docspec' => Armagh::Documents::DocSpec.new('twentytest', Armagh::Documents::DocState::READY),
+              }
+          }
       )
+      @workflow.create_action_config(
+          'Armagh::CustomActions::TestPublishInASecond',
+          {
+              'action' => {'name' => 'test_publish_in_a_second'},
+              'input' => {'docspec' => Armagh::Documents::DocSpec.new('twentytest', Armagh::Documents::DocState::READY)},
+              'output' => {'docspec' => Armagh::Documents::DocSpec.new('twentytest', Armagh::Documents::DocState::PUBLISHED)}
+          }
+      )
+
 
   end
 
 
   @workflow.run
   puts 'Running Workflow'
+end
+
+And(/I try to stop the running workflow$/) do
+  begin
+    @workflow.stop
+  rescue Armagh::Actions::WorkflowDocumentsInProcessError => e
+    # do nothing
+  end
+end
+
+Then(/the workflow run_mode should be "([^"]*)"/) do |expected_run_mode|
+  assert_equal expected_run_mode, @workflow.run_mode
+end
+
+Then(/the workflow run_mode should become "([^"]*)" in (\d+) seconds/) do |expected_run_mode, within_seconds|
+
+  give_up_waiting = Time.now + within_seconds.to_i
+  while Time.now < give_up_waiting
+    @workflow = Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config).get_workflow( @workflow.name )
+    break if @workflow.run_mode == expected_run_mode
+    sleep 1
+  end
+  assert_equal expected_run_mode, @workflow.run_mode
 end
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
@@ -438,13 +494,13 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
       })
 
       if @workflow.running?
-        @workflow.finish
         retry_count = 0
         begin
           @workflow.stop
-        rescue Armagh::Actions::WorkflowActivationError
-          if retry_count < 3
-            sleep 30
+        rescue Armagh::Actions::WorkflowDocumentsInProcessError
+          if retry_count < 4
+            sleep 35
+            retry_count += 1
             retry
           else
             raise

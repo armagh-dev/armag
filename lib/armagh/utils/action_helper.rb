@@ -23,7 +23,9 @@ module Armagh
       def self.get_action_super(type)
         type = type.class unless type.is_a? Class
 
-        raise ActionClassError, "#{type} is not a known action type." unless Actions.defined_actions.include?(type)
+        defined_actions = Actions.defined_actions + Actions::UtilityAction.defined_utilities
+
+        raise ActionClassError, "#{type} is not a known action type." unless defined_actions.include?(type)
 
         superclass_name = type.superclass.to_s
         superclass_name.sub!(/^Armagh::Actions::/, '') ? superclass_name : get_action_super(type.superclass)

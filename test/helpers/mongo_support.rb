@@ -151,6 +151,10 @@ class MongoSupport
     `mongo #{ADMIN_DATABASE_NAME} --eval "db.dropDatabase();"`
   end
 
+  def drop_collection( collection )
+    @client[ collection ].drop
+  end
+
   def initiate_replica_set
     `mongo --eval "rs.initiate();"`
   end

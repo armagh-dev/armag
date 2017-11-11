@@ -29,14 +29,14 @@ task :default => [:ci_vm]
 
 Rake::TestTask.new(:test) do |t|
   t.libs << 'test'
-  t.pattern = "test/unit/**/test_*.rb"
+  t.pattern = 'test/unit/**/test_*.rb'
   t.warning = false
   t.options = '-v'
 end
 
 Rake::TestTask.new(:integration) do |t|
   t.libs << 'integration'
-  t.pattern = "test/integration/**/test_*.rb"
+  t.pattern = 'test/integration/**/test_*.rb'
   t.warning = false
   t.options = '-v'
 end
@@ -46,7 +46,7 @@ task :clean do
 end
 
 task :check_licenses do
-  sh "bundle exec license_finder --quiet --decisions_file licensing/approvals.yml"
+  sh 'bundle exec license_finder --quiet --decisions_file licensing/approvals.yml'
 end
 
 Cucumber::Rake::Task.new

@@ -50,6 +50,8 @@
         <th>Failed</th>
         <th>Pending Consume</th>
         <th>Published</th>
+        <th>Error Alerts</th>
+        <th>Warn Alerts</th>
         <th>State</th>
       </tr>
     </thead>
@@ -77,18 +79,20 @@
           <td id="count-failed-{{= uuid }}">{{= workflow['failed_docs_count'] }}</td>
           <td id="count-pending-{{= uuid }}">{{= workflow['published_pending_consume_docs_count'] }}</td>
           <td id="count-docs-{{= uuid }}">{{= workflow['docs_count'] }}</td>
+          <td id="count-error-alerts-{{= uuid }}">{{= workflow['error_alerts'] }}</td>
+          <td id="count-warn-alerts-{{= uuid }}">{{= workflow['warn_alerts'] }}</td>
           <td>
             <input id="workflow-{{= uuid }}" type="hidden" value="{{= workflow['name'] }}">
             <input id="active-status-{{= uuid }}" type="hidden" value="{{= workflow['run_mode'] }}">
             <span id="status-icon-{{= uuid }}">
               {{ case workflow['run_mode'] }}
-              {{ when 'run' }}
+              {{ when 'running' }}
                 <i class="uk-icon-toggle-on"></i>
                 Running
-              {{ when 'finish' }}
+              {{ when 'stopping' }}
                 <i class="uk-icon-spinner uk-icon-spin"></i>
-                Finishing
-              {{ when 'stop' }}
+                Stopping
+              {{ when 'stopped' }}
                 <i class="uk-icon-toggle-off"></i>
                 Stopped
               {{ else }}
@@ -334,7 +338,7 @@
     cks.each(function(_index, chk) {
       var id = $(chk).prop('id').replace(/select-workflow-/, '')
       any_checked    = true
-      if ($("#active-status-" + id).val() != "stop") {
+      if ($("#active-status-" + id).val() != "stopped") {
         any_active   = true
       } else {
         any_inactive = true
@@ -411,7 +415,7 @@
           wf = $("#workflow-" + id).val(),
           st = $("#active-status-" + id).val()
 
-      if ((activating && st != 'stop') || (!activating && st == 'stop')) {
+      if ((activating && st != 'stopped') || (!activating && st == 'stopped')) {
         update_request_status()
         return
       }
@@ -467,13 +471,13 @@
     var span = $("#status-icon-" + id)
 
     switch(status) {
-      case 'run':
+      case 'running':
         span.html('<i class="uk-icon-toggle-on"></i>' + "\nRunning")
         break
-      case 'finish':
-        span.html('<i class="uk-icon-spinner uk-icon-spin"></i>' + "\nFinishing")
+      case 'stopping':
+        span.html('<i class="uk-icon-spinner uk-icon-spin"></i>' + "\nStopping")
         break
-      case 'stop':
+      case 'stopped':
         span.html('<i class="uk-icon-toggle-off"></i>' + "\nStopped")
         break
       default:

@@ -185,6 +185,10 @@ module Armagh
           get_json(user, '/status.json')
         end
 
+        def get_workflow_alerts(user,workflow)
+          get_json(user, '/workflow/#{workflow}/alerts.json')
+        end
+
         def get_workflows(user)
           get_json(user, '/workflows.json')
         end
@@ -209,7 +213,7 @@ module Armagh
 
         private def workflow_active?(user, workflow)
           status = get_json(user, "/workflow/#{workflow}/status.json")
-          status['run_mode'] != Actions::Workflow::STOPPED
+          status['run_mode'] != 'stopped'
         end
 
         def activate_workflow(user, workflow)
@@ -221,9 +225,9 @@ module Armagh
         end
 
         private def change_workflow_status(user, workflow, status_change)
-          unchanged_status = status_change == :activate ? Actions::Workflow::STOPPED : Actions::Workflow::RUNNING
+          unchanged_status = status_change == :activate ? 'stop' : 'run'
           status, response =
-            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? Actions::Workflow::RUNNING : Actions::Workflow::STOPPED}.json")
+            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
         rescue => e
           [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
         else

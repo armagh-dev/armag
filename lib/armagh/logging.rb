@@ -39,6 +39,7 @@ module Armagh
       ::Logging.init :debug, :info, :warn, :ops_warn, :dev_warn, :error, :ops_error, :dev_error, :fatal, :any
       LEVELS = ::Logging::LNAMES.dup.freeze
       LEVELS.each_with_index {|lname, idx| const_set(lname, idx)}
+      ALERT_LEVELS = %w{ WARN OPS_WARN DEV_WARN ERROR OPS_ERROR DEV_ERROR FATAL}.collect{ |lstr| LEVELS.index( lstr )}
     end
 
     def self.set_logger(name)
@@ -49,11 +50,12 @@ module Armagh
       @log_dir
     end
 
-    def self.set_details(workflow_name, action_name, action_supertype_name)
+    def self.set_details(workflow_name, action_name, action_supertype_name, doc_internal_id)
       ::Logging.mdc['workflow'] = workflow_name
       ::Logging.mdc['action'] = action_name
       ::Logging.mdc['action_supertype'] = action_supertype_name
-      ::Logging.mdc['action_workflow'] = " [#{workflow_name}/#{action_name}]"
+      ::Logging.mdc['action_workflow'] = "[#{workflow_name}/#{action_name}]"
+      ::Logging.mdc['document_internal_id'] = doc_internal_id
     end
 
     def self.clear_details
@@ -61,6 +63,7 @@ module Armagh
       ::Logging.mdc.delete 'action'
       ::Logging.mdc.delete 'action_supertype'
       ::Logging.mdc.delete 'action_workflow'
+      ::Logging.mdc.delete 'document_internal_id'
     end
 
     def self.ops_error_exception(logger, exception, additional_info)
@@ -144,9 +147,9 @@ module Armagh
       ::Logging.logger.root.level = :debug
       ::Logging.logger.root.add_appenders(::Logging.appenders.stdout(:layout => ::Logging.layouts.pattern(pattern: FORMAT)))
 
-      app_logger = set_logger'Armagh::Application'
+      app_logger = set_logger 'Armagh::Application'
       app_logger.add_appenders(::Logging.appenders.rolling_file(@app_logfile, {roll_by: 'date', layout: ::Logging.layouts.pattern(pattern: FORMAT)}))
-      app_logger.add_appenders(Armagh::Logging.mongo('mongo_app_log'))
+      app_logger.add_appenders(Armagh::Logging.mongo('mongo_app_log', {'alert_levels' => ALERT_LEVELS} ))
 
       app_admin_logger = set_logger 'Armagh::ApplicationAdminAPI'
       app_admin_logger.add_appenders(::Logging.appenders.rolling_file(@app_admin_logfile, {roll_by: 'date', layout: ::Logging.layouts.pattern(pattern: FORMAT)}))

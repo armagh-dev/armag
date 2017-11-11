@@ -16,12 +16,13 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../../helpers/armagh_test'
+require_relative '../../helpers/armagh_test/logger'
 require 'test/unit'
 require 'mocha/test_unit'
 
 require_relative '../../helpers/workflow_generator_helper'
 require_relative '../../../lib/armagh/actions/workflow_set'
+require_relative '../../../lib/armagh/logging/alert'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/document/document'
 
@@ -41,7 +42,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     @fred_workflow_config_values = {'workflow'=>{'name' => 'fred'}}
     @fred_workflow_actions_config_values  = WorkflowGeneratorHelper.workflow_actions_config_values_no_divide('fred')
     @state_coll = mock
-    Armagh::Connection.stubs(:config).returns(@state_coll)
+    Armagh::Connection.stubs(:config).returns(@config_store)
   end
 
   def good_alice_in_db
@@ -77,6 +78,7 @@ class TestWorkflowSet < Test::Unit::TestCase
                       'a_alicedoc' => {'a_alicedoc:published'=>4},
                       'b_alicedoc' => {'b_alicedoc:published'=>5}
                   })
+    Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def expect_no_alice_docs_in_db
@@ -90,6 +92,7 @@ class TestWorkflowSet < Test::Unit::TestCase
                       'a_alicedoc' => {},
                       'b_alicedoc' => {}
                   })
+    Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def expect_no_fred_docs_in_db
@@ -103,6 +106,7 @@ class TestWorkflowSet < Test::Unit::TestCase
                       'a_alicedoc' => {},
                       'b_alicedoc' => {}
                   })
+    Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def teardown
@@ -198,6 +202,10 @@ class TestWorkflowSet < Test::Unit::TestCase
     good_fred_in_db
     expect_alice_docs_in_db
     expect_no_fred_docs_in_db
+
+    Armagh::Logging::Alert.expects( :get_counts ).at_least_once.with( { :workflow => 'alice' }).returns( { 'warn' => 2, 'error' => 3 })
+    Armagh::Logging::Alert.expects( :get_counts ).at_least_once.with( { :workflow => 'fred' }).returns( { 'warn' => 0, 'error' => 0 })
+
     @alice.run
     @fred.run
 
@@ -207,8 +215,8 @@ class TestWorkflowSet < Test::Unit::TestCase
     end
 
     expected = [
-      {"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::RUNNING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true},
-      {"name"=>"fred", "run_mode"=>Armagh::Actions::Workflow::RUNNING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+      {"name"=>"alice", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0},
+      {"name"=>"fred", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     ]
 
     expect_alice_docs_in_db
@@ -347,9 +355,9 @@ class TestWorkflowSet < Test::Unit::TestCase
     action_config = @alice.valid_action_configs.find{ |ac| ac.__name == action_name }
     wf_set.instantiate_action_from_config(action_config, @caller, @logger, @state_coll)
     trigger = mock('trigger')
-    trigger.expects(:trigger_individual_collection).once
-    require_relative '../../../lib/armagh/utils/collection_trigger'
-    Armagh::Utils::CollectionTrigger.expects(:new).once.returns(trigger)
+    trigger.expects(:trigger_individual_action).once
+    require_relative '../../../lib/armagh/utils/scheduled_action_trigger'
+    Armagh::Utils::ScheduledActionTrigger.expects(:new).once.returns(trigger)
     result = wf_set.trigger_collect(action_name)
     assert_true result
   end

@@ -25,7 +25,7 @@ require_relative '../../launcher/launcher'
 require_relative '../../actions/workflow_set'
 require_relative '../../document/document'
 require_relative '../../actions/gem_manager'
-require_relative '../../utils/collection_trigger'
+require_relative '../../utils/scheduled_action_trigger'
 require_relative '../../authentication'
 require_relative '../../status'
 require_relative '../../connection'
@@ -34,6 +34,7 @@ require_relative '../../agent/agent'
 require_relative '../../authentication/configuration'
 require_relative '../../utils/archiver'
 require_relative '../../utils/password'
+require_relative '../../logging/alert'
 
 module Armagh
   module Admin
@@ -122,7 +123,10 @@ module Armagh
             launcher['agents'] = agents.find_all {|agent| agent['hostname'] == launcher['hostname']}
           end
 
-          launchers
+          alert_counts = Armagh::Logging::Alert.get_counts
+
+          { 'launchers' => launchers,
+            'alert_counts' => alert_counts }
         end
 
         def get_all_launcher_configurations
@@ -259,16 +263,14 @@ module Armagh
           raise APIClientError.new( e.message )
         end
 
-        def finish_workflow( workflow_name )
-          with_workflow(workflow_name){ |wf| wf.finish}
-        rescue Actions::WorkflowActivationError => e
-          raise APIClientError.new( e.message )
-        end
-
         def stop_workflow( workflow_name )
-          with_workflow(workflow_name){ |wf| wf.stop}
-        rescue Actions::WorkflowActivationError => e
-          raise APIClientError.new( e.message )
+          with_workflow(workflow_name) do |wf|
+            begin
+              wf.stop
+            rescue Actions::WorkflowDocumentsInProcessError => e
+              return wf.status
+            end
+          end
         end
 
         def import_workflow(data)
@@ -282,7 +284,7 @@ module Armagh
 
           if get_workflows.map { |wf| wf['name'].downcase }.include? wf_name.downcase
             with_workflow(wf_name) do |wf|
-              raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != Actions::Workflow::STOPPED
+              raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != Status::STOPPED
             end
           else
             begin
@@ -811,6 +813,10 @@ module Armagh
         private def protect_remove_roles(remote_user, roles, message)
           missing_roles = roles.reject{|role| remote_user.has_role?(role)}
           raise APIClientError, "#{message}. Doing so would remove the following roles, which you don't have: #{missing_roles.collect{|r|r.name}.join(', ')}." unless missing_roles.empty?
+        end
+
+        def get_alerts( count_only: false, workflow: nil, action: nil )
+          Armagh::Logging::Alert.get_counts( workflow: workflow, action: action )
         end
       end
     end

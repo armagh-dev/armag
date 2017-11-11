@@ -23,7 +23,7 @@ def self.get_build_version(version)
   if ENV['ARMAGH_PRODUCTION_RELEASE']
     version
   else
-    revision = ENV['ARMAGH_INTEG_BUILD_REVISION']
+    revision = `hg identify --num 2>/dev/null`.strip.gsub('+', '-dev')
     if revision.empty?
       "#{version}-dev"
     else

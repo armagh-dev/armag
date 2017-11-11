@@ -216,7 +216,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
@@ -255,7 +255,7 @@ class TestAgent < Test::Unit::TestCase
       define_method(:collect, proc {@caller.instance_variable_set(:@num_creates, 3)})
     end
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
@@ -298,7 +298,7 @@ class TestAgent < Test::Unit::TestCase
 
     action.expects(:collect).with()
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
@@ -343,7 +343,7 @@ class TestAgent < Test::Unit::TestCase
                                                        document_timestamp: nil)
     action.expects(:split).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
                :raw => 'new', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
     doc.expects(:to_action_document).returns(action_doc)
@@ -391,7 +391,7 @@ class TestAgent < Test::Unit::TestCase
                                                        document_timestamp: nil)
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
                :raw => 'action', :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
                :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
                :error? => false)
@@ -454,7 +454,8 @@ class TestAgent < Test::Unit::TestCase
                                                        document_timestamp: nil)
     action.expects(:publish).with(action_doc)
 
-    doc = stub(:document_id => 'document_id',
+    doc = stub(:internal_id => '123',
+               :document_id => 'document_id',
                :pending_actions => [],
                :content => {'content' => true},
                :raw => 'action',
@@ -547,7 +548,7 @@ class TestAgent < Test::Unit::TestCase
                                                              document_timestamp: nil)
     action.expects(:consume).with(published_doc)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true},
                :raw => 'raw', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
     doc.expects(:to_published_document).returns(published_doc)
@@ -585,7 +586,7 @@ class TestAgent < Test::Unit::TestCase
     })
     action_name = divider.config.action.name
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
 
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
@@ -616,7 +617,7 @@ class TestAgent < Test::Unit::TestCase
 
     pending_actions = [action_name]
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false )
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false, :internal_id => '123' )
     doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger, @state_coll).returns(action).at_least_once
@@ -634,8 +635,6 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
-
-    @logger.expects(:warn).with("Error executing action 'testc' on 'document_id'.  See document (in the published_collection collection) for details.")
 
     @default_agent.instance_variable_set(:@running, true)
 
@@ -658,7 +657,7 @@ class TestAgent < Test::Unit::TestCase
 
     pending_actions = [action_name]
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
@@ -677,8 +676,6 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
     @backoff_mock.expects(:reset).at_least_once
-
-    @logger.expects(:warn).with("Error executing action 'testc' on 'document_id'.  See document (in the documents collection) for details.")
 
     @default_agent.instance_variable_set(:@running, true)
 
@@ -700,7 +697,7 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort')
     action.expects(:collect).raises(e)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
@@ -750,7 +747,7 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort')
     action.expects(:publish).raises(e)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => pending_actions, :content => {'content' => true},
                :raw => 'action', :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING,
                :deleted? => false, :collection_task_ids => [], archive_files: [], :source => Armagh::Documents::Source.new,
                :error? => false)
@@ -808,7 +805,7 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort)')
     action.expects(:consume).raises(e)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [action_name], :content => {'content' => true},
                :raw => 'raw', :metadata => {'meta' => true}, :deleted? => true, :collection_task_ids => [],
                :archive_files => [], :error? => false)
     doc.stubs(:delete_pending_actions_if).yields( action_name )
@@ -844,7 +841,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false, :error? => false)
 
     doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).then.yields(nil).returns(false).at_least_once
@@ -1619,7 +1616,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
                :dev_errors => [], :ops_errors => [], :error? => false
     )
@@ -1658,7 +1655,7 @@ class TestAgent < Test::Unit::TestCase
     action_name = action.config.action.name
     action.stubs(:collect).raises(exception)
 
-    doc = stub(:document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => 'raw',
                :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :deleted? => false,
                :dev_errors => [], :ops_errors => [], :error? => false
     )

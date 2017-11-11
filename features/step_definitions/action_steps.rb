@@ -142,3 +142,5 @@ And(/^I should see (\d+) "([^"]*)" documents in the "([^"]*)" collection$/) do |
 
   assert_equal(expected_count, num_found)
 end
+
+

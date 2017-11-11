@@ -90,6 +90,10 @@ module Armagh
       MongoConnection.instance.connection['action_state']
     end
 
+    def self.semaphores
+      MongoConnection.instance.connection['semaphores']
+    end
+
     def self.log
       MongoConnection.instance.connection['log']
     end
@@ -164,6 +168,7 @@ module Armagh
       users.indexes.create_one({'username' => 1}, unique: true, name: 'usernames')
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames')
+      semaphores.indexes.create_one( {'name' => 1}, unique: true, name: 'names')
 
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e
@@ -190,10 +195,14 @@ module Armagh
       end
 
       # Unlocked documents pending work
-      collection.indexes.create_one({'pending_work' => 1, 'updated_timestamp' => 1},
+      collection.indexes.create_one({'pending_work' => 1, 'updated_timestamp' => 1 },
                                     name: 'pending_unlocked',
                                     partial_filter_expression: { 'pending_work' => {'$exists' => true }, '_locked' => false }
       )
+
+      # locked documents; needed by db_cleanup_utility_action
+      collection.indexes.create_one( {'_locked.until' => 1 }, name: 'locked_docs')
+
     rescue => e
       raise IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
     end

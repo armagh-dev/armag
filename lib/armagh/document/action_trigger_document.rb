@@ -19,19 +19,19 @@ require 'armagh/support/random'
 require_relative 'document'
 
 module Armagh
-  class TriggerDocument < Document
+  class ActionTriggerDocument < Document
 
-    def self.ensure_one_exists(state:, type:, pending_actions:)
+    def self.ensure_one_exists(state:, type:, pending_actions:, logger: nil)
 
       unless find_one_read_only( { 'type' => type, 'state' => state })
-        create_one_unlocked(
-            {
-                'document_id' => Armagh::Support::Random.random_id,
-                'type' => type,
-                'state' => state,
-                'pending_actions' => pending_actions
-            }
-        )
+        values = {
+            'document_id' => Armagh::Support::Random.random_id,
+            'type' => type,
+            'state' => state,
+            'pending_actions' => pending_actions
+        }
+        create_one_unlocked( values, logger: logger )
+        logger.debug "created one action trigger doc #{ values.inspect }" unless logger.nil?
       end
     end
   end

@@ -130,18 +130,21 @@ class TestLogging < Test::Unit::TestCase
     workflow = 'workflow_name'
     action = 'action_name'
     action_supertype = 'supertype_name'
+    document_internal_id = '123'
 
     assert_nil ::Logging.mdc['workflow']
     assert_nil ::Logging.mdc['action']
     assert_nil ::Logging.mdc['action_supertype']
     assert_nil ::Logging.mdc['action_workflow']
+    assert_nil ::Logging.mdc['document_internal_id']
 
-    Armagh::Logging.set_details(workflow, action, action_supertype)
+    Armagh::Logging.set_details(workflow, action, action_supertype, document_internal_id)
 
     assert_equal workflow, ::Logging.mdc['workflow']
     assert_equal action, ::Logging.mdc['action']
     assert_equal action_supertype, ::Logging.mdc['action_supertype']
-    assert_equal " [#{workflow}/#{action}]", ::Logging.mdc['action_workflow']
+    assert_equal "[#{workflow}/#{action}]", ::Logging.mdc['action_workflow']
+    assert_equal document_internal_id, ::Logging.mdc['document_internal_id']
 
     Armagh::Logging.clear_details
 
@@ -149,6 +152,7 @@ class TestLogging < Test::Unit::TestCase
     assert_nil ::Logging.mdc['action']
     assert_nil ::Logging.mdc['action_supertype']
     assert_nil ::Logging.mdc['action_workflow']
+    assert_nil ::Logging.mdc['document_internal_id']
   end
 
   def test_default_log_level

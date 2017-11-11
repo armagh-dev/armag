@@ -222,7 +222,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_status
     get '/status.json'do
       assert last_response.ok?
-      assert_empty JSON.parse(last_response.body)
+      response_hash = JSON.parse(last_response.body)
+      assert_empty response_hash['launchers']
+      assert_equal( { 'warn' => 0, 'error' => 0, 'fatal' => 0}, response_hash['alert_counts'])
     end
 
     agent_inserted = fake_agent_status
@@ -249,7 +251,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
     get '/status.json'do
       assert last_response.ok?
-      assert_equal [expected],  JSON.parse(last_response.body)
+      assert_equal [expected],  JSON.parse(last_response.body)['launchers']
     end
   end
 
@@ -589,7 +591,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflows
     good_alice_in_db
-    expected_result = [{"name"=>"alice", "run_mode"=>Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}]
 
     get '/workflows.json' do
       assert last_response.ok?
@@ -600,7 +602,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   def test_get_workflow
     good_alice_in_db
-    expected_result = {"name"=>"alice", "run_mode"=>Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     get '/workflow/alice/status.json' do
       result = JSON.parse(last_response.body)
       assert last_response.ok?
@@ -621,32 +623,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_run
     good_alice_in_db
     expect_alice_docs_in_db
-    expected_result = {"name"=>"alice", "run_mode"=>Actions::Workflow::RUNNING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     patch '/workflow/alice/run.json' do
       assert last_response.ok?
-      result = JSON.parse( last_response.body )
-      assert_equal expected_result, result
-    end
-  end
-
-  def test_get_workflow_finish
-    good_alice_in_db
-    expect_alice_docs_in_db
-    @alice.run
-    expected_result = {"name"=>"alice", "run_mode"=>Actions::Workflow::FINISHING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
-    patch '/workflow/alice/finish.json' do
-      assert last_response.ok?
-      result = JSON.parse( last_response.body )
-      assert_equal expected_result, result
-    end
-
-  end
-
-  def test_get_workflow_finish_not_running
-    good_alice_in_db
-    expected_result = { 'client_error_detail' => { 'message' => 'Workflow not running', 'markup' => nil }}
-    patch '/workflow/alice/finish.json' do
-      assert last_response.client_error?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
     end
@@ -656,8 +635,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     expect_no_alice_docs_in_db
     @alice.run
-    @alice.finish
-    expected_result = {"name"=>"alice", "run_mode"=>Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
       result = JSON.parse( last_response.body )
@@ -670,22 +648,9 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     expect_alice_docs_in_db
     @alice.run
-    expected_result = {"name"=>"alice", "run_mode"=>Actions::Workflow::FINISHING, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>"stopping", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     patch '/workflow/alice/stop.json' do
       assert last_response.ok?
-      result = JSON.parse( last_response.body )
-      assert_equal expected_result, result
-    end
-  end
-
-  def test_get_workflow_stop_documents_exist
-    good_alice_in_db
-    expect_alice_docs_in_db
-    @alice.run
-    @alice.finish
-    expected_result = { 'client_error_detail' => { 'message' => 'Cannot stop - 41 documents still processing', 'markup' => nil }}
-    patch '/workflow/alice/stop.json' do
-      assert last_response.client_error?
       result = JSON.parse( last_response.body )
       assert_equal expected_result, result
     end
@@ -723,15 +688,17 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "name"=>"Testflow",
          "published_pending_consume_docs_count"=>0,
          "retired"=>false,
-         "run_mode"=>Actions::Workflow::STOPPED,
+         "run_mode"=>"stopped",
          "unused_output_docspec_check"=>true,
          "working_docs_count"=>0,
-         "valid"=>true}},
+         "valid"=>true,
+         'error_alerts' => 0,
+         'warn_alerts' => 0}},
       JSON.parse(last_response.body)
     )
     wf_set = Armagh::Actions::WorkflowSet.for_admin(Connection.config)
     assert_equal(
-      [{'name'=>'Testflow', 'run_mode'=>Actions::Workflow::STOPPED, 'retired'=>false, 'unused_output_docspec_check'=>true, 'working_docs_count'=>0, 'failed_docs_count'=>0, 'published_pending_consume_docs_count'=>0, 'docs_count'=>0, 'valid'=>true}],
+      [{'name'=>'Testflow', 'run_mode'=>'stopped', 'retired'=>false, 'unused_output_docspec_check'=>true, 'working_docs_count'=>0, 'failed_docs_count'=>0, 'published_pending_consume_docs_count'=>0, 'docs_count'=>0, 'valid'=>true, 'warn_alerts' => 0, 'error_alerts' => 0}],
       wf_set.list_workflows
     )
   end
@@ -915,10 +882,13 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   end
 
-  def test_get_workflow_actions_finishing
+  def test_get_workflow_actions_stopping
     good_alice_in_db
     @alice.run
-    @alice.finish
+    expect_alice_docs_in_db
+    assert_raises do
+      @alice.stop
+    end
     db_time_approx = Time.now.to_f
     expected_residual_result = [{"active"=>false,
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
@@ -990,8 +960,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         assert_equal expected, result[idx]
       end
 
-      assert_in_delta db_time_approx, timestamps.min.to_f, 5
-      assert_in_delta db_time_approx, timestamps.max.to_f, 5
+      assert_in_delta db_time_approx, timestamps.min.to_f, 6
+      assert_in_delta db_time_approx, timestamps.max.to_f, 6
     end
 
   end

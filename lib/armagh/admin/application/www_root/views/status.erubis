@@ -1,5 +1,8 @@
 {{= partial :header, data: {title: 'Status', subtitle: "#{@data.size} server#{@data.size == 1 ? '' : 's'}"} }}
 
+{{ launcher_data = @data&.[ 'launchers' ] || [] }}
+{{ alert_counts = @data&.[ 'alert_counts' ] # TODO - Ilya, add the display where you think it fits here, yeah }}
+
 <table class="uk-table uk-table-hover uk-table-condensed">
   <thead>
     <tr class="uk-text-small">
@@ -10,7 +13,7 @@
       <th>Versions</th>
     </tr>
   </thead>
-    {{ @data&.each do |host| }}
+    {{ launcher_data.each do |host| }}
       {{ uuid = SecureRandom.uuid }}
       <tr>
         <td>

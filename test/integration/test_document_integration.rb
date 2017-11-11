@@ -171,7 +171,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     )
     sleep 2
 
-    Armagh::Document.get_one_for_processing_locked(@agent)
+    Armagh::Document.get_one_for_processing_locked(@agent) {}
 
     doc = Armagh::Document.find_one_read_only({ 'document_id' => id }, collection: Armagh::Connection.documents )
     assert_true doc.locked_by_anyone?

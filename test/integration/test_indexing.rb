@@ -56,7 +56,7 @@ class TestIndexing < Test::Unit::TestCase
   end
 
   def create_document(id, type = 'TestDocument', state = Armagh::Documents::DocState::READY)
-    doc = Armagh::Document.create_one_locked(
+    doc = Armagh::Document.create_one_unlocked(
         {
             type: type,
             content: {},
@@ -64,14 +64,13 @@ class TestIndexing < Test::Unit::TestCase
             pending_actions: ['action'],
             state: Armagh::Documents::DocState::READY,
             document_id: id
-        },
-        @agent,
-        lock_hold_duration: 3
+        }
     )
     unless state == Armagh::Documents::DocState::READY
       doc.state = state
       doc.save( true, @agent )
     end
+
   end
 
   def test_config_idx
@@ -117,6 +116,7 @@ class TestIndexing < Test::Unit::TestCase
     initial_ops = index_stats['accesses']['ops']
 
     Armagh::Document.get_one_for_processing_locked(@agent) do |d|
+      sleep 1
     end
 
     index_stats = get_index_stats(Armagh::Connection.documents('TestDocument'), 'pending_unlocked')

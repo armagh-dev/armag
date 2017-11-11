@@ -18,7 +18,7 @@
 require_relative '../../helpers/coverage_helper'
 require_relative '../../helpers/armagh_test'
 require_relative '../../../lib/armagh/document/document'
-require_relative '../../../lib/armagh/document/trigger_document'
+require_relative '../../../lib/armagh/document/action_trigger_document'
 
 require 'armagh/documents/doc_state'
 
@@ -39,7 +39,7 @@ class TestDocument < Test::Unit::TestCase
     @agent.stubs( signature: 'agent-1', running?: true )
 
     Armagh::Document.default_locking_agent = @agent
-    Armagh::TriggerDocument.default_locking_agent = @agent
+    Armagh::ActionTriggerDocument.default_locking_agent = @agent
 
     mock_insert_one( @internal_id )
     @doc = Armagh::Document.create_one_locked(
@@ -95,14 +95,14 @@ class TestDocument < Test::Unit::TestCase
     expected_values = { 'type' => 'type',  'state' => 'ready'}
 
     @documents.expects(:insert_one).with(has_entries(expected_values)).returns( mock( inserted_ids: [ 'internal_id ']))
-    Armagh::TriggerDocument.default_locking_agent = @agent
-    Armagh::TriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])
+    Armagh::ActionTriggerDocument.default_locking_agent = @agent
+    Armagh::ActionTriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])
   end
 
   def test_create_trigger_document_error
     e = RuntimeError.new('error')
     @documents.expects(:insert_one).raises(e)
-    assert_raise(e) { Armagh::TriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])     }
+    assert_raise(e) { Armagh::ActionTriggerDocument.create_one_locked(state: Armagh::Documents::DocState::READY, type: 'type', pending_actions: [])     }
   end
 
   def test_from_action_document

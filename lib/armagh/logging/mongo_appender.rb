@@ -32,6 +32,7 @@ module Armagh
         @hostname = Socket.gethostname
         @name = name
         @resource_log = opts['resource_log']
+        @alert_level = opts['alert_level']
       end
 
       def write(event)
@@ -43,13 +44,17 @@ module Armagh
           'timestamp' => event.time.dup.utc
         }
 
+        log_msg[ 'alert' ] = true if Armagh::Logging::ALERT_LEVELS.include?(event.level)
+
         workflow = ::Logging.mdc['workflow']
         action = ::Logging.mdc['action']
         action_supertype = ::Logging.mdc['action_supertype']
+        document_internal_id = ::Logging.mdc['document_internal_id']
 
         log_msg['workflow'] = workflow if workflow
         log_msg['action'] = action if action
         log_msg['action_supertype'] = action_supertype if action_supertype
+        log_msg['document_internal_id'] = document_internal_id if document_internal_id
 
         if event.data.is_a? Armagh::Logging::EnhancedException
           log_msg['message'] = "#{event.data.additional_details}"

@@ -201,7 +201,7 @@ module Armagh
 
       actions.each do |action|
         if action.is_a? Actions::Divide
-          Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class))
+          Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class), ::Logging.mdc['document_internal_id'])
           return action
         end
       end
@@ -253,7 +253,7 @@ module Armagh
     private def execute
       @logger.debug 'Getting document for processing'
 
-      got_one = Document.get_one_for_processing_locked(self) do |current_doc|
+      got_one = Document.get_one_for_processing_locked(self, logger: @logger) do |current_doc|
 
         @current_doc = current_doc
         @backoff.reset
@@ -278,6 +278,8 @@ module Armagh
           report_status(current_doc, current_action)
           if current_action
             begin
+              Logging.set_details(current_action.config.action.workflow, current_action.name, Utils::ActionHelper.get_action_super(current_action.class), current_doc.internal_id) if current_action.is_a? Actions::Action
+
               exec_id = current_doc.document_id || current_doc.internal_id
               @logger.info "Executing #{name} on document '#{exec_id}'."
               start = Time.now
@@ -296,6 +298,8 @@ module Armagh
             rescue Exception => e
               Logging.dev_error_exception(@logger, e, "Error while executing action '#{name}' on '#{current_doc.document_id}'")
               current_doc.add_dev_error(name, e)
+            ensure
+              Logging.clear_details
             end
           else
             # This could happen while actions are propagating through the system
@@ -305,7 +309,6 @@ module Armagh
 
           if current_doc.dev_errors.any? || current_doc.ops_errors.any?
             collection_name = current_doc.published? ? Connection.documents(current_doc.type).name : Connection.documents.name
-            @logger.warn "Error executing action '#{name}' on '#{current_doc.document_id}'.  See document (in the #{collection_name} collection) for details."
             action_success = false
           end
 
@@ -324,7 +327,6 @@ module Armagh
 
     # returns new actions that should be added to the iterator
     private def execute_action(action, doc)
-      Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class)) if action.is_a? Actions::Action
 
       initial_id = doc.document_id
       allowed_id_change = false
@@ -393,6 +395,11 @@ module Armagh
           action.consume published_doc
           # Only metadata can be changed
           doc.metadata = published_doc.metadata
+
+        when Actions::UtilityAction
+          action.run
+          doc.mark_delete
+
         when Actions::Action
           @logger.dev_error "#{action.name} is an unknown action type."
         else
@@ -402,7 +409,6 @@ module Armagh
     ensure
       @num_creates = 0
       @archives_for_collect.clear
-      Logging.clear_details
     end
 
     private def report_status(doc, action)

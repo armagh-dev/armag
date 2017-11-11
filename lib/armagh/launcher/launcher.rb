@@ -34,7 +34,7 @@ require_relative '../connection'
 require_relative '../document/document'
 require_relative '../status'
 require_relative '../logging'
-require_relative '../utils/collection_trigger'
+require_relative '../utils/scheduled_action_trigger'
 require_relative '../version'
 
 module Armagh
@@ -120,8 +120,9 @@ module Armagh
 
       @archive_config = Utils::Archiver.find_or_create_config(Connection.config)
 
-      @collection_trigger = Utils::CollectionTrigger.new(@workflow_set)
-      Logging.set_level(@collection_trigger.logger,  @config.launcher.log_level)
+      @scheduled_action_trigger = Utils::ScheduledActionTrigger.new(@workflow_set)
+      Logging.set_level(@scheduled_action_trigger.logger,  @config.launcher.log_level)
+
 
       @hostname = Socket.gethostname
       @agents = {}
@@ -156,7 +157,7 @@ module Armagh
 
     def apply_config
       Logging.set_level(@logger, @config.launcher.log_level)
-      Logging.set_level(@collection_trigger.logger, @config.launcher.log_level)
+      Logging.set_level(@scheduled_action_trigger.logger, @config.launcher.log_level)
       set_num_agents(@config.launcher.num_agents)
       @logger.debug "Updated configuration to log level #{ @config.launcher.log_level.upcase }, num agents #{ @config.launcher.num_agents }"
     end
@@ -244,7 +245,7 @@ module Armagh
       Thread.new{ @logger.any "Received #{signal}.  Shutting down once agents finish" }.join
       @running = false
       @shutdown = true
-      @collection_trigger.stop
+      @scheduled_action_trigger.stop
       Thread.new{kill_all_agents(signal)}.join
     end
 
@@ -299,7 +300,7 @@ module Armagh
         apply_config
 
         if !@shutdown
-          @collection_trigger.start
+          @scheduled_action_trigger.start
           @running = true
           checkin(Status::RUNNING)
         end

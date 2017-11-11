@@ -21,6 +21,7 @@ require_relative '../../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../../../../lib/armagh/admin/application/api'
+require_relative '../../../../lib/armagh/logging/alert'
 require_relative '../../../../lib/armagh/connection'
 require_relative '../../../../test/helpers/workflow_generator_helper'
 
@@ -84,6 +85,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
     end
+    Armagh::Logging::Alert.stubs(:get_counts).with( { :workflow => 'alice' }).returns( { 'warn' => 0, 'error' => 0})
     @alice
   end
 
@@ -98,6 +100,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
     end
+    Armagh::Logging::Alert.stubs(:get_counts).with( { :workflow => 'fred' }).returns( { 'warn' => 0, 'error' => 0})
     @fred
   end
 
@@ -181,75 +184,78 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def test_get_status
-    expected = [
-        {
-            '_id' => '1',
-            'hostname' => 'host1',
-            'agents' => [
-                {
-                    '_id' => '1',
-                    'signature' => 'agent-1',
-                    'hostname' => 'host1',
-                    'last_updated' => Time.at(1000),
-                    'running_since' => Time.at(0),
-                    'status' => 'running'
-                },
-                {
-                    '_id' => '2',
-                    'signature' => 'agent-2',
-                    'hostname' => 'host1',
-                    'idle_since' => Time.at(100),
-                    'last_updated' => Time.at(1000),
-                    'status' => 'idle',
-                    'task' => {
-                        'action' => 'action1',
-                        'document' => 'doc1'
-                    }
-                }
-            ],
-            'last_updated' => Time.at(1000),
-            'status' => 'running',
-            'versions' => {
-                'actions' => {
-                    'armagh_test' => '1.0.2',
-                    'standard' => '1.0.1'
-                },
-                'armagh' => '1.0.0'
-            }
-        },
-        {
-            '_id' => '2',
-            'hostname' => 'host2',
-            'agents' => [
-                {
-                    '_id' => '3',
-                    'signature' => 'agent-3',
-                    'hostname' => 'host2',
-                    'idle_since' => Time.at(0),
-                    'last_updated' => Time.at(1000),
-                    'status' => 'idle'},
-                {
-                    '_id' => '4',
-                    'signature' => 'agent-4',
-                    'hostname' => 'host2',
-                    'idle_since' => Time.at(100),
-                    'last_updated' => Time.at(1000),
-                    'status' => 'idle'}],
-            'last_updated' => Time.at(1000),
-            'status' => 'running',
-            'versions' => {
-                'actions' => {
-                    'armagh_test' => '2.0.2',
-                    'standard' => '2.0.1'
-                },
-                'armagh' => '2.0.0'
-            }
-        }
-    ]
+    expected = {
+        'launchers' => [
+          {
+              '_id' => '1',
+              'hostname' => 'host1',
+              'agents' => [
+                  {
+                      '_id' => '1',
+                      'signature' => 'agent-1',
+                      'hostname' => 'host1',
+                      'last_updated' => Time.at(1000),
+                      'running_since' => Time.at(0),
+                      'status' => 'running'
+                  },
+                  {
+                      '_id' => '2',
+                      'signature' => 'agent-2',
+                      'hostname' => 'host1',
+                      'idle_since' => Time.at(100),
+                      'last_updated' => Time.at(1000),
+                      'status' => 'idle',
+                      'task' => {
+                          'action' => 'action1',
+                          'document' => 'doc1'
+                      }
+                  }
+              ],
+              'last_updated' => Time.at(1000),
+              'status' => 'running',
+              'versions' => {
+                  'actions' => {
+                      'armagh_test' => '1.0.2',
+                      'standard' => '1.0.1'
+                  },
+                  'armagh' => '1.0.0'
+              }
+          },
+          {
+              '_id' => '2',
+              'hostname' => 'host2',
+              'agents' => [
+                  {
+                      '_id' => '3',
+                      'signature' => 'agent-3',
+                      'hostname' => 'host2',
+                      'idle_since' => Time.at(0),
+                      'last_updated' => Time.at(1000),
+                      'status' => 'idle'},
+                  {
+                      '_id' => '4',
+                      'signature' => 'agent-4',
+                      'hostname' => 'host2',
+                      'idle_since' => Time.at(100),
+                      'last_updated' => Time.at(1000),
+                      'status' => 'idle'}],
+              'last_updated' => Time.at(1000),
+              'status' => 'running',
+              'versions' => {
+                  'actions' => {
+                      'armagh_test' => '2.0.2',
+                      'standard' => '2.0.1'
+                  },
+                  'armagh' => '2.0.0'
+              }
+          }
+      ],
+    'alert_counts' => { 'alert' => 0, 'fatal' => 0, 'warn' => 0}
+    }
 
     @api.expects(:get_agent_status).returns(agent_statuses)
     @api.expects(:get_launcher_status).returns(launcher_statuses)
-
+    Armagh::Logging::Alert.expects(:get_counts).returns( { 'warn' => 0, 'alert' => 0, 'fatal' => 0})
 
     assert_equal expected, @api.get_status
   end
@@ -260,7 +266,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     expect_fred_docs_in_db
 
-    expected_result = [{"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}, {"name"=>"fred", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0 }, {"name"=>"fred", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}]
 
     assert_equal expected_result, @api.get_workflows
   end
@@ -294,7 +300,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_fred_in_db
 
 
-    expected_result = {"name"=>"alice", "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true}
+    expected_result = {"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'error_alerts' => 0, 'warn_alerts' => 0}
     assert_equal expected_result, @api.get_workflow_status( 'alice' )
   end
 
@@ -315,10 +321,12 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
                   })
 
     test_wf_name = 'new_workflow'
+    Armagh::Logging::Alert.expects( :get_counts ).with( { :workflow => test_wf_name }).returns( { 'warn' => 0, 'error' => 0 })
+
 
     wf = @api.create_workflow( { 'workflow' => { 'name' => test_wf_name }})
     assert_equal test_wf_name, wf.name
-    expected_response = {"name"=>test_wf_name, "run_mode"=>Armagh::Actions::Workflow::STOPPED, "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true}
+    expected_response = {"name"=>test_wf_name, "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     assert_equal expected_response,@api.get_workflow_status( test_wf_name )
   end
 
@@ -360,22 +368,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     expect_alice_docs_in_db
     wf = @api.get_workflow_status('alice')
-    assert_equal Armagh::Actions::Workflow::RUNNING, wf['run_mode']
-  end
-
-  def test_finish_workflow
-    good_alice_in_db
-    good_fred_in_db
-    expect_alice_docs_in_db
-    @api.run_workflow('alice')
-    assert_nothing_raised do
-      expect_alice_docs_in_db
-      @api.finish_workflow('alice')
-    end
-
-    expect_alice_docs_in_db
-    wf = @api.get_workflow_status('alice')
-    assert_equal Armagh::Actions::Workflow::FINISHING, wf['run_mode']
+    assert_equal 'running', wf['run_mode']
   end
 
   def test_stop_workflow
@@ -384,7 +377,6 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @alice.run
     expect_no_alice_docs_in_db
 
-    @api.finish_workflow('alice')
     assert_nothing_raised do
       @api.stop_workflow('alice')
     end
@@ -401,25 +393,22 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       @api.stop_workflow('alice')
     end
     wf_status = @api.get_workflow_status('alice')
-    assert_equal Armagh::Actions::Workflow::FINISHING, wf_status['run_mode']
+    assert_equal 'stopped', wf_status['run_mode']
   end
 
   def test_stop_workflow_docs_still
     good_alice_in_db
-    expect_alice_docs_in_db
 
-    @api.run_workflow('alice')
     expect_alice_docs_in_db
-    @api.finish_workflow('alice')
-    e = assert_raises Armagh::Admin::Application::APIClientError do
+    @api.run_workflow('alice')
+
+      expect_alice_docs_in_db
       expect_alice_docs_in_db
       @api.stop_workflow('alice')
-    end
-    assert_equal 'Cannot stop - 41 documents still processing', e.message
 
     expect_alice_docs_in_db
     wf_status = @api.get_workflow_status('alice')
-    assert_equal Armagh::Actions::Workflow::FINISHING, wf_status['run_mode']
+    assert_equal 'stopping', wf_status['run_mode']
   end
 
   def test_import_workflow
@@ -469,7 +458,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_import_workflow_not_stopped
     data = {'workflow'=>{'name'=>'test'},'actions'=>[{'type'=>'type','action'=>{'name'=>'name'}}]}
     wf = mock('wf')
-    wf.expects(:status).once.returns({'run_mode'=>Armagh::Actions::Workflow::RUNNING})
+    wf.expects(:status).once.returns({'run_mode'=>Armagh::Status::RUNNING})
     @api.expects(:get_workflows).once.returns([{'name'=>'test'}])
     @api.expects(:with_workflow).with('test').once.yields(wf)
     e = assert_raise Armagh::Admin::Application::APIClientError do
@@ -852,6 +841,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_create_workflow_action_config_running
     good_fred_in_db
     expect_fred_docs_in_db
+
     @fred.run
 
     actions_status = @api.get_workflow_actions('fred').collect{ |h| h['active']}.uniq
@@ -987,9 +977,9 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def test_trigger_collect
-    collection_trigger = mock('collection trigger')
-    collection_trigger.expects(:trigger_individual_collection).with(kind_of(Configh::Configuration))
-    Armagh::Utils::CollectionTrigger.expects(:new).returns(collection_trigger)
+    action_trigger = mock('action trigger')
+    action_trigger.expects(:trigger_individual_action).with(kind_of(Configh::Configuration))
+    Armagh::Utils::ScheduledActionTrigger.expects(:new).returns(action_trigger)
     good_alice_in_db
     expect_no_alice_docs_in_db
     @alice.run

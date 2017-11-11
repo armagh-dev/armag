@@ -54,7 +54,7 @@ class TestConnection < Test::Unit::TestCase
 
   def test_all_document_collections
     indexes = mock
-    indexes.expects(:create_one).twice
+    indexes.expects(:create_one).times(3)
     documents = stub(name: 'documents', indexes: indexes)
     sometype1 = stub(name: 'documents.SomeType1', indexes: indexes)
     sometype2 = stub(name: 'documents.SomeType2', indexes: indexes)
@@ -229,18 +229,21 @@ class TestConnection < Test::Unit::TestCase
     groups_indexes = mock
     doc_indexes = mock
     agent_status_indexes = mock
+    semaphore_indexes = mock
 
     config = stub(indexes: config_indexes)
     action_state = stub(indexes: action_state_indexes)
     users = stub(indexes: users_indexes)
     groups = stub(indexes: groups_indexes)
     agent_status = stub(indexes: agent_status_indexes)
+    semaphores = stub(indexes: semaphore_indexes)
 
     @connection.stubs(:[]).with('config').returns(config)
     @connection.stubs(:[]).with('action_state').returns(action_state)
     @connection.stubs(:[]).with('users').returns(users)
     @connection.stubs(:[]).with('groups').returns(groups)
     @connection.stubs(:[]).with('agent_status').returns(agent_status)
+    @connection.stubs(:[]).with('semaphores').returns(semaphores)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
@@ -248,7 +251,8 @@ class TestConnection < Test::Unit::TestCase
     users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'usernames'})
     groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames'})
-    doc_indexes.expects(:create_one).twice
+    semaphore_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
+    doc_indexes.expects(:create_one).times(3)
 
     Armagh::Connection.setup_indexes
   end
@@ -266,20 +270,20 @@ class TestConnection < Test::Unit::TestCase
 
   def test_index_doc_collection
     indexes = mock
-    indexes.expects(:create_one).twice
+    indexes.expects(:create_one).times(3)
     collection = mock
     collection.stubs(:name).returns('documents')
-    collection.stubs(:indexes).returns(indexes).twice
+    collection.stubs(:indexes).returns(indexes).times(3)
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
   end
 
   def test_index_published_doc_collection
     indexes = mock
-    indexes.expects(:create_one).twice
+    indexes.expects(:create_one).times(3)
     collection = mock
     collection.stubs(:name).returns('documents.PublishedType')
-    collection.stubs(:indexes).returns(indexes).twice
+    collection.stubs(:indexes).returns(indexes).times(3)
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
   end

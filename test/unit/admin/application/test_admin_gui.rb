@@ -306,10 +306,10 @@ module Armagh
         def test_create_workflow
           response = mock('response')
           response.stubs(:status).returns(200)
-          expected = {'workflow'=>{'run_mode'=>Actions::Workflow::STOPPED}}
+          expected = {'workflow'=>{'run_mode'=>'stopped'}}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:post).once.returns(response)
-          assert_equal [:success, {'run_mode'=>Actions::Workflow::STOPPED}], @admin_gui.create_workflow(@user, 'workflow')
+          assert_equal [:success, {'run_mode'=>'stopped'}], @admin_gui.create_workflow(@user, 'workflow')
         end
 
         def test_get_workflow
@@ -337,7 +337,7 @@ module Armagh
         def test_private_workflow_active?
           response = mock('response')
           response.stubs(:status).returns(200)
-          expected = {'workflow'=>{'run_mode'=>Actions::Workflow::RUNNING}}
+          expected = {'workflow'=>{'run_mode'=>'running'}}
           response.stubs(:body).returns(expected.to_json)
           HTTPClient.any_instance.expects(:get).once.returns(response)
           assert_true @admin_gui.send(:workflow_active?, @user, 'workflow')
@@ -354,41 +354,41 @@ module Armagh
 
         def test_activate_workflow
           response = {
-            'run_mode' => Actions::Workflow::RUNNING
+            'run_mode' => 'running'
           }
           @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          assert_equal [Actions::Workflow::RUNNING, response], result
+          assert_equal ['running', response], result
         end
 
         def test_activate_workflow_failure
           response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          expected = [Actions::Workflow::STOPPED, "Unable to activate workflow dummy: #{response}"]
+          expected = ['stop', "Unable to activate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 
         def test_activate_workflow_unexpected_error
           @admin_gui.expects(:patch_json).once.raises(RuntimeError, 'unexpected error')
           result = @admin_gui.activate_workflow(@user, 'dummy')
-          assert_equal [Actions::Workflow::STOPPED, "Unable to activate workflow dummy: unexpected error"], result
+          assert_equal ['stop', "Unable to activate workflow dummy: unexpected error"], result
         end
 
         def test_deactivate_workflow
           response = {
-            'run_mode' => Actions::Workflow::STOPPED
+            'run_mode' => 'stopped'
           }
           @admin_gui.expects(:patch_json).once.returns([:success, response])
           result = @admin_gui.deactivate_workflow(@user, 'dummy')
-          assert_equal [Actions::Workflow::STOPPED, response], result
+          assert_equal ['stopped', response], result
         end
 
         def test_deactivate_workflow_failure
           response = 'some error'
           @admin_gui.expects(:patch_json).once.returns([:error, response])
           result = @admin_gui.deactivate_workflow(@user, 'dummy')
-          expected = [Actions::Workflow::RUNNING, "Unable to deactivate workflow dummy: #{response}"]
+          expected = ['run', "Unable to deactivate workflow dummy: #{response}"]
           assert_equal expected, result
         end
 

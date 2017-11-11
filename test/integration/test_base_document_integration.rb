@@ -239,5 +239,25 @@ class TestIntegrationBaseDocument < Test::Unit::TestCase
     emmet.save( false, @agent1 )
   end
 
+  def test_force_reset_expired_locks
+    message = 'Everything is awesome'
+    emmet_doc = TIBDLockingPerson.create_one_locked( {'name' => 'Emmet', 'message' => message}, @agent1, lock_hold_duration: 10 )
+    sleep 5
+    lucy_doc = TIBDLockingPerson.create_one_locked( {'name' => 'Lucy', 'message' => message}, @agent1, lock_hold_duration: 10 )
+    sleep 5
+
+    expired_docs = TIBDLockingPerson.find_many_read_only( { '_locked.until' => { '$lt' => Time.now.utc }})
+    unlocked_docs = TIBDLockingPerson.find_many_read_only( { '_locked' => false })
+    assert_equal 1, expired_docs.count
+    assert_equal 0, unlocked_docs.count
+
+    TIBDLockingPerson.force_reset_expired_locks
+    expired_docs = TIBDLockingPerson.find_many_read_only( { '_locked.until' => { '$lt' => Time.now.utc }})
+    unlocked_docs = TIBDLockingPerson.find_many_read_only( { '_locked' => false })
+    assert_equal 0, expired_docs.count
+    assert_equal 1, unlocked_docs.count
+
+  end
+
 end
 

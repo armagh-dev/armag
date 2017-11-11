@@ -25,10 +25,11 @@ require 'mocha/test_unit'
 class CollectionLA; end
 class CollectionFailedLA; end
 
+LOCK_HOLD_DURATION = 10
 class DocumentLA < Armagh::BaseDocument::Document
   include Armagh::BaseDocument::LockingCRUD
   def self.default_collection; CollectionLA; end
-  def self.default_lock_hold_duration; 10; end
+  def self.default_lock_hold_duration; LOCK_HOLD_DURATION; end
   def self.default_lock_wait_duration; 15; end
   delegated_attr_accessor :name
   delegated_attr_accessor :message
@@ -76,6 +77,10 @@ class TestBaseDocumentLockingCRUD < Test::Unit::TestCase
   def has_valid_lock_params( query_qualifier, query_set, locker_sig, orig_qual, orig_set )
     has_valid_unlock_qualifier( query_qualifier, orig_qual, locker_sig) &&
     has_valid_locking_set( query_set, locker_sig, orig_set )
+  end
+
+  def has_locked_until( h )
+    h.keys.include? '_locked.until'
   end
 
   def is_locked( doc, by )
@@ -481,5 +486,12 @@ class TestBaseDocumentLockingCRUD < Test::Unit::TestCase
     assert_equal 'prepare to die', doc.message
     assert_in_delta sleep_between_create_and_update, ( doc.updated_timestamp - original_updated_timestamp  ), 0.5
 
+  end
+
+  def test_force_reset_expired_locks
+    CollectionLA.expects(:update_many).with(){ |qual,set|
+      has_locked_until( qual ) && set == { '$set' => { '_locked' => false}}
+    }
+    DocumentLA.force_reset_expired_locks
   end
 end

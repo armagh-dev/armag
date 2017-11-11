@@ -66,7 +66,7 @@ class TestLauncher < Test::Unit::TestCase
     @collection_trigger.stubs(:start)
     @collection_trigger.stubs(:stop)
     @collection_trigger.stubs(:logger)
-    Armagh::Utils::CollectionTrigger.stubs(:new).returns(@collection_trigger)
+    Armagh::Utils::ScheduledActionTrigger.stubs(:new).returns(@collection_trigger)
   end
 
   def mock_connection

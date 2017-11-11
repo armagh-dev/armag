@@ -20,6 +20,8 @@ require 'tsort'
 require 'configh'
 
 require_relative '../utils/t_sortable_hash'
+require_relative '../logging/alert'
+require_relative '../status'
 
 module Armagh
   module Actions
@@ -27,6 +29,8 @@ module Armagh
     class WorkflowInitError < StandardError; end
     class WorkflowConfigError < StandardError; end
     class WorkflowActivationError < StandardError; end
+    class WorkflowDocumentsInProcessError < StandardError; end
+
     class ActionConfigError < StandardError
       attr_reader :config_markup
       def initialize( message, config_markup=nil )
@@ -40,20 +44,17 @@ module Armagh
       include Configh::Configurable
       attr_reader :name, :valid_action_configs, :invalid_action_configs, :actions, :has_no_cycles
 
-      RUNNING   = 'run'.freeze
-      STOPPED   = 'stop'.freeze
-      FINISHING = 'finish'.freeze
+      VALID_RUN_MODES = [ Armagh::Status::RUNNING, Armagh::Status::STOPPING, Armagh::Status::STOPPED ]
 
-      define_parameter name: 'run_mode', type: 'string', description: "#{RUNNING}, #{FINISHING}, or #{STOPPED}", required: true, default: STOPPED, group: 'workflow'
+      define_parameter name: 'run_mode', type: 'string', description: VALID_RUN_MODES.join(", "), required: true, default: Armagh::Status::STOPPED, group: 'workflow'
       define_parameter name: 'retired',  type: 'boolean', description: 'not normally displayed', required: true, default: false, group: 'workflow'
       define_parameter name: 'unused_output_docspec_check', type: 'boolean', description: 'verify that there are no unused output docspecs', required: true, default: true, group: 'workflow'
       define_group_validation_callback callback_class: Workflow, callback_method: 'check_run_mode'
 
       def self.check_run_mode(candidate_config)
         error = nil
-        good_run_modes = [ RUNNING, FINISHING, STOPPED ]
-        unless good_run_modes.include? candidate_config.workflow.run_mode
-          error = "run_mode must be one of: #{good_run_modes}"
+        unless VALID_RUN_MODES.include? candidate_config.workflow.run_mode
+          error = "run_mode must be one of: #{VALID_RUN_MODES.join(", ")}"
         end
         error
       end
@@ -123,7 +124,7 @@ module Armagh
 
       def update_action_config( type, cand_config_values, creating: false)
 
-        raise( WorkflowConfigError, 'Stop workflow before making changes' ) unless run_mode == STOPPED
+        raise( WorkflowConfigError, 'Stop workflow before making changes' ) unless stopped?
 
         begin
           action_class = Actions.name_to_class( type )
@@ -183,7 +184,7 @@ module Armagh
       end
 
       def retired=(retire)
-        raise(WorkflowConfigError, 'Stop workflow before retiring it') unless run_mode == STOPPED
+        raise(WorkflowConfigError, 'Stop workflow before retiring it') unless stopped?
         @config.update_merge({'workflow'=>{'retired'=>retire}})
         @notify_to_refresh&.refresh
       end
@@ -201,7 +202,7 @@ module Armagh
       def unused_output_docspec_check=(val)
         return if val == unused_output_docspec_check
         raise(WorkflowConfigError, 'Must specify boolean value for unused_output_docspec_check') unless val == true || val == false
-        raise(WorkflowConfigError, 'Stop workflow before changing unused_output_docspec_check') unless run_mode == STOPPED
+        raise(WorkflowConfigError, 'Stop workflow before changing unused_output_docspec_check') unless stopped?
         @check_unused_outputs = val
         raise(WorkflowConfigError, unused_output_message) if val && has_unused_output?
         @config.update_merge({'workflow'=>{'unused_output_docspec_check'=>val}})
@@ -228,11 +229,19 @@ module Armagh
       end
 
       def running?
-        @config.workflow.run_mode == RUNNING
+        @config.workflow.run_mode == Armagh::Status::RUNNING
+      end
+
+      def stopping?
+        @config.workflow.run_mode == Armagh::Status::STOPPING
+      end
+
+      def stopped?
+        @config.workflow.run_mode == Armagh::Status::STOPPED
       end
 
       def run
-        raise(WorkflowActivationError, 'Wait for workflow to stop before restarting' ) unless run_mode == STOPPED
+        raise(WorkflowActivationError, 'Wait for workflow to stop before restarting' ) unless stopped?
         raise(WorkflowActivationError, 'Workflow not valid') unless valid?
         raise(WorkflowActivationError, unused_output_message) if has_unused_output?
 
@@ -251,41 +260,39 @@ module Armagh
         raise(WorkflowActivationError, callback_errors.join("\n")) unless callback_errors.empty?
 
         change_actions_active_status(true)
-        @config.update_merge({'workflow'=>{'run_mode' => RUNNING}})
+        @config.update_merge({'workflow'=>{'run_mode' => Armagh::Status::RUNNING}})
 
         @notify_to_refresh&.refresh
         status
       end
 
-      #TODO - This method is intended to stop collection so we can finish processing out
-      # this workflow.  Just setting the collect action inactive isn't enough - what
-      # if there's a collect doc sitting out there, or one that's been picked up by
-      # an agent, we could have a race condition.
-      def finish
+      private def move_to_stopping
         raise(WorkflowActivationError, 'Workflow not valid') unless valid?
-        raise(WorkflowActivationError, 'Workflow not running' ) unless run_mode == RUNNING
+        raise(WorkflowActivationError, 'Workflow not running' ) unless running?
 
         change_actions_active_status( false, collect_actions_only: true )
-        @config.update_merge( { 'workflow' => { 'run_mode' => FINISHING }} )
+        @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPING }} )
+        sleep 1
         @notify_to_refresh&.refresh
-        status
       end
 
       def stop
         raise( WorkflowActivationError, 'Workflow not valid' ) unless valid?
 
-        if @config.workflow.run_mode == RUNNING
-          finish
+        if running?
+          move_to_stopping
+          sleep 3
+        end
+
+        total_docs = doc_counts.sum
+        if total_docs.zero?
+          change_actions_active_status( false )
+          @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPED }} )
+          sleep 1
+          @notify_to_refresh&.refresh
+          status
         else
-          num_docs = doc_counts.inject(0){|r,n| r+n}
-          if num_docs == 0
-            change_actions_active_status( false )
-            @config.update_merge( { 'workflow' => { 'run_mode' => STOPPED }} )
-            @notify_to_refresh&.refresh
-            status
-          else
-            raise( WorkflowActivationError, "Cannot stop - #{num_docs} documents still processing")
-          end
+          raise( WorkflowDocumentsInProcessError, "Cannot stop - #{total_docs} documents still processing")
         end
       end
 
@@ -326,6 +333,7 @@ module Armagh
 
       def status
         working_docs_count, failed_docs_count, published_pending_consume_docs_count = doc_counts
+        alerts = Logging::Alert.get_counts( workflow: @name )
 
         valid = true
         action_statuses.each { |action| valid = false unless action['valid'] }
@@ -339,7 +347,9 @@ module Armagh
           'failed_docs_count'  => failed_docs_count,
           'published_pending_consume_docs_count' => published_pending_consume_docs_count,
           'docs_count' => working_docs_count + failed_docs_count + published_pending_consume_docs_count,
-          'valid' => valid
+          'valid' => valid,
+          'warn_alerts' => alerts[ 'warn' ],
+          'error_alerts' => alerts[ 'error' ]
         }
       end
 
@@ -445,7 +455,7 @@ module Armagh
 
       def new_action_config( type )
 
-        raise( WorkflowConfigError, 'Stop workflow before making changes' ) unless run_mode == STOPPED
+        raise( WorkflowConfigError, 'Stop workflow before making changes' ) unless stopped?
 
         begin
           action_class = Actions.name_to_class(type)
