@@ -49,18 +49,9 @@ module Armagh
     define_parameter name: "num_agents",        description: "Number of agents",                      type: 'positive_integer', required: true, default: 1,      group: 'launcher'
     define_parameter name: "update_frequency",  description:  "Configuration refresh rate (seconds)", type: 'positive_integer', required: true, default: 60,     group: 'launcher'
     define_parameter name: "checkin_frequency", description: "Status update rate (seconds)",          type: 'positive_integer', required: true, default: 60,     group: 'launcher'
-    define_parameter name: "log_level",         description: "Log level",                             type: 'populated_string', required: true, default: 'info', group: 'launcher'
-    define_group_validation_callback callback_class: Launcher, callback_method: :report_validation_errors
+    define_parameter name: "log_level",         description: "Log level",                             type: 'string',           required: true, options:  Armagh::Logging.valid_log_levels.collect{|s| s.encode('UTF-8')}, default: 'info', group: 'launcher'
 
     TERM_SIGNALS = [:INT, :QUIT, :TERM]
-
-    def Launcher.report_validation_errors( candidate_config )
-      errors = nil
-      unless Logging.valid_level?( candidate_config.launcher.log_level)
-        errors = "Log level must be one of #{ Logging.valid_log_levels.join(', ')}"
-      end
-      errors
-    end
 
     def Launcher.config_name( launcher_name = CONFIG_NAME )
       [ Connection.ip, launcher_name ].join("_")

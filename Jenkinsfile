@@ -24,16 +24,13 @@ def isNewBuild(name) {
 
 
 try {
-
 currentBuild.result = "SUCCESS"
-
-
   node('armagh-builder') {
 
      stage('Prep') {
 
        deleteDir()
-     
+
        checkout scm
 
        sh """#!/bin/bash -l
@@ -45,18 +42,18 @@ currentBuild.result = "SUCCESS"
          mongod --version
        """
      }
-  
+
      stage('Unit Test') {
-     
+
        sh """#!/bin/bash -l
          echo -e "*********************************************\n** Unit testing:" `hg identify -i` "\n*********************************************"
          set -e
          bundle exec rake test --trace
        """
      }
-  
+
      stage('Integration Test') {
-     
+
        sh """#!/bin/bash -l
          echo -e "*********************************************\n** Integration testing:" `hg identify -i` "\n*********************************************"
          set -e
@@ -65,7 +62,7 @@ currentBuild.result = "SUCCESS"
      }
 
      stage('Cucumber Test') {
-     
+
        try {
          sh """#!/bin/bash -l
            echo -e "*********************************************\n** Cucumber testing:" `hg identify -i` "\n*********************************************"
@@ -88,7 +85,7 @@ currentBuild.result = "SUCCESS"
      }
 
      stage('Rcov') {
-     
+
        publishHTML (target: [
          allowMissing: false,
          alwaysLinkToLastBuild: false,
@@ -106,7 +103,7 @@ currentBuild.result = "SUCCESS"
          set -e
          bundle exec rake yard --trace
        """
-     
+
        publishHTML (target: [
          allowMissing: false,
          alwaysLinkToLastBuild: false,
@@ -118,16 +115,16 @@ currentBuild.result = "SUCCESS"
      }
 
      stage('Prerelease') {
-
-       if ((env.BRANCH_NAME == "default") && (currentBuild.result == 'SUCCESS') && isNewBuild('armagh')) {
-
-         sh """#!/bin/bash -l
-           echo -e "*********************************************\n** Prereleasing:" `hg identify -i` "\n*********************************************"
-           set -e
-           bundle exec rake prerelease
-         """
-       }
-     }
+       if ((env.BRANCH_NAME == "default") && (currentBuild.result == 'SUCCESS')) {
+         if (isNewBuild('armagh')) {
+           sh """#!/bin/bash -l
+             echo -e "*********************************************\n** Prereleasing:" `hg identify -i` "\n*********************************************"
+             set -e
+             bundle exec rake prerelease
+           """
+         }
+      }
+    }
   }
 }
 
@@ -146,4 +143,3 @@ finally {
   properties([[$class: 'BuildDiscarderProperty', strategy: [$class: 'LogRotator', artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10']]]);
 
 }
-

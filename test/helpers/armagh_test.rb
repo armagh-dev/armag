@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 
-require_relative './armagh_test/logger.rb'
+require_relative './armagh_test/logger'
+require_relative './armagh_test/document_counts'
 
 module ArmaghTest
   ENV['ARMAGH_CONFIG_FILE'] = File.join(__dir__, '..', 'armagh_env_test.json')

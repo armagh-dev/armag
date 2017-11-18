@@ -419,7 +419,7 @@ module Armagh
 
               value = data[key]
               case param[:type]
-              when 'populated_string'
+              when 'string'
                 next if value.to_s.strip.empty?
               when 'string_array'
                 value = value.split("\x19")

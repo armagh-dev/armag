@@ -496,7 +496,6 @@ Feature: Actions Execution
       | log_level         | debug |
     And armagh's "agent" config is
       | log_level | debug |
-#    TODO: And armagh's workflow config is "full_workflow" - do this after merging def.  you'll have to stop the workflow.
     And armagh's workflow config is "too_large_collector"
     And I run armagh
     And I wait until there are agents with the statuses
@@ -521,8 +520,6 @@ Feature: Actions Execution
     And the alerts count should be {"error"=>1, "fatal"=>0, "warn"=>0}
     And the alerts count for the "test_workflow" workflow should be {"error"=>1, "fatal"=>0, "warn"=>0}
     And the alerts count for the "too_large_collector" action should be {"error"=>1, "fatal"=>0, "warn"=>0}
-    And the alerts count for the "full_workflow" workflow should be {"error"=>0, "fatal"=>0, "warn"=>0}
-    And the alerts count for the "test_collect" action should be {"error"=>0, "fatal"=>0, "warn"=>0}
     And the alerts messages should be [ "Error while executing action 'too_large_collector' on 'incoming': Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size." ]
     And the alerts messages for the "test_workflow" workflow should be [ "Error while executing action 'too_large_collector' on 'incoming': Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size."]
     And the alerts messages for the "too_large_collector" action should be [ "Error while executing action 'too_large_collector' on 'incoming': Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size."]
@@ -902,6 +899,7 @@ Feature: Actions Execution
     And the logs should contain 1 "Triggering test_collect-twenty"
     And the logs should contain "Test Collect Running"
     And the logs should not contain "ERROR"
+    And I wait 5 seconds
     And I try to stop the running workflow
     Then the workflow run_mode should be "stopping"
     And the workflow run_mode should become "stopped" in 120 seconds

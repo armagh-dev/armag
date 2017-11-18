@@ -44,12 +44,12 @@ class TestUtilityAction < Test::Unit::TestCase
     config = nil
     assert_nothing_raised do
       config = Armagh::Actions::UtilityActions::SubUtilityAction.create_configuration(@config_store, 'util', {
-        'action' => {'name' => 'mysubutility'},
+        'action' => {'name' => 'mysubutility', 'workflow' => 'wf'},
         'utility' => {'schedule' => '*/10 * * * *'}
       })
     end
 
-    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config, @collection)
+    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config)
     assert_equal 'mysubutility',@utility_action.config.action.name
     assert_equal '*/10 * * * *', @utility_action.config.utility.schedule
     assert @utility_action.config.action.active
@@ -60,10 +60,10 @@ class TestUtilityAction < Test::Unit::TestCase
     config = nil
     assert_nothing_raised do
       config = Armagh::Actions::UtilityActions::SubUtilityAction.create_configuration(@config_store, 'util', {
-          'action' => {'name' => 'mysubutilityaction'}
+          'action' => {'name' => 'mysubutilityaction', 'workflow' => 'wf'}
       })
     end
-    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config, @collection)
+    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config)
     assert_equal 'mysubutilityaction',@utility_action.config.action.name
     assert_nil @utility_action.config.utility.schedule
     assert @utility_action.config.action.active
@@ -74,7 +74,7 @@ class TestUtilityAction < Test::Unit::TestCase
     expected_error = Configh::ConfigInitError.new( "Unable to create configuration for 'Armagh::Actions::UtilityActions::SubUtilityAction' named 'util' because: \n    Schedule 'notacron' is not valid cron syntax.")
     assert_raises expected_error do
     config = Armagh::Actions::UtilityActions::SubUtilityAction.create_configuration(@config_store, 'util', {
-        'action' => {'name' => 'mysubutilityaction'},
+        'action' => {'name' => 'mysubutilityaction', 'workflow' => 'wf'},
         'utility' => {'schedule' => 'notacron'}
     })
     end
@@ -88,10 +88,10 @@ class TestUtilityAction < Test::Unit::TestCase
 
   def test_run_not_implemented
     config = Armagh::Actions::UtilityActions::SubUtilityAction.create_configuration(@config_store, 'util', {
-        'action' => {'name' => 'mysubutility'}
+        'action' => {'name' => 'mysubutility', 'workflow' => 'wf'}
     })
 
-    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config, @collection)
+    @utility_action = Armagh::Actions::UtilityActions::SubUtilityAction.new(@caller, 'logger_name', config)
     expected_error = Armagh::Actions::Errors::ActionMethodNotImplemented.new("Utility actions must overwrite the run method.")
     assert_raises expected_error do
       @utility_action.run

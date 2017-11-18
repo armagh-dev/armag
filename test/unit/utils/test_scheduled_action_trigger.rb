@@ -33,7 +33,7 @@ require 'mocha/test_unit'
 class UTAction < Armagh::Actions::Collect
   def self.make_test_config(store:, action_name:, collected_doctype:)
     create_configuration(store, action_name, {
-      'action' => {'name' => action_name, 'active' => true},
+      'action' => {'name' => action_name, 'active' => true, 'workflow' => 'wf'},
       'collect' => {'schedule' => '* * * * *', 'archive' => false},
       'input' => {},
       'output' => {
@@ -44,7 +44,7 @@ class UTAction < Armagh::Actions::Collect
 
   def self.make_long_test_config(store:, action_name:, collected_doctype:)
     create_configuration(store, action_name, {
-      'action' => {'name' => action_name, 'active' => true},
+      'action' => {'name' => action_name, 'active' => true, 'workflow' => 'wf'},
       'collect' => {'schedule' => '* 0 1 * *', 'archive' => false},
       'input' => {},
       'output' => {
@@ -83,7 +83,7 @@ class TestScheduledActionTrigger < Test::Unit::TestCase
     @mock_doc.attr_singleton_accessor :last_run, :seen_actions, :locked_by_me_until
     @mock_doc.last_run = {}
     @mock_doc.seen_actions = []
-    @mock_doc.locked_by_me_until = Time.now + 60
+    def @mock_doc.locked_by_me_until(me);  Time.now.utc + 60; end
     def @mock_doc.locked_by_anyone?; true; end
     @mock_doc.expects(:save).at_least_once
     Armagh::TriggerManagerSemaphoreDocument.expects( :create_one_unlocked ).returns( 'inserted_id_response' )
@@ -134,9 +134,8 @@ class TestScheduledActionTrigger < Test::Unit::TestCase
   end
 
   def test_start_stop_restart
-    setup_good_trigger_existing_config
+    setup_good_trigger_new_config
     setup_run
-    @mock_doc.expects(:save).at_least_once
 
     time_plus_100 = Time.now + 100
     @trigger.instance_variable_get(:@last_run)['name'] = time_plus_100

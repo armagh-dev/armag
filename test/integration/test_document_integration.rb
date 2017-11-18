@@ -186,7 +186,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
     assert_nothing_raised {Armagh::Document.force_unlock_all_in_collection_held_by(@agent)}
   end
 
-  def test_count_incomplete_all
+  def test_count_failed_and_in_process_documents_by_doctype
 
 
     n = 0
@@ -196,6 +196,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
       [ 'doc_type3', Armagh::Documents::DocState::READY,     nil, false, 6 ],
       [ 'pub_type1', Armagh::Documents::DocState::PUBLISHED, nil, false, 5 ],
       [ 'pub_type1', Armagh::Documents::DocState::PUBLISHED, ['act'], false, 3 ],
+      [ 'pub_type1', Armagh::Documents::DocState::PUBLISHED, nil, true, 2 ],
       [ 'doc_type2', Armagh::Documents::DocState::READY, nil, true, 1 ]
     ].each do |dtype, dstate, pending_actions, failed, number|
 
@@ -223,12 +224,17 @@ class TestDocumentIntegration < Test::Unit::TestCase
       end
     end
 
-    counts = Armagh::Document.count_incomplete_by_doctype
-    expected_counts = {
-        'documents' => { 'doc_type1:ready' => 4, 'doc_type2:ready' => 5, 'doc_type3:ready' => 6 },
-        'documents.pub_type1' => { 'pub_type1:published' => 3 },
-        'failures' => { 'doc_type2:ready' => 1}
-    }
-    assert_equal expected_counts, counts
+    sleep 1
+    Armagh::Document.clear_document_counts
+    expected_counts = [
+        { 'category' => 'in process', 'docspec_string' => 'doc_type1:ready',     'count' => 4, 'published_collection' => nil },
+        { 'category' => 'in process', 'docspec_string' => 'doc_type2:ready',     'count' => 5, 'published_collection' => nil },
+        { 'category' => 'in process', 'docspec_string' => 'doc_type3:ready',     'count' => 6, 'published_collection' => nil },
+        { 'category' => 'failed',     'docspec_string' => 'doc_type2:ready',     'count' => 1, 'published_collection' => nil },
+        { 'category' => 'in process', 'docspec_string' => 'pub_type1:published', 'count' => 3, 'published_collection' => 'pub_type1' },
+        { 'category' => 'failed',     'docspec_string' => 'pub_type1:published', 'count' => 2, 'published_collection' => 'pub_type1' }
+    ]
+    counts = Armagh::Document.count_failed_and_in_process_documents_by_doctype
+    assert_equal expected_counts.sort_by{ |c| c['count']}, counts.sort_by{ |c| c['count']}
   end
 end

@@ -22,7 +22,7 @@ require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
-require_relative '../helpers/armagh_test/logger'
+require_relative '../helpers/armagh_test'
 require_relative '../../lib/armagh/utils/scheduled_action_trigger'
 
 require 'armagh/actions'
@@ -79,14 +79,13 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     MongoSupport.instance.clean_database
     @config_store = []
 
-    @workflow_set = Armagh::Actions::WorkflowSet.for_agent(@config_store)
-    @wf = @workflow_set.create_workflow( {'workflow' => { 'name' => 'wf'}})
+    @workflow_set = Armagh::Actions::WorkflowSet.for_agent(@config_store, logger: @logger)
+    @wf = @workflow_set.create_workflow( {'workflow' => { 'name' => 'wf'}}, logger: @logger)
     @wf.unused_output_docspec_check = false
     @collect_config = Armagh::StandardActions::CollectActionForTest.make_test_config(workflow: @wf, action_name: 'collect_action', collected_doctype: 'collect_type')
     Armagh::StandardActions::SplitActionForTest.make_test_config(workflow: @wf, action_name: 'split_action', input_doctype: 'incoming_split', output_doctype: 'outgoing_split')
-
-    @scheduled_action_trigger = Armagh::Utils::ScheduledActionTrigger.new(@workflow_set)
     @wf.run
+    @scheduled_action_trigger = Armagh::Utils::ScheduledActionTrigger.new(@workflow_set)
   end
 
   def teardown
@@ -125,7 +124,7 @@ class TestCollectTriggerIntegration < Test::Unit::TestCase
     sleep 1 if sec < 1
 
     @scheduled_action_trigger.start
-    wait_for_documents(70)
+    wait_for_documents(90)
 
     MongoSupport.instance.drop_collection( 'documents' )
     assert_empty MongoSupport.instance.get_mongo_documents('documents').to_a

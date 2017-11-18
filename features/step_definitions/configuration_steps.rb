@@ -25,7 +25,8 @@ require 'test/unit/assertions'
 require 'time'
 
 When(/^armagh's workflow config is "([^"]*)"$/) do |config|
-  @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+  logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')
+  @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config, logger: logger)
   @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
   @workflow.unused_output_docspec_check = false
 
@@ -470,6 +471,8 @@ Then(/the workflow run_mode should become "([^"]*)" in (\d+) seconds/) do |expec
 end
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
+  logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::ConfigurationSteps')
+
   config = table.rows_hash
   config.default = nil
 
@@ -483,7 +486,7 @@ When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
     when 'agent'
       @agent_config = Armagh::Agent.force_update_configuration(Armagh::Connection.config, 'default', {'agent' => config})
     when 'action'
-      @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+      @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config, logger: logger)
       @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
       @workflow.unused_output_docspec_check = false
 

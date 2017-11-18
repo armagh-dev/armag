@@ -29,6 +29,7 @@ require 'test/unit'
 require 'mocha/test_unit'
 
 class TestDocument < Test::Unit::TestCase
+  include ArmaghTest
 
   def setup
     @documents = mock('documents')
@@ -252,7 +253,7 @@ class TestDocument < Test::Unit::TestCase
 
   def test_dev_errors
     assert_empty(@doc.dev_errors)
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     failures = [
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
@@ -261,7 +262,7 @@ class TestDocument < Test::Unit::TestCase
     failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
     assert_equal(2, @doc.dev_errors.length)
-    assert_true @doc.error?
+    assert_true @doc.error
 
     failures.each do |failure|
       name = failure[:name]
@@ -283,20 +284,20 @@ class TestDocument < Test::Unit::TestCase
     end
 
     assert_empty @doc.dev_errors
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
-    assert_true @doc.error?
+    assert_true @doc.error
 
     @doc.clear_dev_errors
-    assert_false @doc.error?
+    assert_nil @doc.error
     assert_empty @doc.dev_errors
   end
 
   def test_ops_errors
     assert_empty(@doc.ops_errors)
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     failures = [
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
@@ -305,7 +306,7 @@ class TestDocument < Test::Unit::TestCase
     failures.each { |f| @doc.add_error_to_ops_errors(f[:name], f[:details]) }
 
     assert_equal(2, @doc.ops_errors.length)
-    assert_true @doc.error?
+    assert_true @doc.error
 
     failures.each do |failure|
       name = failure[:name]
@@ -327,26 +328,26 @@ class TestDocument < Test::Unit::TestCase
     end
 
     assert_empty @doc.ops_errors
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     failures.each { |f| @doc.add_error_to_ops_errors(f[:name], f[:details]) }
 
-    assert_true @doc.error?
+    assert_true @doc.error
 
     @doc.clear_ops_errors
-    assert_false @doc.error?
+    assert_nil @doc.error
     assert_empty @doc.ops_errors
   end
 
   def test_pending_and_failed
     assert_false @doc.pending_work?
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     pending_actions = %w(Action1 Action2 Action3)
     @doc.add_items_to_pending_actions pending_actions
 
     assert_true @doc.pending_work?
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     failures = [
       {name: 'failed_action', details: RuntimeError.new('runtime error')},
@@ -355,16 +356,16 @@ class TestDocument < Test::Unit::TestCase
     failures.each { |f| @doc.add_error_to_dev_errors(f[:name], f[:details]) }
 
     assert_false @doc.pending_work?
-    assert_true @doc.error?
+    assert_true @doc.error
 
     @doc.clear_dev_errors
 
     assert_true @doc.pending_work?
-    assert_false @doc.error?
+    assert_nil @doc.error
 
     @doc.clear_pending_actions
     assert_false @doc.pending_work?
-    assert_false @doc.error?
+    assert_nil @doc.error
   end
 
   def test_ids
@@ -660,68 +661,29 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(expected, @doc.to_json)
   end
 
-  def setup_count_incomplete_tests
-
-    docs_type1 = mock
-    docs_type2 = mock
-    failures = mock
-    %w{ docs_type1 docs_type2 }.each do |coll_mock|
-      Armagh::Connection.stubs( :documents ).with( coll_mock ).returns( eval(coll_mock))
-      eval(coll_mock).stubs( :name ).returns( coll_mock)
-      eval(coll_mock)
-          .stubs( :aggregate )
-          .with( [
-                     { '$match'=>{ 'pending_work' => true }},
-                     { '$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}
-                 ])
-          .returns( [{ '_id' => { 'type' => coll_mock, 'state' => 'published' }, 'count' => 4 }] )
-    end
-    @documents.stubs( :name ).returns( 'documents' )
-    @documents
-        .stubs( :aggregate )
-        .with( [{'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}])
-        .returns( [{ '_id' => { 'type' => 'pre_docs_type1', 'state' => 'ready' }, 'count' => 3 },
-                   { '_id' => { 'type' => 'pre_docs_type2', 'state' => 'ready' }, 'count' => 6 }] )
-    Armagh::Connection.stubs( :failures ).returns( failures )
-    failures.stubs( :name ).returns( 'failures' )
-    failures
-        .stubs( :aggregate )
-        .with( [{'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}])
-        .returns( [{ '_id' => { 'type' => 'failures', 'state' => 'ready' }, 'count' => 3 }] )
-    Armagh::Connection.stubs(:all_document_collections).returns( [ @documents, docs_type1, docs_type2])
-    Armagh::Connection.stubs( :published_collection?).with( @documents ).returns(false)
-    Armagh::Connection.stubs( :published_collection?).with( docs_type1 ).returns(true)
-    Armagh::Connection.stubs( :published_collection?).with( docs_type2 ).returns(true)
-
-  end
-
   def test_count_incomplete_all
-    setup_count_incomplete_tests
 
+    Armagh::Document.clear_document_counts
     counts = nil
+    expected_counts =
+        [
+            { 'category' => 'in process', 'docspec_string' => 'docs_type1:ready',     'count' => 5, 'published_collection' => nil },
+            { 'category' => 'in process', 'docspec_string' => 'docs_type2:ready',     'count' => 6, 'published_collection' => nil },
+            { 'category' => 'failed',     'docspec_string' => 'docs_type1:ready',     'count' => 7, 'published_collection' => nil },
+            { 'category' => 'failed',     'docspec_string' => 'docs_type2:ready',     'count' => 8, 'published_collection' => nil },
+            { 'category' => 'in process', 'docspec_string' => 'docs_type1:published', 'count' => 1, 'published_collection' => 'docs_type1' },
+            { 'category' => 'in process', 'docspec_string' => 'docs_type2:published', 'count' => 2, 'published_collection' => 'docs_type2' },
+            { 'category' => 'failed',     'docspec_string' => 'docs_type1:published', 'count' => 3, 'published_collection' => 'docs_type1' },
+            { 'category' => 'failed',     'docspec_string' => 'docs_type2:published', 'count' => 4, 'published_collection' => 'docs_type2' }
+        ]
+    Armagh::Connection.unstub(:documents)
+    Armagh::Connection.unstub(:all_document_collections)
+
+    expect_document_counts( expected_counts )
     assert_nothing_raised do
-      counts = Armagh::Document.count_incomplete_by_doctype
+      counts = Armagh::Document.count_failed_and_in_process_documents_by_doctype
     end
-    expected_counts =  {
-        'documents' => { 'pre_docs_type1:ready'=>3, 'pre_docs_type2:ready'=>6 },
-        'failures'  => {'failures:ready'=>3},
-        'docs_type1' => {'docs_type1:published'=>4},
-        'docs_type2'=>{'docs_type2:published'=>4} }
     assert_equal expected_counts, counts
   end
 
-  def test_count_incomplete_selected
-    setup_count_incomplete_tests
-
-    counts = nil
-    assert_nothing_raised do
-      counts = Armagh::Document.count_incomplete_by_doctype( ['docs_type1'])
-    end
-    expected_counts =  {
-        'documents' => { 'pre_docs_type1:ready'=>3, 'pre_docs_type2:ready'=>6 },
-        'failures'  => {'failures:ready'=>3},
-        'docs_type1' => {'docs_type1:published'=>4} }
-    assert_equal expected_counts, counts
-
-  end
-end
+ end

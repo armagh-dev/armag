@@ -280,10 +280,10 @@ class TestConnection < Test::Unit::TestCase
 
   def test_index_published_doc_collection
     indexes = mock
-    indexes.expects(:create_one).times(3)
+    indexes.expects(:create_one).times(4)
     collection = mock
     collection.stubs(:name).returns('documents.PublishedType')
-    collection.stubs(:indexes).returns(indexes).times(3)
+    collection.stubs(:indexes).returns(indexes).times(4)
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
   end

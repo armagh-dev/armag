@@ -187,6 +187,12 @@ module Armagh
                                       unique: true,
                                       partial_filter_expression: {'document_id' => {'$exists' => true} },
                                       name: 'published_document_ids')
+
+        collection.indexes.create_one({'document_id' => 1, 'pending_actions' => 1 },
+                                      unique: true,
+                                      name: 'published_with_errors',
+                                      partial_filter_expression: { 'document_id' => {'$exists'=>true}, 'error' => true }
+        )
       else
         collection.indexes.create_one({'document_id' => 1, 'type' => 1},
                                       unique: true,

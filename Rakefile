@@ -41,10 +41,12 @@ Rake::TestTask.new(:integration) do |t|
   t.options = '-v'
 end
 
+desc 'cleans artifacts left from building'
 task :clean do
   rm_rf Dir.glob(%w(doc .yardoc coverage features/**/coverage test/**/coverage failure_logs))
 end
 
+desc 'check license compliance'
 task :check_licenses do
   sh 'bundle exec license_finder --quiet --decisions_file licensing/approvals.yml'
 end

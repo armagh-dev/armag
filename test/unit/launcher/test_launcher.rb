@@ -132,7 +132,7 @@ class TestLauncher < Test::Unit::TestCase
   end
 
   def test_configure_set_log_level_invalid
-    assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Log level must be one of debug, info, warn, ops_warn, dev_warn, error, ops_error, dev_error, fatal, any" )
+    assert_configure( { 'launcher' => { 'log_level' => 'fred' }}, nil, nil, nil, nil, Configh::ConfigInitError, "Unable to create configuration for 'Armagh::Launcher' named 'default' because: \n    Group 'launcher' Parameter 'log_level': value is not one of the options (debug,info,warn,ops_warn,dev_warn,error,ops_error,dev_error,fatal,any)" )
   end
 
   def test_checkin_running

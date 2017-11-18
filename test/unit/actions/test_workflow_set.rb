@@ -16,7 +16,7 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../../helpers/armagh_test/logger'
+require_relative '../../helpers/armagh_test'
 require 'test/unit'
 require 'mocha/test_unit'
 
@@ -41,12 +41,14 @@ class TestWorkflowSet < Test::Unit::TestCase
     @alice_workflow_actions_config_values = WorkflowGeneratorHelper.workflow_actions_config_values_with_divide( 'alice' )
     @fred_workflow_config_values = {'workflow'=>{'name' => 'fred'}}
     @fred_workflow_actions_config_values  = WorkflowGeneratorHelper.workflow_actions_config_values_no_divide('fred')
-    @state_coll = mock
     Armagh::Connection.stubs(:config).returns(@config_store)
+
+    Armagh::Document.clear_document_counts
   end
 
   def good_alice_in_db
-    @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @alice = @wf_set.create_workflow( { 'workflow' => { 'name' => 'alice' }} )
     @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
@@ -55,7 +57,8 @@ class TestWorkflowSet < Test::Unit::TestCase
   end
 
   def good_fred_in_db
-    @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @fred = @wf_set.create_workflow( { 'workflow' => { 'name' => 'fred' }} )
     @fred.unused_output_docspec_check = false
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
@@ -69,43 +72,21 @@ class TestWorkflowSet < Test::Unit::TestCase
   end
 
   def expect_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_alicedoc:ready'=>9, 'b_alicedocs_aggr:ready'=>20, 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_alicedoc:ready'=>3, 'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {'a_alicedoc:published'=>4},
-                      'b_alicedoc' => {'b_alicedoc:published'=>5}
-                  })
+    expect_document_counts( [
+      { 'category' => 'in process', 'docspec_string' => 'a_alicedoc:ready',       'count' =>9},
+      { 'category' => 'in process', 'docspec_string' => 'b_alicedocs_aggr:ready', 'count' =>20},
+      { 'category' => 'failed',     'docspec_string' => 'a_alicedoc:ready',       'count'=>3 }
+    ])
     Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def expect_no_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .at_least_once
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {},
-                      'b_alicedoc' => {}
-                  })
+    expect_document_counts([])
     Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def expect_no_fred_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .at_least_once
-        .with(["a_freddoc", "b_freddoc"])
-        .returns( {
-                      'documents' => { },
-                      'failures'   => { },
-                      'a_alicedoc' => {},
-                      'b_alicedoc' => {}
-                  })
+    expect_document_counts( [])
     Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
@@ -201,7 +182,6 @@ class TestWorkflowSet < Test::Unit::TestCase
     good_alice_in_db
     good_fred_in_db
     expect_alice_docs_in_db
-    expect_no_fred_docs_in_db
 
     Armagh::Logging::Alert.expects( :get_counts ).at_least_once.with( { :workflow => 'alice' }).returns( { 'warn' => 2, 'error' => 3 })
     Armagh::Logging::Alert.expects( :get_counts ).at_least_once.with( { :workflow => 'fred' }).returns( { 'warn' => 0, 'error' => 0 })
@@ -211,16 +191,14 @@ class TestWorkflowSet < Test::Unit::TestCase
 
     wf_set = nil
     assert_nothing_raised do
-      wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store )
+      wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store, logger: @logger )
     end
 
     expected = [
-      {"name"=>"alice", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0},
-      {"name"=>"fred", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
+      {"name"=>"alice", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "documents_in_process"=>29, "failed_documents"=>3, "valid"=>true, 'warn_alerts' => 2, 'error_alerts' => 3},
+      {"name"=>"fred", "run_mode"=>"running", "retired"=>false, "unused_output_docspec_check"=>false, "documents_in_process"=>0, "failed_documents"=>0,  "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     ]
 
-    expect_alice_docs_in_db
-    expect_no_fred_docs_in_db
     assert_equal expected, wf_set.list_workflows
   end
 
@@ -234,7 +212,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     action = nil
     action_config = @alice.valid_action_configs.find{ |ac| ac.__name == 'collect_alicedocs_from_source' }
     assert_nothing_raised do
-      action = wf_set.instantiate_action_from_config(action_config, @caller, @logger, @state_coll)
+      action = wf_set.instantiate_action_from_config(action_config, @caller, @logger)
     end
     assert_equal Armagh::StandardActions::TWTestCollect, action.class
   end
@@ -242,7 +220,7 @@ class TestWorkflowSet < Test::Unit::TestCase
   def test_instantiate_action_from_config_nil
     wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store )
     e = assert_raises( Armagh::Actions::ActionInstantiationError ) do
-      wf_set.instantiate_action_from_config( nil, @caller, @logger, @state_coll)
+      wf_set.instantiate_action_from_config( nil, @caller, @logger)
     end
     assert_equal 'Attempt to instantiate nil action config', e.message
   end
@@ -254,7 +232,7 @@ class TestWorkflowSet < Test::Unit::TestCase
 
     action_config = @alice.valid_action_configs.find{ |ac| ac.__name == 'collect_alicedocs_from_source' }
     e = assert_raises Armagh::Actions::ActionInstantiationError do
-      wf_set.instantiate_action_from_config(action_config, @caller, @logger, @state_coll)
+      wf_set.instantiate_action_from_config(action_config, @caller, @logger)
     end
     assert_equal 'Action not active', e.message
   end
@@ -267,7 +245,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     action = nil
     wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store )
     assert_nothing_raised do
-      action = wf_set.instantiate_action_named('collect_alicedocs_from_source', @caller, @logger, @state_coll)
+      action = wf_set.instantiate_action_named('collect_alicedocs_from_source', @caller, @logger)
     end
     assert_equal Armagh::StandardActions::TWTestCollect, action.class
   end
@@ -276,7 +254,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     good_alice_in_db
     wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store )
     e = assert_raises( Armagh::Actions::ActionInstantiationError ) do
-      wf_set.instantiate_action_named('i_dont_exist', @caller, @logger, @state_coll)
+      wf_set.instantiate_action_named('i_dont_exist', @caller, @logger)
     end
     assert_equal 'Action i_dont_exist not defined', e.message
   end
@@ -288,7 +266,7 @@ class TestWorkflowSet < Test::Unit::TestCase
 
     wf_set = Armagh::Actions::WorkflowSet.for_agent( @config_store )
     e = assert_raises( Armagh::Actions::ActionInstantiationError ) do
-      wf_set.instantiate_action_named(nil, @caller, @logger, @state_coll)
+      wf_set.instantiate_action_named(nil, @caller, @logger)
     end
     assert_equal 'Action name cannot be nil', e.message
   end
@@ -302,7 +280,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     actions = nil
     actions = wf_set.instantiate_actions_handling_docspec(
         Armagh::Documents::DocSpec.new('b_alicedocs_aggr_big', Armagh::Documents::DocState::READY),
-        @caller, @logger, @state_coll )
+        @caller, @logger)
     assert_equal 'divide_b_alicedocs', actions.first.config.action.name
     assert_equal Armagh::StandardActions::TWTestDivide, actions.first.class
     assert_equal 'split_b_alicedocs', actions.last.config.action.name
@@ -353,7 +331,7 @@ class TestWorkflowSet < Test::Unit::TestCase
     wf_set = Armagh::Actions::WorkflowSet.for_agent(@config_store)
     action_name = 'collect_alicedocs_from_source'
     action_config = @alice.valid_action_configs.find{ |ac| ac.__name == action_name }
-    wf_set.instantiate_action_from_config(action_config, @caller, @logger, @state_coll)
+    wf_set.instantiate_action_from_config(action_config, @caller, @logger)
     trigger = mock('trigger')
     trigger.expects(:trigger_individual_action).once
     require_relative '../../../lib/armagh/utils/scheduled_action_trigger'

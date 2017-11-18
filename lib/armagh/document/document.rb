@@ -32,6 +32,8 @@ module Armagh
     class DocumentMarkError < StandardError;
     end
 
+    COUNT_QUERY_INTERVAL_IN_SECONDS = 2
+
     def self.default_collection
       Connection.documents
     end
@@ -57,8 +59,8 @@ module Armagh
     delegated_attr_accessor       :state,               validates_with: :validate_state
     delegated_attr_accessor_array :pending_actions,     after_change: :update_pending_work
     delegated_attr_accessor       :error
-    delegated_attr_accessor_errors :dev_errors,         after_change: :update_pending_work
-    delegated_attr_accessor_errors :ops_errors,         after_change: :update_pending_work
+    delegated_attr_accessor_errors :dev_errors,         after_change: :update_error_and_pending_work
+    delegated_attr_accessor_errors :ops_errors,         after_change: :update_error_and_pending_work
     delegated_attr_accessor       :pending_work
 
     alias_method :add_dev_error, :add_error_to_dev_errors
@@ -104,31 +106,50 @@ module Armagh
       )
     end
 
-    def self.count_incomplete_by_doctype( pub_type_names = nil )
-      pub_types = pub_type_names ?
-          pub_type_names.collect{ |pt| Connection.documents(pt) } :
-          Connection.all_document_collections.select{ |c| Connection.published_collection?(c) }
-      counts = {}
-      queries = [
-          { doc_colls: [ Connection.documents ], filter: nil },
-          { doc_colls: [ Connection.failures ],  filter: nil },  #TODO filter out acknowledged failures
-          { doc_colls: pub_types, filter: { 'pending_work' => true }}
-      ]
+    def self.count_failed_and_in_process_documents_by_doctype
 
-      group_by_doctype_clause = {'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}
-      queries.each do |query_params|
-        query_params[:doc_colls].each do |doc_coll|
-          counts[ doc_coll.name ] = {}
-          match_clause = query_params[:filter] ? { '$match' => query_params[:filter] } : nil
-          pipeline = [ match_clause, group_by_doctype_clause ].compact
-          counts_by_type_in_coll = doc_coll.aggregate( pipeline ).to_a
-          counts_by_type_in_coll.each do |count_detail|
-            docspec_brief = "#{count_detail['_id']['type']}:#{count_detail['_id']['state']}"
-            counts[doc_coll.name][docspec_brief] = count_detail['count']
+      @dont_count_again_until ||= Time.now - 1
+
+      if @dont_count_again_until < Time.now
+
+        @failed_and_in_process_documents_by_doctype = []
+
+        pub_types = Connection.all_published_collections
+
+        queries = [
+            { category: 'in process', doc_colls: [ Connection.documents ], filter: nil },
+            { category: 'failed',     doc_colls: [ Connection.failures ],  filter: nil },
+            { category: 'in process', doc_colls: pub_types,                filter: { 'pending_work' => true }},
+            { category: 'failed',     doc_colls: pub_types,                filter: { 'error' => true }}
+        ]
+
+        queries.each do |query|
+
+          query[:doc_colls].each do |doc_coll|
+
+            match_clause = query[:filter] ? { '$match' => query[:filter] } : nil
+            pipeline = [
+                match_clause,
+                {'$group'=>{'_id'=>{'type'=>'$type','state'=>'$state'},'count'=>{'$sum'=>1}}}
+            ].compact
+            counts_this_query = doc_coll.aggregate( pipeline ).to_a
+            counts_this_query.each do |count_detail|
+              @failed_and_in_process_documents_by_doctype << {
+                  'category'             => query[:category],
+                  'published_collection' => doc_coll.name.split(".")[1],
+                  'docspec_string'       => "#{count_detail['_id']['type']}:#{count_detail['_id']['state']}",
+                  'count'                => count_detail[ 'count' ].to_i
+              }
+            end
           end
         end
+        @dont_count_again_until = Time.now + COUNT_QUERY_INTERVAL_IN_SECONDS
       end
-      counts
+      @failed_and_in_process_documents_by_doctype
+    end
+
+    def self.clear_document_counts
+      @dont_count_again_until = Time.now - 1
     end
 
     def self.find_many_by_ts_range_read_only(doc_type, begin_ts, end_ts, page_number, page_size)
@@ -194,6 +215,7 @@ module Armagh
       self.metadata ||= {}
       self.source = Armagh::Documents::Source.new( **Hash[ self.source.collect{ |k,v| [ k.to_sym, v ]} ]) if self.source.is_a?(Hash)
       self.pending_actions ||= []
+      clear_errors
     end
 
     def clear_errors
@@ -205,27 +227,22 @@ module Armagh
       dev_errors.merge(ops_errors) {|_key, left, right| left + right}
     end
 
-    def error?
-      dev_errors.any? || ops_errors.any?
-    end
-
     def pending_work?
       pending_work ? true : false
     end
 
     def save( unlock = true, caller = self.class.default_locking_agent )
 
-      if !error? && ((@abort && !published?) || @pending_delete)
+      if !error && ((@abort && !published?) || @pending_delete)
         delete
       else
 
         self.version = self.class.version
         self.collection_task_ids.uniq!
         self.archive_files.uniq!
-        error? ? self.error = true : delete_error
 
         save_to_collection = case
-                            when (error? && !published?)     then Connection.failures
+                            when (error && !published?)      then Connection.failures
                             when @pending_publish            then Connection.documents(type)
                             when @pending_collection_history then Connection.collection_history
                             when published?                  then Connection.documents(type)
@@ -357,12 +374,22 @@ module Armagh
     end
 
     private def update_pending_work( _pending_actions=nil)
-      if pending_actions.any? && !error?
+      if pending_actions.any? && !error
         self.pending_work = true
       else
         delete_pending_work
       end
       pending_actions
+    end
+
+    private def update_error_and_pending_work( original_error_info )
+      if dev_errors.any? || ops_errors.any?
+        self.error = true
+      else
+        delete_error
+      end
+      update_pending_work
+      original_error_info
     end
   end
 end

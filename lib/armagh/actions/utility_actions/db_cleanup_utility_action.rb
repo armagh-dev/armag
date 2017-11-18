@@ -35,7 +35,7 @@ module Armagh
         end
 
         def try_to_move_stopping_workflows_to_stopped
-          workflow_set = WorkflowSet.for_agent( Connection.config )
+          workflow_set = WorkflowSet.for_agent( Connection.config, logger: logger )
           workflow_set.try_to_move_stopping_workflows_to_stopped
         end
 

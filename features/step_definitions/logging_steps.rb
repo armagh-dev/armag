@@ -16,6 +16,7 @@ Then(/the alerts count( for the "([^"]*)" (workflow|action)){0,1} should be (.*)
   end
   actual_alerts_count = Armagh::Logging::Alert.get_counts( workflow: workflow , action: action )
   assert_equal eval(expected_alerts_count), actual_alerts_count
+  p Armagh::Logging::Alert.get
 end
 
 Then(/the alerts messages( for the "([^"]*)" (workflow|action)){0,1} should be (.*)$/) do |_constraint, constraint_name, constraint_type, expected_alerts_messages|

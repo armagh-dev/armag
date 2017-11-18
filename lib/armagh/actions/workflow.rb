@@ -59,9 +59,9 @@ module Armagh
         error
       end
 
-      def self.create( config_store, name, notify_to_refresh: nil )
+      def self.create( config_store, name, workflow_set, logger: nil )
         workflow_config = create_configuration(config_store, name, {}, maintain_history:true )
-        new(config_store, name, workflow_config, notify_to_refresh: notify_to_refresh )
+        new(config_store, name, workflow_config, workflow_set, logger: logger )
       rescue WorkflowInitError, Configh::ConfigInitError => e
         raise WorkflowConfigError, e.message
       end
@@ -69,30 +69,38 @@ module Armagh
       def self.edit_configuration( config_values, creating_in: )
         edit = super( config_values )
         name = config_values.dig('workflow','name')
-        if creating_in && name && find( creating_in, name)
+        if creating_in && name && exists?( creating_in, name)
           raise WorkflowConfigError, 'Workflow name already in use'
         end
         edit
       end
 
-      def self.find( config_store, name, notify_to_refresh: nil )
+      def self.find( config_store, name, workflow_set, logger: nil )
         raise WorkflowConfigError, 'create requires a workflow name' if name.nil? || name.empty?
         workflow_config = find_configuration( config_store, name )
         if workflow_config
-          new(config_store, name, workflow_config, notify_to_refresh: notify_to_refresh )
+          new(config_store, name, workflow_config, workflow_set, logger: logger )
         end
       rescue Configh::ConfigInitError => e
         raise WorkflowConfigError, e.message
       end
 
-      def self.find_all( config_store, notify_to_refresh: nil )
-        raise WorkflowConfigError, 'notify_to_refresh must respond to :refresh' unless notify_to_refresh && notify_to_refresh.respond_to?(:refresh)
+      def self.exists?( config_store, name )
+        raise WorkflowConfigError, 'exists? requires a workflow name' if name.nil? || name.empty?
+        begin
+          !find_configuration( config_store, name ).nil?
+        rescue Configh::ConfigInitError => e
+          raise WorkflowConfigError, e.message
+        end
+      end
+
+      def self.find_all( config_store, workflow_set, logger: nil )
         workflows = []
 
         workflow_configs = find_all_configurations( config_store )
         workflow_configs.each do |_klass,workflow_config|
           name = workflow_config.__name
-          workflows << new(config_store, name, workflow_config, notify_to_refresh: notify_to_refresh )
+          workflows << new(config_store, name, workflow_config, workflow_set, logger: logger )
         end
         workflows
       rescue Configh::ConfigInitError => e
@@ -101,20 +109,21 @@ module Armagh
 
       private_class_method :new
 
-      def initialize(config_store, name, config_object, notify_to_refresh: nil )
+      def initialize(config_store, name, config_object, workflow_set, logger: nil )
 
         raise WorkflowInitError, 'name cannot be nil' if name.nil? || name.empty?
-        raise WorkflowInitError, 'notify_to_refresh must respond to :refresh' unless notify_to_refresh.nil? || notify_to_refresh.respond_to?(:refresh)
 
         @config_store = config_store
         @name = name
         @config = config_object
-        @notify_to_refresh = notify_to_refresh
+        @workflow_set = workflow_set
         @valid_action_configs = []
         @invalid_action_configs = []
         @has_no_cycles = true
         @check_unused_outputs = unused_output_docspec_check
         @unused_outputs = {}
+        @logger = logger
+
         load_action_configs
       end
 
@@ -144,7 +153,7 @@ module Armagh
             config = action_class.force_update_configuration(@config_store, cand_action_name, cand_config_values, maintain_history: true  )
           end
           load_action_configs
-          @notify_to_refresh&.refresh
+          @workflow_set.refresh_pointers
           config
         rescue Configh::ConfigInitError => e
           config_with_errors = action_class.edit_configuration(cand_config_values)
@@ -186,7 +195,7 @@ module Armagh
       def retired=(retire)
         raise(WorkflowConfigError, 'Stop workflow before retiring it') unless stopped?
         @config.update_merge({'workflow'=>{'retired'=>retire}})
-        @notify_to_refresh&.refresh
+        @workflow_set.refresh_pointers
       end
 
       def unused_output_message
@@ -206,7 +215,7 @@ module Armagh
         @check_unused_outputs = val
         raise(WorkflowConfigError, unused_output_message) if val && has_unused_output?
         @config.update_merge({'workflow'=>{'unused_output_docspec_check'=>val}})
-        @notify_to_refresh&.refresh
+        @workflow_set.refresh_pointers
       end
 
       def has_unused_output?
@@ -245,6 +254,8 @@ module Armagh
         raise(WorkflowActivationError, 'Workflow not valid') unless valid?
         raise(WorkflowActivationError, unused_output_message) if has_unused_output?
 
+        @logger.debug( "Running workflow #{@name}")
+
         callback_errors = []
         @valid_action_configs.each do |action_config|
           callback_error = action_config.test_and_return_errors
@@ -261,39 +272,42 @@ module Armagh
 
         change_actions_active_status(true)
         @config.update_merge({'workflow'=>{'run_mode' => Armagh::Status::RUNNING}})
-
-        @notify_to_refresh&.refresh
+        @workflow_set.refresh_pointers
         status
       end
 
-      private def move_to_stopping
-        raise(WorkflowActivationError, 'Workflow not valid') unless valid?
-        raise(WorkflowActivationError, 'Workflow not running' ) unless running?
+      def stop
+        @logger.debug "Attempting to stop workflow #{@name}"
+        return move_to_stopped if (!valid? && (running? || stopping?))
 
-        change_actions_active_status( false, collect_actions_only: true )
-        @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPING }} )
-        sleep 1
-        @notify_to_refresh&.refresh
+        documents_in_process = count_of_documents_in_process
+        @logger.debug( "Trying to stop workflow #{@name}: #{documents_in_process} documents in process")
+
+        if documents_in_process.zero? && !stopped?
+          move_to_stopped
+        else
+          move_to_stopping if running?
+          raise( WorkflowDocumentsInProcessError, "Cannot stop - #{documents_in_process} documents still processing")
+        end
       end
 
-      def stop
-        raise( WorkflowActivationError, 'Workflow not valid' ) unless valid?
+      private def move_to_stopping
 
-        if running?
-          move_to_stopping
-          sleep 3
-        end
+        raise(WorkflowActivationError, 'Workflow not running' ) unless running?
 
-        total_docs = doc_counts.sum
-        if total_docs.zero?
-          change_actions_active_status( false )
-          @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPED }} )
-          sleep 1
-          @notify_to_refresh&.refresh
-          status
-        else
-          raise( WorkflowDocumentsInProcessError, "Cannot stop - #{total_docs} documents still processing")
-        end
+        @logger.debug( "Moving workflow #{@name} to stopping")
+        change_actions_active_status( false, collect_actions_only: true )
+        @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPING }} )
+        @workflow_set.refresh_pointers
+        status
+      end
+
+      private def move_to_stopped
+        @logger.debug( "Stopping workflow #{@name}")
+        change_actions_active_status( false )
+        @config.update_merge( { 'workflow' => { 'run_mode' => Armagh::Status::STOPPED }} )
+        @workflow_set.refresh_pointers
+        status
       end
 
       def Workflow.actions_have_no_cycles?(action_configs)
@@ -332,61 +346,48 @@ module Armagh
       end
 
       def status
-        working_docs_count, failed_docs_count, published_pending_consume_docs_count = doc_counts
         alerts = Logging::Alert.get_counts( workflow: @name )
-
-        valid = true
-        action_statuses.each { |action| valid = false unless action['valid'] }
 
         {
           'name' => @name,
           'run_mode' => run_mode,
           'retired' => retired,
           'unused_output_docspec_check' => unused_output_docspec_check,
-          'working_docs_count' => working_docs_count,
-          'failed_docs_count'  => failed_docs_count,
-          'published_pending_consume_docs_count' => published_pending_consume_docs_count,
-          'docs_count' => working_docs_count + failed_docs_count + published_pending_consume_docs_count,
-          'valid' => valid,
+          'documents_in_process' => count_of_documents_in_process,
+          'failed_documents'  => count_of_failed_documents,
+          'valid' => valid?,
           'warn_alerts' => alerts[ 'warn' ],
           'error_alerts' => alerts[ 'error' ]
         }
       end
 
-      def produced_docspec_names
+      def docspec_strings
         @valid_action_configs
-          .collect{ |ac| ac.find_all_parameters{ |p| p.group == 'output' and p.type == 'docspec' } }
+          .collect{ |ac| ac.find_all_parameters{ |p| p.type == 'docspec' } }
           .flatten
           .collect{ |p| p.value.to_s }
+          .sort
+          .uniq
       end
 
-      def published_doctypes
-        @valid_action_configs
-          .select{ |ac| ac.__type < Publish }
-          .collect{ |ac| ac.find_all_parameters{ |p| p.group == 'output' and p.type == 'docspec' } }
-          .flatten
-          .collect{ |p| p.value.type }.sort.uniq
+      def failed_and_in_process_document_counts
+
+        all_incomplete_docs = Armagh::Document.count_failed_and_in_process_documents_by_doctype
+        my_docspec_strings = docspec_strings
+
+        all_incomplete_docs.find_all{ |count_hash| my_docspec_strings.include?(count_hash['docspec_string'])}
       end
 
-      def doc_counts
-        all_docs = Armagh::Document.count_incomplete_by_doctype( published_doctypes )
+      def count_of_failed_documents
+        failed_and_in_process_document_counts.collect{ |count_hash|
+          count_hash['count'] if count_hash['category'] == 'failed'
+        }.compact.sum
+      end
 
-        working_docs_count = 0
-        all_docs['documents'].each do |counted_docspec_name, count|
-          working_docs_count += count if produced_docspec_names.include?(counted_docspec_name)
-        end
-        failed_docs_count  = 0
-        all_docs['failures'].each do |counted_docspec_name, count|
-          failed_docs_count += count if produced_docspec_names.include?(counted_docspec_name)
-        end
-        published_pending_consume_docs_count = 0
-        other_collections = all_docs.keys - [ 'documents', 'failures' ]
-        other_collections.each do |coll|
-          all_docs[ coll ].each do |counted_docspec_name, count|
-            published_pending_consume_docs_count += count if produced_docspec_names.include?(counted_docspec_name)
-          end
-        end
-        [ working_docs_count, failed_docs_count, published_pending_consume_docs_count ]
+      def count_of_documents_in_process
+        failed_and_in_process_document_counts.collect{ |count_hash|
+          count_hash['count'] if count_hash['category'] == 'in process'
+        }.compact.sum
       end
 
       def valid_action_config_status( action_config )

@@ -67,7 +67,7 @@ class TestEditCallback < Test::Unit::TestCase
     @output_state = Armagh::Documents::DocState::WORKING
 
     config_store = []
-    workflow_set = Armagh::Actions::WorkflowSet.for_agent( config_store )
+    workflow_set = Armagh::Actions::WorkflowSet.for_agent( config_store, logger: @logger )
     wf = workflow_set.create_workflow( {'workflow' => { 'name' => 'test_wf'}})
     wf.unused_output_docspec_check = false
     wf.create_action_config(
@@ -84,7 +84,7 @@ class TestEditCallback < Test::Unit::TestCase
     archive_config = Armagh::Utils::Archiver.find_or_create_config(config_store)
     agent = Armagh::Agent.new(agent_config, archive_config, workflow_set, @hostname)
 
-    @splitter = workflow_set.instantiate_action_named( 'test_splitter', agent, @logger, nil )
+    @splitter = workflow_set.instantiate_action_named( 'test_splitter', agent, @logger )
 
     doc = TestDocument.new
     doc.document_id = 'some other id'

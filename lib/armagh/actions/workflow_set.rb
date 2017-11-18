@@ -20,6 +20,7 @@ require 'configh'
 require_relative 'workflow'
 require_relative 'utility_actions/utility_action'
 require_relative 'utility_actions/db_cleanup_utility_action'
+require_relative '../document/document'
 
 module Armagh
   module Actions
@@ -33,17 +34,17 @@ module Armagh
       include Configh::Configurable
       attr_reader :action_config_named, :action_configs_handling_docspec, :collect_action_configs, :utility_action_configs, :last_timestamp
 
-      def self.for_admin(config_store)
-        new(config_store, :admin)
+      def self.for_admin(config_store, logger: nil)
+        new(config_store, :admin, logger: logger)
       end
 
-      def self.for_agent(config_store)
-        new(config_store, :agent)
+      def self.for_agent(config_store, logger: nil)
+        new(config_store, :agent, logger: logger)
       end
 
       private_class_method :new
 
-      def initialize(config_store, target)
+      def initialize(config_store, target, logger: nil)
         @config_store = config_store
         @target = target
         @workflows = {}
@@ -52,6 +53,7 @@ module Armagh
         @collect_action_configs = []
         @utility_action_configs = []
         @last_timestamp = nil
+        @logger = logger
         refresh
       end
 
@@ -68,7 +70,7 @@ module Armagh
 
       def reload_all(exclude_retired: true)
         @workflows.clear
-        @workflows = Workflow.find_all(@config_store, notify_to_refresh: self )
+        @workflows = Workflow.find_all(@config_store, self, logger: @logger)
         @workflows.delete_if{ |wf| exclude_retired && wf.retired }
         @workflows = Hash[ @workflows.collect{ |wf|[  wf.name, wf ]}]
         true
@@ -77,34 +79,38 @@ module Armagh
       def reload_active_valid(exclude_retired: true, force: false)
         last_timestamp = Action.max_timestamp(@config_store)
         if @last_timestamp != last_timestamp || force
-          @action_config_named.clear
-          @action_configs_handling_docspec.clear
-          @collect_action_configs.clear
-          @utility_action_configs.clear
-
           reload_all(exclude_retired: exclude_retired)
-          @workflows.values.select( &:valid? ).each do |wf|
-            wf.valid_action_configs.each do |action_config|
-              if action_config.action.active
-                @action_config_named[ action_config.action.name ] = action_config
-                @action_configs_handling_docspec[ action_config.input.docspec ] ||= []
-                @action_configs_handling_docspec[ action_config.input.docspec ] << action_config
-                @collect_action_configs << action_config if action_config.__type < Actions::Collect
-              end
-            end
-          end
-          @utility_action_configs = Actions::UtilityAction.find_or_create_all_configurations( Connection.config )
-          @utility_action_configs.each do |utility_config|
-            if utility_config.action.active
-              @action_config_named[ utility_config.action.name ] = utility_config
-              @action_configs_handling_docspec[ utility_config.input.docspec ] ||= []
-              @action_configs_handling_docspec[ utility_config.input.docspec ] << utility_config
-            end
-          end
+          refresh_pointers
           @last_timestamp = last_timestamp
           return true
         end
         false
+      end
+
+      def refresh_pointers
+        @action_config_named.clear
+        @action_configs_handling_docspec.clear
+        @collect_action_configs.clear
+        @utility_action_configs.clear
+
+        @workflows.values.select( &:valid? ).each do |wf|
+          wf.valid_action_configs.each do |action_config|
+            if action_config.action.active
+              @action_config_named[ action_config.action.name ] = action_config
+              @action_configs_handling_docspec[ action_config.input.docspec ] ||= []
+              @action_configs_handling_docspec[ action_config.input.docspec ] << action_config
+              @collect_action_configs << action_config if action_config.__type < Actions::Collect
+            end
+          end
+        end
+        @utility_action_configs = Actions::UtilityAction.find_or_create_all_configurations( Connection.config )
+        @utility_action_configs.each do |utility_config|
+          if utility_config.action.active
+            @action_config_named[ utility_config.action.name ] = utility_config
+            @action_configs_handling_docspec[ utility_config.input.docspec ] ||= []
+            @action_configs_handling_docspec[ utility_config.input.docspec ] << utility_config
+          end
+        end
       end
 
       def list_workflows
@@ -115,9 +121,9 @@ module Armagh
         @workflows.values.find_all{ |wf| wf.stopping? }
       end
 
-      def create_workflow(config_values)
+      def create_workflow(config_values, logger: nil )
         workflow_name = config_values.dig('workflow','name')
-        @workflows[workflow_name] = Workflow.create(@config_store,workflow_name, notify_to_refresh: self )
+        @workflows[workflow_name] = Workflow.create(@config_store, workflow_name, self, logger: logger || @logger  )
       rescue Configh::ConfigInitError => e
         raise WorkflowConfigError, e.message
       end
@@ -126,28 +132,28 @@ module Armagh
         @workflows[workflow_name]
       end
 
-      def instantiate_action_from_config(action_config, caller, logger, state_collection)
+      def instantiate_action_from_config(action_config, caller, logger)
         raise( ActionInstantiationError, 'Attempt to instantiate nil action config' ) unless action_config
         raise( ActionInstantiationError, 'Action not active' ) unless action_config.action.active
         action_type = action_config.__type
-        action_type.new( caller, logger.name, action_config, state_collection )
+        action_type.new( caller, logger.name, action_config )
       end
 
-      def instantiate_action_named(action_name, caller, logger, state_collection)
+      def instantiate_action_named(action_name, caller, logger)
         raise( ActionInstantiationError, 'Action name cannot be nil' ) unless action_name
         action_config = @action_config_named[ action_name ]
         raise( ActionInstantiationError, "Action #{action_name} not defined") unless action_config
-        instantiate_action_from_config( action_config, caller, logger, state_collection )
+        instantiate_action_from_config( action_config, caller, logger)
       end
 
-      def instantiate_actions_handling_docspec(docspec, caller, logger, state_collection)
+      def instantiate_actions_handling_docspec(docspec, caller, logger)
         raise( ActionInstantiationError, 'Docspec cannot be nil' ) unless docspec
         action_configs = @action_configs_handling_docspec[ docspec ]
         actions = []
 
         if action_configs
           action_configs.each do |action_config|
-            actions << instantiate_action_from_config( action_config, caller, logger, state_collection )
+            actions << instantiate_action_from_config( action_config, caller, logger )
           end
         end
 
@@ -173,6 +179,7 @@ module Armagh
       end
 
       def try_to_move_stopping_workflows_to_stopped
+        Document.clear_document_counts
         get_stopping_workflows.each do |wf|
           begin
             wf.stop

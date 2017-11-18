@@ -83,6 +83,8 @@ module Armagh
 
         def create_one_unlocked(values, collection: self.default_collection, **other_args )
           new( unlocked_values(values), collection:collection, **other_args ).save( true )
+        rescue => e
+            raise Armagh::Connection.convert_mongo_exception(e)
         end
 
         def find( *args )
@@ -184,6 +186,8 @@ module Armagh
 
         def create_one_locked(values, caller=default_locking_agent, collection: self.default_collection, lock_hold_duration:default_lock_hold_duration )
           new( locked_values(values,caller), collection:collection ).save( false, caller )
+        rescue => e
+          raise Armagh::Connection.convert_mongo_exception( e)
         end
 
         def find_or_create_one( *args )

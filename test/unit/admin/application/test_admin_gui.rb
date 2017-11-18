@@ -471,7 +471,7 @@ module Armagh
             'action' => [{name: 'name', description: 'description', type: 'type', required: true, prompt: 'prompt', default: 'default'}],
             'input' => [{name: 'docspec', defined_states: ['collected']}],
             'output' => [{name: 'docspec', defined_states: ['ready', 'working']}],
-            'html' => [{name: 'node', type: 'populated_string'}],
+            'html' => [{name: 'node', type: 'string'}],
             'rss' => [{name: 'url', type: 'string_array'}],
             'ssl' => [{name: 'keys', type: 'hash'}],
             type: 'Armagh::SomeType',

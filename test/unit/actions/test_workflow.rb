@@ -16,12 +16,13 @@
 #
 
 require_relative '../../helpers/coverage_helper'
-require_relative '../../helpers/armagh_test/logger'
+require_relative '../../helpers/armagh_test'
 require 'test/unit'
 require 'mocha/test_unit'
 
 require_relative '../../helpers/workflow_generator_helper'
 require_relative '../../../lib/armagh/actions/workflow'
+require_relative '../../../lib/armagh/actions/workflow_set'
 require_relative '../../../lib/armagh/logging/alert'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/document/document'
@@ -29,6 +30,7 @@ require_relative '../../../lib/armagh/document/document'
 require 'armagh/actions'
 
 class TestWorkflow < Test::Unit::TestCase
+  include ArmaghTest
 
   def setup
     @config_store = []
@@ -43,13 +45,14 @@ class TestWorkflow < Test::Unit::TestCase
     @fred_workflow_config_values = {'workflow'=>{'name' => 'fred'}}
     @fred_workflow_actions_config_values  = WorkflowGeneratorHelper.workflow_actions_config_values_no_divide('fred')
     @state_coll = mock
-    @workflow_set = mock
-    @workflow_set.stubs( :refresh )
-    Armagh::Connection.stubs(:config).returns(@state_coll)
+    Armagh::Connection.stubs(:config).returns(@config_store)
+
+    Armagh::Document.clear_document_counts
   end
 
   def good_alice_in_db(check_unused_output = false)
-    @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @alice = @wf_set.create_workflow( { 'workflow' => { 'name' => 'alice' }} )
     @alice.unused_output_docspec_check = check_unused_output
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
@@ -58,7 +61,8 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def good_fred_in_db(check_unused_output = false)
-    @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @fred = @wf_set.create_workflow( { 'workflow' => { 'name' => 'fred' }} )
     @fred.unused_output_docspec_check = check_unused_output
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
@@ -71,29 +75,23 @@ class TestWorkflow < Test::Unit::TestCase
     WorkflowGeneratorHelper.break_array_config_store( @config_store, 'alice' )
   end
 
+  def stored_alice(retired = false)
+    wf_set = Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    wf_set.refresh( exclude_retired: false ) if retired
+    wf_set.get_workflow('alice')
+  end
+
   def expect_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_alicedoc:ready'=>9, 'b_alicedocs_aggr:ready'=>20, 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_alicedoc:ready'=>3, 'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {'a_alicedoc:published'=>4},
-                      'b_alicedoc' => {'b_alicedoc:published'=>5}
-                  })
+    expect_document_counts([
+        { 'category' => 'in process', 'docspec_string' => 'a_alicedoc:ready',       'count' =>9},
+        { 'category' => 'in process', 'docspec_string' => 'b_alicedocs_aggr:ready', 'count' =>20},
+        { 'category' => 'failed',     'docspec_string' => 'a_alicedoc:ready',       'count'=>3 }
+    ])
     Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
   def expect_no_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {},
-                      'b_alicedoc' => {}
-                  })
+    expect_document_counts([])
     Armagh::Logging::Alert.stubs( get_counts: { 'warn' => 0, 'error' => 0, 'fatal' => 0})
   end
 
@@ -125,22 +123,19 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_workflow_create
-    alice = nil
-    assert_nothing_raised do
-      alice = Armagh::Actions::Workflow.create(@config_store, 'alice' )
-    end
-    assert_equal 'alice',alice.name
-    assert_equal 'stopped',alice.run_mode
-    assert_equal false,alice.retired
-    assert_equal true,alice.unused_output_docspec_check
-    assert_empty alice.valid_action_configs
-    assert_true alice.has_no_cycles
+    good_alice_in_db
+    assert_equal 'alice',@alice.name
+    assert_equal 'stopped',@alice.run_mode
+    assert_equal false,@alice.retired
+    assert_equal false,@alice.unused_output_docspec_check
+    assert_equal 8, @alice.valid_action_configs.length
+    assert_true @alice.has_no_cycles
   end
 
   def test_workflow_create_dup_name
-    Armagh::Actions::Workflow.create(@config_store, 'alice' )
+    good_alice_in_db
     e = assert_raises( Armagh::Actions::WorkflowConfigError ) do
-      Armagh::Actions::Workflow.create(@config_store, 'alice' )
+      @wf_set.create_workflow( { 'workflow' => { 'name' => 'alice'}})
     end
     assert_equal 'Name already in use', e.message
   end
@@ -190,33 +185,28 @@ class TestWorkflow < Test::Unit::TestCase
     good_alice_in_db
     config = {'workflow'=>{'name'=>'alice'}}
     Armagh::Actions::Workflow
-      .expects(:find)
-      .once
+      .expects(:exists?)
       .returns(true)
     e = assert_raise Armagh::Actions::WorkflowConfigError do
-      Armagh::Actions::Workflow.edit_configuration(config, creating_in: @workflow_set)
+      Armagh::Actions::Workflow.edit_configuration(config, creating_in: @config_store)
     end
     assert_equal 'Workflow name already in use', e.message
   end
 
   def test_workflow_find
-    alice = nil
-    assert_nothing_raised do
-      alice = Armagh::Actions::Workflow.create(@config_store, 'alice' )
-    end
+    good_alice_in_db
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
     assert_equal 'alice',stored_alice.name
     assert_equal 'stopped',stored_alice.run_mode
     assert_equal false,stored_alice.retired
-    assert_equal true,stored_alice.unused_output_docspec_check
-    assert_empty stored_alice.valid_action_configs
+    assert_equal false,stored_alice.unused_output_docspec_check
+    assert_equal 8, stored_alice.valid_action_configs.length
     assert_true stored_alice.has_no_cycles
   end
 
   def test_workflow_find_not_found
-    not_stored = Armagh::Actions::Workflow.find( @config_store, 'bilbo')
-    assert_nil not_stored
+    not_stored = Armagh::Actions::Workflow.exists?( @config_store, 'bilbo')
+    assert_false not_stored
   end
 
   def test_workflow_find_error
@@ -225,14 +215,14 @@ class TestWorkflow < Test::Unit::TestCase
       .once
       .raises(Configh::ConfigInitError, 'some error')
     e = assert_raise Armagh::Actions::WorkflowConfigError do
-      Armagh::Actions::Workflow.find(@config_store, 'error')
+      Armagh::Actions::Workflow.exists?(@config_store, 'error')
     end
     assert_equal 'some error', e.message
   end
 
   def test_find_all
     good_alice_in_db
-    result = Armagh::Actions::Workflow.find_all(@config_store, notify_to_refresh: @workflow_set)
+    result = Armagh::Actions::Workflow.find_all(@config_store, logger: @logger)
     assert_equal Array, result.class
     assert_equal 1, result.size
   end
@@ -243,16 +233,9 @@ class TestWorkflow < Test::Unit::TestCase
       .once
       .raises(Configh::ConfigInitError, 'some error')
     e = assert_raise Armagh::Actions::WorkflowConfigError do
-      Armagh::Actions::Workflow.find_all(@config_store, notify_to_refresh: @workflow_set)
+      Armagh::Actions::Workflow.find_all(@config_store, logger: @logger)
     end
     assert_equal 'some error', e.message
-  end
-
-  def test_find_all_notify_to_refresh_nill
-    e = assert_raise Armagh::Actions::WorkflowConfigError do
-      Armagh::Actions::Workflow.find_all(@config_store)
-    end
-    assert_equal 'notify_to_refresh must respond to :refresh', e.message
   end
 
   def test_workflow_new_private
@@ -262,29 +245,18 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_retired
-    alice = nil
-    assert_nothing_raised do
-      alice = Armagh::Actions::Workflow.create(@config_store, 'alice')
-    end
-    sleep 1
-    alice.retired=true
+    good_alice_in_db
+    @alice.retired=true
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
-    assert_true stored_alice.retired
+    assert_true stored_alice(true).retired
   end
 
   def test_maintain_history
-    alice = nil
-    assert_nothing_raised do
-      alice = Armagh::Actions::Workflow.create(@config_store, 'alice')
-    end
+    good_alice_in_db
+    @alice.retired=true
 
-    sleep 1
-    alice.retired=true
-
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
-    assert_true stored_alice.retired
-    assert_equal 2, stored_alice.instance_variable_get(:@config).history.length
+    assert_true stored_alice(true).retired
+    assert_equal 3, stored_alice(true).instance_variable_get(:@config).history.length
   end
 
   def test_update_action_config_action_find_error
@@ -309,24 +281,20 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_workflow_create_actions_load_actions
-    @workflow_set.expects(:refresh).times( @alice_workflow_actions_config_values.length)
 
     good_alice_in_db
     assert_true @alice.actions_valid?
     assert_true @alice.valid?
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
     assert_equal @alice_workflow_actions_config_values.length, stored_alice.valid_action_configs.length
   end
 
   def test_workflow_create_actions_load_actions_update_action
-    @workflow_set.expects(:refresh).times( @alice_workflow_actions_config_values.length)
 
     good_alice_in_db
     assert_true @alice.actions_valid?
     assert_true @alice.valid?
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
     assert_equal @alice_workflow_actions_config_values.length, stored_alice.valid_action_configs.length
 
     action_class_to_change, action_to_change = @alice_workflow_actions_config_values.find{ |_k,c|
@@ -336,7 +304,6 @@ class TestWorkflow < Test::Unit::TestCase
     sleep 1
     stored_alice.update_action_config( action_class_to_change, action_to_change )
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice')
     assert_equal @alice_workflow_actions_config_values.length, stored_alice.valid_action_configs.length
     assert_true stored_alice.actions_valid?
     assert_true stored_alice.valid?
@@ -346,7 +313,7 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_workflow_create_invalid_action
     WorkflowGeneratorHelper.break_workflow_actions_config( @alice_workflow_actions_config_values, 'alice' )
-    alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    alice = Armagh::Actions::Workflow.create(@config_store, 'alice', logger: @logger )
     bad_action_config = @alice_workflow_actions_config_values.find{ |_k,c| c['action']['name'] == 'collect_alicedocs_from_source'}
     e = assert_raises( Armagh::Actions::ActionConfigError ) do
       alice.create_action_config(*bad_action_config)
@@ -358,21 +325,16 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_workflow_create_invalid_action_dup_name
     WorkflowGeneratorHelper.force_duplicate_action_name( @alice_workflow_actions_config_values, 'alice')
-    alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
     e = assert_raises( Armagh::Actions::ActionConfigError ) do
-      @alice_workflow_actions_config_values.each do |type,action_config_values|
-        alice.create_action_config(type, action_config_values)
-      end
+      good_alice_in_db # not really
     end
     assert_equal 'Configuration has errors: Name already in use', e.message
   end
 
   def test_workflow_load_some_invalid_actions
-    @workflow_set.expects(:refresh).times( @alice_workflow_actions_config_values.length)
-
     bad_alice_in_db
 
-    alice = Armagh::Actions::Workflow.find(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    alice = Armagh::Actions::Workflow.find(@config_store, 'alice', logger: @logger )
     assert_false alice.actions_valid?
     assert_false alice.valid?
     assert_equal 2, alice.invalid_action_configs.length
@@ -380,16 +342,8 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_workflow_actions_with_cycles
     WorkflowGeneratorHelper.force_cycle( @alice_workflow_actions_config_values, 'alice' )
-    alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
-    @alice_workflow_actions_config_values.each do |type,action_config_values|
-      alice.create_action_config(type, action_config_values)
-    end
-    assert_false alice.valid?
-  end
-
-  def test_published_doctypes
-    good_alice_in_db
-    assert_equal ["a_alicedoc", "b_alicedoc"], @alice.published_doctypes
+    good_alice_in_db #not really!
+    assert_false @alice.valid?
   end
 
   def test_running_false
@@ -407,20 +361,20 @@ class TestWorkflow < Test::Unit::TestCase
   def test_run
     good_alice_in_db
     expect_no_alice_docs_in_db
-
     @alice.run
+
     assert @alice.running?
     assert_equal [true], @alice.valid_action_configs.collect{ |ac| ac.action.active }.uniq
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
     assert @alice.running?
+    assert stored_alice.running?
   end
 
   def test_run_while_stopping
     good_alice_in_db
-
     expect_no_alice_docs_in_db
     @alice.run
 
+    Armagh::Document.clear_document_counts
     expect_alice_docs_in_db
     e = assert_raises( Armagh::Actions::WorkflowDocumentsInProcessError ) do
       @alice.stop
@@ -457,47 +411,57 @@ class TestWorkflow < Test::Unit::TestCase
     expect_no_alice_docs_in_db
     @alice.run
 
-    expect_no_alice_docs_in_db
-    expect_no_alice_docs_in_db
     @alice.stop
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
     assert stored_alice.stopped?
 
-    expect_no_alice_docs_in_db
     @alice.run
 
     assert_nothing_raised do
-      expect_no_alice_docs_in_db
-      expect_no_alice_docs_in_db
       @alice.stop
     end
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
     assert stored_alice.stopped?
     assert_equal [false], stored_alice.valid_action_configs.collect{ |ac| ac.action.active }.uniq
 
-    stored_alice = Armagh::Actions::Workflow.find( @config_store, 'alice' )
-    assert stored_alice.stopped?
   end
 
   def test_stop_docs_processing
     good_alice_in_db
 
-    expect_alice_docs_in_db
+    expect_no_alice_docs_in_db
     @alice.run
 
+    Armagh::Document.clear_document_counts
     e = assert_raises( Armagh::Actions::WorkflowDocumentsInProcessError) do
       expect_alice_docs_in_db
       @alice.stop
     end
-    assert_equal 'Cannot stop - 41 documents still processing', e.message
+    assert_equal 'Cannot stop - 29 documents still processing', e.message
     assert @alice.stopping?
+  end
+
+  def test_stop_running_invalid
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+
+    @alice.stubs( count_of_documents_in_process: 2 )
+
+    assert_raises( Armagh::Actions::WorkflowDocumentsInProcessError.new( 'Cannot stop - 2 documents still processing' )) do
+      @alice.stop
+    end
+    assert_false @alice.stopped?
+
+    @alice.stubs( valid?: false )
+    assert_nothing_raised do
+      @alice.stop
+    end
+    assert_true @alice.stopped?
   end
 
   def test_valid_action_config_status
     good_alice_in_db
-    stored_alice = Armagh::Actions::Workflow.find(@config_store, 'alice')
     action_config = stored_alice.valid_action_configs.first
     result = @alice.valid_action_config_status(action_config)
     result.delete('last_updated')
@@ -513,7 +477,6 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_invalid_action_config_status
     bad_alice_in_db
-    stored_alice = Armagh::Actions::Workflow.find(@config_store, 'alice')
     action_config = stored_alice.invalid_action_configs.first
     result = @alice.invalid_action_config_status(action_config)
     expected = {"active"=>false,
@@ -625,7 +588,7 @@ class TestWorkflow < Test::Unit::TestCase
                 "name" => "name",
                 "prompt" => "example-collect (Warning: Cannot be changed once set)",
                 "required" => true,
-                "type" => "populated_string",
+                "type" => "string",
                 "value" => nil,
                 "warning" => nil,
                 "options" => nil}
@@ -655,7 +618,7 @@ class TestWorkflow < Test::Unit::TestCase
                 "name" => "name",
                 "prompt" => "example-collect (Warning: Cannot be changed once set)",
                 "required" => true,
-                "type" => "populated_string",
+                "type" => "string",
                 "value" => "collect_alicedocs_from_source",
                 "warning" => nil,
                 "options" => nil}
@@ -690,9 +653,9 @@ class TestWorkflow < Test::Unit::TestCase
   end
 
   def test_setting_output_check_to_non_boolean_fails
-    alice = Armagh::Actions::Workflow.create(@config_store, 'alice')
+    good_alice_in_db
     e = assert_raise Armagh::Actions::WorkflowConfigError do
-      alice.unused_output_docspec_check = 'boo'
+      @alice.unused_output_docspec_check = 'boo'
     end
     assert_equal 'Must specify boolean value for unused_output_docspec_check', e.message
   end

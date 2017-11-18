@@ -16,7 +16,7 @@
 #
 
 require_relative '../../../helpers/coverage_helper'
-require_relative '../../../helpers/armagh_test/logger'
+require_relative '../../../helpers/armagh_test'
 require_relative '../../../../lib/armagh/environment'
 Armagh::Environment.init
 
@@ -35,7 +35,7 @@ require 'facets/kernel/constant'
 module Armagh
   module StandardActions
     class TATestCollect < Actions::Collect
-      define_parameter name: 'host', type: 'populated_string', required: true, default: 'fredhost', description: 'desc'
+      define_parameter name: 'host', type: 'string', required: true, default: 'fredhost', description: 'desc'
     end
   end
 end
@@ -70,6 +70,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     @fred_workflow_actions_config_values  = WorkflowGeneratorHelper.workflow_actions_config_values_no_divide('fred')
     @remote_user = mock('remote_user')
     set_remote_user_roles([Armagh::Authentication::Role::USER_ADMIN, Armagh::Authentication::Role::USER])
+
+    Armagh::Document.clear_document_counts
   end
 
   def set_remote_user_roles(roles)
@@ -80,7 +82,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def good_alice_in_db
-    @alice = Armagh::Actions::Workflow.create(@config_store, 'alice', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @alice = @wf_set.create_workflow( { 'workflow' => { 'name' => 'alice' }} )
     @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
@@ -95,7 +98,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def good_fred_in_db
-    @fred = Armagh::Actions::Workflow.create(@config_store, 'fred', notify_to_refresh: @workflow_set )
+    @wf_set ||= Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
+    @fred = @wf_set.create_workflow( { 'workflow' => { 'name' => 'fred' }} )
     @fred.unused_output_docspec_check = false
     @fred_workflow_actions_config_values.each do |type,action_config_values|
       @fred.create_action_config(type, action_config_values)
@@ -121,41 +125,25 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   end
 
   def expect_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_alicedoc:ready'=>9, 'b_alicedocs_aggr:ready'=>20, 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_alicedoc:ready'=>3, 'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {'a_alicedoc:published'=>4},
-                      'b_alicedoc' => {'b_alicedoc:published'=>5}
-                  })
+    expect_document_counts( [
+      { 'category' => 'in process', 'docspec_string' => 'a_alicedoc:ready',       'count' => 9},
+      { 'category' => 'in process', 'docspec_string' => 'b_alicedocs_aggr:ready', 'count' => 20},
+      { 'category' => 'failed',     'docspec_string' => 'a_alicedoc:ready',       'count' => 3},
+      { 'category' => 'in process', 'docspec_string' => 'a_freddoc:ready',        'count' => 40 },
+      { 'category' => 'failed',     'docspec_string' => 'a_freddoc:ready',        'count' => 10 }
+    ])
   end
 
   def expect_no_alice_docs_in_db
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .at_least_once
-        .with(["a_alicedoc", "b_alicedoc"])
-        .returns( {
-                      'documents' => { 'a_freddoc:ready'=>400_000 },
-                      'failures'   => {'a_freddoc:ready' => 100_000 },
-                      'a_alicedoc' => {},
-                      'b_alicedoc' => {}
-                  })
+    expect_document_counts( [] )
   end
 
   def expect_fred_docs_in_db
 
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with(["a_freddoc", "b_freddoc"])
-        .returns( {
-                      'documents' => { 'a_alicedoc:ready'=>9, 'b_alicedocs_aggr:ready'=>20, 'a_freddoc:ready'=>40 },
-                      'failures'   => {'a_alicedoc:ready'=>3, 'a_freddoc:ready' => 10 },
-                      'a_alicedoc' => {'a_alicedoc:published'=>4},
-                      'b_alicedoc' => {'b_alicedoc:published'=>5}
-                  })
+    expect_document_counts( [
+        { 'category' => 'in process', 'docspec_string' => 'a_freddoc:ready',        'count' => 40 },
+        { 'category' => 'failed',     'docspec_string' => 'a_freddoc:ready',        'count' => 10 }
+    ])
   end
 
   def test_check_params
@@ -264,9 +252,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     good_fred_in_db
     expect_alice_docs_in_db
-    expect_fred_docs_in_db
 
-    expected_result = [{"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0 }, {"name"=>"fred", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>40, "failed_docs_count"=>10, "published_pending_consume_docs_count"=>0, "docs_count"=>50, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}]
+    expected_result = [{"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "documents_in_process"=>29, "failed_documents"=>3, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0 }, {"name"=>"fred", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "documents_in_process"=>40, "failed_documents"=>10, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}]
 
     assert_equal expected_result, @api.get_workflows
   end
@@ -300,7 +287,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_fred_in_db
 
 
-    expected_result = {"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "working_docs_count"=>29, "failed_docs_count"=>3, "published_pending_consume_docs_count"=>9, "docs_count"=>41, "valid"=>true, 'error_alerts' => 0, 'warn_alerts' => 0}
+    expected_result = {"name"=>"alice", "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>false, "documents_in_process"=>29, "failed_documents"=>3, "valid"=>true, 'error_alerts' => 0, 'warn_alerts' => 0}
     assert_equal expected_result, @api.get_workflow_status( 'alice' )
   end
 
@@ -312,13 +299,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
   def test_create_workflow
 
-    Armagh::Document
-        .expects(:count_incomplete_by_doctype)
-        .with([])
-        .returns( {
-                      'documents' => { },
-                      'failures'   => { }
-                  })
+    expect_document_counts( [] )
 
     test_wf_name = 'new_workflow'
     Armagh::Logging::Alert.expects( :get_counts ).with( { :workflow => test_wf_name }).returns( { 'warn' => 0, 'error' => 0 })
@@ -326,7 +307,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     wf = @api.create_workflow( { 'workflow' => { 'name' => test_wf_name }})
     assert_equal test_wf_name, wf.name
-    expected_response = {"name"=>test_wf_name, "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>true, "working_docs_count"=>0, "failed_docs_count"=>0, "published_pending_consume_docs_count"=>0, "docs_count"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
+    expected_response = {"name"=>test_wf_name, "run_mode"=>"stopped", "retired"=>false, "unused_output_docspec_check"=>true, "documents_in_process"=>0, "failed_documents"=>0, "valid"=>true, 'warn_alerts' => 0, 'error_alerts' => 0}
     assert_equal expected_response,@api.get_workflow_status( test_wf_name )
   end
 
@@ -366,6 +347,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
       @api.run_workflow('alice')
     end
 
+    Armagh::Document.clear_document_counts
     expect_alice_docs_in_db
     wf = @api.get_workflow_status('alice')
     assert_equal 'running', wf['run_mode']
@@ -375,6 +357,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     good_alice_in_db
     expect_alice_docs_in_db
     @alice.run
+
+    Armagh::Document.clear_document_counts
     expect_no_alice_docs_in_db
 
     assert_nothing_raised do
@@ -388,6 +372,7 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
 
     @api.run_workflow('alice')
 
+    Armagh::Document.clear_document_counts
     expect_no_alice_docs_in_db
     assert_nothing_raised do
       @api.stop_workflow('alice')
@@ -402,11 +387,8 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     expect_alice_docs_in_db
     @api.run_workflow('alice')
 
-      expect_alice_docs_in_db
-      expect_alice_docs_in_db
-      @api.stop_workflow('alice')
+    @api.stop_workflow('alice')
 
-    expect_alice_docs_in_db
     wf_status = @api.get_workflow_status('alice')
     assert_equal 'stopping', wf_status['run_mode']
   end
@@ -789,15 +771,15 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     params = config_hash['parameters']
     params.sort!{ |p1,p2| "#{p1['group']}:#{p1['name']}" <=> "#{p2['group']}:#{p2['name']}"}
     expected_params =[
-        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>nil, 'default'=>Armagh::Documents::DocSpec.new( "__COLLECT__", 'ready'), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
@@ -856,15 +838,15 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_description
     good_fred_in_db
     expected_action_config_params = [
-        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
+        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto"},
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
+        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto"},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_freddocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"fred", "options"=>nil},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new( '__COLLECT__', 'ready' ), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new('__COLLECT__collect_freddocs_from_source', 'ready'), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("a_freddoc", 'ready'), "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("b_freddocs_aggr", "ready"), "valid_states"=>["ready", "working"], "options"=>nil},
@@ -884,15 +866,15 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
   def test_get_workflow_action_description_invalid
     bad_alice_in_db
     expected_action_config_params = [
-        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"populated_string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
+        {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
         {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
-        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
+        {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+        {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
         {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
         {"name"=>"extract", "description"=>"Extract incoming archive files", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
-        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"populated_string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
-        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"populated_string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto"},
+        {"name"=>"extract_filter", "description"=>"Only extracted files matching this filter will be processed.  If not set, all files will be processed.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*.json", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
+        {"name"=>"extract_format", "description"=>"The extraction mechanism to use.  Selecting auto will automatically determine the format based on incoming filename.", "type"=>"string", "required"=>true, "default"=>"auto", "options"=>["auto", "7zip", "tar", "tgz", "zip"], "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"auto"},
         {"name"=>"docspec", "description"=>"The type of document this action accepts", "type"=>"docspec", "required"=>true, "default"=>Armagh::Documents::DocSpec.new("__COLLECT__", "ready"), "prompt"=>nil, "group"=>"input", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("__COLLECT__collect_alicedocs_from_source","ready"), "valid_state"=>"ready", "options"=>nil},
         {"name"=>"docspec", "description"=>"The docspec of the default output from this action", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>"type validation failed: value cannot be nil", "value"=>nil, "valid_states"=>["ready", "working"], "options"=>nil},
         {"name"=>"docspec2", "description"=>"collected documents of second type", "type"=>"docspec", "required"=>true, "default"=>nil, "prompt"=>nil, "group"=>"output", "warning"=>nil, "error"=>nil, "value"=>Armagh::Documents::DocSpec.new("b_alicedocs_aggr_big", "ready"), "valid_states"=>["ready", "working"], "options"=>nil},

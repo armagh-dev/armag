@@ -52,12 +52,18 @@ module Armagh
       end
 
       def stop
-        begin
-          @semaphore_doc.save( true, self ) if @semaphore_doc
-        rescue => e
-          # can't log from a trap context
-        end
-        Thread.new {@logger.debug 'Stopping Scheduled Action Trigger'}.join
+
+        Thread.new {
+          @logger.debug 'Stopping Scheduled Action Trigger'
+          if @semaphore_doc
+            begin
+              @semaphore_doc.save( true, self )
+            rescue => e
+              @logger.debug "sched action trigger couldn't save sem doc: #{ e }. "
+            end
+          end
+
+        }.join
         @running = false
         @thread.join if @thread
         @thread = nil
@@ -154,9 +160,31 @@ module Armagh
       end
 
       private def update_status_in_db
-        @semaphore_doc.last_run = @last_run
-        @semaphore_doc.seen_actions = @seen_actions
-        @semaphore_doc.save( false, self )
+
+        lock_expires_in = 0
+        lbmu = @semaphore_doc.locked_by_me_until(self)
+
+        if lbmu && lbmu > Time.now.utc
+          lock_expires_in = lbmu - Time.now.utc
+        end
+
+        if lock_expires_in <= 0
+          @logger.debug "Lost lock on scheduled_action_trigger semaphore doc: #{ @semaphore_doc}"
+        end
+
+        if @semaphore_doc.last_run != @last_run ||
+            @semaphore_doc.seen_actions != @seen_actions ||
+            lock_expires_in < 3
+
+          @semaphore_doc.last_run = @last_run
+          @semaphore_doc.seen_actions = @seen_actions
+          begin
+            @semaphore_doc.save( false, self )
+          rescue => e
+            @semaphore_doc = nil
+          end
+
+        end
       end
     end
   end

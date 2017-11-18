@@ -41,8 +41,7 @@ module Armagh
 
     include Configh::Configurable
 
-    define_parameter name: 'log_level', type: 'populated_string', description: 'Logging level for agents', required: true, default: 'info', group: 'agent'
-    define_group_validation_callback callback_class: Agent, callback_method: :report_validation_errors
+    define_parameter name: 'log_level', type: 'string', description: 'Logging level for agents', required: true, options: Armagh::Logging.valid_log_levels.collect{|s| s.encode('UTF-8')}, default: 'info', group: 'agent'
 
     attr_reader :signature
 
@@ -193,7 +192,7 @@ module Armagh
 
     def instantiate_divider(docspec)
       begin
-        actions = @workflow_set.instantiate_actions_handling_docspec(docspec, self, @logger, Connection.action_state)
+        actions = @workflow_set.instantiate_actions_handling_docspec(docspec, self, @logger)
       rescue Armagh::Actions::ActionInstantiationError => e
         Logging.ops_error_exception(@logger, e, 'Unable to instantiate divide')
         actions = []
@@ -262,7 +261,7 @@ module Armagh
 
           action_success = true
 
-          if current_doc.error?
+          if current_doc.error
             @logger.info("Skipping further actions on document '#{current_doc.document_id}' since it has errors.")
             break
           end
@@ -270,7 +269,7 @@ module Armagh
 
           begin
             @logger.debug "Instantiating action #{name}"
-            current_action = @workflow_set.instantiate_action_named(name, self, @logger, Connection.action_state)
+            current_action = @workflow_set.instantiate_action_named(name, self, @logger)
           rescue Armagh::Actions::ActionInstantiationError
             @logger.ops_error "Document: #{current_doc.document_id} had an invalid action #{name}.  Please make sure all pending actions of this document are defined."
           end
@@ -278,7 +277,7 @@ module Armagh
           report_status(current_doc, current_action)
           if current_action
             begin
-              Logging.set_details(current_action.config.action.workflow, current_action.name, Utils::ActionHelper.get_action_super(current_action.class), current_doc.internal_id) if current_action.is_a? Actions::Action
+              Logging::set_details(current_action.config.action.workflow, current_action.config.action.name, Utils::ActionHelper.get_action_super(current_action.class), current_doc.internal_id) if current_action.is_a? Actions::Action
 
               exec_id = current_doc.document_id || current_doc.internal_id
               @logger.info "Executing #{name} on document '#{exec_id}'."
@@ -385,7 +384,7 @@ module Armagh
           end
 
           doc.published_timestamp = timestamp
-          doc.state = action.config.output.docspec.state unless doc.error?
+          doc.state = action.config.output.docspec.state unless doc.error
           doc.add_items_to_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
         when Actions::Consume
@@ -411,6 +410,19 @@ module Armagh
       @archives_for_collect.clear
     end
 
+    def with_locked_action_state( action_name, **locking_args, &block )
+
+      state_doc = ActionStateDocument.find_or_create_one_by_action_name_locked( action_name, self, **locking_args )
+      if state_doc
+        begin
+          state_doc.content ||= {}
+          yield state_doc.content
+        ensure
+          state_doc.save( true, self )
+        end
+      end
+    end
+
     private def report_status(doc, action)
       now = Time.now
 
@@ -433,12 +445,5 @@ module Armagh
       Status::AgentStatus.report(signature: @signature, hostname: @hostname, status: status, task: task, running_since: running_since, idle_since: @idle_since)
     end
 
-    def Agent.report_validation_errors(candidate_config)
-      errors = nil
-      unless Logging.valid_level?(candidate_config.agent.log_level)
-        errors = "Log level must be one of #{ Logging.valid_log_levels.join(", ")}"
-      end
-      errors
-    end
   end
 end

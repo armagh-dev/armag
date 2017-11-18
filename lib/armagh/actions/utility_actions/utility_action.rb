@@ -27,7 +27,7 @@ module Armagh
     class UtilityAction < Action
       include Configh::Configurable
 
-      define_parameter name: 'schedule', type: 'populated_string', required: false, description: 'Schedule to run the utility.  Cron syntax.  If not set, Utility must be manually triggered.', prompt: '*/15 * * * *', group: 'utility'
+      define_parameter name: 'schedule', type: 'string', required: false, description: 'Schedule to run the utility.  Cron syntax.  If not set, Utility must be manually triggered.', prompt: '*/15 * * * *', group: 'utility'
       define_group_validation_callback callback_class: UtilityAction, callback_method: :report_validation_errors
 
       UTILITY_DOCTYPE_PREFIX = '__UTILITY__'
@@ -43,7 +43,7 @@ module Armagh
 
       def self.default_config_values
         {
-            'action' => { 'name' => simple_name, 'active' => true },
+            'action' => { 'name' => simple_name, 'active' => true, 'workflow' => 'XYZZY' },
             'utility' => { 'schedule' => default_cron  }
         }
       end
