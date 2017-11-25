@@ -18,8 +18,13 @@ def sendToSlack() {
 def isNewBuild(name) {
   def current_version = sh(script: 'rake version', returnStdout: true).trim()
   def result = sh(script: "gem search ^${name}\$", returnStdout: true).trim()
-  def latest_version = (result =~ /\((.+)\)/)[0][1]
-  return current_version != latest_version
+  def match = (result =~ /\((.+)\)/)
+  if(match) {
+    def latest_version = match[0][1]
+    return current_version != latest_version
+  } else {
+    return true
+  }
 }
 
 
