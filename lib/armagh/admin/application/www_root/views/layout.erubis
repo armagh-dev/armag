@@ -148,6 +148,20 @@
       </div>
     </div>
 
+    <div id="modal-wait" class="uk-modal">
+      <div class="uk-modal-dialog">
+        <div class="uk-margin uk-text-center">
+          <div id="modal-wait-title" class="uk-panel uk-panel-box uk-text-bold uk-margin-bottom">
+          </div>
+          <div id="modal-wait-details">
+          </div>
+          <div class="uk-margin uk-margin-bottom-remove">
+            <i class="uk-icon-circle-o-notch uk-icon-spin uk-icon-large uk-text-success"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </body>
 </html>
 
@@ -231,5 +245,22 @@
     } else {
       $('#scroll-bot').stop().css({top: offset})
     }
+  }
+
+  var modal = undefined
+
+  function show_wait_modal(title = 'Please wait...', details = '') {
+    modal = UIkit.modal('#modal-wait', {'keyboard':false, 'bgclose':false, 'center':true})
+    $('#modal-wait-title').html(title)
+    $('#modal-wait-details').html(details)
+    modal.show()
+  }
+
+  function hide_wait_modal() {
+    if (modal == undefined) {
+      return
+    }
+    modal.hide()
+    modal = undefined
   }
 </script>

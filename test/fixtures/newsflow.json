@@ -1,11 +1,14 @@
 {
   "workflow": {
     "name": "Newsflow",
-    "exported": "2017-09-18 08:21:40 UTC",
-    "versions": {
-      "armagh": "0.5.1",
-      "actions": {
-        "standard": "0.5.1"
+    "retired": "false",
+    "metadata": {
+      "exported": "2017-09-18 08:21:40 UTC",
+      "versions": {
+        "armagh": "0.5.1",
+        "actions": {
+          "standard": "0.5.1"
+        }
       }
     }
   },
@@ -13,7 +16,8 @@
     {
       "type": "Armagh::StandardActions::HTMLPublish",
       "action": {
-        "name": "newsflow-publish"
+        "name": "newsflow-publish",
+        "retired": "false"
       },
       "html": {
         "exclude": "[\"<a.*?</a>\"]",
@@ -32,7 +36,8 @@
     {
       "type": "Armagh::StandardActions::RSSCollect",
       "action": {
-        "name": "newsflow-collect"
+        "name": "newsflow-collect",
+        "retired": "false"
       },
       "collect": {
         "schedule": "*/10 * * * *",
@@ -70,7 +75,8 @@
     {
       "type": "Armagh::StandardActions::TacballConsume",
       "action": {
-        "name": "newsflow-tacball"
+        "name": "newsflow-tacball",
+        "retired": "false"
       },
       "tacball": {
         "feed": "newsflow",

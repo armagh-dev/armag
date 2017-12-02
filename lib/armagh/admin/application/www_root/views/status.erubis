@@ -1,7 +1,33 @@
-{{= partial :header, data: {title: 'Status', subtitle: "#{@data.size} server#{@data.size == 1 ? '' : 's'}"} }}
+{{ launcher_data = @data&.[]( 'launchers' ) || [] }}
+{{ alert_counts = @data&.[]( 'alert_counts' ) }}
 
-{{ launcher_data = @data&.[ 'launchers' ] || [] }}
-{{ alert_counts = @data&.[ 'alert_counts' ] # TODO - Ilya, add the display where you think it fits here, yeah }}
+{{ if alert_counts }}
+  {{ unless alert_counts['fatal'].to_i.zero? }}
+    <div class="uk-alert uk-alert-danger" data-uk-alert>
+      <a href="" class="uk-alert-close uk-close"></a>
+      <i class="uk-icon-bomb uk-icon-small uk-margin-small-right"></i>
+      {{= alert_counts['fatal'] }} <strong>fatal</strong> alert{{= 's' if alert_counts['fatal'].to_i > 1 }}!
+    </div>
+  {{ end }}
+
+  {{ unless alert_counts['error'].to_i.zero? }}
+    <div class="uk-alert uk-alert-danger" data-uk-alert>
+      <a href="" class="uk-alert-close uk-close"></a>
+      <i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>
+      {{= alert_counts['error'] }} <strong>error</strong> alert{{= 's' if alert_counts['error'].to_i > 1 }}!
+    </div>
+  {{ end }}
+
+  {{ unless alert_counts['warn'].to_i.zero? }}
+    <div class="uk-alert uk-alert-danger" data-uk-alert>
+      <a href="" class="uk-alert-close uk-close"></a>
+      <i class="uk-icon-exclamation uk-icon-small uk-margin-small-right"></i>
+      {{= alert_counts['warn'] }} <strong>warning</strong> alert{{= 's' if alert_counts['warn'].to_i > 1 }}!
+    </div>
+  {{ end }}
+{{ end }}
+
+{{= partial :header, data: {title: 'Status', subtitle: "#{launcher_data.size} server#{launcher_data.size == 1 ? '' : 's'}"} }}
 
 <table class="uk-table uk-table-hover uk-table-condensed">
   <thead>
@@ -9,7 +35,8 @@
       <th>Hostname</th>
       <th>Status</th>
       <th>Agents</th>
-      <th>Last Update</th>
+      <th>Created</th>
+      <th>Updated</th>
       <th>Versions</th>
     </tr>
   </thead>
@@ -17,14 +44,15 @@
       {{ uuid = SecureRandom.uuid }}
       <tr>
         <td>
-          <a href="javascript:" onclick="toggle_agents('{{= uuid }}')">
+          <a href="javascript:" onclick="toggle_agents('{{= uuid }}')" title="{{= host['internal_id'] }}" style="white-space:nowrap;">
             <i id="icon-{{= uuid }}" class="uk-icon-caret-{{= host['agents'] ? 'down' : 'right' }}"></i>
-            {{= host['_id'] }}
+            {{= host['hostname'] }}
           </a>
         </td>
         <td>{{= host['status'] }}</td>
         <td>{{= host['agents'].size }}</td>
-        <td>{{= host['last_updated'] }}</td>
+        <td>{{= host['created_timestamp'] }}</td>
+        <td>{{= host['updated_timestamp'] }}</td>
         <td>
           armagh: {{= host.dig('versions', 'armagh') }}
           {{ host.dig('versions', 'actions')&.each do |package, version| }}
@@ -34,16 +62,17 @@
           {{ end }}
         </td>
       </tr>
-      {{ if host['agents'] }}
+      {{ if host['agents']&.size > 0 }}
         <tr id="{{= uuid }}">
-          <td colspan="5">
+          <td colspan="6">
             <table class="uk-table uk-table-condensed uk-margin-left uk-text-small">
               <thead>
                 <tr style="font-style: italic;">
                   <td>Agent</td>
                   <td>Status</td>
+                  <td>Task</td>
+                  <td>Running Since</td>
                   <td>Idle Since</td>
-                  <td>Last Update</td>
                 </tr>
               </thead>
               <tbody>
@@ -51,11 +80,12 @@
                   <tr>
                     <td style="border-style: none;">
                       <i class="uk-icon-user-secret"></i>
-                      {{= fields['_id'] }}
+                      {{= fields['signature'] }}
                     </td>
                     <td style="border-style: none;">{{= fields['status'] }}</td>
+                    <td style="border-style: none;">{{= fields['task'] }}</td>
+                    <td style="border-style: none;">{{= fields['running_since'] }}</td>
                     <td style="border-style: none;">{{= fields['idle_since'] }}</td>
-                    <td style="border-style: none;">{{= fields['last_updated'] }}</td>
                   </tr>
                 {{ end }}
               </tbody>
@@ -64,7 +94,7 @@
         </tr>
       {{ else }}
         <tr id="{{= uuid }}" style="display: none;">
-          <td colspan="5">
+          <td colspan="6">
             <span class="uk-text-small uk-text-muted uk-margin uk-margin-left">
               No agents are running
             </span>

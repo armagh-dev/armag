@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#
+
 require 'configh'
 require_relative 'workflow'
 require_relative 'utility_actions/utility_action'
@@ -57,10 +57,10 @@ module Armagh
         refresh
       end
 
-      def refresh(exclude_retired: true)
+      def refresh(include_retired: false)
         case @target
           when :admin then
-            reload_active_valid(exclude_retired: exclude_retired, force: true)
+            reload_active_valid(include_retired: include_retired, force: true)
           when :agent then
             reload_active_valid
           else
@@ -68,18 +68,18 @@ module Armagh
         end
       end
 
-      def reload_all(exclude_retired: true)
+      def reload_all(include_retired: false)
         @workflows.clear
         @workflows = Workflow.find_all(@config_store, self, logger: @logger)
-        @workflows.delete_if{ |wf| exclude_retired && wf.retired }
+        @workflows.delete_if{ |wf| !include_retired && wf.retired }
         @workflows = Hash[ @workflows.collect{ |wf|[  wf.name, wf ]}]
         true
       end
 
-      def reload_active_valid(exclude_retired: true, force: false)
+      def reload_active_valid(include_retired: false, force: false)
         last_timestamp = Action.max_timestamp(@config_store)
         if @last_timestamp != last_timestamp || force
-          reload_all(exclude_retired: exclude_retired)
+          reload_all(include_retired: include_retired)
           refresh_pointers
           @last_timestamp = last_timestamp
           return true
@@ -113,7 +113,8 @@ module Armagh
         end
       end
 
-      def list_workflows
+      def list_workflows(include_retired: false)
+        reload_all(include_retired: true) if include_retired
         @workflows.values.collect(&:status)
       end
 
@@ -183,7 +184,7 @@ module Armagh
         get_stopping_workflows.each do |wf|
           begin
             wf.stop
-          rescue WorkflowDocumentsInProcessError => e
+          rescue WorkflowDocumentsInProcessError
             # do nothing
           end
         end

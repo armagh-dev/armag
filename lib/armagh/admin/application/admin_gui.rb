@@ -21,8 +21,6 @@ require 'uri'
 require 'cgi'
 require 'json'
 
-require 'armagh/actions'
-
 require_relative '../../logging'
 require_relative '../../configuration/file_based_configuration'
 
@@ -123,20 +121,20 @@ module Armagh
               "API HTTP #{method} request to #{url} failed with status #{response.status} #{response.reason}"}}
           end
 
-          status = response.status == 200 ? :success : :error
+          status = response.ok? ? :success : :error
           json   = json[json.keys.first] if json.is_a?(Hash) && json.keys.size == 1
-          json   = json['message'] if status == :error && json.respond_to?(:has_key?) && json&.has_key?('message')
+          if json.is_a? Hash
+            markup = json.key?('markup') ? json['markup'] : nil
+            json   = json['message'] if status == :error && json&.key?('message')
+          end
 
-          case method
-          when :get
-            if get_with_status
-              [status, json]
-            else
-              raise AdminGUIHTTPError, json if status == :error
-              json
-            end
-          when :post, :put, :patch, :delete
-            [status, json]
+          if method == :get && !get_with_status
+            raise AdminGUIHTTPError, json if status == :error
+            json
+          else
+            output = [status, json]
+            output << markup if markup
+            output
           end
         end
 
@@ -176,6 +174,18 @@ module Armagh
           end
         end
 
+        def set_session_flag(user, params)
+          params.each do |param, value|
+            case param
+            when 'show_retired'
+              user.show_retired = value&.downcase == 'true'
+            else
+              raise "Unknown session flag #{param.inspect} with value #{value.inspect}"
+            end
+          end
+          true
+        end
+
         def shutdown(user, restart: false)
           raise 'Insufficient user permissions to perform this action.' unless user.roles.include? 'application_admin'
           `armaghd #{restart ? 'restart' : 'stop'}`
@@ -185,12 +195,15 @@ module Armagh
           get_json(user, '/status.json')
         end
 
-        def get_workflow_alerts(user,workflow)
+        def get_workflow_alerts(user, workflow)
           get_json(user, '/workflow/#{workflow}/alerts.json')
         end
 
         def get_workflows(user)
-          get_json(user, '/workflows.json')
+          {
+            workflows:    get_json(user, '/workflows.json', include_retired: user.show_retired),
+            show_retired: user.show_retired
+          }
         end
 
         def create_workflow(user, workflow)
@@ -199,43 +212,28 @@ module Armagh
 
         def get_workflow(user, workflow, created, updated)
           {
-            workflow: workflow,
-            actions:  get_workflow_actions(user, workflow),
-            active:   workflow_active?(user, workflow),
-            created:  created,
-            updated:  updated
+            workflow:     workflow,
+            actions:      get_workflow_actions(user, workflow, include_retired: user.show_retired),
+            created:      created,
+            updated:      updated,
+            show_retired: user.show_retired
+          }.merge! get_workflow_status(user, workflow)
+        end
+
+        private def get_workflow_actions(user, workflow, include_retired: false)
+          get_json(user, "/workflow/#{workflow}/actions.json", include_retired: include_retired)
+        end
+
+        private def get_workflow_status(user, workflow)
+          status = get_json(user, "/workflow/#{workflow}/status.json", include_retired: true)
+          {
+            active:  status['run_mode'] != 'stopped',
+            retired: status['retired']
           }
         end
 
-        private def get_workflow_actions(user, workflow)
-          get_json(user, "/workflow/#{workflow}/actions.json")
-        end
-
-        private def workflow_active?(user, workflow)
-          status = get_json(user, "/workflow/#{workflow}/status.json")
-          status['run_mode'] != 'stopped'
-        end
-
-        def activate_workflow(user, workflow)
-          change_workflow_status(user, workflow, :activate)
-        end
-
-        def deactivate_workflow(user, workflow)
-          change_workflow_status(user, workflow, :deactivate)
-        end
-
-        private def change_workflow_status(user, workflow, status_change)
-          unchanged_status = status_change == :activate ? 'stop' : 'run'
-          status, response =
-            patch_json(user, "/workflow/#{workflow}/#{status_change == :activate ? 'run' : 'stop'}.json")
-        rescue => e
-          [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{e.message}"]
-        else
-          if status == :success
-            [response['run_mode'], response]
-          else
-            [unchanged_status, "Unable to #{status_change} workflow #{workflow}: #{response}"]
-          end
+        def run_stop_workflow(user, workflow, state)
+          patch_json(user, "/workflow/#{workflow}/#{state}.json")
         end
 
         private def get_defined_actions(user)
@@ -270,17 +268,24 @@ module Armagh
         end
 
         def export_workflow(user, workflow)
-          get_json(user, "/workflow/#{workflow}/export.json")
+          JSON.pretty_generate(get_json(user, "/workflow/#{workflow}/export.json"))
+        end
+
+        def retire_workflow(user, workflow)
+          patch_json(user, "/workflow/#{workflow}/retire.json").to_json
+        end
+
+        def unretire_workflow(user, workflow)
+          patch_json(user, "/workflow/#{workflow}/unretire.json").to_json
         end
 
         def new_workflow_action(user, workflow, previous_action, filter)
           {
             workflow:        workflow,
-            active:          workflow_active?(user, workflow),
             defined_actions: get_defined_actions(user),
             previous_action: previous_action,
             filter:          filter
-          }
+          }.merge! get_workflow_status(user, workflow)
         end
 
         def new_action_config(user, workflow, action)
@@ -348,7 +353,22 @@ module Armagh
         end
 
         private def get_action_config(user, workflow, action)
-          config = get_json(user, "/workflow/#{workflow}/action/#{action}/description.json")
+          config = get_json(user, "/workflow/#{workflow}/action/#{action}/description.json", include_retired: true)
+
+          passwords = config['parameters'].select { |p| p['type'] == 'encoded_string' }
+          passwords.each do |password|
+            next if password['value'].to_s.strip.empty?
+            begin
+              plain_text = get_json(user, '/string/decode.json', string: password['value'])
+            rescue
+              password['error'] ||= ''
+              password['error'] << password['error'] ? ', ' : ''
+              password['error'] << "Unable to decode encoded string"
+              plain_text = ''
+            end
+            password['value'] = plain_text
+          end
+
           format_action_config_for_gui(config)
         end
 
@@ -356,7 +376,6 @@ module Armagh
           config = get_action_config(user, workflow, action)
           type   = config.delete(:type)
           {
-            locked:             workflow_active?(user, workflow),
             workflow:           workflow,
             action:             action,
             type:               type,
@@ -364,7 +383,7 @@ module Armagh
             edit_action:        true,
             defined_parameters: config,
             test_callbacks:     get_action_test_callbacks(user, type)
-          }
+          }.merge! get_workflow_status(user, workflow)
         end
 
         def create_action_config(user, data)
@@ -394,9 +413,10 @@ module Armagh
             data.keys.grep(/^#{docspec}-.*?_type$/).each do |field|
               doctype  = data[field]
               docstate = data[field.sub(/_type$/, '_state')]
-              name  = field.sub(/^#{docspec}-/, '').sub(/_(?:type|state)/, '')
+              name     = field.sub(/^#{docspec}-/, '').sub(/_(?:type|state)/, '')
+              value    = "#{doctype}:#{docstate}"
               new_config[docspec] ||= {}
-              new_config[docspec][name] = "#{doctype}:#{docstate}"
+              new_config[docspec][name] = value.strip == ':' ? '' : value
             end
           end
 
@@ -421,6 +441,8 @@ module Armagh
               case param[:type]
               when 'string'
                 next if value.to_s.strip.empty?
+              when 'encoded_string'
+                value = get_json(user, '/string/encode.json', string: value)
               when 'string_array'
                 value = value.split("\x19")
                 value = param[:default] if value.empty?
@@ -440,7 +462,7 @@ module Armagh
             end
           end
 
-          status, response =
+          status, message, markup =
             if new_action
               post_json(user, "/workflow/#{workflow}/action/config.json", new_config)
             else
@@ -450,9 +472,9 @@ module Armagh
           if status == :success && errors.empty?
             status
           else
-            errors << response
-            if response.respond_to?(:has_key?) && response.has_key?('markup')
-              config = format_action_config_for_gui(response['markup'])
+            errors << message
+            if markup
+              config = format_action_config_for_gui(markup)
               config.delete(:type)
               config.delete(:supertype)
 
@@ -471,7 +493,6 @@ module Armagh
             end
 
             data = {
-              locked:             workflow_active?(user, workflow),
               workflow:           workflow,
               action:             action,
               type:               type,
@@ -481,6 +502,8 @@ module Armagh
               pending_values:     data,
               test_callbacks:     get_action_test_callbacks(user, type)
             }
+            data.merge! get_workflow_status(user, workflow)
+
             [data, errors]
           end
         end
@@ -494,16 +517,23 @@ module Armagh
           [response ? :error : :success, response].to_json
         end
 
-        def get_logs(user, page:, limit:, sort:, filter:, hide:)
-          # TODO move this to the API and create a modal
+        def retire_action(user, workflow, action)
+          patch_json(user, "/workflow/#{workflow}/action/#{action}/retire.json").to_json
+        end
+
+        def unretire_action(user, workflow, action)
+          patch_json(user, "/workflow/#{workflow}/action/#{action}/unretire.json").to_json
+        end
+
+        def get_logs(user, page:, limit:, filter:, hide:)
+          # TODO ARM-675 move this to the API and create a modal
           errors = []
           page   = page.to_i
+          init   = page.dup
           page   = 1 if page <= 0
           limit  = limit.to_i
           limit  = 20 if limit <= 0
           skip   = page * limit - limit
-          sort   = {sort.keys.first ? sort.keys.first : 'timestamp'=>
-                   sort.values.first ? sort.values.first.to_i : -1}
 
           query =
             if filter.to_s.strip.empty? || filter == '{}'
@@ -565,13 +595,16 @@ module Armagh
 
           count = Connection.log.find(query).count.to_i
 
+          if init <= 0
+            page = (count / limit).ceil + 1
+            skip = page * limit - limit
+          end
+
           {
             count:    count,
             page:     skip > count ? 1 : page,
             limit:    limit,
             skip:     skip,
-            sort_col: sort.keys.first,
-            sort_dir: sort.values.first,
             filter:   filter,
             hide:     hide,
             distinct: {
@@ -621,7 +654,6 @@ module Armagh
             logs: Connection.log
                     .find(query)
                     .projection(projection)
-                    .sort(sort)
                     .skip(skip)
                     .limit(limit)
                     .to_a,

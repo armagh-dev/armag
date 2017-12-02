@@ -144,6 +144,14 @@ before do
 end
 
 #
+# session flags
+#
+
+patch '/session' do
+  gui.set_session_flag(user, params)
+end
+
+#
 # login
 #
 
@@ -233,7 +241,6 @@ get '/logs' do
   data = gui.get_logs(user,
     page:   params['page'],
     limit:  params['limit'],
-    sort:  {params['sort_col']=>params['sort_dir']},
     filter: params['filter'],
     hide:   params['hide']
   )
@@ -307,17 +314,26 @@ get '/config/:workflow/export' do
   gui.export_workflow(user, workflow)
 end
 
-patch '/config/:workflow/:status_change' do
-  workflow = params['workflow']
-  if params['status_change'] == 'activate'
-    gui.activate_workflow(user, workflow)
-      .unshift(params['id'])
-      .to_json
-  else
-    gui.deactivate_workflow(user, workflow)
-      .unshift(params['id'])
-      .to_json
-  end
+patch '/config/:workflow/retire' do
+  gui.retire_workflow(user, params['workflow'])
+end
+
+patch '/config/:workflow/unretire' do
+  gui.unretire_workflow(user, params['workflow'])
+end
+
+patch '/config/:workflow/:state' do
+  gui.run_stop_workflow(user, params['workflow'], params['state'])
+    .unshift(params['id'])
+    .to_json
+end
+
+patch '/config/:workflow/retire/:action' do
+  gui.retire_action(user, params['workflow'], params['action'])
+end
+
+patch '/config/:workflow/unretire/:action' do
+  gui.unretire_action(user, params['workflow'], params['action'])
 end
 
 #

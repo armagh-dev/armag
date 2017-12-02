@@ -1049,6 +1049,7 @@ Feature: Actions Execution
       | pending_work        | nil                           |
       | version             | APP_VERSION                   |
       | published_timestamp | recent_timestamp              |
+      | title               | '123 (unknown title)'         |
     And I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id         | 'consumed'                    |
       | state               | 'ready'                       |

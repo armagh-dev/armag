@@ -1,11 +1,14 @@
 {
   "workflow": {
     "name": "Testflow",
-    "exported": "2017-09-18 02:26:43 UTC",
-    "versions": {
-      "armagh": "0.5.1",
-      "actions": {
-        "standard": "0.5.1"
+    "retired": "false",
+    "metadata": {
+      "exported": "2017-09-18 02:26:43 UTC",
+      "versions": {
+        "armagh": "0.5.1",
+        "actions": {
+          "standard": "0.5.1"
+        }
       }
     }
   },
@@ -13,16 +16,8 @@
     {
       "type": "Armagh::StandardActions::NewsmlPublish",
       "action": {
-        "name": "testflow-publish"
-      },
-      "html": {
-        "ignore_cdata": "true",
-        "force_breaks": "false",
-        "unescape_html": "false",
-        "preserve_hyperlinks": "false"
-      },
-      "xml": {
-        "html_nodes": "[\"body.content\",\"HeadLine\",\"SubHeadLine\",\"CopyrightLine\"]"
+        "name": "testflow-publish",
+        "retired": "false"
       },
       "input": {
         "docspec": "testflow:ready"
@@ -34,7 +29,8 @@
     {
       "type": "Armagh::StandardActions::SFTPCollect",
       "action": {
-        "name": "testflow-collect"
+        "name": "testflow-collect",
+        "retired": "false"
       },
       "collect": {
         "schedule": "*/10 * * * *",
@@ -62,7 +58,8 @@
     {
       "type": "Armagh::StandardActions::TacballConsume",
       "action": {
-        "name": "testflow-tacball"
+        "name": "testflow-tacball",
+        "retired": "false"
       },
       "tacball": {
         "feed": "testflow",

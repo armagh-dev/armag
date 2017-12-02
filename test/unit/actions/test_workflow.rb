@@ -77,7 +77,7 @@ class TestWorkflow < Test::Unit::TestCase
 
   def stored_alice(retired = false)
     wf_set = Armagh::Actions::WorkflowSet.for_admin( Armagh::Connection.config, logger: @logger )
-    wf_set.refresh( exclude_retired: false ) if retired
+    wf_set.refresh( include_retired: true ) if retired
     wf_set.get_workflow('alice')
   end
 
@@ -389,7 +389,7 @@ class TestWorkflow < Test::Unit::TestCase
   def test_run_with_callback_errors
     good_alice_in_db
     @alice.instance_variable_get(:@valid_action_configs).each_with_index do |action_config, index|
-      action_config.expects(:test_and_return_errors).once.returns('test_connection'=>"Some error #{index + 1}")
+      action_config.expects(:test_and_return_errors).returns('test_connection'=>"Some error #{index + 1}")
     end
     e = assert_raises Armagh::Actions::WorkflowActivationError do
       @alice.run
@@ -405,7 +405,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal expected, e.message
   end
 
-   def test_stop
+  def test_stop
     good_alice_in_db
 
     expect_no_alice_docs_in_db
@@ -469,6 +469,7 @@ class TestWorkflow < Test::Unit::TestCase
       "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
       "name"=>"collect_alicedocs_from_source",
       "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+      "retired"=>false,
       "supertype"=>"Armagh::Actions::Collect",
       "type"=>"Armagh::StandardActions::TWTestCollect",
       "valid"=>true}
@@ -477,6 +478,7 @@ class TestWorkflow < Test::Unit::TestCase
 
   def test_invalid_action_config_status
     bad_alice_in_db
+    stored_alice = Armagh::Actions::Workflow.find(@config_store, 'alice', @workflow_set, logger: @logger)
     action_config = stored_alice.invalid_action_configs.first
     result = @alice.invalid_action_config_status(action_config)
     expected = {"active"=>false,
@@ -484,6 +486,7 @@ class TestWorkflow < Test::Unit::TestCase
       "last_updated"=>"",
       "name"=>"collect_alicedocs_from_source",
       "output_docspecs"=>["b_alicedocs_aggr_big:ready"],
+      "retired"=>false,
       "supertype"=>"Armagh::Actions::Collect",
       "type"=>"Armagh::StandardActions::TWTestCollect",
       "valid"=>false}
@@ -500,6 +503,7 @@ class TestWorkflow < Test::Unit::TestCase
       "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
       "name"=>"collect_alicedocs_from_source",
       "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+      "retired"=>false,
       "supertype"=>"Armagh::Actions::Collect",
       "type"=>"Armagh::StandardActions::TWTestCollect",
       "valid"=>true}
@@ -514,6 +518,7 @@ class TestWorkflow < Test::Unit::TestCase
       "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
       "name"=>"collect_alicedocs_from_source",
       "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+      "retired"=>false,
       "supertype"=>"Armagh::Actions::Collect",
       "type"=>"Armagh::StandardActions::TWTestCollect",
       "valid"=>true}
@@ -580,7 +585,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal Hash, result.class
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
-    assert_equal 13, result['parameters'].size
+    assert_equal 14, result['parameters'].size
     expected = {"default" => nil,
                 "description" => "Name of this action configuration",
                 "error" => nil,
@@ -610,7 +615,7 @@ class TestWorkflow < Test::Unit::TestCase
     assert_equal Hash, result.class
     assert_true result.has_key?('parameters')
     assert_equal Array, result['parameters'].class
-    assert_equal 15, result['parameters'].size
+    assert_equal 16, result['parameters'].size
     expected = {"default" => nil,
                 "description" => "Name of this action configuration",
                 "error" => nil,
@@ -700,4 +705,67 @@ class TestWorkflow < Test::Unit::TestCase
     end
     assert_equal 'Workflow has unused outputs: a_alicedoc_out:ready from consume_a_alicedoc_2, b_aliceconsume_out_doc:ready from consume_b_alicedoc_1, b_alicedocs_aggr:ready from divide_b_alicedocs', e.message
   end
+
+  def test_retire_and_unretire_action
+    good_alice_in_db
+    action_name = 'collect_alicedocs_from_source'
+    @alice.retire_action(action_name)
+    config = @alice.retired_action_configs.find { |ac| ac.action.name == action_name }
+    assert_not_nil config
+    assert_true config.action.retired
+    @alice.unretire_action(action_name)
+    config = @alice.valid_action_configs.find { |ac| ac.action.name == action_name }
+    assert_not_nil config
+    assert_false config.action.retired
+  end
+
+  def test_retire_and_unretire_invalid_action
+    bad_alice_in_db
+    @alice.load_action_configs
+    action_name = 'collect_alicedocs_from_source'
+    @alice.retire_action(action_name)
+    config = @alice.retired_action_configs.find { |ac| ac.action.name == action_name }
+    assert_not_nil config
+    assert_true config.action.retired
+    @alice.unretire_action(action_name)
+    config = @alice.invalid_bypassed_configs.find { |ac| ac.action.name == action_name }
+    assert_not_nil config
+    assert_false config.action.retired
+  end
+
+  def test_retire_action_while_workflow_running
+    good_alice_in_db
+    @alice.expects(:stopped?).returns(false)
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.retire_action('collect_alicedocs_from_source')
+    end
+    assert_equal 'Stop workflow before retiring action "collect_alicedocs_from_source".', e.message
+  end
+
+  def test_retire_action_does_not_exist
+    good_alice_in_db
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.retire_action('i do not exist')
+    end
+    assert_equal 'Action "i do not exist" does not exist for this workflow.', e.message
+  end
+
+  def test_retire_action_already_retired
+    good_alice_in_db
+    action_name = 'collect_alicedocs_from_source'
+    @alice.retire_action(action_name)
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.retire_action(action_name)
+    end
+    assert_equal 'Action "collect_alicedocs_from_source" is already retired.', e.message
+  end
+
+  def test_unretire_action_not_retired
+    good_alice_in_db
+    e = assert_raise Armagh::Actions::WorkflowConfigError do
+      @alice.unretire_action('collect_alicedocs_from_source')
+    end
+    assert_equal 'Action "collect_alicedocs_from_source" is not retired.', e.message
+  end
+
 end

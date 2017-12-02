@@ -1,4 +1,4 @@
-{{ bad_count = @data[:actions].select { |action| !action['valid'] }.size }}
+{{ bad_count = @data[:actions].select { |action| !action['valid'] && !action['retired'] }.size }}
 {{ unless bad_count.zero? }}
   <div class="uk-alert uk-alert-danger uk-margin-top-remove" data-uk-alert>
     <a href="" class="uk-alert-close uk-close"></a>
@@ -6,9 +6,33 @@
     <strong>{{= bad_count }}</strong> action{{= bad_count > 1 ? 's are' : ' is' }} not valid and {{= bad_count > 1 ? 'have' : 'has' }} been identified below.
   </div>
 {{ end }}
+{{ active  = @data[:active] }}
+{{ retired = @data[:retired] }}
 
 {{= partial :header, data: {title:    @data[:workflow],
-                            subtitle: 'Edit Workflow'} }}
+                            subtitle: '<span id="workflow-run-mode">' +
+  (retired ? '<span class="uk-text-muted"><i class="uk-icon-remove uk-text-bold"></i> Retired</span>' :
+    (active ? '<span class="uk-text-success"><i class="uk-icon-toggle-on uk-text-bold"></i> Running</span>' :
+      '<i class="uk-icon-toggle-off uk-text-bold"></i> Stopped')) + '</span>',
+                            right:
+  '<button id="show-retired" onclick="toggle_retired_actions(this)" class="uk-button uk-button-small" title="Show retired workflows">' +
+    'Show Retired' +
+  '</button>'} }}
+
+<style>
+  #action-options {
+    pointer-events: none;
+  }
+
+  #action-options ul li[id$="disabled"] {
+    color: #999;
+    padding: 5px 15px;
+    cursor: not-allowed;
+  }
+  #action-options ul li[id$="enabled"] {
+    display: none;
+  }
+</style>
 
 <div class="uk-grid uk-grid-divider" data-uk-grid-match>
 
@@ -30,17 +54,337 @@
 
 <div class="uk-grid">
   <div class="uk-width-2-5">
-    {{ disabled = @data[:active] ? 'disabled' : '' }}
-    <button id="new-action" onclick="window.location='/config/{{= @data[:workflow] }}/new'" class="uk-button" {{= disabled }}>New Action</button>
+
+    <div id="action-options" class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}">
+      <button id="action-dropdown" class="uk-button" disabled>
+        <label>None Selected</label>
+        <i class="uk-icon-caret-down"></i>
+      </button>
+      <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom uk-dropdown-close">
+        <ul class="uk-nav uk-nav-dropdown" style="text-align:left;">
+
+<!-- TODO
+          <li id="action-test-disabled">
+            <i class="uk-icon-flask uk-margin-small-right"></i>
+            Test
+          </li>
+          <li id="action-test-enabled">
+            <a onclick="">
+              <i class="uk-icon-flask uk-margin-small-right"></i>
+              Test
+            </a>
+          </li>
+
+          <li class="uk-nav-divider"></li>
+-->
+
+          <li id="action-retire-disabled">
+            <i class="uk-icon-remove uk-margin-small-right"></i>
+            Retire
+          </li>
+          <li id="action-retire-enabled">
+            <a onclick="retire_actions(true)">
+              <i class="uk-icon-remove uk-margin-small-right"></i>
+              Retire
+            </a>
+          </li>
+
+          <li id="action-unretire-disabled">
+            <i class="uk-icon-undo uk-margin-small-right"></i>
+            Unretire
+          </li>
+          <li id="action-unretire-enabled">
+            <a onclick="retire_actions(false)">
+              <i class="uk-icon-undo uk-margin-small-right"></i>
+              Unretire
+            </a>
+          </li>
+
+        </ul>
+      </div>
+    </div>
+
   </div>
   <div class="uk-width-1-5 uk-text-center">
+
     <a href="/config" class="uk-button">Back</a>
+
   </div>
   <div class="uk-width-2-5 uk-text-right">
+
+    {{ disabled = (active || retired) ? 'disabled' : '' }}
+    <button id="new-action" onclick="window.location='/config/{{= @data[:workflow] }}/new'" class="uk-button" {{= disabled }}>New Action</button>
+
+    <button onclick="run_stop_workflow({{= !active }})" class="uk-button uk-margin-small-left" {{= 'disabled' if retired }}>
+      <i class="uk-icon-{{= !active || retired ? 'play-circle' : 'stop-circle' }}"></i>
+      {{= !active || retired ? 'Start' : 'Stop' }}
+    </button>
+
   </div>
 </div>
 
 <script>
+  $(document).ready(function() {
+    $('div[action]').each(function(_index, div) {
+      div.onclick = function() {
+        var chk = $(div).find('input')
+        chk.prop('checked', !chk.prop('checked'))
+        update_selection()
+      }
+    })
+    update_selection()
+    update_show_retired_button()
+  })
+
+  function update_selection() {
+    var cks = $('input[type="checkbox"]:checked'),
+        cnt = cks.length,
+        tot = {{= @data[:actions].size }},
+        dropdown = $('#action-dropdown'),
+        any_retired = false,
+        any_normal  = false
+
+    if (cnt > 0) {
+      dropdown.prop('disabled', false)
+      dropdown.find('label').html(cnt + ' Selected')
+      $('#action-options').css('pointer-events', 'auto')
+    } else {
+      dropdown.prop('disabled', true)
+      dropdown.find('label').html('None Selected')
+      $('#action-options').css('pointer-events', 'none')
+    }
+
+    cks.each(function(_index, chk) {
+      var action = chk.id.replace(/action-/, '')
+      if ($('#action-retired-' + action).val() == 'true') {
+        any_retired = true
+      } else {
+        any_normal = true
+      }
+    })
+
+    /* TODO: add functionality */
+    /* enable_dropdown_item('test', true) */
+
+    if ({{= active || retired }}) {            // workflow disabled or retired
+      enable_dropdown_item('retire', false)
+      enable_dropdown_item('unretire', false)
+    } else if (any_retired && any_normal) {     // mix of retired and unretired
+      enable_dropdown_item('retire', true)
+      enable_dropdown_item('unretire', true)
+    } else if (any_normal) {                    // only unretired
+      enable_dropdown_item('retire', true)
+      enable_dropdown_item('unretire', false)
+    } else if (any_retired) {                   // only retired
+      enable_dropdown_item('retire', false)
+      enable_dropdown_item('unretire', true)
+    }
+  }
+
+  function enable_dropdown_item(item, enable) {
+    if (enable) {
+      $('#action-' + item + '-disabled').hide()
+      $('#action-' + item + '-enabled').show()
+    } else {
+      $('#action-' + item + '-disabled').show()
+      $('#action-' + item + '-enabled').hide()
+    }
+  }
+
+  function run_stop_workflow(run, prompt = true) {
+    if (run) {
+      prompt = false
+    } else if (!run && prompt) {
+      UIkit.modal.confirm('Stop workflow <strong>{{= @data[:workflow] }}</strong>?', function() {
+        run_stop_workflow(run, false)
+      })
+    }
+    if (prompt) {
+      return
+    }
+
+    show_wait_modal((run ? 'Starting' : 'Stopping') + ' workflow... Please wait...')
+
+    $.ajax({
+      type: 'PATCH',
+      url: '/config/{{= @data[:workflow] }}/' + (run ? 'run' : 'stop'),
+      success: function(data, text) {
+        data = JSON.parse(data)
+        var id       = data[0],
+            status   = data[1],
+            response = data[2],
+            run_mode = response['run_mode']
+
+        hide_wait_modal()
+
+        if (status == 'success') {
+          var span  = $('#workflow-run-mode'),
+              modal = undefined
+
+          switch(run_mode) {
+            case 'running':
+              span.html('<span class="uk-text-success"><i class="uk-icon-toggle-on uk-text-bold"></i> Running</span>')
+              modal = UIkit.modal.alert(
+                '<i class="uk-icon-check uk-text-success uk-icon-small uk-margin-small-right"></i>' +
+                'Successfully started workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
+              )
+              break
+            case 'stopping':
+              span.html('<i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold"></i> Stopping')
+              modal = UIkit.modal.alert(
+                '<i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold uk-icon-small uk-margin-small-right"></i>' +
+                'Still stopping workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
+              )
+              break
+            case 'stopped':
+              span.html('<i class="uk-icon-toggle-off uk-text-bold"></i> Stopped')
+              modal = UIkit.modal.alert(
+                '<i class="uk-icon-check uk-text-success uk-icon-small uk-margin-small-right"></i>' +
+                'Successfully stopped workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
+              )
+              break
+          }
+          modal.on({
+            'hide.uk.modal': function() {
+              location.reload()
+            }
+          })
+        } else {
+          UIkit.modal.alert(
+            '<div class="uk-text-danger">' +
+              '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
+              'Unable to ' + (run ? 'start' : 'stop') + ' <strong>{{= @data[:workflow] }}</strong>: ' + response +
+            '</div>'
+          )
+        }
+      }
+    })
+  }
+
+  function retire_actions(retire, prompt = true) {
+    if (retire && prompt) {
+      UIkit.modal.confirm(
+        '<i class="uk-icon-question-circle uk-icon-large uk-text-warning uk-margin-right"></i>' +
+        'Are you sure you want to retire selected actions?',
+        function() {
+          retire_actions(retire, false)
+        }
+      )
+      return false
+    }
+
+    var actions = $('input[type="checkbox"]:checked')
+        success = [],
+        failed  = {}
+
+    if (actions.length == 0) {
+      UIkit.modal.alert('No actions selected.')
+      return false
+    }
+
+    show_wait_modal((retire ? 'Re' : 'Unre') + 'tiring actions... Please wait...')
+
+    localStorage['action-retire-counter'] = actions.length
+
+    actions.each(function(_index, action) {
+      action = action.id.replace(/^action-/, '')
+
+      if (retire == ($('#action-retired-' + action).val() == 'true')) {
+        update_retire_outcome(retire, success, failed)
+        return
+      }
+
+      $.ajax({
+        type: 'PATCH',
+        url: '/config/{{= @data[:workflow] }}/' + (retire ? '' : 'un') + 'retire/' + action,
+        success: function(data, text) {
+          data = JSON.parse(data)
+          var status   = data[0],
+              response = data[1]
+          if (status == 'success') {
+            success.push(action)
+            update_retire_outcome(retire, success, failed)
+          } else {
+            failed[action] = response
+            update_retire_outcome(retire, success, failed)
+          }
+        }
+      })
+    })
+  }
+
+  function update_retire_outcome(retire, success, failed) {
+    localStorage['action-retire-counter'] -= 1
+    if (localStorage['action-retire-counter'] > 0) {
+      return
+    }
+    localStorage.removeItem('action-retire-counter')
+    hide_wait_modal()
+
+    var message = ''
+
+    if (success.length > 0) {
+      message += 'Successfully ' + (retire ? '' : 'un') + 'retired ' + success.length + ' action(s).' +
+        '<div class="uk-text-success uk-text-bold uk-margin-top">' +
+          success.join('<br />') +
+        '</div>'
+    }
+
+    if (Object.keys(failed).length > 0) {
+      if (success.length > 0) {
+        message += '<br />'
+      }
+      message += 'Failed to ' + (retire ? '' : 'un') + 'retire ' + Object.keys(failed).length + ' action(s).' +
+        '<div class="uk-text-danger uk-margin-top">'
+          $.each(failed, function(key, value) {
+            message += '<span class="uk-text-bold">' + key + '</span>: ' + value + '<br />'
+          })
+      message += '</div>'
+    }
+
+    var modal = UIkit.modal.alert(message)
+
+    if (success.length > 0) {
+      modal.on({
+        'hide.uk.modal': function() {
+          location.reload()
+        }
+      })
+    }
+  }
+
+  function update_show_retired_button() {
+    if ({{= @data[:show_retired] }}) {
+      $('#show-retired')
+        .removeClass('uk-button-primary')
+        .removeClass('uk-active')
+        .addClass('uk-button-primary')
+        .addClass('uk-active')
+        .prop('title', 'Click to hide retired actions')
+        .text('Hide Retired')
+    } else {
+      $('#show-retired')
+        .removeClass('uk-button-primary')
+        .removeClass('uk-active')
+        .prop('title', 'Click to show retired actions')
+        .text('Show Retired')
+    }
+  }
+
+  function toggle_retired_actions(toggle) {
+    var show_retired = !$(toggle).hasClass('uk-active')
+    $.ajax({
+      type: 'PATCH',
+      url: '/session?show_retired=' + show_retired,
+      success: function(data, text) {
+        location.reload()
+      },
+      error: function(request, status, error) {
+        UIkit.modal.alert('<span class="uk-text-danger">Unable to set show retired: ' + error + '</span>')
+      }
+    })
+  }
+
   function click_add_new_action_type(link) {
     var url = $(link).attr('url')
     if ($("#new-action").attr("disabled")) {

@@ -383,6 +383,7 @@ module Armagh
             doc.source ||= published_doc.source
           end
 
+          doc.title = "#{doc.document_id} (unknown title)" if doc.title.nil? || doc.title.empty?
           doc.published_timestamp = timestamp
           doc.state = action.config.output.docspec.state unless doc.error
           doc.add_items_to_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))

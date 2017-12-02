@@ -42,7 +42,7 @@ module Armagh
 
     class Workflow
       include Configh::Configurable
-      attr_reader :name, :valid_action_configs, :invalid_action_configs, :actions, :has_no_cycles
+      attr_reader :name, :valid_action_configs, :invalid_action_configs, :invalid_bypassed_configs, :retired_action_configs, :actions, :has_no_cycles
 
       VALID_RUN_MODES = [ Armagh::Status::RUNNING, Armagh::Status::STOPPING, Armagh::Status::STOPPED ]
 
@@ -119,6 +119,7 @@ module Armagh
         @workflow_set = workflow_set
         @valid_action_configs = []
         @invalid_action_configs = []
+        @retired_action_configs = []
         @has_no_cycles = true
         @check_unused_outputs = unused_output_docspec_check
         @unused_outputs = {}
@@ -127,11 +128,11 @@ module Armagh
         load_action_configs
       end
 
-      def create_action_config( type, cand_config_values )
-        update_action_config( type, cand_config_values, creating:true )
+      def create_action_config( type, cand_config_values, bypass_validation: false )
+        update_action_config( type, cand_config_values, creating: true, bypass_validation: bypass_validation )
       end
 
-      def update_action_config( type, cand_config_values, creating: false)
+      def update_action_config( type, cand_config_values, creating: false, bypass_validation: false )
 
         raise( WorkflowConfigError, 'Stop workflow before making changes' ) unless stopped?
 
@@ -148,9 +149,9 @@ module Armagh
         config = nil
         begin
           if creating
-            config = action_class.create_configuration(@config_store, cand_action_name, cand_config_values, maintain_history: true  )
+            config = action_class.create_configuration(@config_store, cand_action_name, cand_config_values, maintain_history: true, bypass_validation: bypass_validation )
           else
-            config = action_class.force_update_configuration(@config_store, cand_action_name, cand_config_values, maintain_history: true  )
+            config = action_class.force_update_configuration(@config_store, cand_action_name, cand_config_values, maintain_history: true, bypass_validation: bypass_validation )
           end
           load_action_configs
           @workflow_set.refresh_pointers
@@ -162,23 +163,37 @@ module Armagh
             action_name_config['error'] = 'already in use' if action_name_config
           end
           raise ActionConfigError.new("Configuration has errors: #{e.message}", config_with_errors)
-        rescue Configh::ConfigValidationError => e
+        rescue Configh::ConfigValidationError, InvalidArgumentError => e
           config_with_errors = action_class.edit_configuration(cand_config_values)
-          raise ActionConfigError.new("Configuration has errors: #{e.message}",config_with_errors)
+          raise ActionConfigError.new("Configuration has errors: #{e.message}", config_with_errors)
         end
       end
 
       def load_action_configs
-        @valid_action_configs = []
-        @invalid_action_configs = []
+        @valid_action_configs     = []
+        @invalid_action_configs   = []
+        @invalid_bypassed_configs = []
+        @retired_action_configs   = []
 
         Action.find_all_configurations(@config_store, include_descendants:true, raw:true)
           .each do |klass, raw_action_config|
+          is_retired = raw_action_config.dig('values', 'action', 'retired') == 'true'
           if raw_action_config['values'].dig('action','workflow') == @name
             if klass.configuration_values_valid?(raw_action_config['values'])
-              @valid_action_configs << klass.find_configuration(@config_store, raw_action_config['name'])
+              action = klass.find_configuration(@config_store, raw_action_config['name'])
+              if is_retired
+                @retired_action_configs << action
+              else
+                @valid_action_configs << action
+              end
             else
-              @invalid_action_configs << klass.edit_configuration(raw_action_config['values'])
+              action = klass.find_configuration(@config_store, raw_action_config['name'], bypass_validation: true)
+              if is_retired
+                @retired_action_configs << action
+              else
+                @invalid_bypassed_configs << action
+                @invalid_action_configs << klass.edit_configuration(raw_action_config['values'])
+              end
             end
           end
         end
@@ -196,6 +211,44 @@ module Armagh
         raise(WorkflowConfigError, 'Stop workflow before retiring it') unless stopped?
         @config.update_merge({'workflow'=>{'retired'=>retire}})
         @workflow_set.refresh_pointers
+      end
+
+      def retire_action(action_name)
+        set_action_retired(action_name, retire: true)
+      end
+
+      def unretire_action(action_name)
+        set_action_retired(action_name, retire: false)
+      end
+
+      private def set_action_retired(action_name, retire:)
+        raise WorkflowConfigError, "Stop workflow before #{'un' unless retire}retiring action #{action_name.inspect}." unless stopped?
+
+        valid_action   = @valid_action_configs.find { |ac| ac.action.name == action_name }
+        retired_action = @retired_action_configs.find do |ac|
+          if ac.respond_to? :action
+            ac.action.name == action_name
+          else
+            ac['parameters'].find { |p| p['group'] == 'action' && p['name'] == 'name' && p['value'] == action_name }
+          end
+        end
+
+        invalid_action = @invalid_bypassed_configs.find { |ac| ac.action.name == action_name }
+        raise WorkflowConfigError, "Action #{action_name.inspect} does not exist for this workflow." unless valid_action || invalid_action || retired_action
+
+        action_config =
+          if retire
+            raise WorkflowConfigError, "Action #{action_name.inspect} is already retired." if retired_action
+            valid_action || invalid_action
+          else
+            raise WorkflowConfigError, "Action #{action_name.inspect} is not retired." unless retired_action
+            retired_action
+          end
+
+        action_config.update_merge({'action'=>{'retired'=>retire}}, bypass_validation: true)
+
+        load_action_configs
+        @notify_to_refresh&.refresh
       end
 
       def unused_output_message
@@ -395,10 +448,11 @@ module Armagh
           'name'         => action_config.action.name,
           'valid'        => true,
           'active'       => action_config.action.active,
+          'retired'      => action_config.action.retired,
           'last_updated' => action_config.__timestamp,
           'type'         => action_config.__type.to_s,
           'supertype'    => action_config.__type.superclass.to_s,
-          'input_docspec' => action_config.input.docspec.to_s,
+          'input_docspec' => action_config.input.docspec.to_s
         }
         if action_config.respond_to?(:output)
           status.merge!(
@@ -416,19 +470,28 @@ module Armagh
           'name'         => params.find{|p| p['group']=='action' && p['name']=='name'}['value'],
           'valid'        => false,
           'active'       => params.find{|p| p['group']=='action' && p['name']=='active'}['value'],
+          'retired'      => params.find{|p| p['group']=='action' && p['name']=='retired'}['value'],
           'last_updated' => '',
           'type'         => invalid_action_config_hash['type'].to_s,
           'supertype'    => invalid_action_config_hash['type'].superclass.to_s,
           'input_docspec' => params.find{|p| p['group']=='input' && p['name']=='docspec'}['value'].to_s,
           'output_docspecs' => params.collect{|p| p['value'].to_s if p['group']=='output' && p['type']=='docspec' && p['value'] }.compact
         }
-
       end
 
-      def action_statuses
+      def retired_action_config_status(retired_config)
+        if retired_config.is_a? Hash
+          invalid_action_config_status(retired_config)
+        else
+          valid_action_config_status(retired_config)
+        end
+      end
+
+      def action_statuses(include_retired: false)
         statuses = []
         statuses.concat @valid_action_configs.collect{ |action_config| valid_action_config_status( action_config ) }
         statuses.concat @invalid_action_configs.collect{ |action_config_hash| invalid_action_config_status( action_config_hash)}
+        statuses.concat @retired_action_configs.collect{ |retired_config| retired_action_config_status( retired_config ) } if include_retired
         statuses
       end
 
@@ -442,8 +505,9 @@ module Armagh
         raise ActionFindError, "Workflow #{@name} has no #{action_name} action"
       end
 
-      def type(action_name)
+      def type(action_name, include_retired: false)
         valid_ac = @valid_action_configs.find{ |ac| ac.action.name == action_name }
+        valid_ac = @retired_action_configs.find{ |ac| ac.action.name == action_name } if include_retired && valid_ac.nil?
         return valid_ac.__type.name if valid_ac
         invalid_ac = @invalid_action_configs.find{ |config_hash|
           params = config_hash['parameters']
@@ -474,9 +538,10 @@ module Armagh
         edit
       end
 
-      def edit_action_config(action_name)
-
+      def edit_action_config(action_name, include_retired: false, bypass_validation: false)
         valid_ac = @valid_action_configs.find{ |ac| ac.action.name == action_name }
+        valid_ac = @invalid_bypassed_configs.find{ |ac| ac.action.name == action_name } if bypass_validation && valid_ac.nil?
+        valid_ac = @retired_action_configs.find{ |ac| ac.action.name == action_name } if include_retired && valid_ac.nil?
         if valid_ac
           edit = valid_ac.__type.edit_configuration( valid_ac.__values )
           append_valid_docstates_to_config( edit, valid_ac.__type )
@@ -495,8 +560,11 @@ module Armagh
         raise ActionFindError, "Workflow #{@name} has no #{action_name} action"
       end
 
-      def get_action_config(action_name)
+      def get_action_config(action_name, include_retired: false, bypass_validation: false)
         valid_ac = @valid_action_configs.find{ |ac| ac.action.name == action_name }
+        valid_ac = @invalid_bypassed_configs.find{ |ac| ac.action.name == action_name } if bypass_validation && valid_ac.nil?
+        valid_ac = @retired_action_configs.find{ |ac| ac.action.name == action_name } if include_retired && valid_ac.nil?
+
         config = nil
         if valid_ac
           result = valid_ac.serialize

@@ -24,9 +24,11 @@
 {{
   selected_action = @data[:type]
   edit_action     = @data[:edit_action]
+  active          = @data[:active]
+  retired         = @data[:retired] || @data.dig(:defined_parameters, 'action').find { |p| p[:name] == 'retired' }[:value].to_s == 'true'
   locked_fields   = %w(action-name action-active action-workflow)
   locked_fields  -= %w(action-name) unless edit_action
-  hidden_fields   = %w(action-active action-workflow)
+  hidden_fields   = %w(action-active action-workflow action-retired)
 
   %w(input output).each do |docspec|
     next unless @data[:defined_parameters][docspec]
@@ -43,18 +45,25 @@
   end
 }}
 
-{{= partial :header, data: {title:    edit_action ? @data[:action] : 'New Action',
-                            subtitle: [selected_action.split('::').last,
-                                       '<span class="uk-text-small uk-margin-left" title="Action Type">',
-                                         '<i class="uk-icon-cube"></i>',
-                                         @data[:supertype],
-                                       '</span>',
-                                       '<span class="uk-text-small uk-margin-left" title="Workflow">',
-                                         '<i class="uk-icon-sitemap uk-text-success"></i>',
-                                         "<a href='/config/#{@data[:workflow]}'>",
-                                           @data[:workflow],
-                                         '</a>',
-                                       '</span>'].join(' ')} }}
+{{= partial :header, data: {title: edit_action ? @data[:action] : 'New Action', subtitle:
+[
+  retired ?
+    '<span class="uk-text-muted"><i class="uk-icon-remove uk-text-bold"></i> Retired</span>' : active ?
+    '<span class="uk-text-success"><i class="uk-icon-toggle-on uk-text-bold"></i> Running</span>' :
+    '<i class="uk-icon-toggle-off uk-text-bold"></i> Stopped',
+  '<span class="uk-margin-small-left" title="Workflow">',
+    '<i class="uk-icon-sitemap uk-text-success"></i>',
+    "<a href='/config/#{@data[:workflow]}'>",
+      @data[:workflow],
+    '</a>',
+  '</span>'
+].join(' '), right:
+[
+  '<span class="uk-text-muted" style="line-height:24px;" title="Action Type">',
+    '<i class="uk-icon-cube"></i>',
+    selected_action.split('::').last,
+  '</span>',
+].join(' ')} }}
 
 <ul class="uk-tab uk-margin-bottom" data-uk-tab="{connect:'#page'}">
 
@@ -119,7 +128,7 @@
                 end
 
                 param_prompt   = sanitize_string(param[:prompt])
-                param_disabled = locked_fields.include?(param_id) || @data[:broken] || @data[:locked] ? 'disabled readonly' : ''
+                param_disabled = locked_fields.include?(param_id) || active || retired ? 'disabled readonly' : ''
                 param_tooltip  = param_disabled.empty? ? %Q(data-uk-tooltip="{animation:true}" title="#{sanitize_string(param_prompt)}") : ''
                 param_invalid  = param[:error] ? 'uk-form-danger' : nil
               }}
@@ -151,7 +160,7 @@
                   </div>
                 </div>
               </dt>
-              <dd {{= 'class="uk-hidden"' if hidden_fields.include? param_id }}">
+              <dd {{= 'class="uk-hidden"' if hidden_fields.include? param_id }}>
                 <div class="uk-grid">
                   <div class="uk-width-1-2">
 
@@ -312,7 +321,7 @@
                 {{ callbacks.each do |callback| }}
 
                   <button callback="true" type="button" class="uk-button" onclick="invoke_action_test_callback('{{= callback['group'] }}', '{{= callback['class'] }}', '{{= callback['method'] }}')">
-                    <i class="uk-icon-volume-control-phone uk-margin-small-right"></i>
+                    <i class="uk-icon-flask"></i>
                     {{= callback['method'] }}
                   </button>
 
@@ -333,34 +342,33 @@
     <hr class="uk-margin-top" />
 
     <div class="uk-grid">
-      <div class="uk-width-1-3">
-        {{ if @data[:broken] || @data[:locked] }}
-          <span class="{{= @data[:broken] ? 'uk-text-danger' : 'uk-text-muted' }}">
-            <i class="uk-icon-thumb-tack"></i>
-            {{= @data[:broken] ? 'Invalid config detected' : 'Deactivate workflow to edit actions' }}
-          </span>
-        {{ end }}
+      <div class="uk-width-1-3 uk-text-muted">
+
+        {{= retired ?
+  '<i class="uk-icon-thumb-tack"></i> Retired actions cannot be edited.' : active ?
+  '<i class="uk-icon-thumb-tack"></i> Running actions cannot be edited.' : '' }}
+
       </div>
       <div class="uk-width-1-3 uk-text-center">
+
         {{
           back_url =
-            if @data[:broken]
-              "/config/invalid?reviewed=#{@data[:action]}"
-            elsif @data[:locked] || edit_action
+            if active || edit_action
               "/config/#{@data[:workflow]}"
             else
               "/config/#{@data[:workflow]}/new?prev=#{selected_action}"
             end
         }}
         <a id="back-button" href="{{= back_url }}" class="uk-button">Back</a>
+
       </div>
       <div class="uk-width-1-3 uk-text-right">
-        {{ if @data[:broken] }}
-          <a href="javascript:" class="uk-button uk-button-primary" onclick="submit()">Repair Config</a>
-        {{ elsif !@data[:locked] }}
-          {{ submit_caption = edit_action ? 'Update' : 'Create' }}
-          <a href="javascript:" class="uk-button uk-button-primary" onclick="submit()">{{= submit_caption }}</a>
-        {{ end }}
+
+        {{ submit_caption = edit_action ? 'Update' : 'Create' }}
+        <button submit class="uk-button uk-button-primary" {{= 'disabled' if active || retired }}>
+          {{= submit_caption }}
+        </button>
+
       </div>
     </div>
   </fieldset>
@@ -413,24 +421,9 @@
   <input id="modal-list-hash"   type="hidden" />
 </div>
 
-<div id="modal-test-callback" class="uk-modal">
-  <div class="uk-modal-dialog">
-    <div class="uk-margin uk-text-center">
-      <div class="uk-panel uk-panel-box uk-text-bold uk-margin-bottom">
-        Please wait while the test callback is running...
-      </div>
-      <div id="modal-test-callback-details">
-      </div>
-      <div class="uk-margin uk-margin-bottom-remove">
-        <i class="uk-icon-circle-o-notch uk-icon-spin uk-icon-large uk-text-success"></i>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script type="text/javascript">
   $(document).ready(function() {
-    $("#autoform").on("keyup keypress", function(e) {
+    $('#autoform').on('keyup keypress', function(e) {
       var keyCode = e.keyCode || e.which
       if (keyCode === 13) {
         e.preventDefault()
@@ -438,13 +431,17 @@
       }
     })
 
+    $('button[submit]').on('click', function(e) {
+      submit()
+    })
+
     window.setTimeout(function() {
       $("#page li[class='uk-active']").find("input").first().focus()
     }, 1)
 
-    $("[data-uk-tab]").on("show.uk.switcher", function(event, area){
+    $('[data-uk-tab]').on('show.uk.switcher', function(event, area){
       window.setTimeout(function() {
-        $("#page li[class='uk-active']").find("input").first().focus()
+        $('#page li[class="uk-active"]').find('input').first().focus()
       }, 1)
     })
   })
@@ -725,7 +722,10 @@
   }
 
   function invoke_action_test_callback(group, klass, method) {
-    $('#modal-test-callback-details').html(
+    var params      = $("[name^='" + group + "-']"),
+        test_config = {}
+
+    show_wait_modal('Please wait while the test callback is running...',
       '<div>' +
         '<span class="uk-text-muted uk-text-small uk-margin-small-right">Group:</span>' +
         group.toUpperCase() +
@@ -737,12 +737,6 @@
         method +
       '</div>'
     )
-
-    var modal       = UIkit.modal('#modal-test-callback', {'keyboard':false, 'bgclose':false, 'center':true}),
-        params      = $("[name^='" + group + "-']"),
-        test_config = {}
-
-    modal.show()
 
     params.each(function() {
       var param = $(this),
@@ -788,6 +782,8 @@
             response = data[1],
             result   = ''
 
+        hide_wait_modal()
+
         if (error) {
           result = '<div class="uk-text-danger uk-text-bold uk-text-large uk-margin-bottom">' +
                      '<i class="uk-icon-times-circle uk-margin-small-right"></i>' +
@@ -812,7 +808,6 @@
         var alert = UIkit.modal.alert(result)
         alert.on({
           'hide.uk.modal': function() {
-            modal.hide()
             disable_callback_buttons(false)
           }
         })
@@ -821,7 +816,7 @@
         var alert = UIkit.modal.alert('Failed to invoke test callback: <div class="uk-text-danger uk-text-bold">' + error + '</div>')
         alert.on({
           'hide.uk.modal': function() {
-            modal.hide()
+            hide_wait_modal()
             disable_callback_buttons(false)
           }
         })

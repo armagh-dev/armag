@@ -64,9 +64,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     include Rack::Test::Methods
   end
 
-  def good_alice_in_db
+  def good_alice_in_db(retired: false)
     wf_set = Armagh::Actions::WorkflowSet.for_admin( Connection.config, logger: @logger )
-    @alice = wf_set.create_workflow( { 'workflow' => { 'name' => 'alice' }} )
+    wf_config = { 'workflow' => { 'name' => 'alice' } }
+    wf_config['workflow'].merge! 'retired' => true if retired
+    @alice = wf_set.create_workflow( wf_config )
     @alice.unused_output_docspec_check = false
     @alice_workflow_actions_config_values.each do |type,action_config_values|
       @alice.create_action_config(type, action_config_values)
@@ -665,10 +667,11 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
 
   private def import_workflow_fixture(filename)
     post '/workflow/import.json', read_workflow_fixture(filename)
+    assert last_response.ok?
   end
 
   private def scrub_workflow_timestamp_and_versions(data)
-    data.gsub!(/(\"workflow\": {\n\s+\"name\": \"\w+\",\n\s+\"exported\": ).+?(,\n\s+\"versions\": ).+?(,\n\s+\"actions\": \[)/m, '\1<timestamp>\2<versions>\3')
+    data.gsub!(/({\s+"workflow": {\s+"name": "\w+",\s+"retired": "false",\s+"metadata": {\s+"exported": ).+?(,\s+"versions": ).+?(\s+}\s+},\s+"actions": \[)/m, '\1<timestamp>\2<versions>\3')
     data
   end
 
@@ -699,9 +702,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     filename = 'newsflow.json'
     import_workflow_fixture(filename)
     get '/workflow/NEWSFLOW/export.json'
+    assert last_response.ok?
     assert_equal(
       scrub_workflow_timestamp_and_versions(read_workflow_fixture(filename)),
-      scrub_workflow_timestamp_and_versions(JSON.parse(last_response.body))
+      scrub_workflow_timestamp_and_versions(last_response.body)
     )
   end
 
@@ -709,10 +713,46 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     import_workflow_fixture('newsflow.json')
     import_workflow_fixture('testflow.json')
     get '/workflow/export.json'
+    assert last_response.ok?
     assert_equal(
       scrub_workflow_timestamp_and_versions(read_workflow_fixture('newsflow.json', 'testflow.json')),
-      scrub_workflow_timestamp_and_versions(JSON.parse(last_response.body)),
+      scrub_workflow_timestamp_and_versions(last_response.body),
     )
+  end
+
+  def test_retire_workflow_stopped
+    good_alice_in_db
+    patch '/workflow/alice/retire.json'
+    assert_equal(
+      {'documents_in_process'=>0,
+       'failed_documents'=>0,
+       'name'=>'alice',
+       'retired'=>true,
+       'run_mode'=>'stopped',
+       'unused_output_docspec_check'=>false,
+       'valid'=>true,
+       'error_alerts'=>0,
+       'warn_alerts'=>0},
+      JSON.parse(last_response.body)
+    )
+  end
+
+  def test_retire_workflow_running
+    good_alice_in_db
+    @alice.run
+    patch '/workflow/alice/retire.json'
+    assert last_response.client_error?
+    assert_equal(
+      {'client_error_detail'=>{'markup'=>nil, 'message'=>'Stop workflow before retiring it'}},
+      JSON.parse(last_response.body)
+    )
+  end
+
+  def test_unretire_workflow
+    good_alice_in_db(retired: true)
+    patch '/workflow/alice/unretire.json'
+    assert last_response.ok?
+    assert_false @alice.retired
   end
 
   def test_get_workflow_actions_stopped
@@ -722,12 +762,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
                                  "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Collect",
                                  "type"=>"Armagh::StandardActions::TWTestCollect",
                                  "valid"=>true},
                                 {"active"=>false,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -735,6 +777,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>false,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_2",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -742,6 +785,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>false,
                                  "input_docspec"=>"b_alicedoc:published",
                                  "output_docspecs"=>["b_aliceconsume_out_doc:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_b_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -750,6 +794,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"divide_b_alicedocs",
                                  "output_docspecs"=>["b_alicedocs_aggr:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Divide",
                                  "type"=>"Armagh::StandardActions::TWTestDivide",
                                  "valid"=>true},
@@ -757,6 +802,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"a_alicedoc:ready",
                                  "name"=>"publish_a_alicedocs",
                                  "output_docspecs"=>["a_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -764,6 +810,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedoc:ready",
                                  "name"=>"publish_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -771,6 +818,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"split_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Split",
                                  "type"=>"Armagh::StandardActions::TWTestSplit",
                                  "valid"=>true}].sort{ |p1,p2| p1['name'] <=> p2['name']}
@@ -802,12 +850,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
                                  "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Collect",
                                  "type"=>"Armagh::StandardActions::TWTestCollect",
                                  "valid"=>true},
                                 {"active"=>true,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -815,6 +865,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>true,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_2",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -822,6 +873,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>true,
                                  "input_docspec"=>"b_alicedoc:published",
                                  "output_docspecs"=>["b_aliceconsume_out_doc:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_b_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -830,6 +882,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"divide_b_alicedocs",
                                  "output_docspecs"=>["b_alicedocs_aggr:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Divide",
                                  "type"=>"Armagh::StandardActions::TWTestDivide",
                                  "valid"=>true},
@@ -837,6 +890,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"a_alicedoc:ready",
                                  "name"=>"publish_a_alicedocs",
                                  "output_docspecs"=>["a_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -844,6 +898,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedoc:ready",
                                  "name"=>"publish_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -851,6 +906,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"split_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Split",
                                  "type"=>"Armagh::StandardActions::TWTestSplit",
                                  "valid"=>true}].sort{ |p1,p2| p1['name'] <=> p2['name'] }
@@ -886,12 +942,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"__COLLECT__collect_alicedocs_from_source:ready",
                                  "name"=>"collect_alicedocs_from_source",
                                  "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Collect",
                                  "type"=>"Armagh::StandardActions::TWTestCollect",
                                  "valid"=>true},
                                 {"active"=>true,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -899,6 +957,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>true,
                                  "input_docspec"=>"a_alicedoc:published",
                                  "output_docspecs"=>["a_alicedoc_out:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_a_alicedoc_2",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -906,6 +965,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>true,
                                  "input_docspec"=>"b_alicedoc:published",
                                  "output_docspecs"=>["b_aliceconsume_out_doc:ready"],
+                                 "retired"=>false,
                                  "name"=>"consume_b_alicedoc_1",
                                  "supertype"=>"Armagh::Actions::Consume",
                                  "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -913,6 +973,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                 {"active"=>true,
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"divide_b_alicedocs",
+                                 "retired"=>false,
                                  "output_docspecs"=>["b_alicedocs_aggr:ready"],
                                  "supertype"=>"Armagh::Actions::Divide",
                                  "type"=>"Armagh::StandardActions::TWTestDivide",
@@ -921,6 +982,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"a_alicedoc:ready",
                                  "name"=>"publish_a_alicedocs",
                                  "output_docspecs"=>["a_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -928,6 +990,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedoc:ready",
                                  "name"=>"publish_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:published"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Publish",
                                  "type"=>"Armagh::StandardActions::TWTestPublish",
                                  "valid"=>true},
@@ -935,6 +998,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                                  "input_docspec"=>"b_alicedocs_aggr_big:ready",
                                  "name"=>"split_b_alicedocs",
                                  "output_docspecs"=>["b_alicedoc:ready"],
+                                 "retired"=>false,
                                  "supertype"=>"Armagh::Actions::Split",
                                  "type"=>"Armagh::StandardActions::TWTestSplit",
                                  "valid"=>true}].sort{ |p1,p2| p1['name'] <=> p2['name'] }
@@ -968,12 +1032,14 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "input_docspec"=>"",
          "name"=>"collect_alicedocs_from_source",
          "output_docspecs"=>["a_alicedoc:ready", "b_alicedocs_aggr_big:ready"],
+         "retired"=>false,
          "supertype"=>"Armagh::Actions::Collect",
          "type"=>"Armagh::StandardActions::TWTestCollect",
          "valid"=>false},
         {"active"=>false,
          "input_docspec"=>"a_alicedoc:published",
          "output_docspecs"=>["a_alicedoc_out:ready"],
+         "retired"=>false,
          "name"=>"consume_a_alicedoc_1",
          "supertype"=>"Armagh::Actions::Consume",
          "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -981,6 +1047,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         {"active"=>false,
          "input_docspec"=>"a_alicedoc:published",
          "output_docspecs"=>["a_alicedoc_out:ready"],
+         "retired"=>false,
          "name"=>"consume_a_alicedoc_2",
          "supertype"=>"Armagh::Actions::Consume",
          "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -988,6 +1055,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         {"active"=>false,
          "input_docspec"=>"b_alicedoc:published",
          "output_docspecs"=>["b_aliceconsume_out_doc:ready"],
+         "retired"=>false,
          "name"=>"consume_b_alicedoc_1",
          "supertype"=>"Armagh::Actions::Consume",
          "type"=>"Armagh::StandardActions::TWTestConsume",
@@ -996,6 +1064,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "input_docspec"=>"b_alicedocs_aggr_big:ready",
          "name"=>"divide_b_alicedocs",
          "output_docspecs"=>["b_alicedocs_aggr:ready"],
+         "retired"=>false,
          "supertype"=>"Armagh::Actions::Divide",
          "type"=>"Armagh::StandardActions::TWTestDivide",
          "valid"=>true},
@@ -1003,6 +1072,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "input_docspec"=>"a_alicedoc:ready",
          "name"=>"publish_a_alicedocs",
          "output_docspecs"=>["a_alicedoc:published"],
+         "retired"=>false,
          "supertype"=>"Armagh::Actions::Publish",
          "type"=>"Armagh::StandardActions::TWTestPublish",
          "valid"=>true},
@@ -1010,6 +1080,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "input_docspec"=>"b_alicedoc:ready",
          "name"=>"publish_b_alicedocs",
          "output_docspecs"=>["b_alicedoc:published"],
+         "retired"=>false,
          "supertype"=>"Armagh::Actions::Publish",
          "type"=>"Armagh::StandardActions::TWTestPublish",
          "valid"=>true},
@@ -1017,6 +1088,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
          "input_docspec"=>"b_alicedocs_aggr_big:ready",
          "name"=>"split_b_alicedocs",
          "output_docspecs"=>["b_alicedoc:ready"],
+         "retired"=>false,
          "supertype"=>"Armagh::Actions::Split",
          "type"=>"Armagh::StandardActions::TWTestSplit",
          "valid"=>true}].sort{ |p1,p2| p1['name'] <=> p2['name']}
@@ -1075,6 +1147,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>nil, "warning"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>nil, "options"=>nil},
@@ -1123,6 +1196,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
@@ -1154,6 +1228,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
               {"name"=>"name", "description"=>"Name of this action configuration", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"example-collect (Warning: Cannot be changed once set)", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"collect_alicedocs_from_source", "options"=>nil},
               {"name"=>"active", "description"=>"Agents will run this configuration if active", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>true, "options"=>nil},
               {"name"=>"workflow", "description"=>"Workflow this action config belongs to", "type"=>"string", "required"=>true, "default"=>nil, "prompt"=>"<WORKFLOW-NAME>", "group"=>"action", "warning"=>nil, "error"=>nil, "value"=>"alice", "options"=>nil},
+              {"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
               {"name"=>"schedule", "description"=>"Schedule to run the collector.  Cron syntax.  If not set, Collect must be manually triggered.", "type"=>"string", "required"=>false, "default"=>nil, "prompt"=>"*/15 * * * *", "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>"7 * * * *", "options"=>nil},
               {"name"=>"archive", "description"=>"Archive collected documents", "type"=>"boolean", "required"=>true, "default"=>true, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
               {"name"=>"decompress", "description"=>"Decompress (gunzip) incoming documents", "type"=>"boolean", "required"=>true, "default"=>false, "prompt"=>nil, "group"=>"collect", "warning"=>nil, "error"=>nil, "value"=>false, "options"=>nil},
@@ -1180,7 +1255,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'action' => {
               'name' => 'collect_alicedocs_from_source',
               'active' => 'false',
-              'workflow' => 'alice'
+              'workflow' => 'alice',
+              'retired' => 'false'
           },
           'collect' => {
               'schedule' => '7 * * * *',
@@ -1220,6 +1296,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
           'type' => 'Armagh::StandardActions::TWTestConsume',
           'supertype' => 'Armagh::Actions::Consume',
           'parameters' =>[
+              {"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
               {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"example-collect (Warning: Cannot be changed once set)", "required"=>true, "type"=>"string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
               {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
               {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>true, "type"=>"string", "value"=>"alice", "warning"=>nil, "options"=>nil},
@@ -1252,6 +1329,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
                   {"default"=>nil, "description"=>"Name of this action configuration", "error"=>nil, "group"=>"action", "name"=>"name", "prompt"=>"example-collect (Warning: Cannot be changed once set)", "required"=>true, "type"=>"string", "value"=>"new_alice_consume", "warning"=>nil, "options"=>nil},
                   {"default"=>false, "description"=>"Agents will run this configuration if active", "error"=>nil, "group"=>"action", "name"=>"active", "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"Workflow this action config belongs to", "error"=>nil, "group"=>"action", "name"=>"workflow", "prompt"=>"<WORKFLOW-NAME>", "required"=>true, "type"=>"string", "value"=>"alice", "warning"=>nil, "options"=>nil},
+                  {"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
                   {"default"=>nil, "description"=>"Input doctype for this action", "error"=>"type validation failed: value cannot be nil", "group"=>"input", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>nil, "warning"=>nil, "options"=>nil},
                   {"default"=>nil, "description"=>"the output from consume", "error"=>nil, "group"=>"output", "name"=>"docspec", "prompt"=>nil, "required"=>true, "type"=>"docspec", "value"=>"alicedoc_out:ready", "warning"=>nil, "options"=>nil},
               ]},
@@ -1296,7 +1374,8 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       expected_result = {
           'type' => 'Armagh::StandardActions::TWTestCollect',
           'supertype' => 'Armagh::Actions::Collect',
-          'parameters' => [{"error" => nil, "group" => "action"},
+          'parameters' => [{"default"=>false, "description"=>"Not normally displayed", "error"=>nil, "group"=>"action", "name"=>"retired", "options"=>nil, "prompt"=>nil, "required"=>true, "type"=>"boolean", "value"=>false, "warning"=>nil},
+                           {"error" => nil, "group" => "action"},
                            {"default" => false, "description" => "Agents will run this configuration if active", "error" => nil, "group" => "action", "name" => "active", "prompt" => nil, "required" => true, "type" => "boolean", "value" => false, "warning" => nil, "options" => nil},
                            {"default" => nil, "description" => "Name of this action configuration", "error" => nil, "group" => "action", "name" => "name", "prompt" => "example-collect (Warning: Cannot be changed once set)", "required" => true, "type" => "string", "value" => "collect_alicedocs_from_source", "warning" => nil, "options" => nil},
                            {"default" => nil, "description" => "Workflow this action config belongs to", "error" => nil, "group" => "action", "name" => "workflow", "prompt" => "<WORKFLOW-NAME>", "required" => true, "type" => "string", "value" => "alice", "warning" => nil, "options" => nil},
@@ -1315,6 +1394,44 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
       }
       assert_equal expected_result, result
     end
+  end
+
+  def test_get_defined_group_test_callbacks
+    get '/test/Armagh::StandardActions::TacballConsume/callbacks.json'
+    assert last_response.ok?
+    assert_equal(
+      [{"class"=>"Armagh::StandardActions::TacballConsume", "group"=>"sftp", "method"=>"test_connection"}],
+      JSON.parse(last_response.body)
+    )
+  end
+
+  def test_invoke_group_test_callback
+    data = '{"type":"Armagh::StandardActions::TacballConsume", "group":"sftp", "method":"test_connection", "test_config":{"host":"localhost", "port":"22", "directory_path":"./", "username":"", "password":"", "maximum_transfer":"50"}}'
+    patch '/test/invoke_callback.json', data
+    assert last_response.ok?
+    assert_nil JSON.parse(last_response.body)
+  end
+
+  def test_retire_action
+    good_alice_in_db
+    patch '/workflow/alice/action/publish_a_alicedocs/retire.json'
+    assert last_response.ok?
+    get '/workflow/alice/actions.json?include_retired=true'
+    assert last_response.ok?
+    action_config = JSON.parse(last_response.body).find { |ac| ac['name'] == 'publish_a_alicedocs' }
+    assert action_config['retired']
+  end
+
+  def test_unretire_action
+    good_alice_in_db
+    patch '/workflow/alice/action/publish_a_alicedocs/retire.json'
+    assert last_response.ok?
+    patch '/workflow/alice/action/publish_a_alicedocs/unretire.json'
+    assert last_response.ok?
+    get '/workflow/alice/actions.json'
+    assert last_response.ok?
+    action_config = JSON.parse(last_response.body).find { |ac| ac['name'] == 'publish_a_alicedocs' }
+    assert !action_config['retired']
   end
 
   def test_get_documents
@@ -2203,6 +2320,10 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         lambda{put('/workflow/:workflow_name/action/:action_name/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/test/:type/callbacks.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{patch('/test/invoke_callback.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/workflow/:workflow_name/action/:action_name/retire.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/workflow/:workflow_name/action/:action_name/unretire.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/string/encode.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{get('/string/decode.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/documents.json', {type: 'type'}){}} => Authentication::Role::USER,
         lambda{get('/document.json', {type: 'type', id: '123'}){}} => Authentication::Role::USER,
         lambda{get('/documents/failures.json'){}} => Authentication::Role::APPLICATION_ADMIN,

@@ -1,6 +1,6 @@
 <script type="text/javascript" src="/ui/js/components/upload.min.js"></script>
 
-{{ bad_count = @data.select { |wf| !wf['valid'] }.size }}
+{{ bad_count = @data[:workflows].select { |wf| !wf['valid'] && !wf['retired'] }.size }}
 {{ unless bad_count.zero? }}
   <div class="uk-alert uk-alert-danger uk-margin-top-remove" data-uk-alert>
     <a href="" class="uk-alert-close uk-close"></a>
@@ -12,9 +12,12 @@
 <div id="status-change-errors">
 </div>
 
-{{= partial :header, data: {title: 'Workflows', subtitle: "#{@data.size} defined"} }}
+{{= partial :header, data: {title: 'Workflows', subtitle: "#{@data[:workflows].size} defined", right:
+  '<button id="show-retired" onclick="toggle_retired_workflows(this)" class="uk-button uk-button-small" title="Show retired workflows">' +
+    'Show Retired' +
+  '</button>'} }}
 
-{{ if !@data || @data.empty? }}
+{{ if !@data[:workflows] || @data[:workflows].empty? }}
 
   <div class="uk-panel uk-panel-box uk-margin-bottom">
     No workflows have been defined yet.
@@ -37,6 +40,19 @@
     table tr {
       cursor: default;
     }
+
+    #workflow-options {
+      pointer-events: none;
+    }
+
+    #workflow-options ul li[id$="disabled"] {
+      color: #999;
+      padding: 5px 15px;
+      cursor: not-allowed;
+    }
+    #workflow-options ul li[id$="enabled"] {
+      display: none;
+    }
   </style>
 
   <table class="uk-table uk-table-hover uk-table-condensed">
@@ -46,10 +62,8 @@
           <input id="select-all" type="checkbox" onclick="this.checked = !this.checked">
         </th>
         <th>Workflow</th>
-        <th>Working</th>
+        <th>In Process</th>
         <th>Failed</th>
-        <th>Pending Consume</th>
-        <th>Published</th>
         <th>Error Alerts</th>
         <th>Warn Alerts</th>
         <th>State</th>
@@ -57,47 +71,51 @@
     </thead>
     <tbody>
 
-      {{ @data.each do |workflow| }}
+      {{ @data[:workflows].each do |workflow| }}
         {{ uuid = SecureRandom.uuid }}
         {{ valid = workflow['valid'] }}
+        {{ retired = workflow['retired'] }}
 
-        <tr>
+        <tr {{= 'class="uk-text-muted"' if retired }}>
           <td>
             <input id="select-workflow-{{= uuid }}" type="checkbox" onclick="this.checked = !this.checked">
+            <input id="workflow-retired-{{= uuid }}" type="hidden" value="{{= retired }}">
           </td>
           <td>
-            {{ if valid }}
-              <i class="uk-icon-sitemap uk-text-success"></i>
+            {{ if valid || retired }}
+              <i class="uk-icon-sitemap {{= retired ? 'uk-text-muted' : 'uk-text-success' }}"></i>
             {{ else }}
               <i class="uk-icon-exclamation-circle uk-text-danger"></i>
             {{ end }}
-            <a href="/config/{{= workflow['name'] }}" onclick="select_workflow($('#select-workflow-{{= uuid }}').prop('checked', !$('#select-workflow-{{= uuid }}').prop('checked')))" {{= 'class="uk-text-danger"' unless valid }}>
-              {{= workflow['name'] }}
+            <a href="/config/{{= workflow['name'] }}" onclick="select_workflow($('#select-workflow-{{= uuid }}').prop('checked', !$('#select-workflow-{{= uuid }}').prop('checked')))" class="{{= retired ? 'uk-text-muted' : (valid ? '' : 'uk-text-danger') }}">
+              {{== workflow['name'] }}
             </a>
           </td>
-          <td id="count-working-{{= uuid }}">{{= workflow['working_docs_count'] }}</td>
-          <td id="count-failed-{{= uuid }}">{{= workflow['failed_docs_count'] }}</td>
-          <td id="count-pending-{{= uuid }}">{{= workflow['published_pending_consume_docs_count'] }}</td>
-          <td id="count-docs-{{= uuid }}">{{= workflow['docs_count'] }}</td>
+          <td id="count-in-process-{{= uuid }}">{{= workflow['documents_in_process'] }}</td>
+          <td id="count-failed-{{= uuid }}">{{= workflow['failed_documents'] }}</td>
           <td id="count-error-alerts-{{= uuid }}">{{= workflow['error_alerts'] }}</td>
           <td id="count-warn-alerts-{{= uuid }}">{{= workflow['warn_alerts'] }}</td>
           <td>
             <input id="workflow-{{= uuid }}" type="hidden" value="{{= workflow['name'] }}">
             <input id="active-status-{{= uuid }}" type="hidden" value="{{= workflow['run_mode'] }}">
             <span id="status-icon-{{= uuid }}">
-              {{ case workflow['run_mode'] }}
-              {{ when 'running' }}
-                <i class="uk-icon-toggle-on"></i>
-                Running
-              {{ when 'stopping' }}
-                <i class="uk-icon-spinner uk-icon-spin"></i>
-                Stopping
-              {{ when 'stopped' }}
-                <i class="uk-icon-toggle-off"></i>
-                Stopped
+              {{ if retired }}
+                <i class="uk-icon-remove"></i>
+                Retired
               {{ else }}
-                <i class="uk-icon-question-circle-o"></i>
-                Unknown
+                {{ case workflow['run_mode'] }}
+              {{ when 'running' }}
+                  <span class="uk-text-success">
+                    <i class="uk-icon-toggle-on uk-text-bold"></i>
+                    Running
+                  </span>
+                {{ when 'stopping' }}
+                  <i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold"></i>
+                  Stopping
+                {{ when 'stopped' }}
+                  <i class="uk-icon-toggle-off uk-text-bold"></i>
+                  Stopped
+                {{ end }}
               {{ end }}
             </span>
           </td>
@@ -113,7 +131,7 @@
 <div class="uk-grid">
   <div class="uk-width-1-3">
 
-    <div id="workflow-options" class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}" style="pointer-events:none;">
+    <div id="workflow-options" class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}">
       <button id="workflow-dropdown" class="uk-button" disabled>
         <label>None Selected</label>
         <i class="uk-icon-caret-down"></i>
@@ -121,38 +139,62 @@
       <div class="uk-dropdown uk-dropdown-small uk-dropdown-bottom uk-dropdown-close">
         <ul class="uk-nav uk-nav-dropdown" style="text-align:left;">
 
-          <li id="workflow-run-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
-            <i class="uk-icon-rocket uk-margin-small-right"></i>
-            Run
+          <li id="workflow-run-disabled">
+            <i class="uk-icon-play-circle uk-margin-small-right"></i>
+            Start
           </li>
-          <li id="workflow-run-enabled" style="display:none;">
-            <a onclick="activate()">
-              <i class="uk-icon-rocket uk-margin-small-right"></i>
-              Run
+          <li id="workflow-run-enabled">
+            <a onclick="run_stop_selected_workflows(true)">
+              <i class="uk-icon-play-circle uk-margin-small-right"></i>
+              Start
             </a>
           </li>
 
-          <li id="workflow-stop-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
-            <i class="uk-icon-hand-stop-o uk-margin-small-right"></i>
+          <li id="workflow-stop-disabled">
+            <i class="uk-icon-stop-circle uk-margin-small-right"></i>
             Stop
           </li>
-          <li id="workflow-stop-enabled" style="display:none;">
-            <a onclick="deactivate()">
-              <i class="uk-icon-hand-stop-o uk-margin-small-right"></i>
+          <li id="workflow-stop-enabled">
+            <a onclick="run_stop_selected_workflows(false)">
+              <i class="uk-icon-stop-circle uk-margin-small-right"></i>
               Stop
             </a>
           </li>
 
           <li class="uk-nav-divider"></li>
 
-          <li id="workflow-export-disabled" style="color:#999; padding:5px 15px; cursor:not-allowed;">
+          <li id="workflow-export-disabled">
             <i class="uk-icon-upload uk-margin-small-right"></i>
             Export
           </li>
-          <li id="workflow-export-enabled" style="display:none;">
+          <li id="workflow-export-enabled">
             <a onclick="export_workflows()">
               <i class="uk-icon-upload uk-margin-small-right"></i>
               Export
+            </a>
+          </li>
+
+          <li class="uk-nav-divider"></li>
+
+          <li id="workflow-retire-disabled">
+            <i class="uk-icon-remove uk-margin-small-right"></i>
+            Retire
+          </li>
+          <li id="workflow-retire-enabled">
+            <a onclick="retire_workflows(true)">
+              <i class="uk-icon-remove uk-margin-small-right"></i>
+              Retire
+            </a>
+          </li>
+
+          <li id="workflow-unretire-disabled">
+            <i class="uk-icon-undo uk-margin-small-right"></i>
+            Unretire
+          </li>
+          <li id="workflow-unretire-enabled">
+            <a onclick="retire_workflows(false)">
+              <i class="uk-icon-undo uk-margin-small-right"></i>
+              Unretire
             </a>
           </li>
 
@@ -163,6 +205,9 @@
   </div>
   <div class="uk-width-1-3 uk-text-center">
 
+  </div>
+  <div class="uk-width-1-3 uk-text-right">
+
     <a href="/config/new" class="uk-button">
       New Workflow
     </a>
@@ -170,9 +215,6 @@
       <i class="uk-icon-download"></i>
       Import
     </button>
-
-  </div>
-  <div class="uk-width-1-3 uk-text-right">
 
   </div>
 </div>
@@ -201,6 +243,7 @@
 </div>
 
 <script type="text/javascript">
+  var cancel_wait_modal = false
   $(function() {
     var progressbar = $("#progressbar"),
         bar         = progressbar.find(".uk-progress-bar"),
@@ -215,12 +258,21 @@
           progress: function(percent) {
             percent = Math.ceil(percent)
             bar.css("width", percent + "%").text(percent + "%")
+            if (percent == 100) {
+              setTimeout(function() {
+                progressbar.addClass("uk-hidden")
+                if (cancel_wait_modal) {
+                  cancel_wait_modal = false
+                } else {
+                  show_wait_modal('Importing workflows... Please wait...')
+                }
+              }, 1000)
+            }
           },
           allcomplete: function(response) {
+            cancel_wait_modal = true
             bar.css("width", "100%").text("100%")
-            setTimeout(function() {
-              progressbar.addClass("uk-hidden")
-            }, 250)
+            hide_wait_modal()
 
             response = JSON.parse(response)
             var message = '',
@@ -260,7 +312,6 @@
               'hide.uk.modal': function() {
                 if (success) {
                   location.reload()
-                  /* $('#import-close').click() */
                 }
                 reset_import_file_upload(settings)
               }
@@ -292,6 +343,7 @@
       }
     })
     update_toggle_buttons()
+    update_show_retired_button()
   })
 
   function click_add_new_action_type(link) {
@@ -309,7 +361,6 @@
     chks.each(function(_index, chk) {
       $(chk).prop('checked', checked)
       var id = $(chk).prop('id').replace(/select-workflow-/, '')
-      $("#toggle-status-" + id).prop('disabled', checked)
     })
     update_toggle_buttons()
   }
@@ -317,8 +368,7 @@
   function select_workflow(chk) {
     $(chk).prop('checked', chk.checked)
     var id  = $(chk).prop('id').replace(/select-workflow-/, ''),
-        all = $('input[id^="select-workflow"]:checked').length == {{= @data.size }}
-    $("#toggle-status-" + id).prop('disabled', chk.checked)
+        all = $('input[id^="select-workflow"]:checked').length == {{= @data[:workflows].size }}
     $("#select-all").prop('checked', all)
     update_toggle_buttons()
   }
@@ -332,16 +382,23 @@
   function update_toggle_buttons() {
     var any_checked  = false,
         any_active   = false,
-        any_inactive = false
+        any_inactive = false,
+        any_retired  = false,
+        any_enabled  = false
 
-    var cks = $("input[id^='select-workflow']:checked")
+    var cks = $('input[id^="select-workflow"]:checked')
     cks.each(function(_index, chk) {
       var id = $(chk).prop('id').replace(/select-workflow-/, '')
       any_checked    = true
-      if ($("#active-status-" + id).val() != "stopped") {
+      if ($('#active-status-' + id).val() != 'stopped') {
         any_active   = true
       } else {
         any_inactive = true
+      }
+      if ($('#workflow-retired-' + id).val() == 'true') {
+        any_retired = true
+      } else {
+        any_enabled = true
       }
     })
 
@@ -357,137 +414,193 @@
       $('#workflow-options').css('pointer-events', 'none')
     }
 
-    if (!any_checked) {
-      $('#workflow-run-disabled').show()
-      $('#workflow-run-enabled').hide()
-      $('#workflow-stop-disabled').show()
-      $('#workflow-stop-enabled').hide()
-      $('#workflow-export-disabled').show()
-      $('#workflow-export-enabled').hide()
-    } else if (any_active && any_inactive) {
-      $('#workflow-run-disabled').hide()
-      $('#workflow-run-enabled').show()
-      $('#workflow-stop-disabled').hide()
-      $('#workflow-stop-enabled').show()
-      $('#workflow-export-disabled').hide()
-      $('#workflow-export-enabled').show()
-    } else if (any_active) {
-      $('#workflow-run-disabled').show()
-      $('#workflow-run-enabled').hide()
-      $('#workflow-stop-disabled').hide()
-      $('#workflow-stop-enabled').show()
-      $('#workflow-export-disabled').hide()
-      $('#workflow-export-enabled').show()
-    } else if (any_inactive) {
-      $('#workflow-run-disabled').hide()
-      $('#workflow-run-enabled').show()
-      $('#workflow-stop-disabled').show()
-      $('#workflow-stop-enabled').hide()
-      $('#workflow-export-disabled').hide()
-      $('#workflow-export-enabled').show()
+    if (any_retired && any_enabled) {           // mix of retired and unretired
+      enable_dropdown_item('retire', true)
+      enable_dropdown_item('unretire', true)
+    } else if (any_retired) {                   // only retired
+      enable_dropdown_item('retire', false)
+      enable_dropdown_item('unretire', true)
+    } else if (any_enabled) {                   // only unretired
+      enable_dropdown_item('retire', true)
+      enable_dropdown_item('unretire', false)
+    }
+
+    if (!any_checked) {                         // none selected
+      enable_dropdown_item('run', false)
+      enable_dropdown_item('stop', false)
+      enable_dropdown_item('export', false)
+      enable_dropdown_item('retire', false)
+      enable_dropdown_item('unretire', false)
+    } else if (any_active && any_inactive) {    // mix of active and inactive
+      enable_dropdown_item('run', true)
+      enable_dropdown_item('stop', true)
+      enable_dropdown_item('export', true)
+    } else if (any_active) {                    // only active
+      enable_dropdown_item('run', false)
+      enable_dropdown_item('stop', true)
+      enable_dropdown_item('export', true)
+      enable_dropdown_item('retire', false)
+      enable_dropdown_item('unretire', false)
+    } else if (any_inactive) {                  // only inactive
+      enable_dropdown_item('run', true)
+      enable_dropdown_item('stop', false)
+      enable_dropdown_item('export', true)
+    }
+
+    if (any_retired && any_enabled) {           // mix of retired and unretired
+    } else if (any_retired) {                   // only retired
+      enable_dropdown_item('run', false)
+      enable_dropdown_item('stop', false)
+    } else if (any_enabled) {                   // only unretired
     }
   }
 
-  function activate() {
-    toggle_selected_workflows()
-  }
-
-  function deactivate() {
-    UIkit.modal.confirm("Stop selected workflow(s)?", function() {
-      toggle_selected_workflows(false)
-    })
-  }
-
-  function toggle_selected_workflows(activating = true) {
-    var status = ""
-    if (activating) {
-      status = "activate"
+  function enable_dropdown_item(item, enable) {
+    if (enable) {
+      $('#workflow-' + item + '-disabled').hide()
+      $('#workflow-' + item + '-enabled').show()
     } else {
-      status = "deactivate"
+      $('#workflow-' + item + '-disabled').show()
+      $('#workflow-' + item + '-enabled').hide()
     }
+  }
 
-    var cks = $("input[id^='select-workflow']:checked")
-    localStorage['workflow-status-change-counter'] = cks.length
-    $('#status-change-errors').html('')
+  var queue = []
 
-    cks.each(function(_index, chk) {
-      var id = $(chk).prop('id').replace(/select-workflow-/, ''),
-          wf = $("#workflow-" + id).val(),
-          st = $("#active-status-" + id).val()
-
-      if ((activating && st != 'stopped') || (!activating && st == 'stopped')) {
-        update_request_status()
-        return
-      }
-
-      $.ajax({
-        type: 'PATCH',
-        url: '/config/' + wf + '/' + status + '?id=' + id,
-        success: function(data, text) {
-          update_status_change(data)
-          update_request_status()
-        },
-        error: function(request, status, error) {
-          update_request_status()
-          $("#status-change-errors").html(
-            '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
-              '<a href="" class="uk-alert-close uk-close"></a>' +
-              '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
-              'Unable to change status for one or more workflows: ' + error +
-            '</div>'
-          )
-        }
+  function run_stop_selected_workflows(run, prompt = true) {
+    if (run) {
+      prompt = false
+    } else if (!run && prompt) {
+      UIkit.modal.confirm('Stop selected workflows?', function() {
+        run_stop_selected_workflows(run, false)
       })
-
-    })
-  }
-
-  function update_request_status() {
-    localStorage['workflow-status-change-counter'] -= 1
-    if (localStorage['workflow-status-change-counter'] <= 0) {
-      localStorage.removeItem('workflow-status-change-counter')
-      update_toggle_buttons()
     }
-  }
-
-  function update_status_change(data) {
-    var data   = JSON.parse(data),
-        id     = data[0],
-        status = data[1],
-        data   = data[2]
-
-    if ($.type(data) === 'string' && data.match("^Unable")) {
-      $("#status-change-errors").append(
-        '<div class="uk-alert uk-alert-danger" data-uk-alert>' +
-          '<a href="" class="uk-alert-close uk-close"></a>' +
-          '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
-          data +
-        '</div>'
-      )
+    if (prompt) {
       return
     }
 
-    $("#active-status-" + id).val(status)
-    var span = $("#status-icon-" + id)
+    show_wait_modal((run ? 'Starting' : 'Stopping') + ' workflows... Please wait...')
 
-    switch(status) {
-      case 'running':
-        span.html('<i class="uk-icon-toggle-on"></i>' + "\nRunning")
-        break
-      case 'stopping':
-        span.html('<i class="uk-icon-spinner uk-icon-spin"></i>' + "\nStopping")
-        break
-      case 'stopped':
-        span.html('<i class="uk-icon-toggle-off"></i>' + "\nStopped")
-        break
-      default:
-        span.html('<i class="question-circle-o"></i>' + "\nUnknown")
+    var cks = $('input[id^="select-workflow"]:checked')
+    queue   = []
+
+    cks.each(function(_index, chk) {
+      var id = $(chk).prop('id').replace(/select-workflow-/, ''),
+          st = $('#active-status-' + id).val(),
+          retired = $('#workflow-retired-' + id).val() == 'true'
+
+      if ((run && st != 'stopped') || (!run && st == 'stopped') || retired) {
+        return
+      }
+
+      queue.push(id)
+    })
+
+    process_run_stop_queue(run)
+  }
+
+  function process_run_stop_queue(run, success = [], stopping = [], failed = {}) {
+    if (queue == undefined || queue.length == 0) {
+      hide_wait_modal()
+      update_toggle_buttons()
+
+      var message = ''
+
+      if (success.length > 0) {
+        message += 'Successfully ' + (run ? 'started' : 'stopped') + ' ' + success.length + ' workflow(s).' +
+          '<div class="uk-text-success uk-text-bold uk-margin-top">' +
+            success.join('<br />') +
+          '</div>'
+      }
+
+      if (stopping.length > 0) {
+        if (success.length > 0) {
+          message += '<br />'
+        }
+        message += 'Still stopping ' + stopping.length + ' workflow(s).' +
+          '<div class="uk-text-bold uk-margin-top">' +
+            stopping.join('<br />') +
+          '</div>'
+      }
+
+      if (Object.keys(failed).length > 0) {
+        if (success.length > 0) {
+          message += '<br />'
+        }
+        message += 'Failed to ' + (run ? 'start' : 'stop') + ' ' + Object.keys(failed).length + ' workflow(s).' +
+          '<div class="uk-text-danger uk-margin-top">'
+            $.each(failed, function(key, value) {
+              message += '<span class="uk-text-bold">' + key + '</span>: ' + value + '<br />'
+            })
+        message += '</div>'
+      }
+
+      UIkit.modal.alert(message)
+
+      return
     }
 
-    $("count-working-" + id).val(data["working_docs_count"])
-    $("count-failed-" + id).val(data["failed_docs_count"])
-    $("count-pending-" + id).val(data["published_pending_consume_docs_count"])
-    $("count-docs-" + id).val(data["docs_count"])
+    var id    = queue.shift(),
+        wf    = $('#workflow-' + id).val(),
+        state = ''
+
+    if (run) {
+      state = 'run'
+    } else {
+      state = 'stop'
+    }
+
+    $.ajax({
+      type: 'PATCH',
+      url: '/config/' + wf + '/' + state + '?id=' + id,
+      success: function(data, text) {
+
+        data = JSON.parse(data)
+        var id       = data[0],
+            status   = data[1],
+            response = data[2],
+            run_mode = response['run_mode']
+
+        if (status == 'success') {
+          $('#active-status-' + id).val(run_mode)
+          var span = $('#status-icon-' + id)
+
+          switch(run_mode) {
+            case 'running':
+              success.push(wf)
+              span.html('<span class="uk-text-success"><i class="uk-icon-toggle-on uk-text-bold"></i> Running</span>')
+              break
+            case 'stopping':
+              stopping.push(wf)
+              span.html('<i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold"></i> Stopping')
+              break
+            case 'stopped':
+              success.push(wf)
+              span.html('<i class="uk-icon-toggle-off uk-text-bold"></i> Stopped')
+              break
+          }
+
+          $('count-in-process-' + id).val(data['documents_in_process'])
+          $('count-failed-' + id).val(data['failed_documents'])
+          $('count-error-alerts-' + id).val(data['error_alerts'])
+          $('count-warn-alerts-' + id).val(data['warn_alerts'])
+        } else {
+          failed[wf] = response
+        }
+
+        process_run_stop_queue(run, success, stopping, failed)
+
+      },
+      error: function(request, status, error) {
+        hide_wait_modal()
+        UIkit.modal.alert(
+          '<span class="uk-text-danger">' +
+            '<i class="uk-icon-warning uk-icon-small uk-margin-small-right"></i>' +
+            'Unable to ' + state + ' workflow <strong>' + wf + '</strong>: ' + error +
+          '</span>'
+        )
+      }
+    })
   }
 
   function export_workflows() {
@@ -499,6 +612,133 @@
           timestamp = Math.floor(Date.now() / 1000)
           url       = '/config/' + workflow + '/export?ts=' + timestamp
       window.open(url)
+    })
+  }
+
+  function retire_workflows(retire, prompt = true) {
+    if (retire && prompt) {
+      UIkit.modal.confirm(
+        '<i class="uk-icon-question-circle uk-icon-large uk-text-warning uk-margin-right"></i>' +
+        'Are you sure you want to retire selected workflows?',
+        function() {
+          retire_workflows(retire, false)
+        }
+      )
+      return false
+    }
+
+    var cks     = $('input[id^="select-workflow"]:checked'),
+        success = [],
+        failed  = {}
+
+    if (cks.length == 0) {
+      UIkit.modal.alert('No workflows selected.')
+      return false
+    }
+
+    show_wait_modal((retire ? 'Re' : 'Unre') + 'tiring workflows... Please wait...')
+
+    localStorage['workflow-retire-counter'] = cks.length
+
+    cks.each(function(_index, chk) {
+      var id = chk.id.replace(/^select-workflow-/, ''),
+          wf = $('#workflow-' + id).val(),
+          st = $('#active-status-' + id).val(),
+          retired = $('#workflow-retired-' + id).val() == 'true'
+
+      if (st != 'stopped' || retire == retired) {
+        update_retire_outcome(retire, success, failed)
+        return
+      }
+
+      $.ajax({
+        type: 'PATCH',
+        url: '/config/' + wf + '/' + (retire ? '' : 'un') + 'retire',
+        success: function(data, text) {
+          data = JSON.parse(data)
+          var status   = data[0],
+              response = data[1]
+          if (status == 'success') {
+            success.push(wf)
+            update_retire_outcome(retire, success, failed)
+          } else {
+            failed[wf] = response
+            update_retire_outcome(retire, success, failed)
+          }
+        }
+      })
+    })
+  }
+
+  function update_retire_outcome(retire, success, failed) {
+    localStorage['workflow-retire-counter'] -= 1
+    if (localStorage['workflow-retire-counter'] > 0) {
+      return
+    }
+    localStorage.removeItem('workflow-retire-counter')
+    hide_wait_modal()
+
+    var message = ''
+
+    if (success.length > 0) {
+      message += 'Successfully ' + (retire ? '' : 'un') + 'retired ' + success.length + ' workflow(s).' +
+        '<div class="uk-text-success uk-text-bold uk-margin-top">' +
+          success.join('<br />') +
+        '</div>'
+    }
+
+    if (Object.keys(failed).length > 0) {
+      if (success.length > 0) {
+        message += '<br />'
+      }
+      message += 'Failed to ' + (retire ? '' : 'un') + 'retire ' + Object.keys(failed).length + ' workflow(s).' +
+        '<div class="uk-text-danger uk-margin-top">'
+          $.each(failed, function(key, value) {
+            message += '<span class="uk-text-bold">' + key + '</span>: ' + value + '<br />'
+          })
+      message += '</div>'
+    }
+
+    var modal = UIkit.modal.alert(message)
+
+    if (success.length > 0) {
+      modal.on({
+        'hide.uk.modal': function() {
+          location.reload()
+        }
+      })
+    }
+  }
+
+  function update_show_retired_button() {
+    if ({{= @data[:show_retired] }}) {
+      $('#show-retired')
+        .removeClass('uk-button-primary')
+        .removeClass('uk-active')
+        .addClass('uk-button-primary')
+        .addClass('uk-active')
+        .prop('title', 'Click to hide retired actions')
+        .text('Hide Retired')
+    } else {
+      $('#show-retired')
+        .removeClass('uk-button-primary')
+        .removeClass('uk-active')
+        .prop('title', 'Click to show retired actions')
+        .text('Show Retired')
+    }
+  }
+
+  function toggle_retired_workflows(toggle) {
+    var show_retired = !$(toggle).hasClass('uk-active')
+    $.ajax({
+      type: 'PATCH',
+      url: '/session?show_retired=' + show_retired,
+      success: function(data, text) {
+        location.reload()
+      },
+      error: function(request, status, error) {
+        UIkit.modal.alert('<span class="uk-text-danger">Unable to set show retired: ' + error + '</span>')
+      }
     })
   }
 </script>

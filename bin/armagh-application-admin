@@ -97,6 +97,7 @@ use Rack::CommonLogger, api.logger
 # REST API
 #
 #------------------------------------------------------------------------------------------------
+
 get '/' do
   rest_helper.handle_request(request) do |_fields, _remote_user|
     'Armagh Application Admin API'
@@ -137,7 +138,7 @@ end
 # list of workflows with status
 get '/workflows.json' do
   rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
-    api.get_workflows
+    api.get_workflows(include_retired: params['include_retired']&.downcase == 'true')
   end
 end
 
@@ -152,7 +153,7 @@ end
 # status for existing workflow
 get '/workflow/:workflow_name/status.json' do
   rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
-    api.get_workflow_status(params['workflow_name'])
+    api.get_workflow_status(params['workflow_name'], include_retired: params['include_retired']&.downcase == 'true')
   end
 end
 
@@ -191,6 +192,20 @@ get '/workflow/?:workflow_name?/export.json' do
   end
 end
 
+# retire workflow
+patch '/workflow/:workflow_name/retire.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.retire_workflow(params['workflow_name'], true)
+  end
+end
+
+# unretire workflow
+patch '/workflow/:workflow_name/unretire.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.retire_workflow(params['workflow_name'], false)
+  end
+end
+
 #------------------------------
 #
 # workflow actions
@@ -214,7 +229,7 @@ end
 # list of workflow actions with status
 get '/workflow/:workflow_name/actions.json' do
   rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
-    api.get_workflow_actions(params['workflow_name'])
+    api.get_workflow_actions(params['workflow_name'], include_retired: params['include_retired']&.downcase == 'true')
   end
 end
 
@@ -236,7 +251,7 @@ end
 # edit form for existing workflow action
 get '/workflow/:workflow_name/action/:action_name/description.json' do
   rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
-    api.get_workflow_action_description(params['workflow_name'], params['action_name'])
+    api.get_workflow_action_description(params['workflow_name'], params['action_name'], include_retired: params['include_retired']&.downcase == 'true')
   end
 end
 
@@ -271,8 +286,36 @@ end
 
 # invoke action test callback
 patch '/test/invoke_callback.json' do
-  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields|
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
     api.invoke_action_test_callback(fields)
+  end
+end
+
+# retire action
+patch '/workflow/:workflow_name/action/:action_name/retire.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.retire_action(params['workflow_name'], params['action_name'])
+  end
+end
+
+# unretire action
+patch '/workflow/:workflow_name/action/:action_name/unretire.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.unretire_action(params['workflow_name'], params['action_name'])
+  end
+end
+
+# encode string
+get '/string/encode.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.encode_string(params['string'])
+  end
+end
+
+# decode string
+get '/string/decode.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.decode_string(params['string'])
   end
 end
 
@@ -487,7 +530,6 @@ get '/roles.json' do
     api.get_roles
   end
 end
-
 
 #---------------------
 #

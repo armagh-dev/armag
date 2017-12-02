@@ -229,11 +229,11 @@ module Armagh
           config.nil? ? nil : config.serialize['values']
         end
 
-        def get_workflows
-          Actions::WorkflowSet.for_admin( Connection.config, logger: @logger ).list_workflows
+        def get_workflows(include_retired: false)
+          Actions::WorkflowSet.for_admin( Connection.config, logger: @logger ).list_workflows( include_retired: include_retired )
         end
 
-        def with_workflow( workflow_name )
+        def with_workflow( workflow_name, include_retired: false )
           raise APIClientError.new('Provide a workflow name') if workflow_name.nil? || workflow_name.empty?
           wf_set = Actions::WorkflowSet.for_admin( Connection.config, logger: @logger )
           wf = wf_set.get_workflow( workflow_name )
@@ -241,8 +241,8 @@ module Armagh
           yield wf
         end
 
-        def get_workflow_status( workflow_name )
-          with_workflow( workflow_name ) { |wf| wf.status }
+        def get_workflow_status( workflow_name, include_retired: true )
+          with_workflow( workflow_name, include_retired: true ) { |wf| wf.status }
         end
 
         def new_workflow
@@ -267,7 +267,7 @@ module Armagh
           with_workflow(workflow_name) do |wf|
             begin
               wf.stop
-            rescue Actions::WorkflowDocumentsInProcessError => e
+            rescue Actions::WorkflowDocumentsInProcessError
               return wf.status
             end
           end
@@ -275,15 +275,15 @@ module Armagh
 
         def import_workflow(data)
           error_prefix = 'Unable to import workflow.'
-          raise APIClientError, "#{error_prefix} Missing JSON data." unless [Hash, Array].include? data.class
+          raise APIClientError, "#{error_prefix} Missing JSON data." unless data.is_a? Hash
 
-          raise APIClientError, %Q{#{error_prefix} Missing {"workflow": {"name": "<name_goes_here>"}} section.} unless data.is_a?(Hash) && data.key?('workflow') && data['workflow'].is_a?(Hash) && data['workflow'].key?('name')
+          raise APIClientError, %Q{#{error_prefix} Missing {"workflow": {"name": "<name_goes_here>"}} section.} unless data.key?('workflow') && data['workflow'].is_a?(Hash) && data['workflow'].key?('name')
 
           wf_name = data.dig('workflow', 'name')
           raise APIClientError, "#{error_prefix} Workflow name cannot be blank." if  wf_name.to_s.strip.empty?
 
-          if get_workflows.map { |wf| wf['name'].downcase }.include? wf_name.downcase
-            with_workflow(wf_name) do |wf|
+          if get_workflows(include_retired: true).map { |wf| wf['name'].downcase }.include? wf_name.downcase
+            with_workflow(wf_name, include_retired: true) do |wf|
               raise APIClientError, "#{error_prefix} Workflow #{wf_name.inspect} is still running." if wf.status['run_mode'] != Status::STOPPED
             end
           else
@@ -291,6 +291,16 @@ module Armagh
               create_workflow('workflow'=>{'name'=>wf_name})
             rescue => e
               raise APIClientError, "#{error_prefix} Failed to create workflow #{wf_name.inspect}: #{e}"
+            end
+          end
+
+          wf_retired = data.dig('workflow', 'retired').to_s.strip.downcase == 'true'
+          with_workflow(wf_name, include_retired: true) do |wf|
+            break if wf.retired == wf_retired
+            begin
+              wf.retired = wf_retired
+            rescue => e
+              raise APIClientError, "#{error_prefix} Failed to #{'un' unless wf_retired}retire workflow #{wf_name.inspect}: #{e}"
             end
           end
 
@@ -310,15 +320,20 @@ module Armagh
           end
 
           begin
-            existing_actions = get_workflow_actions(wf_name)&.map { |a| a['name'] }
+            existing_actions = get_workflow_actions(wf_name, include_retired: true)&.map { |a| a['name'] }
           rescue
             existing_actions = []
           end
 
-          # TODO ARM-759 retire any existing workflow actions that are not part of the import
           import_actions = data['actions'].map { |a| a.dig('action', 'name') }
           extra_actions  = existing_actions.map { |a| a.downcase } - import_actions.map { |a| a.downcase }
-          raise APIClientError, "#{error_prefix} The following actions exist for #{wf_name.inspect} but are not part of the import: #{extra_actions.sort.join(', ')}" unless extra_actions.empty?
+          extra_actions.each do |retire_action|
+            begin
+              with_workflow(wf_name, include_retired: true) { |wf| wf.retire_action(retire_action) }
+            rescue
+              # ignore since action is already retired
+            end
+          end
 
           data['actions'].each do |action|
             action_name = action.dig('action', 'name')
@@ -329,14 +344,13 @@ module Armagh
 
             if existing_actions.include? action_name.downcase
               begin
-                action['type'] = action_type
-                update_workflow_action_config(wf_name, action_name, action)
+                update_workflow_action_config(wf_name, action_name, action, include_retired: true, bypass_validation: true)
               rescue => e
                 raise APIClientError, "#{error_prefix} Action #{action_name.inspect} was unable to be updated: #{e}"
               end
             else
               begin
-                create_workflow_action_config(wf_name, action_type, action)
+                create_workflow_action_config(wf_name, action_type, action, include_retired: true, bypass_validation: true)
               rescue => e
                 raise APIClientError, "#{error_prefix} Action #{action_name.inspect} was unable to be created: #{e}"
               end
@@ -344,34 +358,39 @@ module Armagh
           end
 
           {
-            'workflow' => get_workflows.find { |wf| wf['name'].downcase == wf_name.downcase },
+            'workflow' => get_workflows(include_retired: true).find { |wf| wf['name'].downcase == wf_name.downcase },
             'actions'  => import_actions
           }
         end
 
         def export_workflow(wf_name = nil)
-          output = []
-
+          output        = []
+          versions      = get_version || 'none available'
           wfs_to_export =
             if wf_name
-              _wf_name = get_workflows.find { |wf| wf['name'].downcase == wf_name.downcase }
+              _wf_name = get_workflows(include_retired: true)
+                .find { |wf| wf['name'].downcase == wf_name.downcase }
               raise APIClientError, 'Workflow does not exist.' unless _wf_name
               [_wf_name['name']]
             else
-              get_workflows.map { |wf| wf['name'] }
+              get_workflows(include_retired: true).map { |wf| wf['name'] }
             end
 
           wfs_to_export.each do |wf|
             wf_output = {
               'workflow' => {
                 'name'     => wf,
-                'exported' => Time.now.utc,
-                'versions' => Armagh::Status::LauncherStatus.find_all(raw: true)&.first&.[]('versions') || 'none available'
+                'retired'  => get_workflow_status(wf, include_retired: true)['retired'].to_s,
+                'metadata' => {
+                  'exported' => Time.now.utc,
+                  'versions' => versions
+                }
               },
               'actions' => []
             }
-            get_workflow_actions(wf).each do |action|
-              config = get_workflow_action_config(wf, action['name'])
+
+            get_workflow_actions(wf, include_retired: true).each do |action|
+              config = get_workflow_action_config(wf, action['name'], include_retired: true, bypass_validation: true)
               raise "Action #{action['name'].inspect} is invalid and will not export." unless config
               config['action'].delete('active')
               config['action'].delete('workflow')
@@ -379,13 +398,21 @@ module Armagh
               _config.merge! config
               wf_output['actions'] << _config
             end
-
             output << wf_output
           end
 
-          JSON.pretty_generate(output.size == 1 ? output.first : output)
+          output.size == 1 ? output.first : output
         rescue => e
           raise APIClientError, "Unable to export workflow #{wf_name.inspect}: #{e}"
+        end
+
+        def retire_workflow(workflow_name, retire)
+          with_workflow(workflow_name, include_retired: !retire) do |wf|
+            wf.retired = retire
+            wf.status
+          end
+        rescue => e
+          raise APIClientError, e.message
         end
 
         def get_action_super(type)
@@ -403,8 +430,8 @@ module Armagh
           actions.sort.to_h
         end
 
-        def get_workflow_actions( workflow_name )
-          with_workflow(workflow_name){ |wf| wf.action_statuses}
+        def get_workflow_actions( workflow_name, include_retired: false )
+          with_workflow(workflow_name, include_retired: true){ |wf| wf.action_statuses(include_retired: include_retired) }
         end
 
         def get_workflow_action_status( workflow_name, action_name )
@@ -419,29 +446,29 @@ module Armagh
           raise APIClientError.new( e.message )
         end
 
-        def create_workflow_action_config( workflow_name, type, action_config )
-          with_workflow(workflow_name){ |wf|
-            wf.create_action_config( type, action_config )
-            serialize_edit_action_config(wf.edit_action_config( action_config.dig('action','name')))
+        def create_workflow_action_config( workflow_name, type, action_config, include_retired: false, bypass_validation: false )
+          with_workflow(workflow_name, include_retired: include_retired){ |wf|
+            wf.create_action_config( type, action_config, bypass_validation: bypass_validation )
+            serialize_edit_action_config(wf.edit_action_config( action_config.dig('action','name'), include_retired: include_retired, bypass_validation: bypass_validation ))
           }
         rescue Actions::ActionConfigError, Actions::WorkflowConfigError => e
           raise APIClientError.new( e.message, markup: (e.respond_to?(:config_markup) ? serialize_edit_action_config(e.config_markup ): nil) )
         end
 
-        def get_workflow_action_description( workflow_name, action_name )
-          with_workflow(workflow_name){ |wf| serialize_edit_action_config(wf.edit_action_config( action_name ))}
+        def get_workflow_action_description( workflow_name, action_name, include_retired: false )
+          with_workflow(workflow_name, include_retired: include_retired){ |wf| serialize_edit_action_config(wf.edit_action_config( action_name, include_retired: include_retired ))}
         rescue Actions::ActionFindError, Actions::WorkflowConfigError => e
           raise APIClientError.new( e.message )
         end
 
-        def get_workflow_action_config(workflow_name, action_name)
-          with_workflow(workflow_name) {|wf| wf.get_action_config(action_name)}
+        def get_workflow_action_config(workflow_name, action_name, include_retired: false, bypass_validation: false)
+          with_workflow(workflow_name, include_retired: include_retired) {|wf| wf.get_action_config(action_name, include_retired: include_retired, bypass_validation: bypass_validation)}
         end
 
-        def update_workflow_action_config( workflow_name, action_name, action_config)
-          with_workflow(workflow_name){ |wf|
-            wf.update_action_config( wf.type( action_name ), action_config )
-            serialize_edit_action_config(wf.edit_action_config( action_name ))
+        def update_workflow_action_config( workflow_name, action_name, action_config, include_retired: false, bypass_validation: false )
+          with_workflow(workflow_name, include_retired: include_retired){ |wf|
+            wf.update_action_config( wf.type( action_name, include_retired: include_retired ), action_config, bypass_validation: bypass_validation )
+            serialize_edit_action_config(wf.edit_action_config( action_name, include_retired: include_retired, bypass_validation: bypass_validation ))
           }
         rescue Actions::ActionConfigError, Actions::WorkflowConfigError => e
           raise APIClientError.new( e.message, markup: (e.respond_to?(:config_markup) ? serialize_edit_action_config(e.config_markup) : nil) )
@@ -496,6 +523,30 @@ module Armagh
           end
 
           type_class.send(method, config)
+        end
+
+        def retire_action(workflow_name, action_name)
+          with_workflow(workflow_name) { |wf| wf.retire_action(action_name) }
+        rescue => e
+          raise APIClientError, "Unable to retire workflow action: #{e}"
+        end
+
+        def unretire_action(workflow_name, action_name)
+          with_workflow(workflow_name) { |wf| wf.unretire_action(action_name) }
+        rescue => e
+          raise APIClientError, "Unable to unretire workflow action: #{e}"
+        end
+
+        def encode_string(string)
+          Configh::DataTypes::EncodedString.from_plain_text(string)
+        rescue
+          ''
+        end
+
+        def decode_string(string)
+          Configh::DataTypes::EncodedString.from_encoded(string).plain_text
+        rescue
+          ''
         end
 
         def get_documents( doc_type, begin_ts, end_ts, start_index, max_returns )

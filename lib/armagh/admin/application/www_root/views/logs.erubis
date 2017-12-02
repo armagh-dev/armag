@@ -39,37 +39,28 @@
       {{ columns.each do |column| }}
         <th>
           {{= column.capitalize }}
+          {{ active_filter = '' }}
+          {{ @data[:filter]&.split("\x19")&.each do |filter_column| }}
+            {{ next if filter_column.empty? }}
+            {{ filter_column = filter_column.split("\x11").first }}
+            {{ active_filter = 'uk-text-success uk-text-bold' if filter_column == column }}
+          {{ end }}
           <div class="uk-button-dropdown" data-uk-dropdown>
-            <button class="uk-button uk-button-mini" onclick="sort('{{= column }}')">
-              {{
-                dir = ''
-                if @data[:sort_col] == column
-                  dir += @data[:sort_dir] == 1 ? '-asc' : '-desc'
-                  dir += ' uk-text-primary'
-                end
-              }}
-              <i class="uk-icon-sort{{= dir }}"></i>
+            <button class="uk-button uk-button-mini {{= active_filter }}">
+             <i class="uk-icon-filter"></i>
             </button>
-            <div class="uk-dropdown uk-dropdown-small uk-text-small" style="font-weight: normal;">
+            <div class="uk-dropdown uk-dropdown-small uk-text-small uk-dropdown-close" style="font-weight: normal;">
               <ul class="uk-nav uk-nav-dropdown">
-                <li>
-                  <a href="javascript:" onclick="sort('{{= column }}', 1)">
-                    <i class="uk-icon-sort-alpha-asc uk-margin-small-right"></i>
-                    Sort Ascending
-                  </a>
-                </li>
-                <li>
-                  <a href="javascript:" onclick="sort('{{= column }}', -1)">
-                    <i class="uk-icon-sort-alpha-desc uk-margin-small-right"></i>
-                    Sort Descending
-                  </a>
-                </li>
                 <li>
                   <a href="javascript:" onclick="filter('{{= column }}')">
                     <i class="uk-icon-filter uk-margin-small-right"></i>
-                    Filter
+                    Custom Filter...
                   </a>
                 </li>
+
+                {{ if @data[:distinct][column] }}
+                  <li class="uk-nav-divider"></li>
+                {{ end }}
 
                 {{ @data[:distinct][column]&.each do |distinct| }}
                   <li>
@@ -80,6 +71,7 @@
                 {{ end }}
 
                 <li class="uk-nav-divider"></li>
+
                 <li>
                   <a href="javascript:" onclick="hide('{{= column }}')">
                     <i class="uk-icon-eye-slash uk-margin-small-right"></i>
@@ -156,10 +148,8 @@
 </div>
 
 <form id="form">
-  <input name="page" type="hidden" value="{{= @data[:page] }}">
+  <input name="page" type="hidden" value="{{#= @data[:page] }}">
   <input name="limit" type="hidden" value="{{= @data[:limit] }}">
-  <input name="sort_col" type="hidden" value="{{= @data[:sort_col] }}">
-  <input name="sort_dir" type="hidden" value="{{= @data[:sort_dir] }}">
   <input name="filter" type="hidden" value="{{= @data[:filter] }}">
   <input name="hide" type="hidden" value="{{= @data[:hide] }}">
 </form>
@@ -188,31 +178,6 @@
 
   function submit() {
     $("#form").submit()
-  }
-
-  function sort(column, force_dir = 0) {
-    var col = $("input[name='sort_col']")
-    var dir = $("input[name='sort_dir']")
-
-    col.val(column)
-
-    if (force_dir != 0) {
-      dir.val(force_dir)
-      submit()
-      return
-    }
-
-    if (col.val() != column) {
-      dir.val("")
-    }
-
-    if (dir.val() == "" || dir.val() == "-1") {
-      dir.val("1")
-    } else {
-      dir.val("-1")
-    }
-
-    submit()
   }
 
   function filter(column, value = "", remove = false) {
