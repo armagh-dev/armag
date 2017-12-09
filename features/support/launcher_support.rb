@@ -30,11 +30,16 @@ module LauncherSupport
 
   def self.start_launcher_daemon
     `#{DAEMON} start > /dev/null`
-    sleep 1
+    sleep 5
   end
 
   def self.stop_launcher_daemon
     `#{DAEMON} stop > /dev/null`
+  end
+
+  def self.restart_launcher_daemon
+    `#{DAEMON} restart > /dev/null`
+    sleep 5
   end
 
   def self.launch_launcher

@@ -96,7 +96,7 @@ class TestScheduledActionTrigger < Test::Unit::TestCase
     @mock_doc.attr_singleton_accessor :last_run, :seen_actions
     @mock_doc.last_run = {}
     @mock_doc.seen_actions = []
-    Armagh::TriggerManagerSemaphoreDocument.expects( :create_one_unlocked).raises( Armagh::Documents::Errors::DocumentUniquenessError)
+    Armagh::TriggerManagerSemaphoreDocument.expects(:create_one_unlocked).raises(Armagh::Connection::DocumentUniquenessError)
   end
 
   def setup_run

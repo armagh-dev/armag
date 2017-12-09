@@ -294,7 +294,7 @@ module Armagh
             rescue Documents::Errors::DocumentSizeError, Documents::Errors::DocumentRawSizeError => e
               Logging.ops_error_exception(@logger, e, "Error while executing action '#{name}' on '#{current_doc.document_id}'")
               current_doc.add_ops_error(name, e)
-            rescue Exception => e
+            rescue => e
               Logging.dev_error_exception(@logger, e, "Error while executing action '#{name}' on '#{current_doc.document_id}'")
               current_doc.add_dev_error(name, e)
             ensure
@@ -366,6 +366,7 @@ module Armagh
           doc.copyright = action_doc.copyright
           doc.document_timestamp = action_doc.document_timestamp || timestamp
           doc.display = action_doc.display
+          version = action_doc.version
 
           published_doc = doc.get_published_copy_read_only
           if published_doc
@@ -381,10 +382,13 @@ module Armagh
             doc.published_id = published_doc.internal_id
             doc.display ||= published_doc.display
             doc.source ||= published_doc.source
+            @logger.dev_warn "Action #{action.name} changed a previously published version of #{doc.type} #{doc.document_id} from version #{published_doc.version} to a lower value of #{version}." if version && version <= published_doc.version
+            version ||= published_doc.version
           end
 
           doc.title = "#{doc.document_id} (unknown title)" if doc.title.nil? || doc.title.empty?
           doc.published_timestamp = timestamp
+          doc.version = version || 1
           doc.state = action.config.output.docspec.state unless doc.error
           doc.add_items_to_pending_actions(@workflow_set.actions_names_handling_docspec(Documents::DocSpec.new(doc.type, doc.state)))
           doc.mark_publish
@@ -405,7 +409,7 @@ module Armagh
         else
           @logger.dev_error "#{action} is not an action."
       end
-      raise Documents::Errors::IDError, "Attempted to change Document's ID from '#{initial_id}' to '#{doc.document_id}.  IDs can only be changed from a publisher." unless initial_id == doc.document_id || allowed_id_change
+      raise Documents::Errors::IDError, "Attempted to change Document's ID from '#{initial_id}' to '#{doc.document_id}'.  IDs can only be changed from a publisher." unless initial_id == doc.document_id || allowed_id_change
     ensure
       @num_creates = 0
       @archives_for_collect.clear

@@ -1,6 +1,6 @@
 # Copyright 2017 Noragh Analytics, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, armagh_version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -51,33 +51,33 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | nil                                                      |
-      | pending_actions     | []                                                       |
-      | dev_errors          | {}                                                       |
-      | ops_errors          | {}                                                       |
-      | content             | nil                                                      |
-      | raw                 | BSON::Binary.new('collected content')                    |
-      | state               | 'ready'                                                  |
-      | _locked             | false                                                    |
-      | error               | nil                                                      |
-      | pending_work        | nil                                                      |
-      | version             | APP_VERSION                                              |
-      | source              | {'type' => 'url', 'url' => 'from test'}                  |
-      | collection_task_ids | not_empty                                                |
+      | document_id         | nil                                     |
+      | pending_actions     | []                                      |
+      | dev_errors          | {}                                      |
+      | ops_errors          | {}                                      |
+      | content             | nil                                     |
+      | raw                 | BSON::Binary.new('collected content')   |
+      | state               | 'ready'                                 |
+      | _locked             | false                                   |
+      | error               | nil                                     |
+      | pending_work        | nil                                     |
+      | armagh_version      | APP_VERSION                             |
+      | source              | {'type' => 'url', 'url' => 'from test'} |
+      | collection_task_ids | not_empty                               |
     And I should see a "DivideCollectedDocument" in "documents" with the following
-      | document_id         | nil                                                         |
-      | pending_actions     | []                                                          |
-      | dev_errors          | {}                                                          |
-      | ops_errors          | {}                                                          |
-      | content             | nil                                                         |
-      | raw                 | BSON::Binary.new('content-for-dividing')                    |
-      | state               | 'ready'                                                     |
-      | _locked             | false                                                       |
-      | error               | nil                                                         |
-      | pending_work        | nil                                                         |
-      | version             | APP_VERSION                                                 |
-      | source              | {'type' => 'url', 'url' => 'from test'}                     |
-      | collection_task_ids | not_empty                                                   |
+      | document_id         | nil                                      |
+      | pending_actions     | []                                       |
+      | dev_errors          | {}                                       |
+      | ops_errors          | {}                                       |
+      | content             | nil                                      |
+      | raw                 | BSON::Binary.new('content-for-dividing') |
+      | state               | 'ready'                                  |
+      | _locked             | false                                    |
+      | error               | nil                                      |
+      | pending_work        | nil                                      |
+      | armagh_version      | APP_VERSION                              |
+      | source              | {'type' => 'url', 'url' => 'from test'}  |
+      | collection_task_ids | not_empty                                |
     And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | '123_trigger'             |
@@ -91,7 +91,7 @@ Feature: Actions Execution
       | _locked         | false                     |
       | error           | nil                       |
       | pending_work    | nil                       |
-      | version         | APP_VERSION               |
+      | armagh_version  | APP_VERSION               |
     And the logs should contain "Test Collect Running"
     And the logs should contain "Test Divide Running"
     And the logs should not contain "ERROR"
@@ -163,19 +163,19 @@ Feature: Actions Execution
     Then I should see an agent with a status of "running" within 60 seconds
     Then I should see an agent with a status of "idle" within 60 seconds
     And  I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | 'collected_id'                                           |
-      | pending_actions     | []                                                       |
-      | dev_errors          | {}                                                       |
-      | ops_errors          | {}                                                       |
-      | content             | nil                                                      |
-      | raw                 | BSON::Binary.new('collected content')                    |
-      | state               | 'ready'                                                  |
-      | _locked             | false                                                    |
-      | error               | nil                                                      |
-      | pending_work        | nil                                                      |
-      | version             | APP_VERSION                                              |
-      | source              | {'type' => 'url', 'url' => 'from test'}                  |
-      | collection_task_ids | not_empty                                                |
+      | document_id         | 'collected_id'                          |
+      | pending_actions     | []                                      |
+      | dev_errors          | {}                                      |
+      | ops_errors          | {}                                      |
+      | content             | nil                                     |
+      | raw                 | BSON::Binary.new('collected content')   |
+      | state               | 'ready'                                 |
+      | _locked             | false                                   |
+      | error               | nil                                     |
+      | pending_work        | nil                                     |
+      | armagh_version      | APP_VERSION                             |
+      | source              | {'type' => 'url', 'url' => 'from test'} |
+      | collection_task_ids | not_empty                               |
     And I should see 0 "__COLLECT__test_collect" documents in the "documents" collection
     And the logs should contain "Test Collect Sets ID Running"
     And the logs should not contain "ERROR"
@@ -208,7 +208,7 @@ Feature: Actions Execution
       | _locked         | false                                                        |
       | error           | nil                                                          |
       | pending_work    | nil                                                          |
-      | version         | APP_VERSION                                                  |
+      | armagh_version  | APP_VERSION                                                  |
     And  I should see a "SplitOutputDocument" with document_id "split_2" in "documents" with the following
       | document_id     | 'split_2'                                         |
       | metadata        | {'touched_by' => ['block_2'], 'new' => 'block_2'} |
@@ -220,7 +220,7 @@ Feature: Actions Execution
       | _locked         | false                                             |
       | error           | nil                                               |
       | pending_work    | nil                                               |
-      | version         | APP_VERSION                                       |
+      | armagh_version  | APP_VERSION                                       |
     And I should see 0 "SplitDocument" documents in the "documents" collection
     And the logs should contain "Test Split Running"
     And the logs should not contain "ERROR"
@@ -259,7 +259,7 @@ Feature: Actions Execution
       | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
-      | version             | APP_VERSION                   |
+      | armagh_version      | APP_VERSION                   |
       | title               | 'The Title'                   |
       | copyright           | 'Copyright the future'        |
       | published_timestamp | recent_timestamp              |
@@ -298,7 +298,7 @@ Feature: Actions Execution
       | _locked         | false                                                                       |
       | error           | nil                                                                         |
       | pending_work    | nil                                                                         |
-      | version         | APP_VERSION                                                                 |
+      | armagh_version  | APP_VERSION                                                                 |
     And the logs should contain "Test Publish Running"
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
@@ -333,7 +333,7 @@ Feature: Actions Execution
       | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
-      | version             | APP_VERSION                   |
+      | armagh_version      | APP_VERSION                   |
       | title               | 'The Title'                   |
       | copyright           | 'Copyright the future'        |
       | published_timestamp | recent_timestamp              |
@@ -369,7 +369,7 @@ Feature: Actions Execution
       | _locked         | false                                                        |
       | error           | nil                                                          |
       | pending_work    | nil                                                          |
-      | version         | APP_VERSION                                                  |
+      | armagh_version  | APP_VERSION                                                  |
     And  I should see a "ConsumeOutputDocument" in "documents" with the following
       | document_id     | 'consume_2'                                       |
       | metadata        | {'touched_by' => ['block_2'], 'new' => 'block_2'} |
@@ -381,13 +381,13 @@ Feature: Actions Execution
       | _locked         | false                                             |
       | error           | nil                                               |
       | pending_work    | nil                                               |
-      | version         | APP_VERSION                                       |
+      | armagh_version  | APP_VERSION                                       |
     And I should see a "ConsumeDocument" in "documents.ConsumeDocument" with the following
-      | document_id | '123'                          |
-      | content     | {'text' => 'incoming content'} |
-      | metadata    | {'meta' => 'incoming meta'}    |
-      | state       | 'published'                    |
-      | version     | APP_VERSION                    |
+      | document_id    | '123'                          |
+      | content        | {'text' => 'incoming content'} |
+      | metadata       | {'meta' => 'incoming meta'}    |
+      | state          | 'published'                    |
+      | armagh_version | APP_VERSION                    |
     And the logs should contain "Test Consume Running"
     And the logs should not contain "ERROR"
 
@@ -411,7 +411,7 @@ Feature: Actions Execution
     Then I should see a "UnimplementedSplitInputDocument" in "failures" with the following
       | document_id     | '123'                                                                                                                                                                                                               |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                         |
-      | pending_actions | ['unimplemented_splitter']                                                                                                                                                                                                                  |
+      | pending_actions | ['unimplemented_splitter']                                                                                                                                                                                          |
       | dev_errors      | {'unimplemented_splitter' => [{'class' => 'Armagh::Actions::Errors::ActionMethodNotImplemented', 'message' => 'Split actions must overwrite the split method.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
       | ops_errors      | {}                                                                                                                                                                                                                  |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                      |
@@ -419,7 +419,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                                                                                                                               |
       | error           | true                                                                                                                                                                                                                |
       | pending_work    | nil                                                                                                                                                                                                                 |
-      | version         | APP_VERSION                                                                                                                                                                                                         |
+      | armagh_version  | APP_VERSION                                                                                                                                                                                                         |
     And the logs should contain "ERROR"
 
   Scenario: Have a document to work on with an action that fails in the middle
@@ -443,7 +443,7 @@ Feature: Actions Execution
     And I should see a "BadPublishDocument" in "failures" with the following
       | document_id     | '123'                                                                                                        |
       | metadata        | {'meta' => 'incoming meta'}                                                                                  |
-      | pending_actions | ['bad_publisher']                                                                                                           |
+      | pending_actions | ['bad_publisher']                                                                                            |
       | dev_errors      | {'bad_publisher' => [{'class' => 'RuntimeError', 'message' => 'poorly implemented', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                           |
       | content         | {'text' => 'incoming content'}                                                                               |
@@ -451,7 +451,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                        |
       | error           | true                                                                                                         |
       | pending_work    | nil                                                                                                          |
-      | version         | APP_VERSION                                                                                                  |
+      | armagh_version  | APP_VERSION                                                                                                  |
     And the logs should contain "ERROR"
 
   Scenario: Have a consumer to work on with an action that fails in the middle that remains published
@@ -475,7 +475,7 @@ Feature: Actions Execution
     Then I should see a "BadConsumeDocument" in "documents.BadConsumeDocument" with the following
       | document_id     | '123'                                                                                                       |
       | metadata        | {'meta' => 'published metadata'}                                                                            |
-      | pending_actions | ['bad_consumer']                                                                                                          |
+      | pending_actions | ['bad_consumer']                                                                                            |
       | dev_errors      | {'bad_consumer' => [{'class' => 'RuntimeError', 'message' => 'poorly implemented', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                          |
       | content         | {'content' => 'published content'}                                                                          |
@@ -483,7 +483,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                       |
       | error           | true                                                                                                        |
       | pending_work    | nil                                                                                                         |
-      | version         | APP_VERSION                                                                                                 |
+      | armagh_version  | APP_VERSION                                                                                                 |
     And the logs should contain "ERROR"
 
   Scenario: Have a collector that produces documents that are too large, admin views and clears alert
@@ -505,17 +505,17 @@ Feature: Actions Execution
     Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "TooLargeCollectorOutputDocument" documents in the "documents" collection
     Then I should see a "__COLLECT__too_large_collector" in "failures" with the following
-      | document_id     | 'incoming'                                                                                                                                                                                                                                    |
-      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                   |
-      | pending_actions | ['too_large_collector']                                                                                                                                                                                                                                            |
-      | dev_errors      | {}                                                                                                                                                                                                                                            |
+      | document_id     | 'incoming'                                                                                                                                                                                                                         |
+      | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                        |
+      | pending_actions | ['too_large_collector']                                                                                                                                                                                                            |
+      | dev_errors      | {}                                                                                                                                                                                                                                 |
       | ops_errors      | {'too_large_collector' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything'}]} |
-      | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                |
-      | state           | 'ready'                                                                                                                                                                                                                                       |
-      | _locked         | false                                                                                                                                                                                                                                         |
-      | error           | true                                                                                                                                                                                                                                          |
-      | pending_work    | nil                                                                                                                                                                                                                                           |
-      | version         | APP_VERSION                                                                                                                                                                                                                                   |
+      | content         | {'text' => 'incoming content'}                                                                                                                                                                                                     |
+      | state           | 'ready'                                                                                                                                                                                                                            |
+      | _locked         | false                                                                                                                                                                                                                              |
+      | error           | true                                                                                                                                                                                                                               |
+      | pending_work    | nil                                                                                                                                                                                                                                |
+      | armagh_version  | APP_VERSION                                                                                                                                                                                                                        |
     And the logs should contain "ERROR"
     And the alerts count should be {"error"=>1, "fatal"=>0, "warn"=>0}
     And the alerts count for the "test_workflow" workflow should be {"error"=>1, "fatal"=>0, "warn"=>0}
@@ -549,16 +549,16 @@ Feature: Actions Execution
     Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "TooLargeSplitterOutputDocument" documents in the "documents" collection
     Then I should see a "TooLargeInputDocType" in "failures" with the following
-      | document_id  | 'incoming'                                                                                                                                                                                                                                               |
-      | metadata     | {'meta' => 'incoming meta'}                                                                                                                                                                                                                              |
-      | dev_errors   | {}                                                                                                                                                                                                                                                       |
-      | ops_errors   | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document split_123 is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
-      | content      | {'text' => 'incoming content'}                                                                                                                                                                                                                           |
-      | state        | 'ready'                                                                                                                                                                                                                                                  |
-      | _locked      | false                                                                                                                                                                                                                                                    |
-      | error        | true                                                                                                                                                                                                                                                     |
-      | pending_work | nil                                                                                                                                                                                                                                                      |
-      | version      | APP_VERSION                                                                                                                                                                                                                                              |
+      | document_id    | 'incoming'                                                                                                                                                                                                                                             |
+      | metadata       | {'meta' => 'incoming meta'}                                                                                                                                                                                                                            |
+      | dev_errors     | {}                                                                                                                                                                                                                                                     |
+      | ops_errors     | {'too_large_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentSizeError', 'message' => "Document split_123 is too large.  Consider using a divider or splitter to break up the document.", 'trace' => 'anything', 'cause' => 'anything'}]} |
+      | content        | {'text' => 'incoming content'}                                                                                                                                                                                                                         |
+      | state          | 'ready'                                                                                                                                                                                                                                                |
+      | _locked        | false                                                                                                                                                                                                                                                  |
+      | error          | true                                                                                                                                                                                                                                                   |
+      | pending_work   | nil                                                                                                                                                                                                                                                    |
+      | armagh_version | APP_VERSION                                                                                                                                                                                                                                            |
     And the logs should contain "ERROR"
 
   Scenario: Have a splitter that edits the current document
@@ -582,7 +582,7 @@ Feature: Actions Execution
     Then I should see a "EditCurrentInputDocType" in "failures" with the following
       | document_id     | 'incoming'                                                                                                                                                                                                                                            |
       | metadata        | {'meta' => 'incoming meta'}                                                                                                                                                                                                                           |
-      | pending_actions | ['edit_current_splitter']                                                                                                                                                                                                                                                    |
+      | pending_actions | ['edit_current_splitter']                                                                                                                                                                                                                             |
       | dev_errors      | {'edit_current_splitter' => [{'class' => 'Armagh::Documents::Errors::DocumentError', 'message' => 'Cannot edit document \'incoming\'.  It is the same document that was passed into the action.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
       | ops_errors      | {}                                                                                                                                                                                                                                                    |
       | content         | {'text' => 'incoming content'}                                                                                                                                                                                                                        |
@@ -590,7 +590,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                                                                                                                                                                 |
       | error           | true                                                                                                                                                                                                                                                  |
       | pending_work    | nil                                                                                                                                                                                                                                                   |
-      | version         | APP_VERSION                                                                                                                                                                                                                                           |
+      | armagh_version  | APP_VERSION                                                                                                                                                                                                                                           |
     And the logs should contain "ERROR"
 
   Scenario: Have a splitter that has an error during document update
@@ -615,7 +615,7 @@ Feature: Actions Execution
     And I should see a "UpdateErrorInputDocType" in "failures" with the following
       | document_id     | 'incoming'                                                                                                |
       | metadata        | {'meta' => 'incoming meta'}                                                                               |
-      | pending_actions | ['update_error_splitter']                                                                                                        |
+      | pending_actions | ['update_error_splitter']                                                                                 |
       | dev_errors      | {'update_error_splitter' => [{'class' => 'RuntimeError', 'message' => 'Failure', 'trace' => 'anything'}]} |
       | ops_errors      | {}                                                                                                        |
       | content         | {'text' => 'incoming content'}                                                                            |
@@ -623,7 +623,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                     |
       | error           | true                                                                                                      |
       | pending_work    | nil                                                                                                       |
-      | version         | APP_VERSION                                                                                               |
+      | armagh_version  | APP_VERSION                                                                                               |
     And I should see a "UpdateErrorSplitterOutputDocument" in "documents" with the following
       | document_id     | 'update_id'                            |
       | metadata        | {'existing_metadata'=>'some meta'}     |
@@ -657,7 +657,7 @@ Feature: Actions Execution
     And I should see a "NotifyDevDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
-      | pending_actions | ['notify_dev']                                             |
+      | pending_actions | ['notify_dev']                                 |
       | dev_errors      | {'notify_dev' => [{'message' => 'Dev Error'}]} |
       | ops_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |
@@ -665,7 +665,7 @@ Feature: Actions Execution
       | _locked         | false                                          |
       | error           | true                                           |
       | pending_work    | nil                                            |
-      | version         | APP_VERSION                                    |
+      | armagh_version  | APP_VERSION                                    |
     And the logs should contain "DEV_ERROR"
     And the logs should contain "Test Split Notify Dev Complete"
 
@@ -689,7 +689,7 @@ Feature: Actions Execution
     And I should see a "NotifyOpsDocType" in "failures" with the following
       | document_id     | 'id'                                           |
       | metadata        | {'existing_metadata'=>'some meta'}             |
-      | pending_actions | ['notify_ops']                                             |
+      | pending_actions | ['notify_ops']                                 |
       | ops_errors      | {'notify_ops' => [{'message' => 'Ops Error'}]} |
       | dev_errors      | {}                                             |
       | content         | {'existing_content'=>'some content'}           |
@@ -697,7 +697,7 @@ Feature: Actions Execution
       | _locked         | false                                          |
       | error           | true                                           |
       | pending_work    | nil                                            |
-      | version         | APP_VERSION                                    |
+      | armagh_version  | APP_VERSION                                    |
     And the logs should contain "OPS_ERROR"
     And the logs should contain "Test Split Notify Ops Complete"
 
@@ -730,7 +730,7 @@ Feature: Actions Execution
       | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
-      | version             | APP_VERSION                   |
+      | armagh_version      | APP_VERSION                   |
       | title               | 'The Title'                   |
       | copyright           | 'Copyright the future'        |
       | published_timestamp | recent_timestamp              |
@@ -771,7 +771,7 @@ Feature: Actions Execution
       | _locked             | false                                                                       |
       | error               | nil                                                                         |
       | pending_work        | nil                                                                         |
-      | version             | APP_VERSION                                                                 |
+      | armagh_version      | APP_VERSION                                                                 |
       | title               | 'The Title'                                                                 |
       | copyright           | 'Copyright the future'                                                      |
       | published_timestamp | recent_timestamp                                                            |
@@ -812,7 +812,7 @@ Feature: Actions Execution
       | _locked             | false                                                                           |
       | error               | nil                                                                             |
       | pending_work        | nil                                                                             |
-      | version             | APP_VERSION                                                                     |
+      | armagh_version      | APP_VERSION                                                                     |
       | collection_task_ids | ['collect_id']                                                                  |
       | archive_files       | not_empty                                                                       |
       | metadata            | {'touched_by' => ['block_1','block_3','block_1','block_3'], 'new' => 'block_1'} |
@@ -823,7 +823,7 @@ Feature: Actions Execution
       | _locked             | false                                                       |
       | error               | nil                                                         |
       | pending_work        | nil                                                         |
-      | version             | APP_VERSION                                                 |
+      | armagh_version      | APP_VERSION                                                 |
       | collection_task_ids | ['collect_id']                                              |
       | archive_files       | not_empty                                                   |
       | metadata            | {"touched_by" => ["block_2","block_2"], "new" => "block_2"} |
@@ -834,7 +834,7 @@ Feature: Actions Execution
       | _locked             | false                                                       |
       | error               | nil                                                         |
       | pending_work        | nil                                                         |
-      | version             | APP_VERSION                                                 |
+      | armagh_version      | APP_VERSION                                                 |
       | collection_task_ids | ['collect_id']                                              |
       | archive_files       | not_empty                                                   |
       | metadata            | {"touched_by" => ["block_1","block_3"], "new" => "block_1"} |
@@ -847,7 +847,7 @@ Feature: Actions Execution
       | _locked             | false                                            |
       | failure             | nil                                              |
       | pending_work        | nil                                              |
-      | version             | APP_VERSION                                      |
+      | armagh_version      | APP_VERSION                                      |
       | collection_task_ids | ['collect_id']                                   |
       | archive_files       | not_empty                                        |
       | metadata            | {"touched_by" => ["block_2"], "new"=> "block_2"} |
@@ -855,16 +855,16 @@ Feature: Actions Execution
       | copyright           | 'Copyright the future'                           |
       | title               | 'The Title'                                      |
     And I should see a "CollectedDocument" in "documents" with the following
-      | document_id         | nil                                                      |
-      | state               | 'ready'                                                  |
-      | _locked             | false                                                    |
-      | error               | nil                                                      |
-      | pending_work        | nil                                                      |
-      | version             | APP_VERSION                                              |
-      | collection_task_ids | ['collect_id']                                           |
-      | metadata            | {}                                                       |
-      | content             | nil                                                      |
-      | raw                 | BSON::Binary.new('collected content')                    |
+      | document_id         | nil                                   |
+      | state               | 'ready'                               |
+      | _locked             | false                                 |
+      | error               | nil                                   |
+      | pending_work        | nil                                   |
+      | armagh_version      | APP_VERSION                           |
+      | collection_task_ids | ['collect_id']                        |
+      | metadata            | {}                                    |
+      | content             | nil                                   |
+      | raw                 | BSON::Binary.new('collected content') |
     And I should see a "__COLLECT__test_collect" in "collection_history" with the following
       | document_id     | 'collect_id'                                                                                                                                     |
       | metadata        | {'docs_collected' => 2, 'archived_files' => ["#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]","#{Time.now.utc.strftime('%Y/%m/%d')}.0000/[ID]"]} |
@@ -876,7 +876,7 @@ Feature: Actions Execution
       | _locked         | false                                                                                                                                            |
       | error           | nil                                                                                                                                              |
       | pending_work    | nil                                                                                                                                              |
-      | version         | APP_VERSION                                                                                                                                      |
+      | armagh_version  | APP_VERSION                                                                                                                                      |
     And I should see 0 "__COLLECT__test_collect" documents in the "document" collection
 
   Scenario: Workflow delayed stop
@@ -977,16 +977,16 @@ Feature: Actions Execution
     Then I should see 0 "BadPublishDocument" documents in the "documents" collection
     And I should see 0 "ConsumeOutputDocument" documents in the "documents" collection
     And I should see a "BadPublishDocument" in "failures" with the following
-      | document_id  | '123'                                                             |
-      | metadata     | {'meta' => 'incoming meta'}                                       |
-      | dev_errors   | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |
-      | ops_errors   | {}                                                                |
-      | content      | {'text' => 'incoming content'}                                    |
-      | state        | 'ready'                                                           |
-      | _locked      | false                                                             |
-      | error        | true                                                              |
-      | pending_work | nil                                                               |
-      | version      | APP_VERSION                                                       |
+      | document_id    | '123'                                                             |
+      | metadata       | {'meta' => 'incoming meta'}                                       |
+      | dev_errors     | {'test_publisher_notify_dev' => [{'message' => 'BAD PUBLISHER'}]} |
+      | ops_errors     | {}                                                                |
+      | content        | {'text' => 'incoming content'}                                    |
+      | state          | 'ready'                                                           |
+      | _locked        | false                                                             |
+      | error          | true                                                              |
+      | pending_work   | nil                                                               |
+      | armagh_version | APP_VERSION                                                       |
     And the logs should contain "ERROR"
     And the logs should contain "Skipping further actions on document '123' since it has errors."
     And the logs should not contain "Test Consume Running"
@@ -1047,19 +1047,19 @@ Feature: Actions Execution
       | _locked             | false                         |
       | error               | nil                           |
       | pending_work        | nil                           |
-      | version             | APP_VERSION                   |
+      | armagh_version      | APP_VERSION                   |
       | published_timestamp | recent_timestamp              |
       | title               | '123 (unknown title)'         |
     And I should see a "ConsumeOutputDocument" in "documents" with the following
-      | document_id         | 'consumed'                    |
-      | state               | 'ready'                       |
-      | _locked             | false                         |
-      | error               | nil                           |
-      | pending_work        | nil                           |
-      | version             | APP_VERSION                   |
-      | metadata            | {'meta' => 'consumed meta'}   |
-      | content             | {}                            |
-      | raw                 | nil                           |
+      | document_id    | 'consumed'                  |
+      | state          | 'ready'                     |
+      | _locked        | false                       |
+      | error          | nil                         |
+      | pending_work   | nil                         |
+      | armagh_version | APP_VERSION                 |
+      | metadata       | {'meta' => 'consumed meta'} |
+      | content        | {}                          |
+      | raw            | nil                         |
     And the logs should contain "Test Publish Passes Raw Running"
     And the logs should contain "Test Consume Receives Raw Running"
     And the logs should contain "publish: raw=raw content"
@@ -1086,7 +1086,7 @@ Feature: Actions Execution
     Then I should see an agent with a status of "idle" within 60 seconds
     Then I should see 0 "CollectedDocument" documents in the "documents" collection
     And  I should see a "__COLLECT__test_collect_too_large_raw" in "failures" with the following
-      | ops_errors      | {'test_collect_too_large_raw' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
+      | ops_errors | {'test_collect_too_large_raw' => [{'class' => 'Armagh::Documents::Errors::DocumentRawSizeError', 'message' => 'Raw exceeds the maximum size of 4 MB.  Consider using a splitter or divider to reduce the size.', 'trace' => 'anything', 'timestamp' => 'anything'}]} |
     And the logs should contain "Test Collect Too Large Raw Running"
     And the logs should contain "ERROR"
 

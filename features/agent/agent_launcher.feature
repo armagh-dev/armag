@@ -20,14 +20,18 @@ Feature: Agent Launcher
   Instead of launching agents manually
   I want armagh to launch them for me
 
-  Scenario: Run as a daemon
+  Scenario: Run as a daemon, restart, and stop
     Given armagh isn't already running
     And mongo is running
     And mongo is clean
-    And I run armagh as a daemon
+    When I run armagh as a daemon
     Then armagh should run in the background
     And the number of running agents equals 1
-    And the armagh daemon can be stopped
+    When I restart the armagh daemon
+    Then armagh was restarted
+    And the number of running agents equals 1
+    Then the armagh daemon can be stopped
+    And the logs should not contain "ERROR"
 
   Scenario: Unable to connect to database
     Given armagh isn't already running
@@ -36,3 +40,4 @@ Feature: Agent Launcher
     And I wait 5 seconds
     Then armagh should have exited
     And the logs should contain "Unable to establish connection to the MongoConnection database configured in '.+'.  The database does not appear to be running."
+

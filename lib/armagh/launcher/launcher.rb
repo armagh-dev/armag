@@ -91,9 +91,9 @@ module Armagh
       action_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
 
       @versions = self.class.get_versions(@logger, action_versions)
-      Document.version['armagh'] = @versions[ 'armagh' ]
+      Document.armagh_version['armagh'] = @versions[ 'armagh' ]
       @versions[ 'actions' ].each do |package, version|
-        Document.version[ package ] = version
+        Document.armagh_version[ package ] = version
       end
 
       Armagh::Authentication.setup_authentication

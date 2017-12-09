@@ -38,12 +38,12 @@ module Armagh
       Connection.documents
     end
 
-    def self.version
-      @version ||= {}
+    def self.armagh_version
+      @armagh_version ||= {}
     end
 
     attr_accessor :published_id
-    delegated_attr_accessor       :version
+    delegated_attr_accessor       :armagh_version
     delegated_attr_accessor       :title
     delegated_attr_accessor       :copyright
     delegated_attr_accessor       :published_timestamp, validates_with: :utcize_ts
@@ -62,6 +62,7 @@ module Armagh
     delegated_attr_accessor_errors :dev_errors,         after_change: :update_error_and_pending_work
     delegated_attr_accessor_errors :ops_errors,         after_change: :update_error_and_pending_work
     delegated_attr_accessor       :pending_work
+    delegated_attr_accessor       :version
 
     alias_method :add_dev_error, :add_error_to_dev_errors
     alias_method :add_ops_error, :add_error_to_ops_errors
@@ -237,7 +238,7 @@ module Armagh
         delete
       else
 
-        self.version = self.class.version
+        self.armagh_version = self.class.armagh_version
         self.collection_task_ids.uniq!
         self.archive_files.uniq!
 
@@ -311,6 +312,7 @@ module Armagh
           source: source,
           document_timestamp: document_timestamp,
           display: display.deep_copy,
+          version: version,
           new: (internal_id.nil? || (updated_timestamp == created_timestamp) )
       )
     end
@@ -326,7 +328,8 @@ module Armagh
           docspec: Documents::DocSpec.new(type, state),
           source: source,
           document_timestamp: document_timestamp,
-          display: display.deep_copy
+          display: display.deep_copy,
+          version: version,
       )
     end
 
@@ -340,6 +343,7 @@ module Armagh
       self.copyright = action_doc.copyright
       self.document_timestamp = action_doc.document_timestamp
       self.display = action_doc.display
+      self.version = action_doc.version
       docspec = action_doc.docspec
       self.type = docspec.type
       self.state = docspec.state

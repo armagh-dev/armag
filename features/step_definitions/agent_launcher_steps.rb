@@ -60,14 +60,25 @@ end
 
 When(/^I run armagh as a daemon$/) do
   LauncherSupport.start_launcher_daemon
-  sleep 3
+  sleep 2
+end
+
+When(/^I restart the armagh daemon$/) do
+  LauncherSupport.restart_launcher_daemon
+  sleep 2
 end
 
 Then(/^armagh should run in the background$/) do
   status = LauncherSupport.get_daemon_status
-  assert_match(/armagh-agentsd is running as PID \d+/, status)
+  assert_match(/armagh-agentsd is running as PID \d+/, status, 'Armagh was not running')
   @spawn_pid = status[/\d+/].to_i
   sleep 2
+end
+
+Then(/^armagh was restarted$/) do
+  old_pid = @spawn_pid
+  step 'armagh should run in the background'
+  assert_not_equal(old_pid, @spawn_pid, 'Armagh is running with a previously used PID.')
 end
 
 Then(/^the armagh daemon can be stopped$/) do

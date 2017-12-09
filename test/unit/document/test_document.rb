@@ -51,7 +51,8 @@ class TestDocument < Test::Unit::TestCase
           'state' => Armagh::Documents::DocState::WORKING,
           'document_id' => 'id',
           'document_timestamp' => Time.new(2016, 1, 1, 0, 0, 0, 0).utc,
-          'source' => Armagh::Documents::Source.new( )
+          'source' => Armagh::Documents::Source.new,
+          'version' => 123
         },
         @agent
     )
@@ -447,6 +448,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.state, action_doc.docspec.state)
     assert_equal(@doc.type, action_doc.docspec.type)
     assert_equal(@doc.source, action_doc.source.to_hash.delete_if { |k, v| v.nil? })
+    assert_equal(@doc.version, action_doc.version)
   end
 
   def test_to_published_document
@@ -457,6 +459,7 @@ class TestDocument < Test::Unit::TestCase
     assert_equal(@doc.state, pub_doc.docspec.state)
     assert_equal(@doc.type, pub_doc.docspec.type)
     assert_equal(@doc.source, pub_doc.source.to_hash.dup.delete_if { |k, v| v.nil? })
+    assert_equal(@doc.version, pub_doc.version)
   end
 
   def test_update_from_draft_action_document
@@ -601,18 +604,18 @@ class TestDocument < Test::Unit::TestCase
 
   def test_class_version
     version = '12345abcdefh'
-    Armagh::Document.version['armagh'] = version
-    assert_equal({'armagh' => version}, Armagh::Document.version)
-    Armagh::Document.version.delete 'armagh'
+    Armagh::Document.armagh_version['armagh'] = version
+    assert_equal({'armagh' => version}, Armagh::Document.armagh_version)
+    Armagh::Document.armagh_version.delete 'armagh'
   end
 
-  def test_version
+  def test_armagh_version
     @documents.expects(:replace_one).returns( mock( modified_count: 1))
     version = '12345abcdefh'
-    Armagh::Document.version['armagh'] = version
+    Armagh::Document.armagh_version['armagh'] = version
     @doc.save
-    assert_equal({'armagh' => version}, @doc.version)
-    Armagh::Document.version.delete 'armagh'
+    assert_equal({'armagh' => version}, @doc.armagh_version)
+    Armagh::Document.armagh_version.delete 'armagh'
   end
 
   def test_clear_errors
@@ -647,17 +650,20 @@ class TestDocument < Test::Unit::TestCase
       document_id: @doc.document_id,
       document_timestamp: @doc.document_timestamp,
       source: @doc.source&.to_hash,
+      version: @doc.version,
       _locked: @doc.instance_variable_get(:@image)[ '_locked'],
       pending_actions: @doc.pending_actions,
       dev_errors: @doc.dev_errors,
       ops_errors: @doc.ops_errors,
-      version: @doc.version,
+      armagh_version: @doc.armagh_version,
       collection_task_ids: @doc.collection_task_ids,
       archive_files: @doc.archive_files,
       updated_timestamp: @doc.updated_timestamp,
       created_timestamp: @doc.created_timestamp,
-      internal_id: @doc.internal_id
+      internal_id: @doc.internal_id,
+
     }.to_json
+
     assert_equal(expected, @doc.to_json)
   end
 

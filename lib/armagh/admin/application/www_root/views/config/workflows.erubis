@@ -711,7 +711,7 @@
   }
 
   function update_show_retired_button() {
-    if ({{= @data[:show_retired] }}) {
+    if ({{= @data[:show_retired] == true }}) {
       $('#show-retired')
         .removeClass('uk-button-primary')
         .removeClass('uk-active')

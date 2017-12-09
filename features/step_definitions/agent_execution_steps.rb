@@ -38,7 +38,7 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   content = content.nil? ? {} : eval(content)
   meta = meta.nil? ? {} : eval(meta)
 
-  Armagh::Document.version.merge! APP_VERSION
+  Armagh::Document.armagh_version.merge! APP_VERSION
 
   count.to_i.times do
     d = Armagh::Document.create_one_unlocked(type: doc_type, content: content, raw: raw, metadata: meta,

@@ -22,14 +22,14 @@ Given(/^the logs are emptied/) do
 end
 
 Then(/^the logs should not contain "([^"]*)"$/) do |string|
-  assert_equal(0, LogSupport.count(string))
+  assert_equal(0, LogSupport.count(string), "Logs unexpectedly contained the string '#{string}'.")
 end
 
 Then(/^the logs should contain "([^"]*)"$/) do |string|
-  assert_not_equal(0, LogSupport.count(string))
+  assert_not_equal(0, LogSupport.count(string), "Logs did not contain the string '#{string}'.")
 end
 
 
 Then(/^the logs should contain (\d+) "([^"]*)"$/) do |count, string|
-  assert_equal(count.to_i, LogSupport.count(string))
+  assert_equal(count.to_i, LogSupport.count(string), "Logs did not contain the string '#{string}' #{count} times.")
 end

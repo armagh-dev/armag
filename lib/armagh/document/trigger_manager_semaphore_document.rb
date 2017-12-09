@@ -44,7 +44,7 @@ module Armagh
     def self.ensure_one_exists
       begin
         create_one_unlocked( {'name' => NAME, 'last_run' => {}, 'seen_actions' => [] })
-      rescue Documents::Errors::DocumentUniquenessError => e
+      rescue Armagh::Connection::DocumentUniquenessError => e
         # ignore uniqueness error
       end
     end

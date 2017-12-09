@@ -48,10 +48,12 @@ module Armagh
       def start
         @thread ||= Thread.new { run }
         @thread.abort_on_exception = true
-        @thread_id = "#{Socket.gethostname}:#{@thread.object_id}"
       end
 
       def stop
+
+        @running = false
+        @thread.join if @thread
 
         Thread.new {
           @logger.debug 'Stopping Scheduled Action Trigger'
@@ -64,8 +66,7 @@ module Armagh
           end
 
         }.join
-        @running = false
-        @thread.join if @thread
+
         @thread = nil
         @thread_id = nil
       end
@@ -85,15 +86,14 @@ module Armagh
         end
 
         unless @semaphore_doc
-          @semaphore_doc = TriggerManagerSemaphoreDocument.find_one_locked(
+          begin
+            @semaphore_doc = TriggerManagerSemaphoreDocument.find_one_locked(
               { 'name' => TriggerManagerSemaphoreDocument::NAME },
               self
-          )
-          # ignore the seen_actions and last_run values from the db intentionally.
-          # they're recorded for the admin's review, but not to communicate state
-          # from one ScheduledActionTrigger on one server to another.  In the time
-          # btwn one shutting down and the other picking up the task (and the document),
-          # the workflows may have changed, rendering the data invalid.
+            )
+          rescue Armagh::BaseDocument::LockTimeoutError
+            # ignore - this means some other launcher has the lock
+          end
         end
 
         @semaphore_doc
@@ -109,6 +109,7 @@ module Armagh
       end
 
       private def run
+        @thread_id = Thread.current.object_id
         @logger.debug 'Starting scheduled action trigger.'
         @running = true
         while @running

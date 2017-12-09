@@ -116,6 +116,15 @@ class TestBaseDocumentLockingCRUD < Test::Unit::TestCase
     end
   end
 
+  def test_create_one_unlocked_mongo_error_document_exists
+    values = { 'name' => 'inigo montoya' }
+
+    CollectionLA.expects( :insert_one ).raises(Mongo::Error::OperationFailure, 'E11000 Document Exists')
+    assert_raises Armagh::Connection::DocumentUniquenessError do
+      doc = DocumentLA.create_one_unlocked(values)
+    end
+  end
+
   def test_find_one
     assert_raises NoMethodError.new( "Find_one not available in locking documents.  Use find_one_locked or find_one_read_only.") do
       DocumentLA.find_one( {} )
