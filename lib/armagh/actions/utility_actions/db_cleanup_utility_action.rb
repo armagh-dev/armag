@@ -17,6 +17,9 @@
 
 require 'configh'
 require_relative 'utility_action.rb'
+require_relative '../../document/action_state_document'
+require_relative '../../document/trigger_manager_semaphore_document'
+require_relative '../../document/document'
 
 module Armagh
   module Actions
@@ -40,8 +43,10 @@ module Armagh
         end
 
         def reset_expired_locks
+          Armagh::ActionStateDocument.force_reset_expired_locks
+          Armagh::TriggerManagerSemaphoreDocument.force_reset_expired_locks
           Connection.all_document_collections.each do |collection|
-            Armagh::Document.force_reset_expired_locks( collection: collection )
+            Armagh::Document.force_reset_expired_locks(collection: collection)
           end
         end
       end

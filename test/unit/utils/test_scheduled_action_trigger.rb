@@ -221,4 +221,16 @@ class TestScheduledActionTrigger < Test::Unit::TestCase
     sleep RUN_SLEEP
     @trigger.stop
   end
+
+  def test_trigger_locked
+    setup_good_trigger_new_config
+    @trigger = Armagh::Utils::ScheduledActionTrigger.new(@workflow_set)
+    Armagh::TriggerManagerSemaphoreDocument.expects(:find_one_locked).raises(Armagh::BaseDocument::LockTimeoutError.new('ERROR')).twice
+    Armagh::TriggerManagerSemaphoreDocument.expects(:force_reset_expired_locks).once
+    @mock_doc.unstub(:save)
+
+    @trigger.start
+    sleep RUN_SLEEP
+    @trigger.stop
+  end
 end

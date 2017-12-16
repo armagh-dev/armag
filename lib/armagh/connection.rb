@@ -164,7 +164,7 @@ module Armagh
 
     def self.setup_indexes
       config.indexes.create_one({'type' => 1, 'name' => 1, 'timestamp' => -1}, unique: true, name: 'types')
-      action_state.indexes.create_one({'name' => 1}, unique: true, name: 'names')
+      action_state.indexes.create_one({'action_name' => 1}, unique: true, name: 'names')
       users.indexes.create_one({'username' => 1}, unique: true, name: 'usernames')
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames')

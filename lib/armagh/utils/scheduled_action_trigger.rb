@@ -86,13 +86,19 @@ module Armagh
         end
 
         unless @semaphore_doc
+          tries = 0
           begin
+            tries += 1
             @semaphore_doc = TriggerManagerSemaphoreDocument.find_one_locked(
               { 'name' => TriggerManagerSemaphoreDocument::NAME },
               self
             )
           rescue Armagh::BaseDocument::LockTimeoutError
-            # ignore - this means some other launcher has the lock
+            # Make sure the expired locks are actually up to date.  If so, ignore
+            if tries == 1
+              TriggerManagerSemaphoreDocument.force_reset_expired_locks
+              retry
+            end
           end
         end
 

@@ -23,6 +23,8 @@ require 'mocha/test_unit'
 
 require_relative '../../../../lib/armagh/actions/utility_actions/db_cleanup_utility_action'
 require_relative '../../../../lib/armagh/document/document'
+require_relative '../../../../lib/armagh/document/action_state_document'
+require_relative '../../../../lib/armagh/document/trigger_manager_semaphore_document'
 require_relative '../../../../lib/armagh/logging/alert'
 
 require 'armagh/actions'
@@ -199,6 +201,9 @@ class TestDBCleanupUtilityAction < Test::Unit::TestCase
     Armagh::Connection.expects( :all_document_collections ).returns( [ coll1, coll2 ])
     Armagh::Document.expects( :force_reset_expired_locks ).with( collection: coll1 )
     Armagh::Document.expects( :force_reset_expired_locks ).with( collection: coll2 )
+
+    Armagh::ActionStateDocument.expects(:force_reset_expired_locks)
+    Armagh::TriggerManagerSemaphoreDocument.expects(:force_reset_expired_locks)
 
     @db_cleanup_utility_action.reset_expired_locks
   end

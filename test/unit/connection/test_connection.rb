@@ -247,7 +247,7 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
-    action_state_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
+    action_state_indexes.expects(:create_one).with({'action_name' => 1}, {:unique => true, :name => 'names'})
     users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'usernames'})
     groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames'})

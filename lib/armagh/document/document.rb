@@ -38,6 +38,10 @@ module Armagh
       Connection.documents
     end
 
+    def self.default_lock_hold_duration
+      1800 # 30 minutes to process a document
+    end
+
     def self.armagh_version
       @armagh_version ||= {}
     end
