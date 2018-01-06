@@ -38,6 +38,7 @@
 {{ actions   = @data[:actions].sort_by { |action| action['supertype'] } }}
 {{ available = @data[:supertypes].dup }}
 {{ actions.each do |action| }}
+  {{ uuid = SecureRandom.uuid }}
   {{ name = action['name'] }}
   {{ modified = true if [@data[:created], @data[:updated]].include?(name) }}
   {{ invalid  = !action['valid'] }}
@@ -53,18 +54,18 @@
       end }}
 
   <div action class="uk-panel uk-panel-hover uk-text-center uk-margin-top-remove" {{= border }}>
-
-    <input id="action-{{= name }}" type="checkbox" onclick="this.checked = !this.checked">
-    <input id="action-retired-{{= name }}" type="hidden" value="{{= retired }}">
+    <input id="action-{{= uuid }}" type="checkbox" onclick="this.checked = !this.checked">
+    <input id="action-{{= uuid }}-name" type="hidden" value="{{= name }}">
+    <input id="action-retired-{{= uuid }}" type="hidden" value="{{= retired }}">
 
     <div class="uk-margin-small-bottom">
       <i class="uk-icon-{{= get_icon_from_supertype(supertype) }} uk-icon-small {{= retired ? 'uk-text-muted' : (invalid ? 'uk-text-danger' : (modified ? 'uk-text-success' : '')) }}"></i>
     </div>
 
     <div class="uk-text-bold {{= retired ? 'uk-text-muted' : (invalid ? 'uk-text-danger' : (modified ? 'uk-text-success' : 'uk-text-primary')) }}">
-      {{ style = invalid ? 'uk-text-danger' : (modified ? 'uk-text-success' : '') }}
+      {{ style = invalid ? 'uk-text-danger' : (retired ? 'uk-text-muted' : (modified ? 'uk-text-success' : '')) }}
       {{ style = %Q{class="#{style}"} unless style.empty? }}
-      <a href="/config/{{= @data[:workflow] }}/edit/{{= name }}" {{= style }} onclick="$('#action-{{= name }}').prop('checked', !$('#action-{{= name }}').prop('checked'))" class="{{= 'uk-text-muted' if retired }}">
+      <a href="/config/{{= @data[:workflow] }}/edit/{{= name }}" {{= style }} onclick="$('#action-{{= uuid }}').prop('checked', !$('#action-{{= uuid }}').prop('checked'))">
         {{== name }}
       </a>
       {{ if retired }}

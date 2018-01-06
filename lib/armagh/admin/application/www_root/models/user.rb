@@ -17,10 +17,12 @@
 
 class User
   attr_reader :id, :username, :name, :roles, :groups, :auth_failures, :directory, :password_timestamp, :permanent, :updated_timestamp, :created_timestamp, :last_login, :email, :disabled, :locked
-  attr_accessor :required_password_reset, :password, :show_retired
+  attr_accessor :required_password_reset, :password, :show_retired, :expand_all, :doc_viewer
 
   def initialize(fields)
     fields[:show_retired] = false
+    fields[:expand_all]   = true
+    fields[:doc_viewer]   = {}
     fields.each { |field, value| self.instance_variable_set "@#{field}", value }
   end
 

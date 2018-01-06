@@ -76,7 +76,7 @@
 
       <br />
 
-      <div id="notices-and-alerts" class="uk-container uk-container-center uk-margin-large-bottom">
+      <div id="notices-and-alerts" class="uk-margin-small-left uk-margin-small-right uk-margin-bottom">
         {{ if @error }}
           {{ @data ||= {} }}
           {{ @data[:error] = @error }}
@@ -263,4 +263,19 @@
     modal.hide()
     modal = undefined
   }
+
+  function set_session_flag(key, value) {
+    $.ajax({
+      type: 'PATCH',
+      url: '/session?' + key + '=' + value,
+      success: function(data, text) {
+        // do nothing
+      },
+      error: function(request, status, error) {
+        UIkit.modal.alert('<span class="uk-text-danger">Unable to set session flag <strong>' + key + '</strong>: ' + error + '</span>')
+      }
+    })
+  }
+
+
 </script>

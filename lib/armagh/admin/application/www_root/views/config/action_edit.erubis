@@ -150,7 +150,7 @@
 
                     {{= proper_case(param[:type]) }}
 
-                    {{ if param[:required] && param_disabled.empty? }}
+                    {{ if param[:required] && param_disabled.empty? && param[:type] != 'boolean' }}
                       <span class="uk-text-primary uk-margin-left">
                         <i class="uk-icon-exclamation uk-text-small"></i>
                         Required

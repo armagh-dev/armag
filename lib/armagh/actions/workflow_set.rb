@@ -129,7 +129,8 @@ module Armagh
         raise WorkflowConfigError, e.message
       end
 
-      def get_workflow(workflow_name)
+      def get_workflow(workflow_name, include_retired: false)
+        reload_all(include_retired: true) if include_retired && !@workflows.key?(workflow_name)
         @workflows[workflow_name]
       end
 

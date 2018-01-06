@@ -538,6 +538,70 @@ module Armagh
           assert_equal expected, result
         end
 
+        def test_create_action_config_drops_empty_strings_and_encoded_strings
+          parameters = {
+            'action' => [{name: 'name', description: 'description', type: 'string', required: true, prompt: 'prompt', default: 'default'}],
+            'input' => [{name: 'docspec'}],
+            'output' => [{name: 'docspec'}],
+            'dropme' => [{name: 'plainstring', type: 'string'}, {name: 'encodedstring', type: 'encoded_string'}],
+            'keepme' => [{name: 'plainstring', type: 'string'}, {name: 'encodedstring', type: 'encoded_string'}],
+            type: 'Armagh::SomeType',
+            supertype: 'SomeSuperType'
+          }
+          data = {
+            'action' => 'action',
+            'workflow' => 'workflow',
+            'action-name' => 'action_name',
+            'dropme-plainstring' => '',
+            'dropme-encodedstring' => Configh::DataTypes::EncodedString.from_plain_text(''),
+            'keepme-plainstring' => 'not_empty',
+            'keepme-encodedstring' => Configh::DataTypes::EncodedString.from_plain_text('also_not_empty'),
+            'type' => 'Armagh::SomeType',
+            'splat' => [],
+            'captures' => []
+          }
+          response = [:error, {'markup' => {}}]
+          @admin_gui.expects(:get_defined_parameters).returns(parameters)
+          @admin_gui.expects(:post_json).returns(response)
+          @admin_gui.expects(:get_json).returns('also_not_empty')
+          @admin_gui.expects(:get_workflow_status).returns({active: false, retired: false})
+          @admin_gui.expects(:get_action_test_callbacks)
+          result = @admin_gui.create_action_config(@user, data)
+          expected = [{:action=>'action',
+            :defined_parameters=>
+             {'action'=>
+               [{:default=>'default',
+                 :description=>'description',
+                 :name=>'name',
+                 :prompt=>'prompt',
+                 :required=>true,
+                 :type=>'string',
+                 :value=>'action_name'}],
+              'dropme'=>
+                [{:name=>'plainstring', :type=>'string'},
+                 {:name=>'encodedstring', :type=>'encoded_string'}],
+              'keepme'=>
+                [{:name=>'plainstring', :type=>'string', :value=>'not_empty'},
+                 {:name=>'encodedstring', :type=>'encoded_string', :value=>'also_not_empty'}],
+              'input'=>[{:name=>'docspec'}],
+              'output'=>[{:name=>'docspec'}]},
+            :edit_action=>false,
+            :active=>false,
+            :retired=>false,
+            :pending_values=>
+              {'action-name'=>'action_name',
+               'dropme-plainstring'=>'',
+               'dropme-encodedstring'=>Configh::DataTypes::EncodedString.from_plain_text(''),
+               'keepme-plainstring'=>'not_empty',
+               'keepme-encodedstring'=>Configh::DataTypes::EncodedString.from_plain_text('also_not_empty')},
+            :supertype=>'SomeSuperType',
+            :test_callbacks=>nil,
+            :type=>'Armagh::SomeType',
+            :workflow=>'workflow'},
+            [{'markup'=>{}}]]
+          assert_equal expected, result
+        end
+
         def test_update_action_config
           parameters = {
             'action' => [{name: 'name', description: 'description', type: 'type', required: true, prompt: 'prompt', default: 'default'}],
@@ -853,6 +917,13 @@ module Armagh
             'search'     => 'search'
           }
           mock_doc_connection
+          @user.expects(:doc_viewer=).with(
+            collection: 'collection',
+            page:       1,
+            from:       '1982-01-04',
+            thru:       '1982-12-27',
+            search:     'search'
+          )
           result = @admin_gui.get_doc(@user, params)
           expected = {
             :count=>1,

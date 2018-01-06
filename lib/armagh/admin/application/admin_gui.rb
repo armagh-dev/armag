@@ -176,9 +176,12 @@ module Armagh
 
         def set_session_flag(user, params)
           params.each do |param, value|
+            is_true = value&.downcase == 'true'
             case param
             when 'show_retired'
-              user.show_retired = value&.downcase == 'true'
+              user.show_retired = is_true
+            when 'expand_all'
+              user.expand_all = is_true
             else
               raise "Unknown session flag #{param.inspect} with value #{value.inspect}"
             end
@@ -364,7 +367,7 @@ module Armagh
               password['error'] ||= ''
               password['error'] << password['error'] ? ', ' : ''
               password['error'] << "Unable to decode encoded string"
-              plain_text = ''
+              plain_text = password['value']
             end
             password['value'] = plain_text
           end
@@ -442,6 +445,7 @@ module Armagh
               when 'string'
                 next if value.to_s.strip.empty?
               when 'encoded_string'
+                next if value.to_s.strip.empty?
                 value = get_json(user, '/string/encode.json', string: value)
               when 'string_array'
                 value = value.split("\x19")
@@ -665,7 +669,7 @@ module Armagh
           collections = {'armagh.failures' => 'Failures'}
           Connection.all_document_collections.each do |collection|
             id    = collection.namespace
-            label = id[/armagh\.documents\.?(\w+)$/, 1]
+            label = id[/^armagh\.documents\.(.+)$/, 1]
             collections[id] = label&.gsub(/(?:^|_)\w/) { |x| x.sub(/_/, ' ').upcase } || 'Pending Publish'
           end
           collections
@@ -680,6 +684,14 @@ module Armagh
           from   = params['from']
           thru   = params['thru']
           search = params['search']
+
+          user.doc_viewer = {
+            collection: id,
+            page:       page + 1,
+            from:       from,
+            thru:       thru,
+            search:     search
+          }
 
           collection =
             case id

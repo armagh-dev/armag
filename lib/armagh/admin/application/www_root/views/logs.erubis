@@ -4,7 +4,7 @@
 
 {{ columns = %w(timestamp component level message hostname pid) }}
 
-<div id="logs-container" class="uk-overflow-container" style="min-height:500px;">
+<div id="logs-container" class="uk-overflow-container" style="min-height:560px;">
   <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap">
 
     <caption>
@@ -45,7 +45,7 @@
             {{ filter_column = filter_column.split("\x11").first }}
             {{ active_filter = 'uk-text-success uk-text-bold' if filter_column == column }}
           {{ end }}
-          <div class="uk-button-dropdown" data-uk-dropdown>
+          <div class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}">
             <button class="uk-button uk-button-mini {{= active_filter }}">
              <i class="uk-icon-filter"></i>
             </button>
@@ -129,17 +129,17 @@
 
 <div class="uk-grid uk-margin-top">
   <div class="uk-width-1-5">
-    <a class="uk-button" href="">
+    <button class="uk-button" onclick="document.location.href = document.location.href.replace(/page=\d+&/, '')">
       <i class="uk-icon-refresh"></i>
       Refresh
-    </a>
+    </button>
   </div>
   <div class="uk-width-3-5 uk-text-center">
-    <ul class="uk-pagination" data-uk-pagination="{items:{{= @data[:count] }}, itemsOnPage:{{= @data[:limit] }}, currentPage:{{= @data[:page] - 1 }}, displayedPages:5}"></ul>
+    <ul class="uk-pagination" data-uk-pagination="{items:{{= @data[:count] }}, itemsOnPage:{{= @data[:limit] }}, currentPage:{{= @data[:page] - 1 }}, displayedPages:3}"></ul>
   </div>
   <div class="uk-width-1-5 uk-text-right uk-form uk-form-horizontal">
-    <select onchange="$('input[name=&quot;limit&quot;]').val(this.value); submit()">
-      {{ [20, 50, 100, 500, 1000].each do |i| }}
+    <select onchange="$('input[name=&quot;limit&quot;]').val(this.value); submit()" style="display:none;">
+      {{ [20].each do |i| }}
         {{ selected = @data[:limit] == i ? 'selected' : '' }}
         <option value="{{= i }}" {{= selected }}>{{= i }} per page</option>
       {{ end }}
@@ -149,7 +149,7 @@
 
 <form id="form">
   <input name="page" type="hidden" value="{{#= @data[:page] }}">
-  <input name="limit" type="hidden" value="{{= @data[:limit] }}">
+  <!--<input name="limit" type="hidden" value="{{= @data[:limit] }}">-->
   <input name="filter" type="hidden" value="{{= @data[:filter] }}">
   <input name="hide" type="hidden" value="{{= @data[:hide] }}">
 </form>

@@ -12,13 +12,13 @@
   {{
     unless none
       doc = {
-        'document_id'        => @data[:doc].delete('document_id'),
         'title'              => @data[:doc].delete('title'),
-        'docspec'            => "#{@data[:doc].delete('type')}:#{@data[:doc].delete('state')}",
+        'document_id'        => @data[:doc].delete('document_id'),
         'document_timestamp' => @data[:doc].delete('document_timestamp'),
+        'content'            => @data[:doc].delete('content'),
+        'docspec'            => "#{@data[:doc].delete('type')}:#{@data[:doc].delete('state')}",
         'source'             => @data[:doc].delete('source'),
-        'metadata'           => @data[:doc].delete('metadata'),
-        'content'            => @data[:doc].delete('content')
+        'metadata'           => @data[:doc].delete('metadata')
       }
       doc.reject! { |_k, v| v.nil? }
       doc.merge!(@data[:doc])
@@ -99,7 +99,7 @@
             CGI.unescape_html(markup)
           end
         }}
-        <span style="font-family:monospace; white-space:pre-wrap; {{= 'font-size:16px; color:#007700;' if field == 'title' }}">{{= value }}</span>
+        <span style="font-family:monospace; white-space:pre-wrap; {{= 'font-size:20px; font-weight:bold; color:#007700;' if field == 'title' }}">{{= value }}</span>
       </span>
 
     {{ end }}

@@ -634,6 +634,7 @@ class TestAgent < Test::Unit::TestCase
                    :display => 'old display',
                    :archive_files => ['old_archive_file'],
                    :version => 1,
+                   :document_timestamp => nil
     )
 
     doc.expects(:to_action_document).returns(action_doc)
@@ -742,6 +743,7 @@ class TestAgent < Test::Unit::TestCase
                    :display => 'old display',
                    :archive_files => ['old_archive_file'],
                    :version => 10,
+                   :document_timestamp => nil
     )
 
     doc.expects(:to_action_document).returns(action_doc)
@@ -785,6 +787,106 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock.expects(:reset).at_least_once
 
     @default_agent.instance_variable_set(:@running, true)
+
+    Thread.new { @default_agent.send(:run) }
+    sleep THREAD_SLEEP_TIME
+  end
+
+  def test_run_publish_action_update_with_older_document
+    input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
+    output_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::PUBLISHED)
+
+    action = setup_action(Armagh::StandardActions::PublishTest, {
+        'action' => { 'workflow' => 'wf' },
+        'input' => {'docspec' => input_docspec},
+      'output' => {'docspec' => output_docspec}
+    })
+    action_name = action.config.action.name
+    pending_actions = %w(one two)
+
+    action_doc = Armagh::Documents::ActionDocument.new(document_id: 'id',
+                                                       content: {'old' => 'content'},
+                                                       raw: 'action',
+                                                       metadata: {'old' => 'meta'},
+                                                       docspec: input_docspec,
+                                                       source: {},
+                                                       title: nil,
+                                                       copyright: nil,
+                                                       document_timestamp: nil,
+                                                       version: 2
+    )
+    action.expects(:publish).with(action_doc)
+
+    doc = stub(:internal_id => '123',
+               :document_id => 'document_id',
+               :pending_actions => [],
+               :content => {'content' => true},
+               :raw => 'action',
+               :metadata => {'meta' => true},
+               :type => 'DocumentType',
+               :state => Armagh::Documents::DocState::WORKING,
+               :deleted? => false,
+               :collection_task_ids => [],
+               :title => 'old_title',
+               :copyright => 'old copyright',
+               :display => 'old_display',
+               :source => 'old_source',
+               :archive_files => ['archive_file'],
+               :version => 1,
+               :document_timestamp => Time.at(1499999999),
+               :error => nil)
+
+    pub_doc = stub(:document_id => 'document_id',
+                   :pending_actions => [],
+                   :type => 'DocumentType',
+                   :state => Armagh::Documents::DocState::PUBLISHED,
+                   :deleted? => false,
+                   :collection_task_ids => [],
+                   :content => {'pub_cont': true},
+                   :raw => 'pub',
+                   :metadata => {'pub_meta' => true},
+                   :created_timestamp => 'created',
+                   :dev_errors => {},
+                   :ops_errors => {},
+                   :source => Armagh::Documents::Source.new,
+                   :title => 'old title',
+                   :internal_id => 'internal',
+                   :display => 'old display',
+                   :archive_files => ['old_archive_file'],
+                   :version => 1,
+                   :document_timestamp => Time.at(1500000000)
+    )
+
+    doc.expects(:to_action_document).returns(action_doc)
+
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
+    @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
+
+    doc.expects(:document_id=, action_doc.document_id)
+    doc.expects(:content=, action_doc.content)
+    doc.expects(:raw=, [ action_doc.raw ]).with('action')
+    doc.expects(:metadata=, action_doc.metadata)
+    doc.expects(:title=, action_doc.title)
+    doc.expects(:copyright=, action_doc.copyright)
+    doc.expects(:document_timestamp=)
+    doc.expects(:delete).never
+    doc.expects(:get_published_copy_read_only).returns(pub_doc)
+    doc.expects(:display=).with(action_doc.display)
+
+    doc.expects(:collection_task_ids).returns []
+
+    Dir.expects(:mktmpdir).yields(@temp_dir)
+    Dir.expects(:chdir).yields
+
+    @logger.unstub(:dev_warn)
+
+    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @backoff_mock.expects(:reset).at_least_once
+
+    @default_agent.instance_variable_set(:@running, true)
+
+    @default_agent.expects(:abort)
 
     Thread.new { @default_agent.send(:run) }
     sleep THREAD_SLEEP_TIME

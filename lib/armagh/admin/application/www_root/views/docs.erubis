@@ -10,9 +10,12 @@
   <div class="uk-form-icon">
     <i class="uk-icon-folder-o"></i>
     <select id="query-collection" style="text-indent:20px;" title="Document Collection" data-uk-tooltip="{animate:true}" onchange="get_doc(); if (!this.options[0].value){this.options[0].remove()}">
-      <option value="">Choose Collection...</option>
-      {{ @data&.each do |id, label| }}
-        <option value="{{= id }}">{{= label }}</option>
+      {{ if @data[:cache].nil? || @data[:cache].empty? }}
+        <option value="">Choose Collection...</option>
+      {{ end }}
+      {{ @data[:collections]&.each do |id, label| }}
+        {{ selected = @data.dig(:cache, :collection) == id ? 'selected' : '' }}
+        <option value="{{= id }}" {{= selected }}>{{= label }}</option>
         {{ if id == 'armagh.documents' }}
           <option disabled>──────────</option>
         {{ end }}
@@ -22,27 +25,36 @@
 
   <div class="uk-form-icon">
     <i class="uk-icon-calendar"></i>
-    <input id="query-from" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="From Date" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+    <input id="query-from" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="From Date" data-uk-tooltip="{animate:true}" onchange="get_doc(); this.select()" value="{{= @data.dig(:cache, :from) }}" onfocus="this.select()" />
   </div>
 
   <div class="uk-form-icon uk-padding-remove">
     <i class="uk-icon-calendar"></i>
-    <input id="query-thru" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="Thru Date" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+    <input id="query-thru" type="text" style="width:120px;" data-uk-datepicker="{format:'YYYY-MM-DD'}" title="Thru Date" data-uk-tooltip="{animate:true}" onchange="get_doc(); this.select()" value="{{= @data.dig(:cache, :thru) }}" onfocus="this.select()" />
   </div>
 
   <div class="uk-form-icon">
     <i class="uk-icon-search"></i>
-    <input id="query-search" style="width:250px;" title="Search" data-uk-tooltip="{animate:true}" onchange="get_doc()" />
+    <input id="query-search" style="width:250px;" title="Search" data-uk-tooltip="{animate:true}" onchange="get_doc(); this.select()" value="{{= @data.dig(:cache, :search) }}" onfocus="this.select()" />
   </div>
 
-  <button class="uk-button uk-button-primary uk-button-small" onclick="get_doc()">Find</button>
+  <button class="uk-button uk-button-primary" onclick="get_doc()">Find</button>
+  <button class="uk-button uk-margin-left" onclick="reset()">Reset</button>
 </div>
 
 <div>
-  <div id="doc-controls" class="uk-margin-bottom" style="display:none;">
-    <hr />
+  <div id="doc-container" class="uk-panel uk-panel-box uk-panel-box-secondary uk-scrollable-text" style="height:500px; padding:15px;">
+    <span class="uk-text-muted">Please select a document collection</span>
+  </div>
+
+  <div id="doc-controls" class="uk-margin-top" style="display:none;">
     <div class="uk-grid">
       <div class="uk-width-1-4">
+
+        <a class="uk-button" href="">
+          <i class="uk-icon-refresh"></i>
+          Refresh
+        </a>
 
       </div>
       <div class="uk-width-2-4 uk-text-center">
@@ -53,7 +65,7 @@
       <div class="uk-width-1-4 uk-text-right">
 
         <div data-uk-button-checkbox>
-          <button class="uk-button uk-button-mini" onclick="expand_all_fields(this)" data="init">
+          <button class="uk-button" onclick="expand_all_fields(this)" data="init">
             Expand All
           </button>
         </div>
@@ -61,13 +73,9 @@
       </div>
     </div>
   </div>
-
-  <div id="doc-container" class="uk-panel uk-panel-box uk-panel-box-secondary" style="padding:15px;">
-    <span class="uk-text-muted">Please select a document collection</span>
-  </div>
 </div>
 
-<script>
+<script type="text/javascript">
   var pagination,
       expand_all_state = false
 
@@ -80,6 +88,14 @@
     $('.uk-pagination').on('select.uk.pagination', function(e, pageIndex) {
       get_doc(pageIndex + 1)
     })
+
+    {{ if @data[:expand_all] == true }}
+      $('button[data="init"]').click()
+    {{ end }}
+
+    {{ unless @data[:cache]&.empty? }}
+      get_doc({{= @data.dig(:cache, :page).to_i }})
+    {{ end }}
   })
 
   function get_doc(page = 0) {
@@ -104,7 +120,7 @@
       type: 'GET',
       success: function(data, text) {
 
-        $('#doc-container').html(data)
+        $('#doc-container').html(data).scrollTop(0)
 
       },
       error: function(request, status, error) {
@@ -123,6 +139,8 @@
 
     expand_all_state = !toggle.hasClass('uk-active')
 
+    set_session_flag('expand_all', expand_all_state)
+
     $('div[id^="attr-"]').each(function(index, attr) {
       attr = $(attr)
       icon = $('#' + attr.prop('id').replace(/^attr-/, 'icon-'))
@@ -134,5 +152,12 @@
         attr.hide()
       }
     })
+  }
+
+  function reset() {
+    $('#query-from').val('')
+    $('#query-thru').val('')
+    $('#query-search').val('')
+    get_doc()
   }
 </script>

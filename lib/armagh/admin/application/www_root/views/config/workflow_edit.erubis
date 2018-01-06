@@ -23,6 +23,9 @@
   #action-options {
     pointer-events: none;
   }
+  #action-options label {
+    cursor: pointer;
+  }
 
   #action-options ul li[id$="disabled"] {
     color: #999;
@@ -166,7 +169,7 @@
     /* TODO: add functionality */
     /* enable_dropdown_item('test', true) */
 
-    if ({{= active || retired }}) {            // workflow disabled or retired
+    if ({{= active || retired }}) {             // workflow disabled or retired
       enable_dropdown_item('retire', false)
       enable_dropdown_item('unretire', false)
     } else if (any_retired && any_normal) {     // mix of retired and unretired
@@ -224,31 +227,16 @@
           switch(run_mode) {
             case 'running':
               span.html('<span class="uk-text-success"><i class="uk-icon-toggle-on uk-text-bold"></i> Running</span>')
-              modal = UIkit.modal.alert(
-                '<i class="uk-icon-check uk-text-success uk-icon-small uk-margin-small-right"></i>' +
-                'Successfully started workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
-              )
               break
             case 'stopping':
               span.html('<i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold"></i> Stopping')
-              modal = UIkit.modal.alert(
-                '<i class="uk-icon-circle-o-notch uk-icon-spin uk-text-bold uk-icon-small uk-margin-small-right"></i>' +
-                'Still stopping workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
-              )
               break
             case 'stopped':
               span.html('<i class="uk-icon-toggle-off uk-text-bold"></i> Stopped')
-              modal = UIkit.modal.alert(
-                '<i class="uk-icon-check uk-text-success uk-icon-small uk-margin-small-right"></i>' +
-                'Successfully stopped workflow <strong>{{= @data[:workflow] }}</strong>. Click Ok to reload page.'
-              )
               break
           }
-          modal.on({
-            'hide.uk.modal': function() {
-              location.reload()
-            }
-          })
+
+          location.reload()
         } else {
           UIkit.modal.alert(
             '<div class="uk-text-danger">' +
@@ -287,9 +275,10 @@
     localStorage['action-retire-counter'] = actions.length
 
     actions.each(function(_index, action) {
-      action = action.id.replace(/^action-/, '')
+      var id = action.id.replace(/^action-/, '')
+      action = $('#action-' + id + '-name').val()
 
-      if (retire == ($('#action-retired-' + action).val() == 'true')) {
+      if (retire == ($('#action-retired-' + id).val() == 'true')) {
         update_retire_outcome(retire, success, failed)
         return
       }

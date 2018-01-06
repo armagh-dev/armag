@@ -52,6 +52,32 @@ When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", c
   docs = Armagh::Document.find_many_read_only({}).to_a
 end
 
+When(/^I insert (\d+) "([^"]*)" with a "([^"]*)" state, document_id "([^"]*)", content "([^"]*)", metadata "([^"]*)", document_timestamp "([^"]*)"$/) do |count, doc_type, state, document_id, content, meta, timestamp|
+  @logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::AgentExecution')
+  @workflow_set ||= Armagh::Actions::WorkflowSet.for_agent(Armagh::Connection.config)
+  @workflow = @workflow_set.get_workflow('test_workflow') || @workflow_set.create_workflow({ 'workflow' => { 'name' => 'test_workflow' }})
+
+  docspec = Armagh::Documents::DocSpec.new(doc_type, state)
+  pending_actions = @workflow_set.actions_names_handling_docspec(docspec)
+
+  timestamp = Time.at(timestamp.to_i) if timestamp
+  content = content.nil? ? {} : eval(content)
+  meta = meta.nil? ? {} : eval(meta)
+
+  Armagh::Document.armagh_version.merge! APP_VERSION
+
+  count.to_i.times do
+    d = Armagh::Document.create_one_unlocked(type: doc_type, content: content, metadata: meta,
+                                             pending_actions: pending_actions, state: Armagh::Documents::DocState::READY, document_id: document_id, document_timestamp: timestamp, collection_task_ids: [])
+    unless state == Armagh::Documents::DocState::READY
+      d.state = state
+      d.save
+    end
+  end
+
+  docs = Armagh::Document.find_many_read_only({}).to_a
+end
+
 And(/^I set all "([^"]*)" documents to have the following$/) do |collection, table|
   new_doc_info = table.rows_hash
   new_doc_info.each{|k,v| new_doc_info[k] = eval(v)}

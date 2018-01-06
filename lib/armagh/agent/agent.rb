@@ -370,6 +370,13 @@ module Armagh
 
           published_doc = doc.get_published_copy_read_only
           if published_doc
+
+            # ARM-770: Armagh should reject old document on publish
+            if published_doc.document_timestamp && published_doc.document_timestamp > doc.document_timestamp
+              @logger.ops_error "Action '#{action.name}' attempted to replace an existing published document ID '#{doc.document_id}' and timestamp '#{published_doc.document_timestamp}' with an older document timestamp '#{doc.document_timestamp}'. Aborting."
+              abort
+            end
+
             doc.created_timestamp = published_doc.created_timestamp
 
             doc.dev_errors.merge!(published_doc.dev_errors) { |_key, v1, v2| v2 + v1 }

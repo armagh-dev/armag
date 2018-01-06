@@ -236,7 +236,7 @@ module Armagh
         def with_workflow( workflow_name, include_retired: false )
           raise APIClientError.new('Provide a workflow name') if workflow_name.nil? || workflow_name.empty?
           wf_set = Actions::WorkflowSet.for_admin( Connection.config, logger: @logger )
-          wf = wf_set.get_workflow( workflow_name )
+          wf = wf_set.get_workflow( workflow_name, include_retired: include_retired )
           raise APIClientError.new( "Workflow #{workflow_name} not found" ) unless wf
           yield wf
         end

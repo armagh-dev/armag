@@ -184,7 +184,7 @@ post '/login' do
       if user.required_password_reset
         render :login, :change_password, notice: 'It seems this may be your first login. Please change your password using the form below.'
       else
-        redirect params['re']
+        redirect params['re'] == '/logout' ? '/' : params['re']
       end
     end
 
@@ -253,7 +253,11 @@ end
 #
 
 get '/docs' do
-  render :docs, data: gui.get_doc_collections(user)
+  render :docs, data: {
+    collections: gui.get_doc_collections(user),
+    expand_all:  user.expand_all,
+    cache:       user.doc_viewer
+  }
 end
 
 get '/docs/:collection' do

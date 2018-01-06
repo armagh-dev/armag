@@ -303,6 +303,43 @@ Feature: Actions Execution
     And the logs should not contain "ERROR"
     And I should see 0 "PublishDocument" documents in the "documents" collection
 
+  Scenario: Have an older document for a publisher that tries to update a newer previously published document
+    Given armagh isn't already running
+    And mongo is running
+    And mongo is clean
+    When armagh's "launcher" config is
+      | num_agents        | 1     |
+      | checkin_frequency | 1     |
+      | log_level         | debug |
+    And armagh's "agent" config is
+      | log_level | debug |
+    And armagh's workflow config is "test_actions"
+    And I run armagh
+    And I wait until there are agents with the statuses
+      | idle |
+    And I insert 1 "PublishDocument" with a "published" state, document_id "123", content "{'orig_content' => 'old published content'}", metadata "{'orig_meta' => 'old published metadata'}", document_timestamp "1500000000"
+    Then the valid reported status should contain agents with statuses
+      | idle |
+    When I insert 1 "PublishDocument" with a "ready" state, document_id "123", content "{'new_content' => 'new content'}", metadata "{'new_meta' => 'new metadata'}", document_timestamp "1499999999"
+    Then I should see an agent with a status of "running" within 60 seconds
+    Then I should see an agent with a status of "idle" within 60 seconds
+    And I should see 0 "PublishDocument" documents in the "documents" collection
+    And I should see a "PublishDocument" in "documents.PublishDocument" with the following
+      | document_id     | '123'                                       |
+      | pending_actions | []                                          |
+      | dev_errors      | {}                                          |
+      | ops_errors      | {}                                          |
+      | metadata        | {'orig_meta' => 'old published metadata'}   |
+      | content         | {'orig_content' => 'old published content'} |
+      | state           | 'published'                                 |
+      | _locked         | false                                       |
+      | error           | nil                                         |
+      | pending_work    | nil                                         |
+      | armagh_version  | APP_VERSION                                 |
+    And the logs should contain "Test Publish Running"
+    And the logs should contain "ERROR"
+    And I should see 0 "PublishDocument" documents in the "documents" collection
+
   Scenario: Have a document for a publisher that sets an ID
     Given armagh isn't already running
     And mongo is running
