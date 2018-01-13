@@ -982,8 +982,242 @@ class TestAdminApplicationAPI < Test::Unit::TestCase
     assert_raise(e){@api.trigger_collect(collect_name)}
   end
 
+  def test_mark_consume_id
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_id = 'id'
+
+    doc = mock('doc')
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+    doc.expects(:save).with(true, @api)
+    doc.expects(:add_item_to_pending_actions).with(action_name)
+
+    Armagh::Document.stubs(:find_one_by_document_id_type_state_locked)
+      .with(doc_id, doc_type, Armagh::Documents::DocState::PUBLISHED, @api)
+      .raises(Armagh::BaseDocument::LockTimeoutError.new('locked')).then.returns(doc)
+
+    assert_true @api.mark_consume_id(action_name, doc_type, doc_id)
+  end
+
+  def test_mark_consume_id_not_consume
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'publish_b_alicedocs'
+    doc_type = 'a_alicedoc'
+    doc_id = 'id'
+
+    doc = mock('doc')
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a consume action.")) do
+      assert_true @api.mark_consume_id(action_name, doc_type, doc_id)
+    end
+  end
+
+  def test_mark_consume_id_not_action
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'invalid_action'
+    doc_type = 'a_alicedoc'
+    doc_id = 'id'
+
+    doc = mock('doc')
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a consume action.")) do
+      assert_true @api.mark_consume_id(action_name, doc_type, doc_id)
+    end
+  end
+
+  def test_mark_consume_id_bad_docspec
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_b_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_id = 'id'
+
+    doc = mock('doc')
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a valid action for published a_alicedoc documents.")) do
+      assert_true @api.mark_consume_id(action_name, doc_type, doc_id)
+    end
+  end
+
+  def test_mark_consume_id_no_doc
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_id = 'id'
+
+    Armagh::Document.expects(:find_one_by_document_id_type_state_locked)
+      .with(doc_id, doc_type, Armagh::Documents::DocState::PUBLISHED, @api)
+      .returns(nil)
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("No published #{doc_type} exists with id #{doc_id}.")) do
+      assert_false @api.mark_consume_id(action_name, doc_type, doc_id)
+    end
+
+  end
+
+  def test_mark_consume_version
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_version = 123
+    doc_id = 'id_12345'
+
+    doc = mock('doc')
+    doc.stubs(:document_id).returns(doc_id)
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    Armagh::Document.stubs(:find_all_by_version_read_only).with(doc_type, doc_version).returns([doc])
+    @api.expects(:mark_consume_id).with do |name, type, id, workflow_set|
+      name == action_name && type == doc_type && id == doc_id && workflow_set.is_a?(Armagh::Actions::WorkflowSet)
+    end.returns(true)
+    assert_equal({'success' => 1}, @api.mark_consume_version(action_name, doc_type, doc_version))
+  end
+
+  def test_mark_consume_version_errors
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_version = 123
+    doc_id = 'id_12345'
+
+    doc = mock('doc')
+    doc.stubs(:document_id).returns(doc_id)
+    doc.stubs(:type).returns(doc_type)
+    doc.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    doc2 = mock('doc2')
+    doc2.stubs(:document_id).returns(doc_id + '_2')
+    doc2.stubs(:type).returns(doc_type)
+    doc2.stubs(:state).returns(Armagh::Documents::DocState::PUBLISHED)
+
+    Armagh::Document.stubs(:find_all_by_version_read_only).with(doc_type, doc_version).returns([doc, doc2])
+    @api.stubs(:mark_consume_id).returns(true).then.raises(RuntimeError.new('some error'))
+    expected = {
+      'failures' => [
+        {'id' => 'id_12345_2', 'message' => 'some error', 'type' => 'a_alicedoc'}
+      ],
+      'success' => 1
+    }
+
+    assert_equal(expected, @api.mark_consume_version(action_name, doc_type, doc_version))
+  end
+
+  def test_mark_consume_version_bad_docspec
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_b_alicedoc_1'
+    doc_type = 'a_alicedoc'
+    doc_version = 123
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a valid action for published #{doc_type} documents.")) do
+      @api.mark_consume_version(action_name, doc_type, doc_version)
+    end
+  end
+
+  def test_mark_consume_version_not_action
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'invalid_action'
+    doc_type = 'a_alicedoc'
+    doc_version = 123
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a consume action.")) do
+      @api.mark_consume_version(action_name, doc_type, doc_version)
+    end
+  end
+
+  def test_mark_consume_multiple_id
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+
+    docs = [{'id' => '123', 'type' => doc_type}]
+
+    @api.expects(:mark_consume_id).with do |name, type, id, workflow_set|
+      name == action_name && type == doc_type && id == '123' && workflow_set.is_a?(Armagh::Actions::WorkflowSet)
+    end.returns(true)
+
+    assert_equal({'success' => 1}, @api.mark_consume_multiple_id(action_name, docs))
+  end
+
+  def test_mark_consume_multiple_id_errors
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_a_alicedoc_1'
+    doc_type = 'a_alicedoc'
+
+    docs = [{'id' => '1', 'type' => doc_type}, {'id' => '2', 'type' => doc_type}]
+
+    @api.stubs(:mark_consume_id).returns(true).then.raises(RuntimeError.new('some error'))
+
+    expected = {
+      'failures' => [
+        {'id' => '2', 'message' => 'some error', 'type' => 'a_alicedoc'}
+      ],
+      'success' => 1
+    }
+
+    assert_equal(expected, @api.mark_consume_multiple_id(action_name, docs))
+  end
+
+  def test_mark_consume_multiple_id_bad_docspec
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'consume_b_alicedoc_1'
+    doc_type_1 = 'a_alicedoc'
+    doc_type_2 = 'b_alicedoc'
+
+    docs = [{'id' => '1', 'type' => doc_type_1}, {'id' => '2', 'type' => doc_type_1}, {'id' => '3', 'type' => doc_type_2}]
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a valid action for published #{doc_type_1} documents.")) do
+      @api.mark_consume_multiple_id(action_name, docs)
+    end
+  end
+
+  def test_mark_consume_multiple_id_not_action
+    good_alice_in_db
+    expect_no_alice_docs_in_db
+    @alice.run
+    action_name = 'invalid_action'
+    doc_type = 'a_alicedoc'
+
+    docs = [{'id' => '1', 'type' => doc_type}, {'id' => '2', 'type' => doc_type}, {'id' => '3', 'type' => doc_type}]
+
+    assert_raise(Armagh::Admin::Application::APIClientError.new("Action #{action_name} is not a consume action.")) do
+      @api.mark_consume_multiple_id(action_name, docs)
+    end
+  end
+
   def test_get_defined_actions
-    global_actions =  Armagh::Actions.defined_actions.collect{|c|c.to_s}
+    global_actions = Armagh::Actions.defined_actions.collect {|c| c.to_s}
     defined_actions = @api.get_defined_actions
 
     assert_kind_of Hash, defined_actions

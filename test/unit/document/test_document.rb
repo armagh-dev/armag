@@ -640,6 +640,23 @@ class TestDocument < Test::Unit::TestCase
     assert_equal 'fail id', found_failures.first.document_id
   end
 
+  def test_find_all_by_version_read_only
+    doc_type = 'testdoc'
+    collection = mock
+    version = 123
+    Armagh::Connection.stubs(:documents).with(doc_type).returns(collection)
+
+    Armagh::Document
+      .expects(:find_many_read_only)
+      .with(
+        {'version' => version},
+        collection: collection)
+      .returns([@doc])
+
+    docs = Armagh::Document.find_all_by_version_read_only(doc_type, version)
+    assert_equal [@doc], docs
+  end
+
   def test_to_json
     expected = {
       type: @doc.type,

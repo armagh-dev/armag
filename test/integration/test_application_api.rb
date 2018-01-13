@@ -89,6 +89,24 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     ])
   end
 
+  def add_alice_docs_to_db
+    count = 5
+    content = {'content' => true}
+    meta = {'meta' => true}
+    count.times do |i|
+      Armagh::Document.create_one_unlocked(type: 'a_alicedoc', content: content, raw: nil, metadata: meta,
+                                           pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED,
+                                           document_id: "id_#{i}", document_timestamp: Time.now, collection_task_ids: [],
+                                           version: i % 2 + 1)
+
+      Armagh::Document.create_one_unlocked(type: 'b_alicedoc', content: content, raw: nil, metadata: meta,
+                                           pending_actions: [], state: Armagh::Documents::DocState::PUBLISHED,
+                                           document_id: "id_#{i}", document_timestamp: Time.now, collection_task_ids: [],
+                                           version: i % 2 + 1)
+    end
+    count
+  end
+
   def expect_no_alice_docs_in_db
     Armagh::Document.clear_document_counts
     expect_document_counts( [] )
@@ -1632,7 +1650,190 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
     patch '/actions/trigger_collect.json' do
       assert last_response.client_error?
       response_hash = JSON.parse(last_response.body)
-      assert_equal 'No action name supplied.', response_hash.dig('client_error_detail', 'message')
+      assert_equal "A parameter named 'name' is missing but is required.", response_hash.dig('client_error_detail', 'message')
+    end
+  end
+
+  def test_mark_for_consume_id
+    good_alice_in_db
+    add_alice_docs_to_db
+    @alice.run
+    action = 'consume_a_alicedoc_1'
+    id = 'id_3'
+    type = 'a_alicedoc'
+
+    doc = Document.find_one_by_document_id_type_state_read_only(id, type, Armagh::Documents::DocState::PUBLISHED)
+    assert_empty doc.pending_actions
+    assert_nil doc.pending_work
+
+    patch '/actions/mark_for_consume.json', {name: action, type: type, id: id}.to_json do
+      assert last_response.ok?
+      response = JSON.parse(last_response.body)
+      assert_true response
+    end
+
+    doc = Document.find_one_by_document_id_type_state_read_only(id, type, Armagh::Documents::DocState::PUBLISHED)
+    assert_equal([action], doc.pending_actions)
+    assert_true doc.pending_work
+  end
+
+  def test_mark_for_consume_id_none
+    good_alice_in_db
+    add_alice_docs_to_db
+    @alice.run
+    action = 'consume_a_alicedoc_1'
+    id = 'bad_id_3'
+    type = 'a_alicedoc'
+
+    patch '/actions/mark_for_consume.json', {name: action, type: type, id: id}.to_json do
+      assert last_response.client_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal("No published #{type} exists with id #{id}.", response_hash.dig('client_error_detail', 'message'))
+    end
+  end
+
+  def test_mark_for_consume_id_error
+    good_alice_in_db
+    add_alice_docs_to_db
+    @alice.run
+    action = 'consume_a_alicedoc_1'
+    id = 'id_3'
+    type = 'b_alicedoc'
+
+    patch '/actions/mark_for_consume.json', {name: action, type: type, id: id}.to_json do
+      assert last_response.client_error?
+      response_hash = JSON.parse(last_response.body)
+      assert_equal("Action #{action} is not a valid action for published #{type} documents.", response_hash.dig('client_error_detail', 'message'))
+    end
+  end
+
+  def test_mark_for_consume_multiple_id
+    good_alice_in_db
+    count = add_alice_docs_to_db
+    @alice.run
+    action = 'consume_a_alicedoc_1'
+
+    docs = {}
+    count.times do |i|
+      doc = Document.find_one_by_document_id_type_state_read_only("id_#{i}", 'a_alicedoc', Armagh::Documents::DocState::PUBLISHED)
+      assert_empty doc.pending_actions
+      assert_nil doc.pending_work
+      docs[i] = doc
+    end
+
+    request_hash = {
+      name: action,
+      documents: [
+        {id: docs[1].document_id, type: docs[1].type},
+        {id: docs[2].document_id, type: docs[2].type},
+      ]
+    }
+
+    patch '/actions/mark_for_consume.json', request_hash.to_json do
+      assert last_response.ok?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal({'success' => 2},  response)
+    end
+
+    count.times do |i|
+      doc = Document.find_one_by_document_id_type_state_read_only("id_#{i}", 'a_alicedoc', Armagh::Documents::DocState::PUBLISHED)
+
+      if i == 1 || i == 2
+        assert_equal([action], doc.pending_actions)
+        assert_true doc.pending_work
+      else
+        assert_empty doc.pending_actions
+        assert_nil doc.pending_work
+      end
+
+    end
+  end
+
+  def test_mark_for_consume_version
+    good_alice_in_db
+    count = add_alice_docs_to_db
+    @alice.run
+    action = 'consume_b_alicedoc_1'
+    type = 'b_alicedoc'
+
+    count.times do |i|
+      doc = Document.find_one_by_document_id_type_state_read_only("id_#{i}", type, Armagh::Documents::DocState::PUBLISHED)
+      assert_empty doc.pending_actions
+      assert_nil doc.pending_work
+    end
+
+    request_hash = {
+      name: action,
+      type: 'b_alicedoc',
+      version: 1
+    }
+
+    patch '/actions/mark_for_consume.json', request_hash.to_json do
+      assert last_response.ok?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal({'success' => 3},  response)
+    end
+
+    count.times do |i|
+      doc = Document.find_one_by_document_id_type_state_read_only("id_#{i}", type, Armagh::Documents::DocState::PUBLISHED)
+      puts doc
+      if doc.version == 1
+        assert_equal([action], doc.pending_actions)
+        assert_true doc.pending_work
+      else
+        assert_empty doc.pending_actions
+        assert_nil doc.pending_work
+      end
+    end
+  end
+
+  def test_mark_for_consume_bad_params
+    patch '/actions/mark_for_consume.json', {}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal("A parameter named 'name' is missing but is required.", response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action'}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action', id: '123'}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action', type: 'something'}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action', version: 123}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action', documents: 123}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
+    end
+
+    patch '/actions/mark_for_consume.json', {name: 'action', documents: [{id: 123, type: 'abc'}, {id: 456}]}.to_json do
+      assert last_response.client_error?, last_response.body
+      response = JSON.parse(last_response.body)
+      assert_equal('Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.',
+                   response.dig('client_error_detail', 'message'))
     end
   end
 
@@ -2311,6 +2512,7 @@ class TestIntegrationApplicationAPI < Test::Unit::TestCase
         lambda{patch('/workflow/:workflow_name/stop.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/actions/defined.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{patch('/actions/trigger_collect.json'){}} => Authentication::Role::APPLICATION_ADMIN,
+        lambda{patch('/actions/mark_for_consume.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/workflow/:workflow_name/actions.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/workflow/:workflow_name/action/:action_name/status.json'){}} => Authentication::Role::APPLICATION_ADMIN,
         lambda{get('/workflow/:workflow_name/action/config.json'){}} => Authentication::Role::APPLICATION_ADMIN,

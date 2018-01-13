@@ -51,6 +51,8 @@ module Armagh
       class APIAuthenticationError < StandardError; end
 
       class API
+        API_NAME = 'application_admin_api'
+
         include Singleton
 
         attr_accessor :ip,
@@ -89,6 +91,14 @@ module Armagh
           end
 
           @gem_versions = Actions::GemManager.instance.activate_installed_gems(@logger)
+        end
+
+        def signature
+          "#{API_NAME}-#{Thread.current.object_id}"
+        end
+
+        def running?
+          true
         end
 
         def using_ssl?
@@ -823,6 +833,91 @@ module Armagh
           workflow_set.trigger_collect(action_name)
         rescue Armagh::Actions::TriggerCollectError => e
           raise APIClientError, e.message
+        end
+
+        def consume_action?(action_name, workflow_set)
+          action_config = workflow_set.action_config_named[action_name]
+          return false unless action_config
+          action_config.__type < Armagh::Actions::Consume
+        end
+
+        def valid_action_for_docspec?(action_name, docspec, workflow_set)
+          workflow_set.actions_names_handling_docspec(docspec).include? action_name
+        end
+
+        def mark_consume_id(action_name, doc_type, doc_id, workflow_set = nil)
+          workflow_set ||= Actions::WorkflowSet.for_agent(Connection.config)
+          raise APIClientError.new("Action #{action_name} is not a consume action.") unless consume_action?(action_name, workflow_set)
+
+          docspec = Documents::DocSpec.new(doc_type, Documents::DocState::PUBLISHED)
+          raise APIClientError, "Action #{action_name} is not a valid action for published #{doc_type} documents." unless valid_action_for_docspec?(action_name, docspec, workflow_set)
+
+          doc = Document.find_one_by_document_id_type_state_locked(doc_id, doc_type, Documents::DocState::PUBLISHED, self)
+
+          raise APIClientError, "No published #{doc_type} exists with id #{doc_id}." unless doc
+
+          doc.add_item_to_pending_actions(action_name)
+          doc.save(true, self)
+
+          true
+        rescue BaseDocument::LockTimeoutError
+          @logger.ops_warn "#{doc_type} document #{doc_id} is currently locked.  Trying to mark for consume again."
+          retry
+        end
+
+        def mark_consume_version(action_name, doc_type, doc_version)
+          count = 0
+          failures = []
+          result = {}
+
+          workflow_set = Actions::WorkflowSet.for_agent(Connection.config)
+          raise APIClientError, "Action #{action_name} is not a consume action." unless consume_action?(action_name, workflow_set)
+
+          docspec = Documents::DocSpec.new(doc_type, Documents::DocState::PUBLISHED)
+          raise APIClientError, "Action #{action_name} is not a valid action for published #{doc_type} documents." unless valid_action_for_docspec?(action_name, docspec, workflow_set)
+
+          documents = Document.find_all_by_version_read_only(doc_type, doc_version)
+          documents.each do |doc|
+            begin
+              mark_consume_id(action_name, doc_type, doc.document_id, workflow_set)
+              count += 1
+            rescue => e
+              failures << {'type' => doc_type, 'id' => doc.document_id, 'message' => e.to_s}
+            end
+          end
+
+          result['success'] = count
+          result['failures'] = failures unless failures.empty?
+          result
+        end
+
+        def mark_consume_multiple_id(action_name, docs)
+          count = 0
+          failures = []
+          result = {}
+          workflow_set = Actions::WorkflowSet.for_agent(Connection.config)
+
+          raise APIClientError, "Action #{action_name} is not a consume action." unless consume_action?(action_name, workflow_set)
+
+          types = docs.collect {|d| d['type']}
+          types.uniq!
+          types.each do |type|
+            docspec = Documents::DocSpec.new(type, Documents::DocState::PUBLISHED)
+            raise APIClientError, "Action #{action_name} is not a valid action for published #{type} documents." unless valid_action_for_docspec?(action_name, docspec, workflow_set)
+          end
+
+          docs.each do |doc|
+            begin
+              mark_consume_id(action_name, doc['type'], doc['id'], workflow_set)
+              count += 1
+            rescue => e
+              failures << doc.merge({'message' => e.to_s})
+            end
+          end
+
+          result['success'] = count
+          result['failures'] = failures unless failures.empty?
+          result
         end
 
         def update_password(user, password)

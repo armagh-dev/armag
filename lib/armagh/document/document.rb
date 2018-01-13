@@ -184,6 +184,10 @@ module Armagh
       find_many_read_only( {}, collection: Connection.failures )
     end
 
+    def self.find_all_by_version_read_only(doc_type, version)
+      find_many_read_only({'version' => version}, collection: collection(doc_type, Documents::DocState::PUBLISHED))
+    end
+
     def self.get_one_for_processing_locked( caller=default_locking_agent, **other_args )
       Connection.all_document_collections.each do |collection|
         begin

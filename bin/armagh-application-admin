@@ -222,7 +222,29 @@ end
 # Trigger a collect
 patch '/actions/trigger_collect.json' do
   rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |_fields, _remote_user|
+    api.check_params(params, 'name')
     api.trigger_collect(params['name'])
+  end
+end
+
+# Trigger a consume
+patch '/actions/mark_for_consume.json' do
+  rest_helper.handle_request(request, Authentication::Role::APPLICATION_ADMIN) do |fields, _remote_user|
+    api.check_params(fields, 'name')
+    action = fields['name']
+
+    if fields['type'] && fields['version']
+      # All documents of a type/version
+      api.mark_consume_version(action, fields['type'], fields['version'])
+    elsif fields['type'] && fields['id']
+      # Individual Document
+      api.mark_consume_id(action, fields['type'], fields['id'])
+    elsif fields['documents'] && fields['documents'].is_a?(Array) && fields['documents'].all?{|i| i.key?('id') && i.key?('type')}
+      # A list of documents
+      api.mark_consume_multiple_id(action, fields['documents'])
+    else
+      raise Admin::Application::APIClientError, 'Request body must contain either a type and version, a type and document id, or a documents array each containing a type and id.'
+    end
   end
 end
 
