@@ -169,6 +169,11 @@ module Armagh
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames')
       semaphores.indexes.create_one( {'name' => 1}, unique: true, name: 'names')
+      log.indexes.create_one(
+          {'alert' => 1},
+          partial_filter_expression: { 'alert' => { '$exists' => true }},
+          name: 'alerts'
+      )
 
       all_document_collections.each { |c| index_doc_collection(c) }
     rescue => e

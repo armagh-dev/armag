@@ -695,9 +695,7 @@ class TestDocument < Test::Unit::TestCase
             { 'category' => 'failed',     'docspec_string' => 'docs_type1:ready',     'count' => 7, 'published_collection' => nil },
             { 'category' => 'failed',     'docspec_string' => 'docs_type2:ready',     'count' => 8, 'published_collection' => nil },
             { 'category' => 'in process', 'docspec_string' => 'docs_type1:published', 'count' => 1, 'published_collection' => 'docs_type1' },
-            { 'category' => 'in process', 'docspec_string' => 'docs_type2:published', 'count' => 2, 'published_collection' => 'docs_type2' },
-            { 'category' => 'failed',     'docspec_string' => 'docs_type1:published', 'count' => 3, 'published_collection' => 'docs_type1' },
-            { 'category' => 'failed',     'docspec_string' => 'docs_type2:published', 'count' => 4, 'published_collection' => 'docs_type2' }
+            { 'category' => 'in process', 'docspec_string' => 'docs_type2:published', 'count' => 2, 'published_collection' => 'docs_type2' }
         ]
     Armagh::Connection.unstub(:documents)
     Armagh::Connection.unstub(:all_document_collections)

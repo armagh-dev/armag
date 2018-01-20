@@ -224,7 +224,7 @@ module Armagh
               options )
 
           unless image
-            if collection.find( qualifier ).limit(1).first
+            if lock_wait_duration > 0 && collection.find( qualifier ).limit(1).first
               interruptible_wait_loop_with_timeout( caller, lock_wait_duration: lock_wait_duration ) {
                 image = collection.find_one_and_update(
                     unlocked_qualifier(qualifier, caller),

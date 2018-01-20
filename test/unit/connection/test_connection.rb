@@ -230,6 +230,7 @@ class TestConnection < Test::Unit::TestCase
     doc_indexes = mock
     agent_status_indexes = mock
     semaphore_indexes = mock
+    log_indexes = mock
 
     config = stub(indexes: config_indexes)
     action_state = stub(indexes: action_state_indexes)
@@ -237,6 +238,7 @@ class TestConnection < Test::Unit::TestCase
     groups = stub(indexes: groups_indexes)
     agent_status = stub(indexes: agent_status_indexes)
     semaphores = stub(indexes: semaphore_indexes)
+    log = stub(indexes: log_indexes)
 
     @connection.stubs(:[]).with('config').returns(config)
     @connection.stubs(:[]).with('action_state').returns(action_state)
@@ -244,6 +246,7 @@ class TestConnection < Test::Unit::TestCase
     @connection.stubs(:[]).with('groups').returns(groups)
     @connection.stubs(:[]).with('agent_status').returns(agent_status)
     @connection.stubs(:[]).with('semaphores').returns(semaphores)
+    @connection.stubs(:[]).with('log').returns(log)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
@@ -253,6 +256,7 @@ class TestConnection < Test::Unit::TestCase
     agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames'})
     semaphore_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
     doc_indexes.expects(:create_one).times(3)
+    log_indexes.expects(:create_one)
 
     Armagh::Connection.setup_indexes
   end

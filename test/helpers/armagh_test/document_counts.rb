@@ -53,8 +53,7 @@ module ArmaghTest
     @documents_mock.expects(:aggregate).once.with( [count_by_doctype_stage] ).returns( working_documents_in_process_db_result)
     @failures_mock.expects(:aggregate).once.with( [count_by_doctype_stage] ).returns( working_failed_documents_db_result)
     published_collections.each do |pc|
-      @published_mock[pc].expects(:aggregate).once.with( [ {'$match' =>  { 'pending_work' => true }}, count_by_doctype_stage]).returns( published_documents_in_process_db_result[pc])
-      @published_mock[pc].expects(:aggregate).once.with( [ {'$match' =>  { 'error'=>true}}, count_by_doctype_stage]).returns( published_failed_documents_db_result[pc])
+      @published_mock[pc].expects(:aggregate).once.with( [ {'$match' =>  { 'pending_work' => true, '_locked' => false }}, count_by_doctype_stage]).returns( published_documents_in_process_db_result[pc])
     end
   end
 

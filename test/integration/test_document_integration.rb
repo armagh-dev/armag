@@ -231,8 +231,7 @@ class TestDocumentIntegration < Test::Unit::TestCase
         { 'category' => 'in process', 'docspec_string' => 'doc_type2:ready',     'count' => 5, 'published_collection' => nil },
         { 'category' => 'in process', 'docspec_string' => 'doc_type3:ready',     'count' => 6, 'published_collection' => nil },
         { 'category' => 'failed',     'docspec_string' => 'doc_type2:ready',     'count' => 1, 'published_collection' => nil },
-        { 'category' => 'in process', 'docspec_string' => 'pub_type1:published', 'count' => 3, 'published_collection' => 'pub_type1' },
-        { 'category' => 'failed',     'docspec_string' => 'pub_type1:published', 'count' => 2, 'published_collection' => 'pub_type1' }
+        { 'category' => 'in process', 'docspec_string' => 'pub_type1:published', 'count' => 3, 'published_collection' => 'pub_type1' }
     ]
     counts = Armagh::Document.count_failed_and_in_process_documents_by_doctype
     assert_equal expected_counts.sort_by{ |c| c['count']}, counts.sort_by{ |c| c['count']}

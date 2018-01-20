@@ -141,15 +141,10 @@ class TestLauncher < Test::Unit::TestCase
       assert_equal Armagh::Status::RUNNING, args[:status]
       assert args[:versions].key? 'armagh'
       assert args[:versions].key? 'actions'
-      assert_in_delta(Time.now, args[:started], 1)
       true
     end
 
-    Thread.new{@launcher.run}  # Generate the start time
-    sleep 0.5
     @launcher.checkin(Armagh::Status::RUNNING)
-  ensure
-    @launcher.shutdown :SIGINT
   end
 
   def test_checkin_not_running

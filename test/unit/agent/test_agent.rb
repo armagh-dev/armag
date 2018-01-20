@@ -85,6 +85,8 @@ class TestAgent < Test::Unit::TestCase
     @temp_dir = '/tmp/armagh_agent_test'
     FileUtils.mkdir_p @temp_dir
     Armagh::Connection.stubs(:action_state).returns(@state_coll)
+
+    Thread.abort_on_exception = true
   end
 
   def prep_an_agent(config_name, archive_config_name, config_values, id)
@@ -220,7 +222,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
@@ -239,8 +241,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_collect_action_collection_history
@@ -259,7 +260,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
@@ -277,9 +278,7 @@ class TestAgent < Test::Unit::TestCase
     @backoff_mock.expects(:reset).at_least_once
 
     @default_agent.instance_variable_set(:@running, true)
-
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_collect_action_archive
@@ -302,7 +301,7 @@ class TestAgent < Test::Unit::TestCase
     doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
     doc.expects(:dev_errors).returns({})
@@ -320,8 +319,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_split_action
@@ -356,7 +354,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -367,8 +365,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action
@@ -401,7 +398,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
 
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
 
@@ -434,8 +431,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action_set_version
@@ -470,7 +466,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
 
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
 
@@ -503,8 +499,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action_no_title
@@ -537,7 +532,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
 
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
 
@@ -569,8 +564,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action_update
@@ -639,7 +633,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
@@ -678,8 +672,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action_update_reduce_version
@@ -748,7 +741,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
     @workflow_set.expects(:actions_names_handling_docspec).returns(pending_actions)
@@ -788,8 +781,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_publish_action_update_with_older_document
@@ -833,6 +825,7 @@ class TestAgent < Test::Unit::TestCase
                :source => 'old_source',
                :archive_files => ['archive_file'],
                :version => 1,
+               :created_timestamp => 'created',
                :document_timestamp => Time.at(1499999999),
                :error => nil)
 
@@ -859,9 +852,11 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:to_action_document).returns(action_doc)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     doc.stubs(:delete_pending_actions_if).yields(action_name ).returns(true).then.yields( pending_actions.shift ).returns(true).then.yields(pending_actions.shift).returns(true).then.yields(nil).returns(false)
+    @workflow_set.expects(:actions_names_handling_docspec).returns([action_name])
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
+    doc.expects(:add_items_to_pending_actions).with([action_name])
 
     doc.expects(:document_id=, action_doc.document_id)
     doc.expects(:content=, action_doc.content)
@@ -869,13 +864,23 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:metadata=, action_doc.metadata)
     doc.expects(:title=, action_doc.title)
     doc.expects(:copyright=, action_doc.copyright)
+    doc.expects(:published_id=)
     doc.expects(:document_timestamp=)
+    doc.expects(:created_timestamp=)
+    doc.expects(:published_timestamp=)
     doc.expects(:delete).never
     doc.expects(:get_published_copy_read_only).returns(pub_doc)
     doc.expects(:display=).with(action_doc.display)
-
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
     doc.expects(:collection_task_ids).returns []
+    doc.expects(:version=)
+    doc.expects(:state=)
 
+    doc.expects(:mark_publish)
+    doc.expects(:raw=).with(nil)
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
     Dir.expects(:mktmpdir).yields(@temp_dir)
     Dir.expects(:chdir).yields
 
@@ -888,8 +893,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.expects(:abort)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_consume_action
@@ -920,7 +924,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({})
 
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -931,8 +935,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_divider
@@ -948,21 +951,22 @@ class TestAgent < Test::Unit::TestCase
     action_name = divider.config.action.name
 
     doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => {'content' => true}, :raw => nil, :metadata => {'meta' => true}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
-
+    doc.expects(:raw=).with(nil)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(divider).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
     Dir.expects(:chdir).yields
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
 
     @default_agent.expects(:report_status).with(doc, divider).at_least_once
     @backoff_mock.expects(:reset).at_least_once
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_action_with_dev_errors
@@ -978,7 +982,7 @@ class TestAgent < Test::Unit::TestCase
 
     pending_actions = [action_name]
 
-    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil, :internal_id => '123' )
+    doc = stub(:document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => {}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil, :internal_id => '123' )
     doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
@@ -991,7 +995,7 @@ class TestAgent < Test::Unit::TestCase
 
     doc.expects(:dev_errors).returns({action_name => ['BROKEN']})
 
-    doc.expects(:mark_delete)
+    doc.expects(:mark_delete).at_least_once
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -999,8 +1003,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run)  }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
 
     assert_equal([action_name], pending_actions)
   end
@@ -1018,7 +1021,7 @@ class TestAgent < Test::Unit::TestCase
 
     pending_actions = [action_name]
 
-    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => pending_actions, :content => 'content', :raw => nil, :metadata => {}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
     doc.stubs(:delete_pending_actions_if).yields( pending_actions.first )
 
     Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
@@ -1032,7 +1035,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:ops_errors).returns({'action_name' => ['BROKEN']})
     doc.expects(:dev_errors).returns({})
 
-    doc.expects(:mark_delete)
+    doc.expects(:mark_delete).at_least_once
     doc.expects(:metadata).returns({})
 
     @default_agent.expects(:report_status).with(doc, action).at_least_once
@@ -1040,8 +1043,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
 
     assert_equal([action_name], pending_actions)
   end
@@ -1058,10 +1060,10 @@ class TestAgent < Test::Unit::TestCase
     e = Armagh::Agent::AbortDocument.new('abort')
     action.expects(:collect).raises(e)
 
-    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => 'meta', :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
+    doc = stub(:internal_id => '123', :document_id => 'document_id', :pending_actions => [], :content => 'content', :raw => 'raw data', :metadata => {}, :type => 'DocumentType', :state => Armagh::Documents::DocState::WORKING, :error => nil)
     doc.stubs(:delete_pending_actions_if).yields( action_name  ).returns(true).then.returns(false)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
@@ -1076,14 +1078,12 @@ class TestAgent < Test::Unit::TestCase
     Dir.expects(:mktmpdir).yields(@temp_dir)
     Dir.expects(:chdir).yields
 
-    @default_agent.expects(:report_status).with(doc, action).at_least_once
+    @default_agent.expects(:report_status).with(doc, action)
     @backoff_mock.expects(:reset).at_least_once
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
-  end
+    @default_agent.send(:execute)  end
 
   def test_run_publish_abort
     input_docspec = Armagh::Documents::DocSpec.new('DocumentType', Armagh::Documents::DocState::READY)
@@ -1115,7 +1115,7 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_action_document).returns(action_doc)
     doc.stubs(:delete_pending_actions_if).yields( action_name ).returns(true).then.yields(nil).returns(false)
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
@@ -1144,8 +1144,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_consume_abort
@@ -1173,10 +1172,11 @@ class TestAgent < Test::Unit::TestCase
     doc.expects(:to_published_document).returns(published_doc)
     doc.expects(:finish_processing).never
     doc.expects(:mark_abort)
-
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
     doc.expects(:metadata=).never
 
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).then.yields(nil)
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(action).at_least_once
 
     Dir.expects(:mktmpdir).yields(@temp_dir)
@@ -1187,8 +1187,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
+    @default_agent.send(:execute)
   end
 
   def test_run_failed_action
@@ -1228,18 +1227,19 @@ class TestAgent < Test::Unit::TestCase
       true
     end
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
-    @default_agent.stop
+    @default_agent.send(:execute)
   end
 
   def test_run_with_work_no_action_exists
     action_name = 'action_name'
     doc = stub(:document_id => 'document_id', :pending_actions => [])
     doc.stubs(:delete_pending_actions_if).yields( action_name )
-    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true).at_least_once
+    Armagh::Document.expects(:get_one_for_processing_locked).yields(doc).returns(true)
     doc.expects(:add_ops_error).at_least_once
     doc.stubs(:error).returns(nil)
+    doc.expects(:dev_errors).returns({})
+    doc.expects(:ops_errors).returns({})
+    doc.expects(:raw=).with(nil)
     @backoff_mock.expects(:reset).at_least_once
 
     @workflow_set.expects(:instantiate_action_named).with(action_name, @default_agent, @logger).returns(nil).at_least_once
@@ -1250,9 +1250,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
-    @default_agent.stop
+    @default_agent.send(:execute)
   end
 
   def test_run_no_work
@@ -1265,9 +1263,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
-    @default_agent.stop
+    @default_agent.send(:execute)
   end
 
   def test_run_not_action
@@ -1295,9 +1291,7 @@ class TestAgent < Test::Unit::TestCase
 
     @default_agent.instance_variable_set(:@running, true)
 
-    Thread.new { @default_agent.send(:run) }
-    sleep THREAD_SLEEP_TIME
-  end
+    @default_agent.send(:execute)  end
 
   def test_run_unexpected_error
     exception = RuntimeError.new 'Exception'

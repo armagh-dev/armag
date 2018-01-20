@@ -111,6 +111,12 @@ module Armagh
       )
     end
 
+    # implementation note:
+    # the query for published docs in process includes a _locked=>false clause.
+    #   Technically, this ins't exactly the right count as it ignores documents
+    #   currently actually be worked by an agent.  However, excluding the clause
+    #   either forces a colscan or requires a very expensive index.  We opted
+    #   for a slightly imperfect count, instead.
     def self.count_failed_and_in_process_documents_by_doctype
 
       @dont_count_again_until ||= Time.now - 1
@@ -124,8 +130,7 @@ module Armagh
         queries = [
             { category: 'in process', doc_colls: [ Connection.documents ], filter: nil },
             { category: 'failed',     doc_colls: [ Connection.failures ],  filter: nil },
-            { category: 'in process', doc_colls: pub_types,                filter: { 'pending_work' => true }},
-            { category: 'failed',     doc_colls: pub_types,                filter: { 'error' => true }}
+            { category: 'in process', doc_colls: pub_types,                filter: { 'pending_work' => true, '_locked'=>false }}
         ]
 
         queries.each do |query|
@@ -359,12 +364,12 @@ module Armagh
     end
 
     def mark_delete
-      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or publish.' if @pending_collection_history || @pending_publish
+      raise DocumentMarkError, 'Document cannot be marked as delete.  It is already marked for collection_history or publish.' if @pending_collection_history || @pending_publish
       @pending_delete = true
     end
 
     def mark_publish
-      raise DocumentMarkError, 'Document cannot be marked as archive.  It is already marked for archive or delete.' if @pending_collection_history || @pending_delete
+      raise DocumentMarkError, 'Document cannot be marked as publish.  It is already marked for collection_history or delete.' if @pending_collection_history || @pending_delete
       @pending_publish = true
     end
 
