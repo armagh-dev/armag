@@ -44,6 +44,7 @@
         "port": "22",
         "directory_path": "/var/path",
         "duplicate_put_directory_paths": "[]",
+        "filename_pattern": "*",
         "username": "user",
         "password": "pass",
         "maximum_transfer": "50"
@@ -74,6 +75,7 @@
         "port": "22",
         "directory_path": "/var/spool/armagh/dataout/tac",
         "duplicate_put_directory_paths": "[\"/var/spool/armagh/dataout/tacautotest\"]",
+        "filename_pattern": "*",
         "username": "armagh",
         "maximum_transfer": "50"
       },

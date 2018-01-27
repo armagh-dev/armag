@@ -1,4 +1,4 @@
-# Copyright 2017 Noragh Analytics, Inc.
+# Copyright 2018 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -155,6 +155,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start
+    @backoff_mock.stubs(:interruptible_backoff)
     @default_agent.instance_variable_set(:@running, false)
     assert_false @default_agent.running?
 
@@ -180,6 +181,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start_with_config
+    @backoff_mock.stubs(:interruptible_backoff)
     Armagh::Logging.expects(:set_level).with(@logger, 'error').at_least_once
     agent = prep_an_agent('logserror', 'archive', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
@@ -189,6 +191,8 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start_without_config
+    @backoff_mock.stubs(:interruptible_backoff)
+
     Thread.new { @default_agent.start}
 
     sleep THREAD_SLEEP_TIME
@@ -196,6 +200,7 @@ class TestAgent < Test::Unit::TestCase
   end
 
   def test_start_and_stop
+    @backoff_mock.stubs(:interruptible_backoff)
     @default_agent.instance_variable_set(:@running, false)
 
     assert_false @default_agent.running?

@@ -1,4 +1,4 @@
-# Copyright 2017 Noragh Analytics, Inc.
+# Copyright 2018 Noragh Analytics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require 'mongo/error'
+require 'mongo'
 require 'armagh/documents/errors'
 
 require_relative '../connection'
