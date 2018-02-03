@@ -163,6 +163,14 @@ class TestLogging < Test::Unit::TestCase
     assert_equal(Armagh::Logging::LEVELS[Armagh::Logging::WARN], Armagh::Logging.default_log_level(logger))
   end
 
+  def test_sublevels
+    assert_equal(['DEBUG'], Armagh::Logging.sublevels('debug'))
+    assert_equal(%w(ANY INFO), Armagh::Logging.sublevels('info'))
+    assert_equal(%w(DEV_WARN OPS_WARN WARN), Armagh::Logging.sublevels('warn'))
+    assert_equal(%w(FATAL DEV_ERROR OPS_ERROR ERROR), Armagh::Logging.sublevels('error'))
+    assert_equal([], Armagh::Logging.sublevels('invalid'))
+  end
+
   def test_set_level
     logger = Armagh::Logging.set_logger('test_logger')
     logger.clear_appenders

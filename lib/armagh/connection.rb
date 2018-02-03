@@ -106,6 +106,10 @@ module Armagh
       MongoAdminConnection.instance.connection['log']
     end
 
+    def self.all_log_collections
+      [log, resource_log]
+    end
+
     def self.ip
       MongoConnection.instance.ip
     end
@@ -169,13 +173,13 @@ module Armagh
       groups.indexes.create_one({'name' => 1}, unique: true, name: 'names')
       agent_status.indexes.create_one({'hostname' => 1}, unique: false, name: 'hostnames')
       semaphores.indexes.create_one( {'name' => 1}, unique: true, name: 'names')
-      log.indexes.create_one(
-          {'alert' => 1},
-          partial_filter_expression: { 'alert' => { '$exists' => true }},
-          name: 'alerts'
-      )
 
-      all_document_collections.each { |c| index_doc_collection(c) }
+      all_document_collections.each {|c| index_doc_collection(c)}
+      all_log_collections.each {|c| index_log_collection(c)}
+
+      log.indexes.create_one({'alert' => 1},
+                             partial_filter_expression: {'alert' => {'$exists' => true}},
+                             name: 'alerts')
     rescue => e
       e = Connection.convert_mongo_exception(e)
       raise IndexError, "Unable to create indexes: #{e.message}"
@@ -216,6 +220,11 @@ module Armagh
 
     rescue => e
       raise IndexError, "Unable to create index for collection #{collection.name}: #{e.message}"
+    end
+
+    def self.index_log_collection(collection)
+      # Needed by PurgeLogsUtilityAction
+      collection.indexes.create_one({'level' => 1, 'timestamp' => 1}, name: 'log_aging')
     end
   end
 end

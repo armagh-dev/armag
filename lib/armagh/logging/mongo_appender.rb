@@ -19,6 +19,7 @@ require 'logging/appender'
 require 'socket'
 
 require_relative '../connection'
+require_relative '../logging'
 
 module Armagh
   module Logging

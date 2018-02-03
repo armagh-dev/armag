@@ -61,10 +61,9 @@ module Armagh
       end
 
       def self.find_or_create_all_configurations( config_store )
-
         configs = []
         Armagh::Actions::UtilityAction.defined_utilities.each do |utility_class|
-          configs << utility_class.find_or_create_configuration( config_store, utility_class.simple_name, values_for_create: utility_class.default_config_values, maintain_history: true )
+          configs << utility_class.find_or_create_configuration(config_store, utility_class.simple_name, values_for_create: utility_class.default_config_values, maintain_history: true)
         end
         configs
       end

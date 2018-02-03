@@ -18,8 +18,7 @@
 
 require 'configh'
 require_relative 'workflow'
-require_relative 'utility_actions/utility_action'
-require_relative 'utility_actions/db_cleanup_utility_action'
+require_relative 'utility_actions'
 require_relative '../document/document'
 
 module Armagh

@@ -39,7 +39,7 @@ module Armagh
       ::Logging.init :debug, :info, :warn, :ops_warn, :dev_warn, :error, :ops_error, :dev_error, :fatal, :any
       LEVELS = ::Logging::LNAMES.dup.freeze
       LEVELS.each_with_index {|lname, idx| const_set(lname, idx)}
-      ALERT_LEVELS = %w{ WARN OPS_WARN DEV_WARN ERROR OPS_ERROR DEV_ERROR FATAL}.collect{ |lstr| LEVELS.index( lstr )}
+      ALERT_LEVELS = %w{ WARN OPS_WARN DEV_WARN ERROR OPS_ERROR DEV_ERROR FATAL}.collect {|lstr| LEVELS.index(lstr)}
     end
 
     def self.set_logger(name)
@@ -79,6 +79,38 @@ module Armagh
       LEVELS[temp_logger.level]
     end
 
+    def self.sublevels(base_level)
+      levels = valid_log_levels
+      sub = case base_level.to_s.downcase
+            when 'debug'
+              [
+                LEVELS[levels.find_index('debug')]
+              ]
+            when 'info'
+              [
+                LEVELS[levels.find_index('any')],
+                LEVELS[levels.find_index('info')]
+              ]
+            when 'warn'
+              [
+                LEVELS[levels.find_index('dev_warn')],
+                LEVELS[levels.find_index('ops_warn')],
+                LEVELS[levels.find_index('warn')]
+              ]
+            when 'error'
+              [
+                LEVELS[levels.find_index('fatal')],
+                LEVELS[levels.find_index('dev_error')],
+                LEVELS[levels.find_index('ops_error')],
+                LEVELS[levels.find_index('error')]
+              ]
+            else
+              []
+            end
+      sub.compact!
+      sub
+    end
+
     def self.set_level(logger, level_string)
       level_string = level_string.upcase
       level = level_string if LEVELS.include? level_string
@@ -91,11 +123,11 @@ module Armagh
     end
 
     def self.valid_log_levels
-      LEVELS.collect { |level| level.downcase }
+      LEVELS.collect {|level| level.downcase}
     end
 
     def self.valid_level?(candidate_level)
-      valid_log_levels.include?(candidate_level.downcase)
+      valid_log_levels.include?(candidate_level.to_s.downcase)
     end
 
     def self.loggers(logger = ::Logging.logger.root)

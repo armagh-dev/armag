@@ -34,18 +34,18 @@ class TestConnection < Test::Unit::TestCase
   end
 
   def mock_mongo
-    @connection = mock
+    @connection = mock('connection')
     instance = mock
     instance.stubs(:connection).returns(@connection)
 
-    @admin_connection = mock
+    @admin_connection = mock('admin_connection')
     admin_instance = mock
     admin_instance.stubs(:connection).returns(@admin_connection)
 
-    @cluster = mock
+    @cluster = mock('cluster')
     @connection.stubs(:cluster).returns(@cluster)
 
-    @database = mock
+    @database = mock('database')
     @connection.stubs(:database).returns(@database)
 
     Armagh::Connection::MongoConnection.stubs(:instance).returns(instance)
@@ -146,6 +146,12 @@ class TestConnection < Test::Unit::TestCase
     Armagh::Connection.resource_log
   end
 
+  def test_all_log_collections
+    @connection.expects(:[]).with('log').returns('connection')
+    @admin_connection.expects(:[]).with('log').returns('admin_connection')
+    assert_equal(%w(connection admin_connection), Armagh::Connection.all_log_collections)
+  end
+
   def test_master_no_master
     result = mock
     result.expects(:documents).returns([{'ismaster' => false}])
@@ -223,14 +229,15 @@ class TestConnection < Test::Unit::TestCase
   end
 
   def test_setup_indexes
-    config_indexes = mock
-    action_state_indexes = mock
-    users_indexes = mock
-    groups_indexes = mock
-    doc_indexes = mock
-    agent_status_indexes = mock
-    semaphore_indexes = mock
-    log_indexes = mock
+    config_indexes = mock('config_indexes')
+    action_state_indexes = mock('action_state_indexes')
+    users_indexes = mock('users_indexes')
+    groups_indexes = mock('groups_indexes')
+    doc_indexes = mock('doc_indexes')
+    agent_status_indexes = mock('agent_status_indexes')
+    semaphore_indexes = mock('semaphore_indexes')
+    log_indexes = mock('log_indexes')
+    resource_log_indexes = mock('resource_log_indexes')
 
     config = stub(indexes: config_indexes)
     action_state = stub(indexes: action_state_indexes)
@@ -239,6 +246,7 @@ class TestConnection < Test::Unit::TestCase
     agent_status = stub(indexes: agent_status_indexes)
     semaphores = stub(indexes: semaphore_indexes)
     log = stub(indexes: log_indexes)
+    resource_log = stub(indexes: resource_log_indexes)
 
     @connection.stubs(:[]).with('config').returns(config)
     @connection.stubs(:[]).with('action_state').returns(action_state)
@@ -247,16 +255,19 @@ class TestConnection < Test::Unit::TestCase
     @connection.stubs(:[]).with('agent_status').returns(agent_status)
     @connection.stubs(:[]).with('semaphores').returns(semaphores)
     @connection.stubs(:[]).with('log').returns(log)
+    @admin_connection.stubs(:[]).with('log').returns(resource_log)
     Armagh::Connection.stubs(:all_document_collections).returns([stub(name: 'collection_name', indexes: doc_indexes)])
 
     config_indexes.expects(:create_one).with({'type' => 1, 'name'=>1, 'timestamp'=>-1}, {unique: true, name: 'types'})
-    action_state_indexes.expects(:create_one).with({'action_name' => 1}, {:unique => true, :name => 'names'})
-    users_indexes.expects(:create_one).with({'username' => 1}, {:unique => true, :name => 'usernames'})
-    groups_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
-    agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {:unique => false, :name => 'hostnames'})
-    semaphore_indexes.expects(:create_one).with({'name' => 1}, {:unique => true, :name => 'names'})
+    action_state_indexes.expects(:create_one).with({'action_name' => 1}, {unique: true, name: 'names'})
+    users_indexes.expects(:create_one).with({'username' => 1}, {unique: true, name: 'usernames'})
+    groups_indexes.expects(:create_one).with({'name' => 1}, {unique: true, name: 'names'})
+    agent_status_indexes.expects(:create_one).with({'hostname' => 1}, {unique: false, name: 'hostnames'})
+    semaphore_indexes.expects(:create_one).with({'name' => 1}, {unique: true, name: 'names'})
     doc_indexes.expects(:create_one).times(3)
-    log_indexes.expects(:create_one)
+    log_indexes.expects(:create_one).with({'alert' => 1}, {:partial_filter_expression => {'alert' => {'$exists' => true}}, :name => 'alerts'})
+    log_indexes.expects(:create_one).with({'level' => 1, 'timestamp' => 1}, {:name => 'log_aging'})
+    resource_log_indexes.expects(:create_one).with({'level' => 1, 'timestamp' => 1}, {:name => 'log_aging'})
 
     Armagh::Connection.setup_indexes
   end
@@ -280,6 +291,15 @@ class TestConnection < Test::Unit::TestCase
     collection.stubs(:indexes).returns(indexes).times(3)
     Armagh::Connection.index_doc_collection(collection)
     Armagh::Connection.index_doc_collection(collection) # Make sure we aren't triggering reindexing
+  end
+
+  def test_index_log_collection
+    indexes = mock
+    indexes.expects(:create_one)
+    collection = mock
+    collection.stubs(:name).returns('log')
+    collection.stubs(:indexes).returns(indexes)
+    Armagh::Connection.index_log_collection(collection)
   end
 
   def test_index_published_doc_collection

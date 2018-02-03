@@ -30,6 +30,7 @@ require_relative '../authentication'
 require_relative '../agent/agent'
 require_relative '../actions/workflow_set'
 require_relative '../actions/gem_manager'
+require_relative '../actions/utility_actions/utility_action'
 require_relative '../connection'
 require_relative '../document/document'
 require_relative '../status'
@@ -99,6 +100,7 @@ module Armagh
       Armagh::Authentication.setup_authentication
 
       @agent_config = Agent.find_or_create_configuration( Connection.config, Agent::CONFIG_NAME, values_for_create: {}, maintain_history: true )
+      Actions::UtilityAction.find_or_create_all_configurations( Connection.config )
 
       begin
         @workflow_set = Actions::WorkflowSet.for_agent( Connection.config )
