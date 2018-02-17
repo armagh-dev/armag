@@ -46,6 +46,7 @@ class TestDaemonizerIntegration < Test::Unit::TestCase
   def test_start
     ARGV.replace ['start']
     Armagh::Utils::Daemonizer.run(@script, app_name: @app_name, work_dir: @work_dir)
+    sleep 2
     log = File.read(@log_file)
     assert_include(log, 'STDERR')
     assert_not_include(log, 'STDOUT')
@@ -59,6 +60,7 @@ class TestDaemonizerIntegration < Test::Unit::TestCase
     File.write(@pid_file, '99999999')
     ARGV.replace ['start']
     Armagh::Utils::Daemonizer.run(@script, app_name: @app_name, work_dir: @work_dir)
+    sleep 2
     log = File.read(@log_file)
     assert_include(log, 'STDERR')
     assert_not_include(log, 'STDOUT')

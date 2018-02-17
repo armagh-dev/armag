@@ -19,7 +19,8 @@ require 'mongo'
 require 'singleton'
 require 'socket'
 
-require_relative '../../lib/armagh/logging'
+require 'armagh/logging'
+
 require_relative '../../lib/armagh/connection'
 
 class MongoSupport

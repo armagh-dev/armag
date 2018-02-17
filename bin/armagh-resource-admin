@@ -21,6 +21,8 @@ require 'sinatra'
 require 'puma'
 require 'json'
 
+require 'armagh/logging'
+
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
@@ -28,7 +30,6 @@ require_relative '../lib/armagh/admin/resource/api.rb'
 require_relative '../lib/armagh/authentication'
 require_relative '../lib/armagh/configuration/file_based_configuration.rb'
 require_relative '../lib/armagh/connection'
-require_relative '../lib/armagh/logging'
 
 require_relative '../lib/armagh/utils/rest_helper'
 

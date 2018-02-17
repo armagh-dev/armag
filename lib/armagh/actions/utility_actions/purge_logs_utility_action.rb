@@ -16,8 +16,9 @@
 #
 
 require 'configh'
+require 'armagh/logging'
+
 require_relative 'utility_action'
-require_relative '../../logging'
 require_relative '../../connection'
 
 module Armagh

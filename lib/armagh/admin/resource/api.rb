@@ -16,7 +16,8 @@
 #
 
 require 'singleton'
-require_relative '../../logging'
+require 'armagh/logging'
+
 require_relative '../../configuration/file_based_configuration.rb'
 require_relative './cluster_server.rb'
 require_relative '../../connection'

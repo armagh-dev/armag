@@ -15,12 +15,12 @@
 # limitations under the License.
 #
 
-require_relative '../utils/exception_helper'
 require_relative '../utils/processing_backoff'
 require_relative 'base_document/document'
 require_relative 'base_document/locking_crud'
 
 require 'armagh/documents'
+require 'armagh/logging'
 require 'armagh/support/encoding'
 
 require 'bson'
@@ -29,6 +29,8 @@ module Armagh
   class Document < BaseDocument::Document
     include BaseDocument::LockingCRUD
 
+    PROCESSING_LOCK_TIMEOUT = 31_536_000 # Locking CRUD doesn't have the option to lock forever.  Locking for a year is kind of like forever
+
     class DocumentMarkError < StandardError;
     end
 
@@ -36,10 +38,6 @@ module Armagh
 
     def self.default_collection
       Connection.documents
-    end
-
-    def self.default_lock_hold_duration
-      1800 # 30 minutes to process a document
     end
 
     def self.armagh_version
@@ -196,7 +194,7 @@ module Armagh
     def self.get_one_for_processing_locked( caller=default_locking_agent, **other_args )
       Connection.all_document_collections.each do |collection|
         begin
-          doc = find_one_locked( { 'pending_work' => true }, caller, collection: collection, oldest: true, lock_wait_duration: 0, **other_args )
+          doc = find_one_locked( { 'pending_work' => true }, caller, collection: collection, oldest: true, lock_wait_duration: 0, lock_hold_duration: PROCESSING_LOCK_TIMEOUT, **other_args )
           if doc
             yield doc
             doc.save( true, caller )

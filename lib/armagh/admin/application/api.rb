@@ -19,7 +19,8 @@ require 'singleton'
 
 require 'facets/kernel/constant'
 
-require_relative '../../logging'
+require 'armagh/logging'
+
 require_relative '../../configuration/file_based_configuration'
 require_relative '../../launcher/launcher'
 require_relative '../../actions/workflow_set'

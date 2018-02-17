@@ -21,7 +21,8 @@ require 'uri'
 require 'cgi'
 require 'json'
 
-require_relative '../../logging'
+require 'armagh/logging'
+
 require_relative '../../configuration/file_based_configuration'
 
 module Armagh

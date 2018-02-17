@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-require_relative '../logging'
+require 'armagh/logging'
 
 require 'socket'
 require 'resolv'

@@ -22,12 +22,12 @@ require 'configh'
 
 require 'armagh/actions'
 require 'armagh/documents'
+require 'armagh/logging'
 require 'armagh/support/random'
 
 require_relative '../actions/workflow_set'
 require_relative '../connection'
 require_relative '../document/document'
-require_relative '../logging'
 require_relative '../status'
 require_relative '../utils/archiver'
 require_relative '../utils/processing_backoff'
@@ -200,7 +200,14 @@ module Armagh
 
       actions.each do |action|
         if action.is_a? Actions::Divide
-          Logging::set_details(action.config.action.workflow, action.name, Utils::ActionHelper.get_action_super(action.class), ::Logging.mdc['document_internal_id'])
+          log_details = {
+            'workflow' => action.config.action.workflow,
+            'action' => action.name,
+            'action_supertype' => Utils::ActionHelper.get_action_super(action.class),
+            'document_internal_id' => ::Logging.mdc['document_internal_id'],
+            'additional_info' => action.name
+          }
+          Logging::set_details(log_details)
           return action
         end
       end
@@ -277,7 +284,16 @@ module Armagh
           report_status(current_doc, current_action)
           if current_action
             begin
-              Logging::set_details(current_action.config.action.workflow, current_action.config.action.name, Utils::ActionHelper.get_action_super(current_action.class), current_doc.internal_id) if current_action.is_a? Actions::Action
+              if current_action.is_a? Actions::Action
+                log_details = {
+                  'workflow' => current_action.config.action.workflow,
+                  'action' => current_action.name,
+                  'action_supertype' => Utils::ActionHelper.get_action_super(current_action.class),
+                  'document_internal_id' => current_doc.internal_id,
+                  'additional_info' => current_action.name
+                }
+                Logging::set_details(log_details)
+              end
 
               exec_id = current_doc.document_id || current_doc.internal_id
               @logger.info "Executing #{name} on document '#{exec_id}'."

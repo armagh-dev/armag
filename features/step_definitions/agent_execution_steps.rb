@@ -15,9 +15,10 @@
 # limitations under the License.
 #
 
+require 'armagh/logging'
+
 require_relative '../../lib/armagh/document/document'
 require_relative '../../lib/armagh/actions/workflow_set'
-require_relative '../../lib/armagh/logging'
 
 ARCHIVE_CONFIG = {
   'sftp' => {

@@ -201,7 +201,7 @@ class TestDocument < Test::Unit::TestCase
   def test_get_one_for_processing_locked
     Armagh::Document
         .expects(:find_one_locked)
-        .with({'pending_work'=>true}, @agent, collection: @documents, oldest: true, lock_wait_duration: 0 )
+        .with({'pending_work'=>true}, @agent, collection: @documents, oldest: true, lock_wait_duration: 0, lock_hold_duration: Armagh::Document::PROCESSING_LOCK_TIMEOUT )
         .returns( @doc)
     @doc.expects(:save)
     res = Armagh::Document.get_one_for_processing_locked do |doc|

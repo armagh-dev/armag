@@ -22,7 +22,6 @@ require_relative '../../../lib/armagh/environment'
 Armagh::Environment.init
 
 require_relative '../../../lib/armagh/launcher/launcher'
-require_relative '../../../lib/armagh/logging'
 require_relative '../../../lib/armagh/connection'
 require_relative '../../../lib/armagh/status'
 
@@ -30,6 +29,7 @@ require 'socket'
 require 'mocha/test_unit'
 require 'test/unit'
 require 'configh'
+require 'armagh/logging'
 
 class TestLauncher < Test::Unit::TestCase
   include ArmaghTest

@@ -23,7 +23,6 @@ Armagh::Environment.init
 
 require_relative '../helpers/mongo_support'
 
-require_relative '../../lib/armagh/logging'
 require_relative '../../lib/armagh/connection'
 require_relative '../../lib/armagh/agent/agent'
 require_relative '../../lib/armagh/actions/workflow_set'
@@ -33,6 +32,7 @@ require 'test/unit'
 
 require 'mongo'
 require 'armagh/actions'
+require 'armagh/logging'
 
 module Armagh
   module StandardActions

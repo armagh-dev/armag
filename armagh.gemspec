@@ -49,20 +49,20 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 
-  spec.required_ruby_version = '~> 2.4'
+  spec.required_ruby_version = '~> 2.5'
 
   # Caution: Since this is actually packaged as a gem, these just verify the required versions are installed.  The versions
   #            used at runtime may differ unless a version is explicitly set before the require.
 
-  spec.add_runtime_dependency 'armagh-base-actions', '< 2.0'
-  spec.add_runtime_dependency 'armagh-standard_actions', '< 2.0'
-  spec.add_runtime_dependency 'exponential-backoff', '~> 0.0.2'
-  spec.add_runtime_dependency 'sinatra', '~> 1.4'
-  spec.add_runtime_dependency 'puma', '~> 3.10'
-  spec.add_runtime_dependency 'oj', '~> 2.14'
-  spec.add_runtime_dependency 'argon2', '~> 1.1'
-  spec.add_runtime_dependency 'mongo', '~> 2.4'
-  spec.add_runtime_dependency 'logging', '~> 2.2'
+  spec.add_dependency 'armagh-base-actions', '< 2.0'
+  spec.add_dependency 'armagh-standard_actions', '< 2.0'
+  spec.add_dependency 'exponential-backoff', '~> 0.0.2'
+  spec.add_dependency 'sinatra', '~> 1.4'
+  spec.add_dependency 'puma', '~> 3.10'
+  spec.add_dependency 'oj', '~> 2.14'
+  spec.add_dependency 'argon2', '~> 1.1'
+  spec.add_dependency 'mongo', '~> 2.4'
+  spec.add_dependency 'armagh-logging', '~> 0.5'
 
   spec.add_development_dependency 'rake', '~> 11.0'
   spec.add_development_dependency 'noragh-gem-tasks'

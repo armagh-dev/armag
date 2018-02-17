@@ -471,7 +471,7 @@ Then(/the workflow run_mode should become "([^"]*)" in (\d+) seconds/) do |expec
 end
 
 When(/^armagh's "([^"]*)" config is$/) do |config_type, table|
-  logger ||= Armagh::Logging.set_logger('Armagh::Application::Test::ConfigurationSteps')
+  logger = Armagh::Logging.set_logger('Armagh::Application::Test::ConfigurationSteps')
 
   config = table.rows_hash
   config.default = nil

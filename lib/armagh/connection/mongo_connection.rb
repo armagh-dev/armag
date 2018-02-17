@@ -21,7 +21,7 @@ require 'mongo'
 require 'singleton'
 require 'base64'
 
-require_relative '../logging'
+require 'armagh/logging'
 require_relative '../configuration/file_based_configuration.rb'
 
 module Armagh

@@ -17,7 +17,7 @@
 
 require 'json'
 
-require_relative '../logging'
+require 'armagh/logging'
 
 module Armagh
   module Utils

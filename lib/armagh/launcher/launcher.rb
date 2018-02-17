@@ -22,6 +22,7 @@ require 'fileutils'
 require 'socket'
 
 require 'configh'
+require 'armagh/logging'
 
 require_relative '../environment'
 Armagh::Environment.init
@@ -34,7 +35,6 @@ require_relative '../actions/utility_actions/utility_action'
 require_relative '../connection'
 require_relative '../document/document'
 require_relative '../status'
-require_relative '../logging'
 require_relative '../utils/scheduled_action_trigger'
 require_relative '../version'
 
@@ -176,16 +176,26 @@ module Armagh
       return if num_agents == 0
 
       Thread.new{ @logger.any "Killing #{num_agents} agent(s)." }.join
-      num_agents.times do
-        pid = @agents.keys.first
-        next unless pid
-        agent_id = @agents[pid].signature
+
+      killed_agents = {}
+
+      @agents.each_with_index do |(pid, agent), idx|
+        break if idx >= num_agents
+        agent_id = agent.signature
 
         Thread.new{ @logger.any "Killing #{agent_id}." }.join
-        Process.kill(signal, pid)
+
         begin
-          pid = Process.wait
+          Process.kill(signal, pid)
         rescue Errno::ECHILD; end
+
+        killed_agents[pid] = agent_id
+      end
+
+      killed_agents.each do |pid, agent_id|
+        begin
+          Process.waitpid(pid)
+        rescue Errno::ESRCH, Errno::ECHILD; end
 
         @agents.delete pid
         remove_agent_status(agent_id)
@@ -239,7 +249,7 @@ module Armagh
       @running = false
       @shutdown = true
       @scheduled_action_trigger.stop
-      Thread.new{kill_all_agents(signal)}.join
+      Thread.new{kill_all_agents(signal)}
     end
 
     def refresh_config

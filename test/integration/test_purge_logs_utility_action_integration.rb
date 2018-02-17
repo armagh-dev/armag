@@ -24,13 +24,14 @@ Armagh::Environment.init
 require_relative '../helpers/mongo_support'
 
 require_relative '../../lib/armagh/connection'
-require_relative '../../lib/armagh/logging'
 require_relative '../../lib/armagh/actions/utility_actions/purge_logs_utility_action'
 
 require 'test/unit'
 require 'mocha/test_unit'
 
 require 'mongo'
+
+require 'armagh/logging'
 
 class TestPurgeLogsUtilityActionIntegration < Test::Unit::TestCase
   Struct.new('Event', :logger, :level, :time, :data)
@@ -46,7 +47,7 @@ class TestPurgeLogsUtilityActionIntegration < Test::Unit::TestCase
     )
     @purge_logs_action = Armagh::Actions::UtilityActions::PurgeLogsUtilityAction.new(@caller, @logger, @config)
 
-    @appender = Armagh::Logging.mongo('test_appender')
+    @appender = Armagh::Logging.mongo('test_appender', Armagh::Connection.log)
   end
 
   def insert_logs

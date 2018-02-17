@@ -22,4 +22,4 @@ Armagh::Environment.init
 
 require_relative '../lib/armagh/utils/daemonizer'
 
-Armagh::Utils::Daemonizer.run("/bin/mongod -f #{ ENV['ARMAGH_CONFIG'] }/mongo/mongod-first.conf", app_name: 'armagh-mongod', work_dir: Armagh::Logging.log_dir)
+Armagh::Utils::Daemonizer.run("/bin/mongod -f #{ ENV['ARMAGH_CONFIG'] }/mongo/mongod-first.conf", app_name: 'armagh-mongod', work_dir: Armagh::Environment.log_dir)

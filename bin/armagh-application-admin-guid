@@ -23,4 +23,4 @@ require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
 file = File.join(__dir__, 'armagh-application-admin-gui')
-Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-application-admin-gui', work_dir: Armagh::Logging.log_dir)
+Armagh::Utils::Daemonizer.run(file, app_name: 'armagh-application-admin-gui', work_dir: Armagh::Environment.log_dir)

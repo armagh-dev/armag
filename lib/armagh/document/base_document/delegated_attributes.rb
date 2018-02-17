@@ -16,7 +16,7 @@
 #
 
 require 'facets/kernel/deep_copy'
-require_relative '../../utils/exception_helper'
+require 'armagh/logging'
 
 module Armagh
   module BaseDocument
@@ -208,7 +208,7 @@ module Armagh
             image[ use_key ] ||= {}
             image[ use_key ][ action_name ] ||= []
             if details.is_a?(Exception)
-              image[ use_key ][action_name] << Utils::ExceptionHelper.exception_to_hash(details)
+              image[ use_key ][action_name] << Logging::ExceptionHelper.exception_to_hash(details)
             else
               image[ use_key ][action_name] << { 'message' => details.to_s, 'timestamp' => Time.now.utc}
             end

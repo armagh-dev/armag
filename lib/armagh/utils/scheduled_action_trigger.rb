@@ -19,10 +19,10 @@ require 'socket'
 
 require 'armagh/documents'
 require 'armagh/actions/collect'
+require 'armagh/logging'
 require 'armagh/support/cron'
 
 require_relative 'interruptible_sleep'
-require_relative '../logging'
 require_relative '../document/action_trigger_document'
 require_relative '../document/trigger_manager_semaphore_document'
 require_relative '../actions/workflow_set'

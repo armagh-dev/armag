@@ -221,11 +221,15 @@ class TestConnection < Test::Unit::TestCase
   def test_require_connection_none
     logger = mock('logger')
     logger.expects(:error)
+    collection = mock('logger')
+    collection.stubs(:is_a?).with(Mongo::Collection).returns(true)
     Armagh::Connection.expects(:can_connect?).returns(false)
+    Armagh::Connection.stubs(:log).returns(collection)
+    Armagh::Connection.stubs(:resource_log).returns(collection)
     assert_raise(SystemExit){Armagh::Connection.require_connection(logger)}
   ensure
     # Restore the log env (since we deleted the mongo outputter)
-    Armagh::Logging.init_log_env
+    Armagh::Environment.init_logging
   end
 
   def test_setup_indexes

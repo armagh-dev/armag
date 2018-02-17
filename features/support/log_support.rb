@@ -16,7 +16,7 @@
 #
 
 require 'fileutils'
-require_relative '../../lib/armagh/logging'
+require 'armagh/logging'
 
 module LogSupport
 

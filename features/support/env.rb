@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+CONFIG_FILE = File.join(__dir__, '..', '..', 'test', 'armagh_env_test.json')
+ENV['ARMAGH_CONFIG_FILE'] = CONFIG_FILE
+
 require_relative '../../lib/armagh/environment'
 Armagh::Environment.init
 
@@ -42,9 +45,6 @@ def quiet_raise(msg)
 end
 
 APP_VERSION = {'armagh' => Armagh::VERSION}
-
-CONFIG_FILE = File.join(__dir__, '..', '..', 'test', 'armagh_env_test.json')
-ENV['ARMAGH_CONFIG_FILE'] = CONFIG_FILE
 
 begin
   require 'armagh/standard_actions'
