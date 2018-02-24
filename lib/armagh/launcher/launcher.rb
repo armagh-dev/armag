@@ -177,7 +177,7 @@ module Armagh
 
       Thread.new{ @logger.any "Killing #{num_agents} agent(s)." }.join
 
-      killed_agents = {}
+      killed_agents = []
 
       @agents.each_with_index do |(pid, agent), idx|
         break if idx >= num_agents
@@ -189,16 +189,15 @@ module Armagh
           Process.kill(signal, pid)
         rescue Errno::ECHILD; end
 
-        killed_agents[pid] = agent_id
+        killed_agents << pid
       end
 
-      killed_agents.each do |pid, agent_id|
+      killed_agents.each do |pid|
         begin
           Process.waitpid(pid)
         rescue Errno::ESRCH, Errno::ECHILD; end
 
         @agents.delete pid
-        remove_agent_status(agent_id)
       end
     end
 

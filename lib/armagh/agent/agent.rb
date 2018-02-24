@@ -251,6 +251,7 @@ module Armagh
         execute
       end
 
+      remove_status
       @logger.info 'Terminated'
     rescue => e
       Logging.dev_error_exception(@logger, e, 'An unexpected error occurred')
@@ -473,5 +474,9 @@ module Armagh
       Status::AgentStatus.report(signature: @signature, hostname: @hostname, status: status, task: task, running_since: running_since, idle_since: @idle_since)
     end
 
+    private def remove_status
+      @logger.debug "Removing Status Report"
+      Status::AgentStatus.delete(@signature)
+    end
   end
 end

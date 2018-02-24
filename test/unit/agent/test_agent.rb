@@ -157,6 +157,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start
     @backoff_mock.stubs(:interruptible_backoff)
+    Armagh::Status::AgentStatus.stubs(:delete)
     @default_agent.instance_variable_set(:@running, false)
     assert_false @default_agent.running?
 
@@ -183,6 +184,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_with_config
     @backoff_mock.stubs(:interruptible_backoff)
+    Armagh::Status::AgentStatus.stubs(:delete)
     Armagh::Logging.expects(:set_level).with(@logger, 'error').at_least_once
     agent = prep_an_agent('logserror', 'archive', {'agent' => {'log_level' => 'error'}}, 'start_id')
 
@@ -193,6 +195,7 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_without_config
     @backoff_mock.stubs(:interruptible_backoff)
+    Armagh::Status::AgentStatus.stubs(:delete)
 
     Thread.new { @default_agent.start}
 
@@ -202,10 +205,12 @@ class TestAgent < Test::Unit::TestCase
 
   def test_start_and_stop
     @backoff_mock.stubs(:interruptible_backoff)
+    Armagh::Status::AgentStatus.stubs(:delete)
+
     @default_agent.instance_variable_set(:@running, false)
 
     assert_false @default_agent.running?
-    Thread.new { @default_agent.start }
+    Thread.new {@default_agent.start}
     sleep THREAD_SLEEP_TIME
     assert_true @default_agent.running?
     sleep THREAD_SLEEP_TIME
@@ -1309,6 +1314,7 @@ class TestAgent < Test::Unit::TestCase
       true
     end
 
+    Armagh::Status::AgentStatus.stubs(:delete)
     @default_agent.instance_variable_set(:@running, true)
     @default_agent.send(:run)
   end
