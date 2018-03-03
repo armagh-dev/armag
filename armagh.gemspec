@@ -63,6 +63,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'argon2', '~> 1.1'
   spec.add_dependency 'mongo', '~> 2.4'
   spec.add_dependency 'armagh-logging', '~> 0.5'
+  spec.add_dependency 'ffi', '1.9.21' # TODO: temp lock to avoid "segmentation fault" error on Jenkins 2 w/ 1.9.23 (ref: https://github.com/ffi/ffi/issues/619)
 
   spec.add_development_dependency 'rake', '~> 11.0'
   spec.add_development_dependency 'noragh-gem-tasks'

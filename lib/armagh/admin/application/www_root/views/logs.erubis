@@ -1,8 +1,9 @@
+<script type="text/javascript" src="/ui/js/components/tooltip.min.js"></script>
 <script type="text/javascript" src="/ui/js/components/pagination.min.js"></script>
 
-{{= partial :header, data: {title: 'Logs', subtitle: "Showing #{@data[:logs].size} entries (#{@data[:skip] + 1} through #{@data[:skip] + @data[:logs].size}) out of #{@data[:count]} total"} }}
+{{= partial :header, data: {title: 'Logs', subtitle: "Showing #{@data[:logs].size} entries (#{@data[:skip] + (@data[:logs].size.zero? ? 0 : 1)} through #{@data[:skip] + @data[:logs].size}) out of #{@data[:count]}"} }}
 
-{{ columns = %w(timestamp component level message hostname pid) }}
+{{ columns = %w(timestamp component level message workflow action action_supertype hostname pid document_internal_id) }}
 
 <div id="logs-container" class="uk-overflow-container" style="min-height:560px;">
   <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap">
@@ -38,14 +39,14 @@
     <thead>
       {{ columns.each do |column| }}
         <th>
-          {{= column.capitalize }}
+          {{= column.split('_').map { |c| c.capitalize }.join(' ') }}
           {{ active_filter = '' }}
           {{ @data[:filter]&.split("\x19")&.each do |filter_column| }}
             {{ next if filter_column.empty? }}
             {{ filter_column = filter_column.split("\x11").first }}
             {{ active_filter = 'uk-text-success uk-text-bold' if filter_column == column }}
           {{ end }}
-          <div class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}">
+          <div class="uk-button-dropdown" data-uk-dropdown="{mode:'click', boundary:'logs-container'}">
             <button class="uk-button uk-button-mini {{= active_filter }}">
              <i class="uk-icon-filter"></i>
             </button>
@@ -54,23 +55,17 @@
                 <li>
                   <a href="javascript:" onclick="filter('{{= column }}')">
                     <i class="uk-icon-filter uk-margin-small-right"></i>
-                    Custom Filter...
+                    Filter...
                   </a>
                 </li>
 
-                {{ if @data[:distinct][column] }}
-                  <li class="uk-nav-divider"></li>
-                {{ end }}
-
-                {{ @data[:distinct][column]&.each do |distinct| }}
+                {{ @data[:filters][column]&.each do |filter| }}
                   <li>
-                    <a href="javascript:" onclick="filter_add('{{= column }}', '{{== distinct }}')">
-                      {{== distinct }}
+                    <a href="javascript:" onclick="filter_add('{{= column }}', '{{== column == 'timestamp' ? filter.sub(/\ \(\w+\)$/, '') : filter }}')">
+                      {{== filter }}
                     </a>
                   </li>
                 {{ end }}
-
-                <li class="uk-nav-divider"></li>
 
                 <li>
                   <a href="javascript:" onclick="hide('{{= column }}')">
@@ -97,10 +92,14 @@
               {{ end }}
               {{== case column
                    when 'timestamp'
-                     log[column].to_s.sub(/\ UTC$/, '')
+                     log[column].strftime('%m-%d · %H:%M:%S.%L')
                    when 'component'
                      split = log[column].split('::')
-                     split.size == 4 ? split[2] : split.last
+                     comp  = split.size == 4 ? split[2] : split.last
+                     comp == 'ScheduledActionTrigger' ? 'ActionTrigger' : comp
+                   when 'message'
+                     mesg = "#{log[column][0].upcase}#{log[column][1..-1]}"
+                     mesg.size > 100 ? "#{mesg[0..100]}..." : mesg
                    else
                      log[column]
                    end }}
@@ -127,21 +126,28 @@
   </table>
 </div>
 
-<div class="uk-grid uk-margin-top">
+<div class="uk-grid uk-margin-top uk-form">
   <div class="uk-width-1-5">
-    <button class="uk-button" onclick="document.location.href = document.location.href.replace(/page=\d+&/, '')">
+    <button class="uk-button" onclick="reload()" title="Refresh" data-uk-tooltip="{animate:true}">
       <i class="uk-icon-refresh"></i>
-      Refresh
+    </button>
+    <button class="uk-button uk-margin-small-left" onclick="page()" title="Go To Page" data-uk-tooltip="{animate:true}">
+      <i class="uk-icon-ellipsis-h"></i>
     </button>
   </div>
   <div class="uk-width-3-5 uk-text-center">
     <ul class="uk-pagination" data-uk-pagination="{items:{{= @data[:count] }}, itemsOnPage:{{= @data[:limit] }}, currentPage:{{= @data[:page] - 1 }}, displayedPages:3}"></ul>
   </div>
-  <div class="uk-width-1-5 uk-text-right uk-form uk-form-horizontal">
-    <select onchange="$('input[name=&quot;limit&quot;]').val(this.value); submit()" style="display:none;">
-      {{ [20].each do |i| }}
-        {{ selected = @data[:limit] == i ? 'selected' : '' }}
-        <option value="{{= i }}" {{= selected }}>{{= i }} per page</option>
+  <div class="uk-width-1-5 uk-text-right">
+    <select id="query-sample" onchange="$('input[name=&quot;sample&quot;]').val(this.value); submit()" title="Sample Size" data-uk-tooltip="{animate:true}">
+      {{ target_sample = @data[:sample] || 10_000 }}
+      {{ samples = [100, 1_000, 10_000, 100_000, 200_000, 300_000] }}
+      {{ samples.each do |sample| }}
+        {{ selected = target_sample == sample ? 'selected' : '' }}
+        <option value="{{= sample }}" {{= selected }}>{{= sample }}</option>
+      {{ end }}
+      {{ unless samples.include? target_sample }}
+        <option value="{{= target_sample }}" selected>{{= target_sample }}</option>
       {{ end }}
     </select>
   </div>
@@ -149,39 +155,61 @@
 
 <form id="form">
   <input name="page" type="hidden" value="{{#= @data[:page] }}">
-  <!--<input name="limit" type="hidden" value="{{= @data[:limit] }}">-->
   <input name="filter" type="hidden" value="{{= @data[:filter] }}">
   <input name="hide" type="hidden" value="{{= @data[:hide] }}">
+  <input name="sample" type="hidden" value="{{= @data[:sample] }}">
 </form>
 
-<script>
+<script type="text/javascript">
   $(document).ready(function() {
     register_resizable_container('#logs-container')
   })
 
   $('[data-uk-pagination]').on('select.uk.pagination', function(e, pageIndex){
-    $("input[name='page']").val(pageIndex + 1)
+    var page = pageIndex + 1
+    if (page == {{= @data[:pages] }}) {
+      page = ''
+    }
+    $('input[name="page"]').val(page)
     submit()
   })
 
   function toggle_exception(id) {
-    var row = $("#" + id)
-    var ico = $("#icon-" + id)
-    if (row.is(":visible")) {
+    var row = $('#' + id)
+    var ico = $('#icon-' + id)
+    if (row.is(':visible')) {
       row.hide()
-      ico.attr("class", "uk-icon-caret-right")
+      ico.attr('class', 'uk-icon-caret-right')
     } else {
       row.show()
-      ico.attr("class", "uk-icon-caret-down")
+      ico.attr('class', 'uk-icon-caret-down')
     }
   }
 
-  function submit() {
-    $("#form").submit()
+  function reload() {
+    setTimeout('show_wait_modal()', 1500)
+    location.reload()
   }
 
-  function filter(column, value = "", remove = false) {
-    var fil = $("input[name='filter']")
+  function submit() {
+    setTimeout('show_wait_modal()', 1500)
+    $('#form').submit()
+  }
+
+  function page() {
+    UIkit.modal.prompt('Go to page:', {{= @data[:page] }}, function(new_page) {
+      if (parseInt(new_page) >= {{= @data[:pages] }}) {
+        new_page = ''
+      }
+      $('input[name="page"]').val(new_page)
+      submit()
+    })
+
+    $('div[class="uk-modal-dialog"] input[type="text"]').select()
+  }
+
+  function filter(column, value = '', remove = false) {
+    var fil = $('input[name="filter"]')
     var pat = "(?:^|\x19)" + column + "\x11.*?(?:\x19|$)"
 
     if (remove) {
@@ -190,21 +218,60 @@
       return
     }
 
-    var prompt = "Filter <strong class='uk-text-primary'>" + column + "</strong>:"
-    if (column == 'message') {
-      prompt += " <span style='font-style: italic;'>(will also filter any exceptions and causes including error class)</span>"
+    var prompt = 'Filter <strong class="uk-text-primary">' + column + '</strong>:'
+    switch (column) {
+      case 'timestamp':
+        prompt += ' ' +
+          '<span style="font-style:italic;">' +
+            '(see the following examples)' +
+          '</span>' +
+          '<br /><br />' +
+          '<table class="uk-text-small"><tr>' +
+            '<td>1999-12-31 </td>' +
+            '<td class="uk-text-muted">One full day.</td>' +
+          '</tr><tr>' +
+            '<td>1999-12-31 | 2000-01-01 </td>' +
+            '<td class="uk-text-muted">Date range (inclusive).</td>' +
+          '</tr><tr>' +
+            '<td>1999-12-31 00:00:00.000 | 2000-01-01 23:59:59.999{{= '&nbsp;'*10 }}</td>' +
+            '<td class="uk-text-muted">Equivalent to the above.</td>' +
+          '</tr><tr>' +
+            '<td>12-31 20:30:40.567 </td>' +
+            '<td class="uk-text-muted">Year is optional; 12-31 20:30:40.567 only.</td>' +
+          '</tr><tr>' +
+            '<td>13 | 14:30 </td>' +
+            '<td class="uk-text-muted">Date is optional; 13:00:00.000 thru 14:30:59.999.</td>' +
+          '</tr><tr>' +
+            '<td>15:16:17 </td>' +
+            '<td class="uk-text-muted">15:16:17.000 thru 15:16:17.999.</td>' +
+          '</tr><tr>' +
+            '<td>0 </td>' +
+            '<td class="uk-text-muted">00:00:00.000 thru 00:59:59.999.</td>' +
+          '</tr></table>' +
+          '<br />'
+        break
+      case 'message':
+        prompt += ' ' +
+          '<span style="font-style:italic;">' +
+            '(will also filter any exceptions and causes including error class)' +
+          '</span>'
+        break
     }
 
-    value = UIkit.modal.prompt(prompt, value, function(new_value) {
+    UIkit.modal.prompt(prompt, value, function(new_value) {
       filter_add(column, new_value)
     })
+
+    $('div[class="uk-modal-dialog"] input[type="text"]').select()
   }
 
   function filter_add(column, value) {
-    var fil = $("input[name='filter']")
+    var fil = $('input[name="filter"]')
     var pat = "(?:^|\x19)" + column + "\x11.*?(?:\x19|$)"
 
-    if (new RegExp(pat).exec(fil.val())) {
+    if (!value.trim()) {
+      fil.val(fil.val().replace(new RegExp(pat), ''))
+    } else if (new RegExp(pat).exec(fil.val())) {
       fil.val(fil.val().replace(new RegExp(pat), "\x19" + column + "\x11" + value + "\x19"))
     } else {
       fil.val(fil.val() + column + "\x11" + value + "\x19")
@@ -213,23 +280,8 @@
     submit()
   }
 
-  function filter_cell(column, cell) {
-    var value = $(cell).html().trim()
-
-    if (column == 'timestamp') {
-      var match = value.match(/^\d{4}-\d{2}-\d{2}/)
-      if (match) {
-        value = match[0]
-      } else {
-        return
-      }
-    }
-
-    filter(column, value)
-  }
-
   function hide(column, remove = false) {
-    var hid = $("input[name='hide']")
+    var hid = $('input[name="hide"]')
     if (remove) {
       var pat = "(?:^|\x19)" + column + "(?:\x19|$)"
       hid.val(hid.val().replace(new RegExp(pat), "\x19"))
@@ -240,14 +292,14 @@
   }
 
   function clear_filter() {
-    var fil = $("input[name='filter']")
-    fil.val("")
+    var fil = $('input[name="filter"]')
+    fil.val('')
     submit()
   }
 
   function show_hidden() {
-    var hid = $("input[name='hide']")
-    hid.val("")
+    var hid = $('input[name="hide"]')
+    hid.val('')
     submit()
   }
 </script>

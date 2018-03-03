@@ -51,10 +51,13 @@
     <div class="uk-grid">
       <div class="uk-width-1-4">
 
-        <a class="uk-button" href="">
+        <a class="uk-button" href="" title="Refresh" data-uk-tooltip="{animate:true}">
           <i class="uk-icon-refresh"></i>
-          Refresh
         </a>
+
+        <button class="uk-button uk-margin-small-left" onclick="page()" title="Go To Page" data-uk-tooltip="{animate:true}">
+          <i class="uk-icon-ellipsis-h"></i>
+        </button>
 
       </div>
       <div class="uk-width-2-4 uk-text-center">
@@ -64,11 +67,25 @@
       </div>
       <div class="uk-width-1-4 uk-text-right">
 
-        <div data-uk-button-checkbox>
-          <button class="uk-button" onclick="expand_all_fields(this)" data="init">
-            Expand All
+        <span class="uk-form uk-margin-small-right">
+          <select id="query-sample" onchange="get_doc()" title="Sample Size" data-uk-tooltip="{animate:true}">
+            {{ cached_sample = @data.dig(:cache, :sample) || 100 }}
+            {{ samples = [10, 100, 1_000, 10_000] }}
+            {{ samples.each do |sample| }}
+              {{ selected = cached_sample == sample ? 'selected' : '' }}
+              <option value="{{= sample }}" {{= selected }}>{{= sample }}</option>
+            {{ end }}
+            {{ unless samples.include? cached_sample }}
+              <option value="{{= cached_sample }}" selected>{{= cached_sample }}</option>
+            {{ end }}
+          </select>
+        </span>
+
+        <span data-uk-button-checkbox>
+          <button class="uk-button" onclick="expand_all_fields(this)" data="init" title="Expand All" data-uk-tooltip="{animate:true}">
+            <i class="uk-icon-expand"></i>
           </button>
-        </div>
+        </span>
 
       </div>
     </div>
@@ -77,7 +94,8 @@
 
 <script type="text/javascript">
   var pagination,
-      expand_all_state = false
+      expand_all_state = false,
+      current_page = 0
 
   $(document).ready(function() {
     register_resizable_container('#doc-container')
@@ -86,7 +104,8 @@
 
     pagination = UIkit.pagination('.uk-pagination', {pages:1, currentPage:0, displayedPages:3})
     $('.uk-pagination').on('select.uk.pagination', function(e, pageIndex) {
-      get_doc(pageIndex + 1)
+      current_page = pageIndex + 1
+      get_doc(current_page)
     })
 
     {{ if @data[:expand_all] == true }}
@@ -102,6 +121,8 @@
     var collection = $('#query-collection').val(),
         query      = {}
 
+    current_page = page
+
     if (!collection) {
       $('#query-collection').addClass('uk-form-danger')
       return false
@@ -109,24 +130,37 @@
       $('#query-collection').removeClass('uk-form-danger')
     }
 
+    var timer = setTimeout('show_wait_modal()', 100)
+
     query = '?page=' + page +
       '&from=' + $('#query-from').val() +
       '&thru=' + $('#query-thru').val() +
       '&search=' + $('#query-search').val() +
-      '&expand=' + expand_all_state
+      '&expand=' + expand_all_state +
+      '&sample=' + $('#query-sample').val()
 
     $.ajax({
       url: '/docs/' + collection + query,
       type: 'GET',
       success: function(data, text) {
-
         $('#doc-container').html(data).scrollTop(0)
-
+        clearTimeout(timer)
+        hide_wait_modal()
       },
       error: function(request, status, error) {
+        clearTimeout(timer)
+        hide_wait_modal()
         UIkit.modal.alert('Failed to retrieve document: <span class="uk-text-danger uk-text-bold">' + error + '</span>')
       }
     })
+  }
+
+  function page() {
+    UIkit.modal.prompt('Go to page:', current_page || 1, function(new_page) {
+      get_doc(new_page)
+    })
+
+    $('div[class="uk-modal-dialog"] input[type="text"]').select()
   }
 
   function expand_all_fields(toggle) {

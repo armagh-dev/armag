@@ -20,6 +20,8 @@
 require 'sinatra'
 require 'puma'
 
+use Rack::Deflater
+
 require_relative '../lib/armagh/environment.rb'
 Armagh::Environment.init
 
@@ -242,7 +244,8 @@ get '/logs' do
     page:   params['page'],
     limit:  params['limit'],
     filter: params['filter'],
-    hide:   params['hide']
+    hide:   params['hide'],
+    sample: params['sample']
   )
   errors = data.delete(:errors)
   render :logs, data: data, error: errors

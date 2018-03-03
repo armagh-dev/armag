@@ -530,15 +530,17 @@ module Armagh
           patch_json(user, "/workflow/#{workflow}/action/#{action}/unretire.json").to_json
         end
 
-        def get_logs(user, page:, limit:, filter:, hide:)
-          # TODO ARM-675 move this to the API and create a modal
+        def get_logs(user, page:, limit:, filter:, hide:, sample:)
+          # TODO ARM-675 move this to the API and create a model
           errors = []
           page   = page.to_i
-          init   = page.dup
+          init   = page <= 0
           page   = 1 if page <= 0
           limit  = limit.to_i
           limit  = 20 if limit <= 0
           skip   = page * limit - limit
+          sample = sample.to_i
+          sample = 10_000 if sample <= 0
 
           query =
             if filter.to_s.strip.empty? || filter == '{}'
@@ -563,22 +565,61 @@ module Armagh
 
                 _filter[column] =
                   case column
-                  when '_id'
-                    BSON::ObjectId(value)
                   when 'timestamp'
+                    p1, p2 = value.split('|')
+                    p2 = p1 unless p2
+
+                    d1, t1 = p1&.split
+                    unless d1&.include?('-') || t1
+                      t1 = d1
+                      d1 = Date.today.to_s
+                    end
+                    d1 = "#{Date.today.year}-#{d1}" if d1.count('-') == 1
+                    t1 = '00:00:00.000' unless t1
+                    t1 << ':00:00.000'  unless t1.include?(':')
+                    t1 << ' +0000'
+
+                    d2, t2 = p2&.split
+                    unless d2&.include?('-') || t2
+                      t2 = d2
+                      d2 = d1
+                    end
+                    d2 = "#{Date.today.year}-#{d2}" if d2.count('-') == 1
+                    t2 = '23:59:59.999' unless t2
+                    t2 <<
+                      case t2.count(':')
+                      when 0 then ':59:59.999'
+                      when 1 then ':59.999'
+                      when 2 then (t2.include?('.') ? '' : '.999')
+                      else
+                        errors << [column, "extra colon (:) detected in time '#{t2}'"]
+                        ''
+                      end
+                    t2 << ' +0000'
+
                     begin
-                      time = Time.parse(value).utc
+                      p1 = Time.parse("#{d1} #{t1}")
+                      p2 = Time.parse("#{d2} #{t2}")
                     rescue => e
-                      errors << "Unable to filter <strong>#{column}</strong>: #{e.message}"
+                      errors << [column, e.message]
                       {}
                     else
                       {
-                        :$gte => Time.new(time.year, time.month, time.day, 00, 00, 00, '+00:00'),
-                        :$lte => Time.new(time.year, time.month, time.day, 23, 59, 59, '+00:00')
+                        :$gte => p1,
+                        :$lte => p2
                       }
                     end
+                  when 'level'
+                    /^#{value}$/i
                   when 'pid'
                     value.to_i
+                  when 'document_internal_id'
+                    begin
+                      BSON::ObjectId(value)
+                    rescue => e
+                      errors << [column, e.message]
+                      {}
+                    end
                   else
                    /#{value}/i
                   end
@@ -598,96 +639,196 @@ module Armagh
               _hide
             end
 
-          count = Connection.log.find(query).count.to_i
+          # ARM-869
+          slice = Connection.log
+            .find()
+            .sort('_id' => -1)
+            .limit(sample)
+            .return_key(true)
+            .to_a
 
-          if init <= 0
-            page = (count / limit).ceil + 1
+          slice_id = slice.last&.[]('_id')
+          query.merge!('_id' => {:$gte => slice_id}) if slice_id
+
+          count = Connection.log
+            .find(query)
+            .count
+
+          pages = (count / limit.to_f).ceil
+          if init
+            page = pages
             skip = page * limit - limit
           end
+          skip = 0 if skip < 0
+
+          logs = Connection.log
+            .find(query)
+            .projection(projection)
+            .skip(skip)
+            .limit(limit)
+            .to_a
+
+          filter_match = {:$match => slice_id ? {'_id' => {:$gte => slice_id}} : {}}
+          filter_sort  = {:$sort  => {'_id' => 1}}
+          filter_desc  = {:$sort  => {'_id' => -1}}
+          filter_limit = {:$limit => 15}
+          filters      = {}
+
+          filters['timestamp'] = Connection.log
+            .aggregate([
+              filter_match,
+              {:$project => {'date' => {:$substr => ['$timestamp', 0, 10]}}},
+              {:$group   => {'_id'  => '$date'}},
+              filter_desc,
+              filter_limit
+            ])
+            .to_a
+            .map { |date|
+              date  = date['_id']
+              wkday = Date.parse(date).strftime('%A')
+              "#{date} (#{wkday})"
+            }
+
+          filters['component'] = Connection.log
+            .aggregate([
+              {:$match => filter_match[:$match].merge(
+                'component' => {:$not => /^Armagh::Application::Agent::armagh-agent/}
+              )},
+              {:$group => {'_id' => '$component'}}
+            ])
+            .to_a
+            .map { |component|
+              component['_id']
+                .split('::')
+                .last
+                .sub(/^ScheduledActionTrigger$/, 'ActionTrigger')
+            }
+            .push('Agent')
+            .uniq
+            .sort
+
+          filters['level'] = Connection.log
+            .aggregate([
+              filter_match,
+              {:$group => {'_id' => '$level'}},
+              filter_sort
+            ])
+            .to_a
+            .map { |level| level['_id'] }
+
+          filters['workflow'] = Connection.log
+            .aggregate([
+              {:$match => filter_match[:$match].merge('workflow' => {:$exists => true})},
+              {:$group => {'_id' => '$workflow'}},
+              filter_limit,
+              filter_sort
+            ])
+            .to_a
+            .map { |workflow| workflow['_id'] }
+
+          filters['action'] = Connection.log
+              .aggregate([
+                {:$match => filter_match[:$match].merge('action' => {:$exists => true})},
+                {:$group => {'_id' => '$action'}},
+                filter_limit,
+                filter_sort
+              ])
+              .to_a
+              .map { |action| action['_id'] }
+
+          filters['action_supertype'] = Connection.log
+              .aggregate([
+                {:$match => filter_match[:$match].merge('action_supertype' => {:$exists => true})},
+                {:$group => {'_id' => '$action_supertype'}},
+                filter_limit,
+                filter_sort
+              ])
+              .to_a
+              .map { |supertype| supertype['_id'] }
+
+          filters['hostname'] = Connection.log
+            .aggregate([
+              filter_match,
+              {:$group => {'_id' => '$hostname'}},
+              filter_limit,
+              filter_sort
+            ])
+            .to_a
+            .map { |hostname| hostname['_id'] }
+
+          filters['pid'] = Connection.log
+            .aggregate([
+              filter_match,
+              {:$group => {'_id' => '$pid'}},
+              filter_limit,
+              filter_desc
+            ])
+            .to_a
+            .map { |pid| pid['_id'] }
+
+          filters['document_internal_id'] = Connection.log
+            .aggregate([
+              {:$match => filter_match[:$match].merge('document_internal_id' => {:$exists => true})},
+              {:$group => {'_id' => '$document_internal_id'}},
+              filter_limit,
+              filter_desc
+            ])
+            .to_a
+            .map { |id| id['_id'] }
 
           {
+            logs:     logs,
+            filters:  filters,
+            errors:   errors.map { |column, error| "Unable to filter <strong>#{column}</strong>: #{error}" },
             count:    count,
+            pages:    pages,
             page:     skip > count ? 1 : page,
             limit:    limit,
             skip:     skip,
             filter:   filter,
             hide:     hide,
-            distinct: {
-              'timestamp' => Connection.log
-                .find(query)
-                .skip(skip)
-                .limit(limit)
-                .aggregate([
-                  {'$project' => {'date' => {'$substr'=>['$timestamp', 0, 10]}}},
-                  {'$group'   => {'_id'  => '$date'}}
-                ])
-                .to_a.map { |date| date['_id'] }
-                .sort,
-              'component' => Connection.log
-                .find(query)
-                .skip(skip)
-                .limit(limit)
-                .distinct('component').to_a
-                .map { |component|
-                  split = component.split('::')
-                  split.size == 4 ? split[2] : split.last
-                }
-                .uniq
-                .sort,
-              'level' => Connection.log
-                .find(query)
-                .skip(skip)
-                .limit(limit)
-                .distinct('level')
-                .to_a
-                .sort,
-              'hostname' => Connection.log
-                .find(query)
-                .skip(skip)
-                .limit(limit)
-                .distinct('hostname')
-                .to_a
-                .sort,
-              'pid' => Connection.log
-                .find(query)
-                .skip(skip)
-                .limit(limit)
-                .distinct('pid')
-                .to_a
-                .sort
-            },
-            logs: Connection.log
-                    .find(query)
-                    .projection(projection)
-                    .skip(skip)
-                    .limit(limit)
-                    .to_a,
-            errors: errors
-          }
+            sample:   sample
+         }
         end
 
         def get_doc_collections(user) # TODO move this to the API
-          collections = {'armagh.failures' => 'Failures'}
-          Connection.all_document_collections.each do |collection|
+          collections = {}
+          ([Connection.failures] + Connection.all_document_collections).each do |collection|
             id    = collection.namespace
-            label = id[/^armagh\.documents\.(.+)$/, 1]
-            collections[id] = label&.gsub(/(?:^|_)\w/) { |x| x.sub(/_/, ' ').upcase } || 'Pending Publish'
+            label = id == 'armagh.failures' ? 'Failures' : id[/^armagh\.documents\.(.+)$/, 1]
+            label = label&.gsub(/(?:^|_)\w/) { |x| x.sub(/_/, ' ').upcase } || 'Pending Publish'
+            count = collection.count
+            count =
+              if count >= 1_000_000_000
+                (count / 1_000_000_000.0).round(2).to_s << 'B'
+              elsif count >= 1_000_000
+                (count / 1_000_000.0).round(2).to_s << 'M'
+              elsif count >= 1_000
+                (count / 1_000.0).round(2).to_s << 'K'
+              else
+                count
+              end
+            collections[id] = "#{label} (#{count})"
           end
           collections
         end
 
-        def get_doc(user, params) # TODO move this to the API and create a modal
+        def get_doc(user, params) # TODO move this to the API and create a model
           query  = {}
           ts     = 'updated_timestamp'
-          id     = params['collection']
+          coll   = params['collection']
           page   = params['page'].to_i - 1
           page   = 0 if page < 0
           from   = params['from']
           thru   = params['thru']
           search = params['search']
+          expand = params['expand'] == 'true'
+          sample = params['sample'].to_i
+          sample = 100 if sample.zero?
 
           user.doc_viewer = {
-            collection: id,
+            collection: coll,
+            sample:     sample,
             page:       page + 1,
             from:       from,
             thru:       thru,
@@ -695,14 +836,14 @@ module Armagh
           }
 
           collection =
-            case id
+            case coll
             when 'armagh.failures'
               Connection.failures
             else
               ts = 'document_timestamp'
-              Connection.all_document_collections.find { |c| c.namespace == id }
+              Connection.all_document_collections.find { |c| c.namespace == coll }
             end
-          raise AdminGUIError, "Unexpected document collection #{id.inspect}" unless collection
+          raise AdminGUIError, "Unexpected document collection #{coll.inspect}" unless collection
 
           unless from.empty?
             from = Time.parse(from)
@@ -716,13 +857,20 @@ module Armagh
           end
 
           unless search.empty?
-            sample = collection.find().limit(1).to_a.first
-            fields = get_doc_searchable_fields(sample)
-            query['$or'] =
-              fields.map! do |field|
-                {field => /#{search}/i}
-              end
-            query['$or'] << {'_id' => BSON::ObjectId(search)} if BSON::ObjectId.legal?(search)
+            sample_doc = collection.find().sort({'_id' => -1}).limit(1).to_a.first
+            fields = get_doc_searchable_fields(sample_doc)
+            query[:$or] = fields.map! { |field| {field => /#{search}/i} }
+            query[:$or] << {'_id' => BSON::ObjectId(search)} if BSON::ObjectId.legal?(search)
+          end
+
+          begin
+            slice    = collection.find().sort('_id' => -1).limit(sample).return_key(true).to_a
+            slice_id = slice.last&.[]('_id')
+            query.merge!('_id' => {:$gte => slice_id})
+            docs     = collection.find(query).sort('_id' => -1).limit(sample).return_key(true).to_a
+            doc      = collection.find('_id' => docs[page]&.[]('_id')).limit(1).to_a.first
+          rescue => e
+            raise AdminGUIError, "Unable to process query: #{e}"
           end
 
           {
@@ -730,9 +878,9 @@ module Armagh
             from:   params['from'],
             thru:   params['thru'],
             search: params['search'],
-            count:  collection.find(query).count,
-            doc:    collection.find(query).sort(ts => -1).skip(page).limit(1).to_a.first,
-            expand: params['expand'] == 'true'
+            expand: expand,
+            count:  docs.size,
+            doc:    doc
           }
         end
 

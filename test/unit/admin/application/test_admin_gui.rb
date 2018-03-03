@@ -794,118 +794,180 @@ module Armagh
         end
 
         private def mock_log_connection
-          BSON.stubs(:ObjectId).returns('mongo_id')
-          array = ['la::la::la']
-          aggregate = mock('aggregate')
-          aggregate.stubs(:to_a).returns(array)
-          limit = mock('limit')
-          limit.stubs(:aggregate).returns(aggregate)
-          limit.stubs(:to_i).returns(10)
-          limit.stubs(:to_a).returns(array)
-          limit.stubs(:distinct).returns(array)
-          skip = mock('skip')
-          skip.stubs(:limit).returns(limit)
-          projection = mock('projection')
-          projection.stubs(:skip).returns(skip)
-          find = mock('find')
-          find.stubs(:count).returns('1000')
-          find.stubs(:skip).returns(skip)
-          find.stubs(:projection).returns(projection)
-          log = mock('log')
-          log.stubs(:find).returns(find)
-          Connection.stubs(:log).returns(log)
+          Date.stubs(:parse).returns(Date.new(2018, 01, 04))
+          array = [{'_id'=>'id'}]
+          Connection.stubs(
+            log: stub(
+              find: stub(
+                sort: stub(
+                  limit: stub(
+                    return_key: array
+                  )
+                ),
+                count: 10,
+                projection: stub(
+                  skip: stub(
+                    limit: array
+                  )
+                )
+              ),
+              aggregate: array
+            )
+          )
         end
 
         def test_logs
           filter = "message\x11blah\x19_id\x11mongo_id\x19timestamp\x111982-01-04\x19pid\x119999\x19level\x11any"
           hide = "pid\x19hostname"
           mock_log_connection
-          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: hide)
-          expected = {:count=>1000,
-            :distinct=>
-              {"component"=>["la"],
-              "hostname"=>["la::la::la"],
-              "level"=>["la::la::la"],
-              "pid"=>["la::la::la"],
-              "timestamp"=>[nil]},
+          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: hide, sample: 10)
+          expected = {
+            :count=>10,
             :errors=>[],
-            :filter=>
-              "message\u0011blah\u0019_id\u0011mongo_id\u0019timestamp\u00111982-01-04\u0019pid\u00119999\u0019level\u0011any",
+            :filter=>"message\u0011blah\u0019_id\u0011mongo_id\u0019timestamp\u00111982-01-04\u0019pid\u00119999\u0019level\u0011any",
+            :filters=>
+              {"action"=>["id"],
+               "component"=>["Agent", "id"],
+               "document_internal_id"=>["id"],
+               "hostname"=>["id"],
+               "level"=>["id"],
+               "pid"=>["id"],
+               "action_supertype"=>["id"],
+               "timestamp"=>["id (Thursday)"],
+               "workflow"=>["id"]},
             :hide=>"pid\u0019hostname",
             :limit=>10,
-            :logs=>["la::la::la"],
+            :logs=>[{"_id"=>"id"}],
             :page=>1,
-            :skip=>0}
+            :pages=>1,
+            :sample=>10,
+            :skip=>0
+          }
           assert_equal expected, result
         end
 
         def test_get_logs_empty_filter
           mock_log_connection
-          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: '', hide: '')
-          expected = {:count=>1000,
-            :distinct=>{"component"=>["la"],
-              "hostname"=>["la::la::la"],
-              "level"=>["la::la::la"],
-              "pid"=>["la::la::la"],
-              "timestamp"=>[nil]},
+          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: '', hide: '', sample: nil)
+          expected = {
+            :count=>10,
             :errors=>[],
             :filter=>"",
+            :filters=>
+              {"action"=>["id"],
+               "component"=>["Agent", "id"],
+               "document_internal_id"=>["id"],
+               "hostname"=>["id"],
+               "level"=>["id"],
+               "pid"=>["id"],
+               "action_supertype"=>["id"],
+               "timestamp"=>["id (Thursday)"],
+               "workflow"=>["id"]},
             :hide=>"",
             :limit=>10,
-            :logs=>["la::la::la"],
+            :logs=>[{"_id"=>"id"}],
             :page=>1,
-            :skip=>0}
+            :pages=>1,
+            :sample=>10000,
+            :skip=>0
+          }
           assert_equal expected, result
         end
 
-        def test_get_logs_time_parse_error
+        def test_get_logs_date_parse_error
           mock_log_connection
+          Time.expects(:parse).raises(RuntimeError.new('parse error'))
           filter = "timestamp\x11fail_me"
-          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: nil)
-          expected = {:count=>1000,
-            :distinct=>
-              {"component"=>["la"],
-               "hostname"=>["la::la::la"],
-               "level"=>["la::la::la"],
-               "pid"=>["la::la::la"],
-               "timestamp"=>[nil]},
-            :errors=>["Unable to filter <strong>timestamp</strong>: no time information in \"fail_me\""],
+          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: nil, sample: 10)
+          expected = {
+            :count=>10,
+            :errors=>["Unable to filter <strong>timestamp</strong>: parse error"],
             :filter=>"timestamp\u0011fail_me",
+            :filters=>
+              {"action"=>["id"],
+               "component"=>["Agent", "id"],
+               "document_internal_id"=>["id"],
+               "hostname"=>["id"],
+               "level"=>["id"],
+               "pid"=>["id"],
+               "action_supertype"=>["id"],
+               "timestamp"=>["id (Thursday)"],
+               "workflow"=>["id"]},
             :hide=>nil,
             :limit=>10,
-            :logs=>["la::la::la"],
+            :logs=>[{"_id"=>"id"}],
             :page=>1,
-            :skip=>0}
+            :pages=>1,
+            :sample=>10,
+            :skip=>0
+          }
+          assert_equal expected, result
+        end
+
+        def test_get_logs_objectid_error
+          mock_log_connection
+          BSON.stubs(:ObjectId).raises(RuntimeError.new('objectid error'))
+          filter = "document_internal_id\x11fail_me"
+          result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: nil, sample: 10)
+          expected = {
+            :count=>10,
+            :errors=>["Unable to filter <strong>document_internal_id</strong>: objectid error"],
+            :filter=>"document_internal_id\u0011fail_me",
+            :filters=>
+              {"action"=>["id"],
+               "component"=>["Agent", "id"],
+               "document_internal_id"=>["id"],
+               "hostname"=>["id"],
+               "level"=>["id"],
+               "pid"=>["id"],
+               "action_supertype"=>["id"],
+               "timestamp"=>["id (Thursday)"],
+               "workflow"=>["id"]},
+            :hide=>nil,
+            :limit=>10,
+            :logs=>[{"_id"=>"id"}],
+            :page=>1,
+            :pages=>1,
+            :sample=>10,
+            :skip=>0
+          }
           assert_equal expected, result
         end
 
         def test_get_doc_collections
-          collection = mock('collection')
-          collection.expects(:namespace).returns('armagh.documents.collection')
-          Connection.expects(:all_document_collections).returns([collection])
+          connection = mock('connection')
+          connection.expects(:namespace).twice.returns('armagh.documents.collection')
+          connection.expects(:count).twice.returns(16_500_000)
+          Connection.expects(:failures).returns(connection)
+          Connection.expects(:all_document_collections).returns([connection])
           result = @admin_gui.get_doc_collections(@user)
-          expected = {"armagh.documents.collection"=>"Collection", "armagh.failures"=>"Failures"}
+          expected = {"armagh.documents.collection"=>"Collection (16.5M)"}
           assert_equal expected, result
         end
 
         private def mock_doc_connection
-          BSON.stubs(:ObjectId).returns('mongo_id')
-          count = mock('count')
-          count.expects(:count).returns(1)
-          array = [{doc: true}]
-          skip = mock('skip')
-          skip.expects(:limit).returns(array)
-          sort = mock('sort')
-          sort.expects(:skip).returns(skip)
           doc = mock('doc')
-          doc.expects(:sort).returns(sort)
+          doc.expects(:limit).returns([{'_id'=>'id'}])
+
+          limit = mock('limit')
+          limit.expects(:return_key).twice.returns([{'_id'=>'id'}])
+          sort = mock('sort')
+          sort.expects(:limit).twice.returns(limit)
+          slice = mock('slice')
+          slice.expects(:sort).twice.returns(sort)
+
+          sample_sort = mock('sample_sort')
+          sample_sort.expects(:limit).returns([{'_id'=>'id'}])
           sample = mock('sample')
-          sample.expects(:limit).returns([{doc: 'doc'}])
-          connection = mock('connection')
-          connection.expects(:find).times(3).returns(sample, count, doc)
-          all_docs = mock('all_docs')
-          all_docs.expects(:find).returns(connection)
-          Connection.expects(:all_document_collections).returns(all_docs)
+          sample.expects(:sort).returns(sample_sort)
+
+          collection = mock('collections')
+          collection.expects(:find).times(4).returns(sample, slice, slice, doc)
+
+          collections = mock('collections')
+          collections.expects(:find).returns(collection)
+
+          Connection.expects(:all_document_collections).returns(collections)
         end
 
         def test_get_doc
@@ -914,7 +976,8 @@ module Armagh
             'page'       => 1,
             'from'       => '1982-01-04',
             'thru'       => '1982-12-27',
-            'search'     => 'search'
+            'search'     => 'search',
+            'sample'     => '100'
           }
           mock_doc_connection
           @user.expects(:doc_viewer=).with(
@@ -922,12 +985,13 @@ module Armagh
             page:       1,
             from:       '1982-01-04',
             thru:       '1982-12-27',
-            search:     'search'
+            search:     'search',
+            sample:     100
           )
           result = @admin_gui.get_doc(@user, params)
           expected = {
             :count=>1,
-            :doc=>{:doc=>true},
+            :doc=>{"_id"=>"id"},
             :expand=>false,
             :from=>"1982-01-04",
             :page=>0,
@@ -935,6 +999,39 @@ module Armagh
             :thru=>"1982-12-27"
           }
           assert_equal expected, result
+        end
+
+        def test_get_doc_unexpected_collection
+          params = {'collection' => 'collection'}
+          @user.expects(:doc_viewer=)
+          collections = mock('collection')
+          collections.expects(:find)
+          Connection.expects(:all_document_collections).returns(collections)
+          e = assert_raise Armagh::Admin::Application::AdminGUIError do
+            @admin_gui.get_doc(@user, params)
+          end
+          assert_equal 'Unexpected document collection "collection"', e.message
+        end
+
+        def test_get_doc_query_error
+          params = {
+            'collection' => 'collection',
+            'page'       => 1,
+            'from'       => '',
+            'thru'       => '',
+            'search'     => '',
+            'sample'     => '100'
+          }
+          @user.expects(:doc_viewer=)
+          collection = mock('collection')
+          collection.expects(:find).raises(RuntimeError.new('some query error'))
+          collections = mock('collection')
+          collections.expects(:find).returns(collection)
+          Connection.expects(:all_document_collections).returns(collections)
+          e = assert_raise Armagh::Admin::Application::AdminGUIError do
+            @admin_gui.get_doc(@user, params)
+          end
+          assert_equal 'Unable to process query: some query error', e.message
         end
 
       end
