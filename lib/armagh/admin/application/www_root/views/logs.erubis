@@ -3,10 +3,10 @@
 
 {{= partial :header, data: {title: 'Logs', subtitle: "Showing #{@data[:logs].size} entries (#{@data[:skip] + (@data[:logs].size.zero? ? 0 : 1)} through #{@data[:skip] + @data[:logs].size}) out of #{@data[:count]}"} }}
 
-{{ columns = %w(timestamp component level message workflow action action_supertype hostname pid document_internal_id) }}
+{{ columns = %w(timestamp component level message workflow action action_supertype hostname pid document_internal_id alert) }}
 
-<div id="logs-container" class="uk-overflow-container" style="min-height:560px;">
-  <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap">
+<div id="logs-container" class="uk-overflow-container" style="min-height:580px;">
+  <table class="uk-table uk-table-hover uk-table-condensed uk-text-small uk-text-nowrap uk-margin-remove">
 
     <caption>
       <div>
@@ -52,14 +52,16 @@
             </button>
             <div class="uk-dropdown uk-dropdown-small uk-text-small uk-dropdown-close" style="font-weight: normal;">
               <ul class="uk-nav uk-nav-dropdown">
-                <li>
-                  <a href="javascript:" onclick="filter('{{= column }}')">
-                    <i class="uk-icon-filter uk-margin-small-right"></i>
-                    Filter...
-                  </a>
-                </li>
+                {{ unless %w(alert).include? column }}
+                  <li>
+                    <a href="javascript:" onclick="filter('{{= column }}')">
+                      <i class="uk-icon-filter uk-margin-small-right"></i>
+                      Filter...
+                    </a>
+                  </li>
+                {{ end }}
 
-                {{ @data[:filters][column]&.each do |filter| }}
+                {{ @data[:filters]&.[](column)&.each do |filter| }}
                   <li>
                     <a href="javascript:" onclick="filter_add('{{= column }}', '{{== column == 'timestamp' ? filter.sub(/\ \(\w+\)$/, '') : filter }}')">
                       {{== filter }}
@@ -83,16 +85,16 @@
     <tbody>
       {{ @data[:logs]&.each_with_index do |log, index| }}
         {{ uuid = SecureRandom.uuid }}
-        <tr>
+        <tr {{= 'class="uk-text-danger uk-text-bold"' if log['alert'] }}>
           {{ columns.each do |column| }}
             <td title="{{== log[column] }}">
               {{ if column == 'message' && log['exception'] }}
-                <a href="javascript:" onclick="{{= log['exception'] ? "toggle_exception('#{uuid}')" : ''}}">
+                <a href="javascript:" onclick="{{= log['exception'] ? "toggle_exception('#{uuid}')" : ''}}" style="color:inherit;">
                   <i id="icon-{{= uuid }}" class="uk-icon-caret-right"></i>
               {{ end }}
               {{== case column
                    when 'timestamp'
-                     log[column].strftime('%m-%d · %H:%M:%S.%L')
+                     log[column].strftime('%m-%d %H:%M:%S.%L')
                    when 'component'
                      split = log[column].split('::')
                      comp  = split.size == 4 ? split[2] : split.last
@@ -139,24 +141,30 @@
     <ul class="uk-pagination" data-uk-pagination="{items:{{= @data[:count] }}, itemsOnPage:{{= @data[:limit] }}, currentPage:{{= @data[:page] - 1 }}, displayedPages:3}"></ul>
   </div>
   <div class="uk-width-1-5 uk-text-right">
-    <select id="query-sample" onchange="$('input[name=&quot;sample&quot;]').val(this.value); submit()" title="Sample Size" data-uk-tooltip="{animate:true}">
-      {{ target_sample = @data[:sample] || 10_000 }}
-      {{ samples = [100, 1_000, 10_000, 100_000, 200_000, 300_000] }}
-      {{ samples.each do |sample| }}
-        {{ selected = target_sample == sample ? 'selected' : '' }}
-        <option value="{{= sample }}" {{= selected }}>{{= sample }}</option>
-      {{ end }}
-      {{ unless samples.include? target_sample }}
-        <option value="{{= target_sample }}" selected>{{= target_sample }}</option>
-      {{ end }}
-    </select>
+
+    {{ drops = {type:   %w(limit sample),
+                prompt: %w(Page Sample),
+                value:  [@data[:limit] || 20, @data[:sample] || 10_000],
+                values: [[20, 25, 30, 40, 50, 100, 500], [100, 1_000, 10_000, 100_000, 200_000, 300_000]]} }}
+    {{ (0..1).each do |i| }}
+      {{ drops[:values][i] = (drops[:values][i] << drops[:value][i]).uniq.sort }}
+      <select id="query-{{= drops[:type][i]  }}" onchange="select_value(this.value, '{{= drops[:type][i] }}', '{{= "#{drops[:prompt][i].downcase} size" }}')" title="{{= "#{drops[:prompt][i]} Size" }}" data-uk-tooltip="{animate:true}">
+        {{ drops[:values][i].each do |v| }}
+          {{ selected = drops[:value][i] == v ? 'selected' : '' }}
+          <option value="{{= v }}" {{= selected }}>{{= v }}</option>
+        {{ end }}
+        <option value="">Other...</option>
+      </select>
+    {{ end }}
+
   </div>
 </div>
 
 <form id="form">
-  <input name="page" type="hidden" value="{{#= @data[:page] }}">
+  <input name="page"   type="hidden">
+  <input name="limit"  type="hidden" value="{{= @data[:limit] }}">
   <input name="filter" type="hidden" value="{{= @data[:filter] }}">
-  <input name="hide" type="hidden" value="{{= @data[:hide] }}">
+  <input name="hide"   type="hidden" value="{{= @data[:hide] }}">
   <input name="sample" type="hidden" value="{{= @data[:sample] }}">
 </form>
 
@@ -174,6 +182,20 @@
     submit()
   })
 
+  function select_value(value, id, prompt) {
+    var field = $('input[name="' + id + '"]')
+    if (!value) {
+      UIkit.modal.prompt('Specify <span class="uk-text-primary uk-text-bold">' + prompt + ':</span> ', field.val(), function(new_value) {
+        if (!new_value) { return false }
+        select_value(new_value, id, prompt)
+      })
+      $('div[class="uk-modal-dialog"] input[type="text"]').select()
+      return false
+    }
+    field.val(value)
+    submit()
+  }
+
   function toggle_exception(id) {
     var row = $('#' + id)
     var ico = $('#icon-' + id)
@@ -187,12 +209,12 @@
   }
 
   function reload() {
-    setTimeout('show_wait_modal()', 1500)
+    setTimeout('show_wait_modal()', 500)
     location.reload()
   }
 
   function submit() {
-    setTimeout('show_wait_modal()', 1500)
+    setTimeout('show_wait_modal()', 500)
     $('#form').submit()
   }
 
@@ -227,25 +249,25 @@
           '</span>' +
           '<br /><br />' +
           '<table class="uk-text-small"><tr>' +
-            '<td>1999-12-31 </td>' +
+            '<td class="uk-text-primary">1999-12-31 </td>' +
             '<td class="uk-text-muted">One full day.</td>' +
           '</tr><tr>' +
-            '<td>1999-12-31 | 2000-01-01 </td>' +
+            '<td class="uk-text-primary">1999-12-31 | 2000-01-01 </td>' +
             '<td class="uk-text-muted">Date range (inclusive).</td>' +
           '</tr><tr>' +
-            '<td>1999-12-31 00:00:00.000 | 2000-01-01 23:59:59.999{{= '&nbsp;'*10 }}</td>' +
+            '<td class="uk-text-primary">1999-12-31 00:00:00.000 | 2000-01-01 23:59:59.999{{= '&nbsp;'*10 }}</td>' +
             '<td class="uk-text-muted">Equivalent to the above.</td>' +
           '</tr><tr>' +
-            '<td>12-31 20:30:40.567 </td>' +
+            '<td class="uk-text-primary">12-31 20:30:40.567 </td>' +
             '<td class="uk-text-muted">Year is optional; 12-31 20:30:40.567 only.</td>' +
           '</tr><tr>' +
-            '<td>13 | 14:30 </td>' +
+            '<td class="uk-text-primary">13 | 14:30 </td>' +
             '<td class="uk-text-muted">Date is optional; 13:00:00.000 thru 14:30:59.999.</td>' +
           '</tr><tr>' +
-            '<td>15:16:17 </td>' +
+            '<td class="uk-text-primary">15:16:17 </td>' +
             '<td class="uk-text-muted">15:16:17.000 thru 15:16:17.999.</td>' +
           '</tr><tr>' +
-            '<td>0 </td>' +
+            '<td class="uk-text-primary">0 </td>' +
             '<td class="uk-text-muted">00:00:00.000 thru 00:59:59.999.</td>' +
           '</tr></table>' +
           '<br />'

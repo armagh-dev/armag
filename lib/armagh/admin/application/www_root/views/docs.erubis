@@ -130,7 +130,7 @@
       $('#query-collection').removeClass('uk-form-danger')
     }
 
-    var timer = setTimeout('show_wait_modal()', 100)
+    var timer = setTimeout('show_wait_modal()', 300)
 
     query = '?page=' + page +
       '&from=' + $('#query-from').val() +

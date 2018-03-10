@@ -538,9 +538,13 @@ module Armagh
           page   = 1 if page <= 0
           limit  = limit.to_i
           limit  = 20 if limit <= 0
+          limit  = 1_000 if limit > 1_000
           skip   = page * limit - limit
           sample = sample.to_i
           sample = 10_000 if sample <= 0
+          sample = 1_000_000 if sample > 1_000_000
+          opts   = {max_time_ms: 30_000}
+          slice  = {}
 
           query =
             if filter.to_s.strip.empty? || filter == '{}'
@@ -604,13 +608,15 @@ module Armagh
                       errors << [column, e.message]
                       {}
                     else
-                      {
-                        :$gte => p1,
-                        :$lte => p2
-                      }
+                      slice = {'_id' => {
+                        :$gte => BSON::ObjectId.from_time(p1.to_i),
+                        :$lt  => BSON::ObjectId.from_time(p2.to_i + 1)}}
+                      {:$gte => p1, :$lte => p2}
                     end
-                  when 'level'
-                    /^#{value}$/i
+                  when 'message', 'component'
+                    /#{value}/i
+                  when 'alert'
+                    %w(1 true t yes y).include?(value.to_s.strip) ? true : nil
                   when 'pid'
                     value.to_i
                   when 'document_internal_id'
@@ -621,7 +627,7 @@ module Armagh
                       {}
                     end
                   else
-                   /#{value}/i
+                    /^#{value}$/i
                   end
               end
               _filter
@@ -639,21 +645,22 @@ module Armagh
               _hide
             end
 
-          # ARM-869
-          slice = Connection.log
-            .find()
+          slice_id = Connection.log
+            .find(slice, opts)
             .sort('_id' => -1)
             .limit(sample)
             .return_key(true)
             .to_a
+            .last&.[]('_id')
 
-          slice_id = slice.last&.[]('_id')
-          query.merge!('_id' => {:$gte => slice_id}) if slice_id
+          if slice.empty?
+            slice['_id'] = {:$gte => slice_id} if slice_id
+          else
+            slice['_id'][:$gte] = slice_id
+          end
+          query.merge!(slice)
 
-          count = Connection.log
-            .find(query)
-            .count
-
+          count = Connection.log.find(query, opts).count
           pages = (count / limit.to_f).ceil
           if init
             page = pages
@@ -662,32 +669,21 @@ module Armagh
           skip = 0 if skip < 0
 
           logs = Connection.log
-            .find(query)
+            .find(query, opts)
             .projection(projection)
             .skip(skip)
             .limit(limit)
             .to_a
 
-          filter_match = {:$match => slice_id ? {'_id' => {:$gte => slice_id}} : {}}
+          filter_match = {:$match => slice}
           filter_sort  = {:$sort  => {'_id' => 1}}
-          filter_desc  = {:$sort  => {'_id' => -1}}
-          filter_limit = {:$limit => 15}
-          filters      = {}
+          filters      = {'alert' => %w(true false)}
 
-          filters['timestamp'] = Connection.log
-            .aggregate([
-              filter_match,
-              {:$project => {'date' => {:$substr => ['$timestamp', 0, 10]}}},
-              {:$group   => {'_id'  => '$date'}},
-              filter_desc,
-              filter_limit
-            ])
-            .to_a
-            .map { |date|
-              date  = date['_id']
-              wkday = Date.parse(date).strftime('%A')
-              "#{date} (#{wkday})"
-            }
+          filters['timestamp'] = (0..14).map { |offset|
+            d = Date.today - offset
+            w = d.strftime('%A')[0..2]
+            "#{d} (#{w})"
+          }
 
           filters['component'] = Connection.log
             .aggregate([
@@ -695,7 +691,7 @@ module Armagh
                 'component' => {:$not => /^Armagh::Application::Agent::armagh-agent/}
               )},
               {:$group => {'_id' => '$component'}}
-            ])
+            ], opts)
             .to_a
             .map { |component|
               component['_id']
@@ -712,7 +708,7 @@ module Armagh
               filter_match,
               {:$group => {'_id' => '$level'}},
               filter_sort
-            ])
+            ], opts)
             .to_a
             .map { |level| level['_id'] }
 
@@ -720,9 +716,8 @@ module Armagh
             .aggregate([
               {:$match => filter_match[:$match].merge('workflow' => {:$exists => true})},
               {:$group => {'_id' => '$workflow'}},
-              filter_limit,
               filter_sort
-            ])
+            ], opts)
             .to_a
             .map { |workflow| workflow['_id'] }
 
@@ -730,9 +725,8 @@ module Armagh
               .aggregate([
                 {:$match => filter_match[:$match].merge('action' => {:$exists => true})},
                 {:$group => {'_id' => '$action'}},
-                filter_limit,
                 filter_sort
-              ])
+              ], opts)
               .to_a
               .map { |action| action['_id'] }
 
@@ -740,9 +734,8 @@ module Armagh
               .aggregate([
                 {:$match => filter_match[:$match].merge('action_supertype' => {:$exists => true})},
                 {:$group => {'_id' => '$action_supertype'}},
-                filter_limit,
                 filter_sort
-              ])
+              ], opts)
               .to_a
               .map { |supertype| supertype['_id'] }
 
@@ -750,36 +743,29 @@ module Armagh
             .aggregate([
               filter_match,
               {:$group => {'_id' => '$hostname'}},
-              filter_limit,
               filter_sort
-            ])
+            ], opts)
             .to_a
             .map { |hostname| hostname['_id'] }
-
-          filters['pid'] = Connection.log
-            .aggregate([
-              filter_match,
-              {:$group => {'_id' => '$pid'}},
-              filter_limit,
-              filter_desc
-            ])
-            .to_a
-            .map { |pid| pid['_id'] }
-
-          filters['document_internal_id'] = Connection.log
-            .aggregate([
-              {:$match => filter_match[:$match].merge('document_internal_id' => {:$exists => true})},
-              {:$group => {'_id' => '$document_internal_id'}},
-              filter_limit,
-              filter_desc
-            ])
-            .to_a
-            .map { |id| id['_id'] }
-
-          {
+        rescue => e
+          errors <<
+            if e.is_a?(Mongo::Error::OperationFailure) && e.message.include?('exceeded time limit')
+              'Query timed out. If possible, please consider narrowing your <strong>timestamp</strong> range and/or your <strong>sample size</strong>.'
+            else
+              e.message
+            end
+          logs  = []
+          count = 0
+          pages = 0
+          skip  = 0
+          page  = 1
+        ensure
+          return {
             logs:     logs,
             filters:  filters,
-            errors:   errors.map { |column, error| "Unable to filter <strong>#{column}</strong>: #{error}" },
+            errors:   errors.map { |column, error|
+              error.nil? ? column : "Unable to filter <strong>#{column}</strong>: #{error}"
+            },
             count:    count,
             pages:    pages,
             page:     skip > count ? 1 : page,
@@ -788,7 +774,7 @@ module Armagh
             filter:   filter,
             hide:     hide,
             sample:   sample
-         }
+          }
         end
 
         def get_doc_collections(user) # TODO move this to the API

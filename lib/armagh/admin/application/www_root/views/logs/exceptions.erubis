@@ -10,7 +10,7 @@
   </div>
 
   <div>
-    <a href="javascript:" onclick="toggle_trace('{{= uuid }}')">
+    <a href="javascript:" onclick="toggle_trace('{{= uuid }}')" style="color:inherit;">
       <i id="icon-{{= uuid }}" class="uk-icon-caret-right"></i>
       Trace [{{= @data['trace']&.size.to_i }}]
     </a>

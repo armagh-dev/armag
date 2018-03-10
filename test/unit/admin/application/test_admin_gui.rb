@@ -821,19 +821,18 @@ module Armagh
           hide = "pid\x19hostname"
           mock_log_connection
           result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: hide, sample: 10)
+          result[:filters].delete('timestamp')
           expected = {
             :count=>10,
             :errors=>[],
             :filter=>"message\u0011blah\u0019_id\u0011mongo_id\u0019timestamp\u00111982-01-04\u0019pid\u00119999\u0019level\u0011any",
             :filters=>
               {"action"=>["id"],
+               "alert"=>["true", "false"],
                "component"=>["Agent", "id"],
-               "document_internal_id"=>["id"],
                "hostname"=>["id"],
                "level"=>["id"],
-               "pid"=>["id"],
                "action_supertype"=>["id"],
-               "timestamp"=>["id (Thursday)"],
                "workflow"=>["id"]},
             :hide=>"pid\u0019hostname",
             :limit=>10,
@@ -849,19 +848,18 @@ module Armagh
         def test_get_logs_empty_filter
           mock_log_connection
           result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: '', hide: '', sample: nil)
+          result[:filters].delete('timestamp')
           expected = {
             :count=>10,
             :errors=>[],
             :filter=>"",
             :filters=>
               {"action"=>["id"],
+               "alert"=>["true", "false"],
                "component"=>["Agent", "id"],
-               "document_internal_id"=>["id"],
                "hostname"=>["id"],
                "level"=>["id"],
-               "pid"=>["id"],
                "action_supertype"=>["id"],
-               "timestamp"=>["id (Thursday)"],
                "workflow"=>["id"]},
             :hide=>"",
             :limit=>10,
@@ -879,19 +877,18 @@ module Armagh
           Time.expects(:parse).raises(RuntimeError.new('parse error'))
           filter = "timestamp\x11fail_me"
           result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: nil, sample: 10)
+          result[:filters].delete('timestamp')
           expected = {
             :count=>10,
             :errors=>["Unable to filter <strong>timestamp</strong>: parse error"],
             :filter=>"timestamp\u0011fail_me",
             :filters=>
               {"action"=>["id"],
+               "alert"=>["true", "false"],
                "component"=>["Agent", "id"],
-               "document_internal_id"=>["id"],
                "hostname"=>["id"],
                "level"=>["id"],
-               "pid"=>["id"],
                "action_supertype"=>["id"],
-               "timestamp"=>["id (Thursday)"],
                "workflow"=>["id"]},
             :hide=>nil,
             :limit=>10,
@@ -909,19 +906,18 @@ module Armagh
           BSON.stubs(:ObjectId).raises(RuntimeError.new('objectid error'))
           filter = "document_internal_id\x11fail_me"
           result = @admin_gui.get_logs(@user, page: 1, limit: 10, filter: filter, hide: nil, sample: 10)
+          result[:filters].delete('timestamp')
           expected = {
             :count=>10,
             :errors=>["Unable to filter <strong>document_internal_id</strong>: objectid error"],
             :filter=>"document_internal_id\u0011fail_me",
             :filters=>
               {"action"=>["id"],
+               "alert"=>["true", "false"],
                "component"=>["Agent", "id"],
-               "document_internal_id"=>["id"],
                "hostname"=>["id"],
                "level"=>["id"],
-               "pid"=>["id"],
                "action_supertype"=>["id"],
-               "timestamp"=>["id (Thursday)"],
                "workflow"=>["id"]},
             :hide=>nil,
             :limit=>10,
